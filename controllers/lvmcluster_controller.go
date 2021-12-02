@@ -18,13 +18,19 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/go-logr/logr"
+	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
 
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+const (
+	ControllerName = "lvmcluster-controller"
 )
 
 // LVMClusterReconciler reconciles a LVMCluster object
@@ -47,16 +53,74 @@ type LVMClusterReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger.Info("reconciling", "topolvmcluster", req)
+	result, err := r.reconcile(ctx, req, logger)
+	// TODO: update status with condition describing whether reconcile succeeded
+	if err != nil {
+		logger.Error(err, "reconcile error")
+	}
 
-	// your logic here
-
-	return ctrl.Result{}, nil
+	return result, err
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&lvmv1alpha1.LVMCluster{}).
-		Complete(r)
+// errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
+func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, logger logr.Logger) (ctrl.Result, error) {
+	result := ctrl.Result{}
+
+	// get lvmcluster
+	lvmCluster := &lvmv1alpha1.LVMCluster{}
+	err := r.Client.Get(ctx, req.NamespacedName, lvmCluster)
+	if err != nil {
+		return result, fmt.Errorf("failed to fetch lvmCluster: %w", err)
+	}
+
+	unitList := []reconcileUnit{}
+
+	// handle deletion
+	if !lvmCluster.DeletionTimestamp.IsZero() {
+		for _, unit := range unitList {
+			err := unit.ensureDeleted(r, *lvmCluster)
+			if err != nil {
+				return result, fmt.Errorf("failed cleaning up: %s %w", unit.getDescription(), err)
+			}
+		}
+	}
+
+	// handle create/update
+	for _, unit := range unitList {
+		err := unit.ensureCreated(r, *lvmCluster)
+		if err != nil {
+			return result, fmt.Errorf("failed reconciling: %s %w", unit.getDescription(), err)
+		}
+	}
+
+	// check  and report deployment status
+	var failedStatusUpdates []string
+	var lastError error
+	for _, unit := range unitList {
+		err := unit.updateStatus(r, *lvmCluster)
+		if err != nil {
+			failedStatusUpdates = append(failedStatusUpdates, unit.getDescription())
+			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getDescription(), err)
+			logger.Error(unitError, "")
+		}
+	}
+	// return simple message that will fit in status reconcileSucceeded condition, don't put all the errors there
+	if len(failedStatusUpdates) > 0 {
+		return ctrl.Result{}, fmt.Errorf("status update failed for %s: %w", strings.Join(failedStatusUpdates, ","), lastError)
+	}
+
+	return ctrl.Result{}, nil
+
+}
+
+type reconcileUnit interface {
+	getDescription() string
+	ensureCreated(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+	ensureDeleted(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+	// each unit will have updateStatus called induvidually so
+	// avoid status fields like lastHeartbeatTime and have a
+	// status that changes only when the operands change.
+	updateStatus(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
 }
