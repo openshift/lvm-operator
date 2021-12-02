@@ -1,0 +1,9 @@
+domain: topolvm.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: lvm-operator
+repo: github.com/red-hat-storage/lvm-operator
+version: "3"
