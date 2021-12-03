@@ -1,0 +1,8 @@
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: lvmcluster-sample
+spec: 
+  deviceClasses:
+    - name: vg1
+    - deviceSelector:
