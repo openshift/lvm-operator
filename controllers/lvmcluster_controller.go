@@ -115,6 +115,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 
 }
 
+// NOTE: when updating this, please also update doc/design/README.md
 type reconcileUnit interface {
 
 	// getName should return a camelCase name of this unit of reconciliation
