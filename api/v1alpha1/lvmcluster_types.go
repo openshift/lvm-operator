@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,13 +26,45 @@ import (
 
 // LVMClusterSpec defines the desired state of LVMCluster
 type LVMClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of LVMCluster. Edit lvmcluster_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// DeviceClasses are a rules that assign local storage devices to volumegroups that are used for creating lvm based PVs
+	// +Optional
+	DeviceClasses []DeviceClass `json:"deviceClasses,omitempty"`
 }
 
+type DeviceClass struct {
+	// Name of the class, the VG and possibly the storageclass.
+	Name string `json:"name,omitempty"`
+
+	// DeviceSelector is a set of rules that should match for a device to be included in this TopoLVMCluster
+	// +optional
+	DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
+
+	// NodeSelector chooses nodes
+	// +optional
+	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
+
+	// TODO: add support for various LVM settings
+	// // Config for this deviceClass, lvm settings are a field here
+	// // +optional
+	// Config *DeviceClassConfig `json:"config,omitempty"`
+}
+
+// DeviceSelector allows specifiying a list of criteria that have to match before a device is assigned
+type DeviceSelector struct {
+	// MinSize is the minimum size of the device which needs to be included. Defaults to `1Gi` if empty
+	// +optional
+	// MinSize *resource.Quantity `json:"minSize,omitempty"`
+}
+
+// type DeviceClassConfig struct {
+// 	LVMConfig *LVMConfig `json:"lvmConfig,omitempty"`
+// }
+
+// type LVMConfig struct {
+// 	thinProvision bool `json:"thinProvision,omitempty"`
+// }
 // LVMClusterStatus defines the observed state of LVMCluster
 type LVMClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
