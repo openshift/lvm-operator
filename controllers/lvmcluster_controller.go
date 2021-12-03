@@ -82,7 +82,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 		for _, unit := range unitList {
 			err := unit.ensureDeleted(r, *lvmCluster)
 			if err != nil {
-				return result, fmt.Errorf("failed cleaning up: %s %w", unit.getDescription(), err)
+				return result, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
 			}
 		}
 	}
@@ -91,7 +91,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 	for _, unit := range unitList {
 		err := unit.ensureCreated(r, *lvmCluster)
 		if err != nil {
-			return result, fmt.Errorf("failed reconciling: %s %w", unit.getDescription(), err)
+			return result, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)
 		}
 	}
 
@@ -101,8 +101,8 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 	for _, unit := range unitList {
 		err := unit.updateStatus(r, *lvmCluster)
 		if err != nil {
-			failedStatusUpdates = append(failedStatusUpdates, unit.getDescription())
-			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getDescription(), err)
+			failedStatusUpdates = append(failedStatusUpdates, unit.getName())
+			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getName(), err)
 			logger.Error(unitError, "")
 		}
 	}
@@ -116,7 +116,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 }
 
 type reconcileUnit interface {
-	getDescription() string
+	getName() string
 	ensureCreated(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
 	ensureDeleted(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
 	// each unit will have updateStatus called induvidually so
