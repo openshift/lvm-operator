@@ -75,7 +75,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 		return result, fmt.Errorf("failed to fetch lvmCluster: %w", err)
 	}
 
-	unitList := []reconcileUnit{}
+	unitList := []resourceManager{}
 
 	// handle deletion
 	if !lvmCluster.DeletionTimestamp.IsZero() {
@@ -116,7 +116,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 }
 
 // NOTE: when updating this, please also update doc/design/README.md
-type reconcileUnit interface {
+type resourceManager interface {
 
 	// getName should return a camelCase name of this unit of reconciliation
 	getName() string

@@ -21,7 +21,7 @@ This will be run by the controller, and errors and success will be propogated to
 This interface is defined in [lvmcluster_controller.go](../../controllers/lvmcluster_controller.go)
 
 ```
-type reconcileUnit interface {
+type resourceManager interface {
 
 	// getName should return a camelCase name of this unit of reconciliation
 	getName() string
