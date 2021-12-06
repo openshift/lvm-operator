@@ -27,15 +27,15 @@ type resourceManager interface {
 	getName() string
 
 	// ensureCreated should check the resources managed by this unit
-	ensureCreated(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+	ensureCreated(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
 
 	// ensureDeleted should wait for the resources to be cleaned up
-	ensureDeleted(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+	ensureDeleted(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
 
 	// updateStatus should optionally update the CR's status about the health of the managed resource
 	// each unit will have updateStatus called induvidually so
 	// avoid status fields like lastHeartbeatTime and have a
 	// status that changes only when the operands change.
-	updateStatus(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+	updateStatus(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
 }
 ```
