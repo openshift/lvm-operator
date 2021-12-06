@@ -51,7 +51,7 @@ type DeviceClass struct {
 	// Config *DeviceClassConfig `json:"config,omitempty"`
 }
 
-// DeviceSelector allows specifiying a list of criteria that have to match before a device is assigned
+// DeviceSelector specifies the list of criteria that have to match before a device is assigned
 type DeviceSelector struct {
 	// MinSize is the minimum size of the device which needs to be included. Defaults to `1Gi` if empty
 	// +optional
