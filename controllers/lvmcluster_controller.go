@@ -82,7 +82,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 		for _, unit := range unitList {
 			err := unit.ensureDeleted(r, *lvmCluster)
 			if err != nil {
-				return result, fmt.Errorf("failed cleaning up: %s %w", unit.getDescription(), err)
+				return result, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
 			}
 		}
 	}
@@ -91,7 +91,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 	for _, unit := range unitList {
 		err := unit.ensureCreated(r, *lvmCluster)
 		if err != nil {
-			return result, fmt.Errorf("failed reconciling: %s %w", unit.getDescription(), err)
+			return result, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)
 		}
 	}
 
@@ -101,8 +101,8 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 	for _, unit := range unitList {
 		err := unit.updateStatus(r, *lvmCluster)
 		if err != nil {
-			failedStatusUpdates = append(failedStatusUpdates, unit.getDescription())
-			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getDescription(), err)
+			failedStatusUpdates = append(failedStatusUpdates, unit.getName())
+			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getName(), err)
 			logger.Error(unitError, "")
 		}
 	}
@@ -115,10 +115,19 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 
 }
 
+// NOTE: when updating this, please also update doc/design/README.md
 type reconcileUnit interface {
-	getDescription() string
+
+	// getName should return a camelCase name of this unit of reconciliation
+	getName() string
+
+	// ensureCreated should check the resources managed by this unit
 	ensureCreated(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+
+	// ensureDeleted should wait for the resources to be cleaned up
 	ensureDeleted(*LVMClusterReconciler, lvmv1alpha1.LVMCluster) error
+
+	// updateStatus should optionally update the CR's status about the health of the managed resource
 	// each unit will have updateStatus called induvidually so
 	// avoid status fields like lastHeartbeatTime and have a
 	// status that changes only when the operands change.
