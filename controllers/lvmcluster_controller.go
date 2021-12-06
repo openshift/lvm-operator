@@ -55,7 +55,7 @@ type LVMClusterReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log = log.FromContext(ctx).WithName(ControllerName)
-	r.Log.Info("reconciling", "topolvmcluster", req)
+	r.Log.Info("reconciling", "lvmcluster", req)
 	result, err := r.reconcile(ctx, req)
 	// TODO: update status with condition describing whether reconcile succeeded
 	if err != nil {
