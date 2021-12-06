@@ -17,7 +17,7 @@
 
 
 Each unit of reconciliation should implement the reconcileUnit interface.
-This will be run by the controller, and errors and success will be propogated to the status and events.
+This will be run by the controller, and errors and success will be propagated to the status and events.
 This interface is defined in [lvmcluster_controller.go](../../controllers/lvmcluster_controller.go)
 
 ```
