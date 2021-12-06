@@ -37,6 +37,7 @@ const (
 type LVMClusterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -53,19 +54,19 @@ type LVMClusterReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithName(ControllerName)
-	logger.Info("reconciling", "topolvmcluster", req)
-	result, err := r.reconcile(ctx, req, logger)
+	r.Log = log.FromContext(ctx).WithName(ControllerName)
+	r.Log.Info("reconciling", "topolvmcluster", req)
+	result, err := r.reconcile(ctx, req)
 	// TODO: update status with condition describing whether reconcile succeeded
 	if err != nil {
-		logger.Error(err, "reconcile error")
+		r.Log.Error(err, "reconcile error")
 	}
 
 	return result, err
 }
 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
-func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, logger logr.Logger) (ctrl.Result, error) {
+func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result := ctrl.Result{}
 
 	// get lvmcluster
@@ -103,7 +104,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request, 
 		if err != nil {
 			failedStatusUpdates = append(failedStatusUpdates, unit.getName())
 			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getName(), err)
-			logger.Error(unitError, "")
+			r.Log.Error(unitError, "")
 		}
 	}
 	// return simple message that will fit in status reconcileSucceeded condition, don't put all the errors there
