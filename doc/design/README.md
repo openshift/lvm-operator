@@ -10,7 +10,6 @@
     - CSI Driver Controller Deployment (controller is the name of the csi-component)
     - CSI Driver Daemonset
       - needs an initContainer to block until lvmd config file is read
-    - StorageClass (TBD)
 - **The vg-manager:** A daemonset with one instance per selected node, will create all resources that require knowledge from the node. Errors and PVs being added to a volumegroup will be passed on as events.
     - volumegroups
     - lvmd config file
