@@ -1,0 +1,18 @@
+---
+name: yamllint
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+jobs:
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: ./.github/workflows/conf/yamllint.yaml
+          file_or_dir: .  # Recursive on all yaml files

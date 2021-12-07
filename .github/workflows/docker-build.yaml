@@ -1,0 +1,26 @@
+---
+name: image-builder
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+jobs:
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.16"]
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - uses: actions/checkout@v2
+
+      - name: Build operator docker image
+        run: make docker-build
