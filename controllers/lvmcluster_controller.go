@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	CSIDriver "github.com/red-hat-storage/lvm-operator/pkg/csi"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,6 +81,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request) 
 
 	// handle deletion
 	if !lvmCluster.DeletionTimestamp.IsZero() {
+		CSIDriver.DeleteCSIDriverInfo(ctx)
 		for _, unit := range unitList {
 			err := unit.ensureDeleted(r, ctx, *lvmCluster)
 			if err != nil {
@@ -90,6 +92,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request) 
 
 	// handle create/update
 	for _, unit := range unitList {
+		CSIDriver.CreateCSIDriverInfo(ctx)
 		err := unit.ensureCreated(r, ctx, *lvmCluster)
 		if err != nil {
 			return result, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)
