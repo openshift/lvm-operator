@@ -38,6 +38,39 @@ var (
 	CsiProvisionerImage   = GetEnvOrDefault("CSI_PROVISIONER_IMAGE")
 	CsiLivenessProbeImage = GetEnvOrDefault("CSI_LIVENESSPROBE_IMAGE")
 	CsiResizerImage       = GetEnvOrDefault("CSI_RESIZER_IMAGE")
+
+	// Topolvm deployment label
+	AppAttr = "app.kubernetes.io/name"
+
+	TopolvmControllerServiceAccount = "topolvm-controller"
+
+	// CSI Controller container and deployment names
+	CsiRegistrarContainerName            = "csi-registrar"
+	TopolvmControllerDeploymentName      = "topolvm-controller"
+	TopolvmControllerContainerName       = "topolvm-controller"
+	TopolvmCsiResizerContainerName       = "csi-resizer"
+	TopolvmCsiProvisionerContainerName   = "csi-provisioner"
+	TopolvmCsiLivenessProbeContainerName = "liveness-probe"
+
+	// CSI Controller health endpoints
+	TopolvmControllerContainerHealthzName   = "healthz"
+	TopolvmControllerContainerLivenessPort  = int32(9808)
+	TopolvmControllerContainerReadinessPort = int32(8080)
+
+	// CSI Controller resource requests/limits
+	// TODO: Reduce these values and reach optimistic values without effecting performance
+	TopolvmControllerMemRequest = "250Mi"
+	TopolvmControllerMemLimit   = "250Mi"
+	TopolvmControllerCPURequest = "250m"
+	TopolvmControllerCPULimit   = "250m"
+
+	TopolvmControllerCsiProvisionMemRequest = "100Mi"
+	TopolvmControllerCsiProvisionMemLimit   = "100Mi"
+	TopolvmControllerCsiProvisionCPURequest = "100m"
+	TopolvmControllerCsiProvisionCPULimit   = "100m"
+
+	// CSIDriver
+	TopolvmCSIDriverName = "topolvm.cybozu.com"
 )
 
 func GetEnvOrDefault(env string) string {

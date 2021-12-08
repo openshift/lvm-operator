@@ -19,6 +19,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -32,9 +35,13 @@ var _ = Describe("LVMCluster controller", func() {
 
 	Context("LvmCluster reconcile", func() {
 		It("Reconciles an LvmCluster, ", func() {
-			By("Indicate setting status to ready")
+
 			ctx := context.Background()
-			lvmCluster := &lvmv1alpha1.LVMCluster{
+
+			// LVM CR
+			lvmClusterName := types.NamespacedName{Name: testLvmClusterName, Namespace: testLvmClusterNamespace}
+			lvmClusterOut := &lvmv1alpha1.LVMCluster{}
+			lvmClusterIn := &lvmv1alpha1.LVMCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testLvmClusterName,
 					Namespace: testLvmClusterNamespace,
@@ -43,23 +50,64 @@ var _ = Describe("LVMCluster controller", func() {
 					DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: "test"}},
 				},
 			}
-			Expect(k8sClient.Create(ctx, lvmCluster)).Should(Succeed())
 
-			//Check that the status.Ready field has been set to true. This is a placeholder test and will
-			// be modified to check for the actual resources once they are implemented.
+			// CSI Driver Resource
+			csiDriverName := types.NamespacedName{Name: TopolvmCSIDriverName}
+			csiDriverOut := &storagev1.CSIDriver{}
 
-			lvmClusterLookupName := types.NamespacedName{Name: testLvmClusterName, Namespace: testLvmClusterNamespace}
-			lvmCluster1 := &lvmv1alpha1.LVMCluster{}
+			// Topolvm Controller Deployment
+			controllerName := types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: testLvmClusterNamespace}
+			controllerOut := &appsv1.Deployment{}
 
+			By("Indicate setting CR status to be ready after CR is deployed")
+			Expect(k8sClient.Create(ctx, lvmClusterIn)).Should(Succeed())
+
+			// placeholder to check CR status.Ready field to be true
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmClusterLookupName, lvmCluster1)
+				err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
 				if err != nil {
 					return false
 				}
-				return lvmCluster1.Status.Ready
+				return lvmClusterOut.Status.Ready
+			}, timeout, interval).Should(Equal(true))
+
+			// presence of csi driver resource
+			By("Confirming csi driver resource is present")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+				return err == nil
 			}, timeout, interval).Should(BeTrue())
-			// Let's make sure our Schedule string value was properly converted/handled.
-			Expect(lvmCluster1.Status.Ready).Should(Equal(true))
+
+			// presence of topolvm controller deployment
+			By("Confirming topolvm deployment is present")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, controllerName, controllerOut)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Confirming deletion of lvm cluster")
+			Eventually(func() bool {
+				err := k8sClient.Delete(ctx, lvmClusterOut)
+
+				// deletion of CSI Driver resource
+				By("Confirming deletion of CSI Driver Resource")
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+					return errors.IsNotFound(err)
+				}, timeout, interval).Should(BeTrue())
+
+				// deletion of Topolvm Controller Deployment
+				By("Confirming deletion of Topolvm Controller Deployment")
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, controllerName, controllerOut)
+					return errors.IsNotFound(err)
+				}, timeout, interval).Should(BeTrue())
+
+				// Deletion of LVM Cluster CR
+				return err != nil
+
+			}, timeout, interval).Should(BeTrue())
+
 		})
 
 	})
