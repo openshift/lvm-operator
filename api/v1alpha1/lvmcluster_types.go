@@ -65,10 +65,15 @@ type DeviceSelector struct {
 // type LVMConfig struct {
 // 	thinProvision bool `json:"thinProvision,omitempty"`
 // }
+
 // LVMClusterStatus defines the observed state of LVMCluster
 type LVMClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// ready describes if the LvmCluster is ready.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
 }
 
 //+kubebuilder:object:root=true
