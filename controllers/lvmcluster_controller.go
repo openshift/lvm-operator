@@ -19,7 +19,8 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/go-logr/logr"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
@@ -27,7 +28,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+var lvmClusterFinalizer = "lvmcluster.topolvm.io"
 
 const (
 	ControllerName = "lvmcluster-controller"
@@ -56,81 +60,135 @@ type LVMClusterReconciler struct {
 func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log = log.FromContext(ctx).WithName(ControllerName)
 	r.Log.Info("reconciling", "lvmcluster", req)
-	result, err := r.reconcile(ctx, req)
-	// TODO: update status with condition describing whether reconcile succeeded
-	if err != nil {
-		r.Log.Error(err, "reconcile error")
-	}
-
-	return result, err
-}
-
-// errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
-func (r *LVMClusterReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	result := ctrl.Result{}
 
 	// get lvmcluster
 	lvmCluster := &lvmv1alpha1.LVMCluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, lvmCluster)
 	if err != nil {
-		return result, fmt.Errorf("failed to fetch lvmCluster: %w", err)
+		if errors.IsNotFound(err) {
+			r.Log.Info("lvmCluster instance not found")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return ctrl.Result{}, err
 	}
 
-	unitList := []resourceManager{}
+	result, reconcileError := r.reconcile(ctx, lvmCluster)
 
-	// handle deletion
-	if !lvmCluster.DeletionTimestamp.IsZero() {
-		for _, unit := range unitList {
-			err := unit.ensureDeleted(r, ctx, *lvmCluster)
-			if err != nil {
-				return result, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
+	// Apply status changes
+	statusError := r.Client.Status().Update(ctx, lvmCluster)
+	if statusError != nil {
+		if errors.IsNotFound(err) {
+			r.Log.Error(statusError, "failed to update status")
+		}
+	}
+
+	// Reconcile errors have higher priority than status update errors
+	if reconcileError != nil {
+		return result, reconcileError
+	} else if statusError != nil && errors.IsNotFound(statusError) {
+		return result, statusError
+	} else {
+		return result, nil
+	}
+}
+
+// errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
+func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
+	resourceList := []resourceManager{}
+
+	//The resource was deleted
+	if !instance.DeletionTimestamp.IsZero() {
+		if contains(instance.GetFinalizers(), lvmClusterFinalizer) {
+			for _, unit := range resourceList {
+				err := unit.ensureDeleted(r, ctx, instance)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
+				}
 			}
+			instance.ObjectMeta.Finalizers = remove(instance.ObjectMeta.Finalizers, lvmClusterFinalizer)
+			if err := r.Client.Update(context.TODO(), instance); err != nil {
+				r.Log.Info("failed to remove finalizer from LvmCluster", "LvmCluster", instance.Name)
+				return reconcile.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if !contains(instance.GetFinalizers(), lvmClusterFinalizer) {
+		r.Log.Info("Finalizer not found for LvmCluster. Adding finalizer.", "LvmCluster", instance.Name)
+		instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, lvmClusterFinalizer)
+		if err := r.Client.Update(context.TODO(), instance); err != nil {
+			r.Log.Info("failed to update LvmCluster with finalizer.", "LvmCluster", instance.Name)
+			return reconcile.Result{}, err
 		}
 	}
 
 	// handle create/update
-	for _, unit := range unitList {
-		err := unit.ensureCreated(r, ctx, *lvmCluster)
+	for _, unit := range resourceList {
+		err := unit.ensureCreated(r, ctx, instance)
 		if err != nil {
-			return result, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)
+			return ctrl.Result{}, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)
 		}
 	}
 
-	// check  and report deployment status
-	var failedStatusUpdates []string
-	var lastError error
-	for _, unit := range unitList {
-		err := unit.updateStatus(r, ctx, *lvmCluster)
-		if err != nil {
-			failedStatusUpdates = append(failedStatusUpdates, unit.getName())
-			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getName(), err)
-			r.Log.Error(unitError, "")
-		}
-	}
-	// return simple message that will fit in status reconcileSucceeded condition, don't put all the errors there
-	if len(failedStatusUpdates) > 0 {
-		return ctrl.Result{}, fmt.Errorf("status update failed for %s: %w", strings.Join(failedStatusUpdates, ","), lastError)
-	}
-
+	/* 	// check  and report deployment status
+	   	var failedStatusUpdates []string
+	   	var lastError error
+	   	for _, unit := range resourceList {
+	   		err := unit.updateStatus(r, ctx, instance)
+	   		if err != nil {
+	   			failedStatusUpdates = append(failedStatusUpdates, unit.getName())
+	   			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getName(), err)
+	   			r.Log.Error(unitError, "")
+	   		}
+	   	} */
+	/* 	// return simple message that will fit in status reconcileSucceeded condition, don't put all the errors there
+	   	if len(failedStatusUpdates) > 0 {
+	   		return ctrl.Result{}, fmt.Errorf("status update failed for %s: %w", strings.Join(failedStatusUpdates, ","), lastError)
+	   	}
+	*/
+	//ToDo: Change the status to something useful
+	instance.Status.Ready = true
 	return ctrl.Result{}, nil
-
 }
 
-// NOTE: when updating this, please also update doc/design/README.md
+// NOTE: when updating this, please also update doc/design/operator.md
 type resourceManager interface {
 
 	// getName should return a camelCase name of this unit of reconciliation
 	getName() string
 
 	// ensureCreated should check the resources managed by this unit
-	ensureCreated(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+	ensureCreated(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
 
 	// ensureDeleted should wait for the resources to be cleaned up
-	ensureDeleted(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+	ensureDeleted(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
 
 	// updateStatus should optionally update the CR's status about the health of the managed resource
-	// each unit will have updateStatus called induvidually so
+	// each unit will have updateStatus called individually so
 	// avoid status fields like lastHeartbeatTime and have a
 	// status that changes only when the operands change.
-	updateStatus(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+	updateStatus(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
+}
+
+// Checks whether a string is contained within a slice
+func contains(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes a given string from a slice and returns the new slice
+func remove(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }

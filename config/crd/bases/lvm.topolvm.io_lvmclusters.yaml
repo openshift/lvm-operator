@@ -137,8 +137,11 @@ spec:
                 type: array
             type: object
           status:
-            description: "type LVMConfig struct { \tthinProvision bool `json:\"thinProvision,omitempty\"`
-              } LVMClusterStatus defines the observed state of LVMCluster"
+            description: LVMClusterStatus defines the observed state of LVMCluster
+            properties:
+              ready:
+                description: ready describes if the LvmCluster is ready.
+                type: boolean
             type: object
         type: object
     served: true
