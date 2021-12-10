@@ -30,38 +30,47 @@ var _ = Describe("LVMCluster controller", func() {
 		interval = time.Millisecond * 250
 	)
 
-	Context("LvmCluster reconcile", func() {
-		It("Reconciles an LvmCluster, ", func() {
-			By("Indicate setting status to ready")
-			ctx := context.Background()
-			lvmCluster := &lvmv1alpha1.LVMCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      testLvmClusterName,
-					Namespace: testLvmClusterNamespace,
-				},
-				Spec: lvmv1alpha1.LVMClusterSpec{
-					DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: "test"}},
-				},
-			}
-			Expect(k8sClient.Create(ctx, lvmCluster)).Should(Succeed())
+	ctx := context.Background()
 
-			//Check that the status.Ready field has been set to true. This is a placeholder test and will
-			// be modified to check for the actual resources once they are implemented.
+	// LVMCluster CR details
+	lvmClusterName := types.NamespacedName{Name: testLvmClusterName, Namespace: testLvmClusterNamespace}
+	lvmClusterOut := &lvmv1alpha1.LVMCluster{}
+	lvmClusterIn := &lvmv1alpha1.LVMCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testLvmClusterName,
+			Namespace: testLvmClusterNamespace,
+		},
+		Spec: lvmv1alpha1.LVMClusterSpec{
+			DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: "test"}},
+		},
+	}
 
-			lvmClusterLookupName := types.NamespacedName{Name: testLvmClusterName, Namespace: testLvmClusterNamespace}
-			lvmCluster1 := &lvmv1alpha1.LVMCluster{}
+	Context("Reconciliation on creating an LVMCluster CR", func() {
+		It("should reconcile LVMCluster CR creation, ", func() {
+			By("verifying CR status.Ready is set to true on reconciliation")
+			Expect(k8sClient.Create(ctx, lvmClusterIn)).Should(Succeed())
 
+			// placeholder to check CR status.Ready field to be true
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmClusterLookupName, lvmCluster1)
+				err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
 				if err != nil {
 					return false
 				}
-				return lvmCluster1.Status.Ready
-			}, timeout, interval).Should(BeTrue())
-			// Let's make sure our Schedule string value was properly converted/handled.
-			Expect(lvmCluster1.Status.Ready).Should(Equal(true))
+				return lvmClusterOut.Status.Ready
+			}, timeout, interval).Should(Equal(true))
 		})
+	})
 
+	Context("Reconciliation on deleting the LVMCluster CR", func() {
+		It("should reconcile LVMCluster CR deletion ", func() {
+			By("confirming absence of lvm cluster CR and deletion of operator created resources")
+			Eventually(func() bool {
+				err := k8sClient.Delete(ctx, lvmClusterOut)
+
+				// deletion of LVM Cluster CR
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+		})
 	})
 
 })
