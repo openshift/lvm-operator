@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -99,14 +100,14 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	//The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
-		if contains(instance.GetFinalizers(), lvmClusterFinalizer) {
+		if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 			for _, unit := range resourceList {
 				err := unit.ensureDeleted(r, ctx, instance)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
 				}
 			}
-			instance.ObjectMeta.Finalizers = remove(instance.ObjectMeta.Finalizers, lvmClusterFinalizer)
+			controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer)
 			if err := r.Client.Update(context.TODO(), instance); err != nil {
 				r.Log.Info("failed to remove finalizer from LvmCluster", "LvmCluster", instance.Name)
 				return reconcile.Result{}, err
@@ -115,9 +116,9 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		return ctrl.Result{}, nil
 	}
 
-	if !contains(instance.GetFinalizers(), lvmClusterFinalizer) {
+	if !controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		r.Log.Info("Finalizer not found for LvmCluster. Adding finalizer.", "LvmCluster", instance.Name)
-		instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, lvmClusterFinalizer)
+		controllerutil.AddFinalizer(instance, lvmClusterFinalizer)
 		if err := r.Client.Update(context.TODO(), instance); err != nil {
 			r.Log.Info("failed to update LvmCluster with finalizer.", "LvmCluster", instance.Name)
 			return reconcile.Result{}, err
@@ -170,25 +171,4 @@ type resourceManager interface {
 	// avoid status fields like lastHeartbeatTime and have a
 	// status that changes only when the operands change.
 	updateStatus(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
-}
-
-// Checks whether a string is contained within a slice
-func contains(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes a given string from a slice and returns the new slice
-func remove(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return
 }
