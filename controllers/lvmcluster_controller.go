@@ -41,8 +41,9 @@ const (
 // LVMClusterReconciler reconciles a LVMCluster object
 type LVMClusterReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Log    logr.Logger
+	Scheme          *runtime.Scheme
+	Log             logr.Logger
+	DevelopmentMode bool
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -98,6 +99,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
 	resourceList := []resourceManager{
 		&csiDriver{},
+		vgManager{},
 	}
 
 	//The resource was deleted
@@ -129,6 +131,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	// handle create/update
 	for _, unit := range resourceList {
+		r.Log.Info("running resourceManager", "resourceManager", unit.getName())
 		err := unit.ensureCreated(r, ctx, instance)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)

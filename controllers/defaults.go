@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -28,23 +29,46 @@ var (
 		"CSI_PROVISIONER_IMAGE":   "k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0",
 		"CSI_LIVENESSPROBE_IMAGE": "k8s.gcr.io/sig-storage/livenessprobe:v2.5.0",
 		"CSI_RESIZER_IMAGE":       "k8s.gcr.io/sig-storage/csi-resizer:v1.3.0",
+		"VGMANAGER_IMAGE":         "vgmanager",
 	}
+)
 
+var OperatorNamespace string
+
+//CSI
+var TopolvmCsiImage string
+var CsiRegistrarImage string
+var CsiProvisionerImage string
+var CsiLivenessProbeImage string
+var CsiResizerImage string
+
+var TopolvmCSIDriverName string
+
+var VGManagerImage string
+
+func init() {
 	OperatorNamespace = GetEnvOrDefault("OPERATOR_NAMESPACE")
 
 	//CSI
-	TopolvmCsiImage       = GetEnvOrDefault("TOPOLVM_CSI_IMAGE")
-	CsiRegistrarImage     = GetEnvOrDefault("CSI_REGISTRAR_IMAGE")
-	CsiProvisionerImage   = GetEnvOrDefault("CSI_PROVISIONER_IMAGE")
+	TopolvmCsiImage = GetEnvOrDefault("TOPOLVM_CSI_IMAGE")
+	CsiRegistrarImage = GetEnvOrDefault("CSI_REGISTRAR_IMAGE")
+	CsiProvisionerImage = GetEnvOrDefault("CSI_PROVISIONER_IMAGE")
 	CsiLivenessProbeImage = GetEnvOrDefault("CSI_LIVENESSPROBE_IMAGE")
-	CsiResizerImage       = GetEnvOrDefault("CSI_RESIZER_IMAGE")
+	CsiResizerImage = GetEnvOrDefault("CSI_RESIZER_IMAGE")
 
 	TopolvmCSIDriverName = "topolvm.cybozu.com"
-)
+
+	CsiResizerImage = GetEnvOrDefault("CSI_RESIZER_IMAGE")
+
+	VGManagerImage = GetEnvOrDefault("VGMANAGER_IMAGE")
+}
 
 func GetEnvOrDefault(env string) string {
-	if val := os.Getenv(env); val != "" {
-		return val
+	var val string
+	val = os.Getenv(env)
+	if val == "" {
+		val = defaultValMap[env]
 	}
-	return defaultValMap[env]
+	fmt.Printf("%q = %q\n", env, val)
+	return val
 }

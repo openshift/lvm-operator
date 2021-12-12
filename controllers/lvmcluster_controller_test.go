@@ -19,13 +19,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("LVMCluster controller", func() {
+var _ = PDescribe("LVMCluster controller", func() {
 
 	const (
 		timeout  = time.Second * 10
@@ -70,6 +71,10 @@ var _ = Describe("LVMCluster controller", func() {
 				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			vgManagerDaemonset := &appsv1.DaemonSet{}
+
+			Eventually(k8sClient.Get(ctx, types.NamespacedName{Name: VGManagerUnit, Namespace: lvmClusterOut.Namespace}, vgManagerDaemonset), timeout, interval).Should(Succeed())
 		})
 	})
 
