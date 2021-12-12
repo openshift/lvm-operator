@@ -30,9 +30,12 @@ IMAGE_REGISTRY ?= quay.io
 REGISTRY_NAMESPACE ?= ocs-dev
 IMAGE_TAG ?= latest
 IMAGE_NAME ?= lvm-operator
+VGMANAGER_IMAGE_NAME ?= vgmanager
 
 # IMG defines the image used for the operator.
 IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)
+# VGMANAGER_IMG is the image for the vgmanager daemonset
+VGMANAGER_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(VGMANAGER_IMAGE_NAME):$(IMAGE_TAG)
 
 # BUNDLE_IMG defines the image used for the bundle.
 BUNDLE_IMAGE_NAME ?= $(IMAGE_NAME)-bundle
@@ -95,14 +98,21 @@ test: manifests generate fmt vet envtest ## Run tests.
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
+build-vgmanager: generate fmt vet ## Build manager binary.
+	go build -o bin/vgmanager cmd/vgmanager/main.go
+
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
+docker-build-vgmanager:
+	docker build -f Dockerfile.vgmanager -t ${VGMANAGER_IMG} .
+
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
+	docker push ${VGMANAGER_IMG}
 
 ##@ Deployment
 
