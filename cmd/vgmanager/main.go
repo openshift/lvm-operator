@@ -17,22 +17,23 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
+	"flag"
+	"os"
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	"github.com/red-hat-storage/lvm-operator/pkg/vgmanager"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
-	"github.com/red-hat-storage/lvm-operator/controllers"
 )
 
 var (
@@ -45,19 +46,22 @@ func init() {
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
 }
 
+var metricsAddr string
+var probeAddr string
+var developmentMode bool
+
 func main() {
-	var metricsAddr string
-	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	opts := zap.Options{
-		Development: true,
-	}
+	flag.BoolVar(&developmentMode, "development", false, "enable to enable development")
+	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+	opts.Development = developmentMode
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	setupLog.V(1).Info("development mode on, debug logs enabled")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -70,7 +74,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.LVMClusterReconciler{
+	if err = (&vgmanager.VGReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
