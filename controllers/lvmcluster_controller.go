@@ -96,7 +96,9 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
 func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
-	resourceList := []resourceManager{}
+	resourceList := []resourceManager{
+		&csiDriver{},
+	}
 
 	//The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {

@@ -38,6 +38,8 @@ var (
 	CsiProvisionerImage   = GetEnvOrDefault("CSI_PROVISIONER_IMAGE")
 	CsiLivenessProbeImage = GetEnvOrDefault("CSI_LIVENESSPROBE_IMAGE")
 	CsiResizerImage       = GetEnvOrDefault("CSI_RESIZER_IMAGE")
+
+	TopolvmCSIDriverName = "topolvm.cybozu.com"
 )
 
 func GetEnvOrDefault(env string) string {
