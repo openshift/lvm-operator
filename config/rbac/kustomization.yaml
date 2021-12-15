@@ -24,3 +24,7 @@ resources:
 - auth_proxy_role.yaml
 - auth_proxy_role_binding.yaml
 - auth_proxy_client_clusterrole.yaml
+- vg_manager_role.yaml
+- vg_manager_role_binding.yaml
+- vg_manager_service_account.yaml
+- vg_manager_scc.yaml
