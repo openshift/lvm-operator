@@ -19,6 +19,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -45,6 +47,10 @@ var _ = Describe("LVMCluster controller", func() {
 		},
 	}
 
+	// CSI Driver Resource
+	csiDriverName := types.NamespacedName{Name: TopolvmCSIDriverName}
+	csiDriverOut := &storagev1.CSIDriver{}
+
 	Context("Reconciliation on creating an LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR creation, ", func() {
 			By("verifying CR status.Ready is set to true on reconciliation")
@@ -58,18 +64,37 @@ var _ = Describe("LVMCluster controller", func() {
 				}
 				return lvmClusterOut.Status.Ready
 			}, timeout, interval).Should(Equal(true))
+
+			By("confirming presence of CSIDriver resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 
 	Context("Reconciliation on deleting the LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR deletion ", func() {
 			By("confirming absence of lvm cluster CR and deletion of operator created resources")
+			// deletion of LVMCluster CR
 			Eventually(func() bool {
 				err := k8sClient.Delete(ctx, lvmClusterOut)
-
-				// deletion of LVM Cluster CR
 				return err != nil
 			}, timeout, interval).Should(BeTrue())
+
+			// deletion of CSI Driver resource
+			By("confirming absence of CSI Driver Resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+
+			By("confirming absence of LVMCluster CR")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+
 		})
 	})
 
