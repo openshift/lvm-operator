@@ -1,27 +1,16 @@
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: vg-manager-role
 rules:
 - apiGroups:
+  - lvm.topolvm.io
   - apps
   resources:
-  - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - lvm.topolvm.io
-  resources:
   - lvmclusters
+  - daemonsets
   verbs:
   - create
   - delete
@@ -45,12 +34,10 @@ rules:
   - patch
   - update
 - apiGroups:
-  - storage.k8s.io
+  - security.openshift.io
+  resourceNames:
+  - privileged
   resources:
-  - csidrivers
+  - securitycontextconstraints
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - watch
+  - use

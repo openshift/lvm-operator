@@ -4,5 +4,4 @@ metadata:
   name: lvmcluster-sample
 spec:
   deviceClasses:
-    - name: vg1
-    - deviceSelector:
+  - name: vg1

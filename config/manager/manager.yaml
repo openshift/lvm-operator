@@ -30,6 +30,13 @@ spec:
         args:
         - --leader-elect
         image: controller:latest
+        env:
+        - name: VGMANAGER_IMAGE
+          value: docker.io/rohantmp/vgmanager@sha256:70a38579e5e0c956feb597dc27c7db45b7a188eb751146f18e7c7ccfc91d5e91
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
