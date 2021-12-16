@@ -1,0 +1,49 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: lvm-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: LVMCluster is the Schema for the lvmclusters API
+      displayName: LVMCluster
+      kind: LVMCluster
+      name: lvmclusters.lvm.topolvm.io
+      version: v1alpha1
+  description: The ODF LVM Operator manages local storage using LVM.
+  displayName: ODF LVM Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - local storage
+  - operator
+  - LVM
+  links:
+  - name: Lvm Operator
+    url: https://lvm-operator.domain
+  maintainers:
+  - email: ocs-support@redhat.com
+    name: Red Hat Support
+  maturity: alpha
+  provider:
+    name: Red Hat
+  version: 0.0.0
