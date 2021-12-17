@@ -3,6 +3,8 @@
 # It should be run by config/default
 resources:
 - bases/lvm.topolvm.io_lvmclusters.yaml
+# Topolvm CRD from https://github.com/red-hat-storage/topolvm/blob/main/config/crd/bases/topolvm.cybozu.com_logicalvolumes.yaml
+- bases/topolvm.cybozu.com_logicalvolumes.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

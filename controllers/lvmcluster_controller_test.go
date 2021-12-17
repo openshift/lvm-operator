@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +52,10 @@ var _ = Describe("LVMCluster controller", func() {
 	csiDriverName := types.NamespacedName{Name: TopolvmCSIDriverName}
 	csiDriverOut := &storagev1.CSIDriver{}
 
+	// Topolvm Controller Deployment
+	controllerName := types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: testLvmClusterNamespace}
+	controllerOut := &appsv1.Deployment{}
+
 	Context("Reconciliation on creating an LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR creation, ", func() {
 			By("verifying CR status.Ready is set to true on reconciliation")
@@ -70,6 +75,12 @@ var _ = Describe("LVMCluster controller", func() {
 				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			By("confirming presence of Topolvm Controller deployment")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, controllerName, controllerOut)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 
@@ -82,10 +93,17 @@ var _ = Describe("LVMCluster controller", func() {
 				return err != nil
 			}, timeout, interval).Should(BeTrue())
 
-			// deletion of CSI Driver resource
+			// auto deletion of CSI Driver resource based on CR deletion
 			By("confirming absence of CSI Driver Resource")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+
+			// auto deletion of Topolvm Controller deployment based on CR deletion
+			By("confirming absence of Topolvm Controller Deployment")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, controllerName, controllerOut)
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 

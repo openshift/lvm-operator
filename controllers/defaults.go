@@ -40,6 +40,40 @@ var (
 	CsiResizerImage       = GetEnvOrDefault("CSI_RESIZER_IMAGE")
 
 	TopolvmCSIDriverName = "topolvm.cybozu.com"
+
+	// Topolvm deployment label
+	AppAttr = "app.kubernetes.io/name"
+
+	TopolvmControllerServiceAccount = "topolvm-controller"
+
+	// CSI Controller container and deployment names
+	TopolvmControllerDeploymentName = "topolvm-controller"
+	TopolvmControllerContainerName  = "topolvm-controller"
+	CsiRegistrarContainerName       = "csi-registrar"
+	CsiResizerContainerName         = "csi-resizer"
+	CsiProvisionerContainerName     = "csi-provisioner"
+	CsiLivenessProbeContainerName   = "liveness-probe"
+
+	// CSI Controller health endpoints
+	TopolvmControllerContainerHealthzName   = "healthz"
+	TopolvmControllerContainerLivenessPort  = int32(9808)
+	TopolvmControllerContainerReadinessPort = int32(8080)
+
+	// CSI Controller resource requests/limits
+	// TODO: Reduce these values and reach optimistic values without effecting performance
+	TopolvmControllerMemRequest = "250Mi"
+	TopolvmControllerMemLimit   = "250Mi"
+	TopolvmControllerCPURequest = "250m"
+	TopolvmControllerCPULimit   = "250m"
+
+	TopolvmCsiProvisionerMemRequest = "100Mi"
+	TopolvmCsiProvisionerMemLimit   = "100Mi"
+	TopolvmCsiProvisionerCPURequest = "100m"
+	TopolvmCsiProvisionerCPULimit   = "100m"
+
+	// CSI Provisioner requires below environment values to make use of CSIStorageCapacity
+	PodNameEnv   = "POD_NAME"
+	NameSpaceEnv = "NAMESPACE"
 )
 
 func GetEnvOrDefault(env string) string {
