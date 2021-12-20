@@ -56,6 +56,10 @@ var _ = Describe("LVMCluster controller", func() {
 	controllerName := types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: testLvmClusterNamespace}
 	controllerOut := &appsv1.Deployment{}
 
+	// CSI Node resource
+	csiNodeName := types.NamespacedName{Namespace: testLvmClusterNamespace, Name: TopolvmNodeDaemonsetName}
+	csiNodeOut := &appsv1.DaemonSet{}
+
 	Context("Reconciliation on creating an LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR creation, ", func() {
 			By("verifying CR status.Ready is set to true on reconciliation")
@@ -81,6 +85,12 @@ var _ = Describe("LVMCluster controller", func() {
 				err := k8sClient.Get(ctx, controllerName, controllerOut)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			By("confirming the existence of CSI Node resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 
@@ -100,10 +110,15 @@ var _ = Describe("LVMCluster controller", func() {
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 
-			// auto deletion of Topolvm Controller deployment based on CR deletion
 			By("confirming absence of Topolvm Controller Deployment")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, controllerName, controllerOut)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+
+			By("confirming absence of CSI Node Resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 

@@ -74,6 +74,21 @@ var (
 	// CSI Provisioner requires below environment values to make use of CSIStorageCapacity
 	PodNameEnv   = "POD_NAME"
 	NameSpaceEnv = "NAMESPACE"
+
+	// topoLVM Node
+	TopolvmNodeServiceAccount       = "topolvm-node"
+	TopolvmNodeDaemonsetName        = "topolvm-node"
+	CSIKubeletRootDir               = "/var/lib/kubelet/"
+	NodeContainerName               = "topolvm-node"
+	TopolvmNodeContainerHealthzName = "healthz"
+	auxImage                        = "registry.access.redhat.com/ubi8/ubi-minimal"
+	lvmdConfigFile                  = "/etc/topolvm/lvmd.yaml"
+
+	// topoLVM Node resource requests/limits
+	TopolvmNodeMemRequest = "250Mi"
+	TopolvmNodeMemLimit   = "250Mi"
+	TopolvmNodeCPURequest = "250m"
+	TopolvmNodeCPULimit   = "250m"
 )
 
 func GetEnvOrDefault(env string) string {

@@ -99,6 +99,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	resourceList := []resourceManager{
 		&csiDriver{},
 		&topolvmController{},
+		&topolvmNode{},
 	}
 
 	//The resource was deleted
