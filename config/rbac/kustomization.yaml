@@ -15,7 +15,6 @@ resources:
 - topolvm_controller_role_bindings.yaml
 # topolvm-node rbac
 - topolvm_node_service_account.yaml
-- topolvm_node_scc.yaml
 - topolvm_node_role.yaml
 - topolvm_node_role_bindings.yaml
 # Comment the following 4 lines if you want to disable
