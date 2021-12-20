@@ -18,6 +18,7 @@ package controllers
 
 import (
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -25,5 +26,6 @@ import (
 func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMCluster{}).
+		Owns(&appsv1.DaemonSet{}).
 		Complete(r)
 }
