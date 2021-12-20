@@ -18,6 +18,7 @@ package controllers
 
 import (
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -40,4 +41,16 @@ func extractNodeSelectorAndTolerations(lvmCluster lvmv1alpha1.LVMCluster) (*core
 		nodeSelector = &corev1.NodeSelector{NodeSelectorTerms: terms}
 	}
 	return nodeSelector, tolerations
+}
+
+func setDaemonsetNodeSelector(nodeSelector *corev1.NodeSelector, ds *appsv1.DaemonSet) {
+	if nodeSelector != nil {
+		ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+			NodeAffinity: &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+			},
+		}
+	} else {
+		ds.Spec.Template.Spec.Affinity = nil
+	}
 }

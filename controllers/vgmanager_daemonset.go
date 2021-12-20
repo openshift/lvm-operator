@@ -190,14 +190,3 @@ func newVGManagerDaemonset(lvmCluster lvmv1alpha1.LVMCluster) appsv1.DaemonSet {
 	return ds
 }
 
-func setDaemonsetNodeSelector(nodeSelector *corev1.NodeSelector, ds *appsv1.DaemonSet) {
-	if nodeSelector != nil {
-		ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
-			},
-		}
-	} else {
-		ds.Spec.Template.Spec.Affinity = nil
-	}
-}
