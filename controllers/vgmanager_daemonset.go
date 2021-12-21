@@ -33,12 +33,12 @@ var (
 	DevDirVolName = "device-dir"
 	SysVolName    = "sys"
 
-	LVMdDir    = "/mnt/lvmd/"
+	LVMdDir    = "/etc/topolvm"
 	devDirPath = "/dev"
 	udevPath   = "/run/udev"
 	sysPath    = "/sys"
 
-	// LVMDConfVol is the corev1.Volume definition for the directory on host ("/mnt/lvmd/") for storing
+	// LVMDConfVol is the corev1.Volume definition for the directory on host ("/etc/topolvm") for storing
 	// the lvmd.conf file
 	LVMDConfVol = corev1.Volume{
 		Name: LVMdVolName,
