@@ -156,7 +156,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.DaemonSet {
 		{Name: "lvmd-config-dir",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: filepath.Dir(lvmdConfigFile),
+					Path: filepath.Dir(LvmdConfigFile),
 					Type: &hostPathDirectory}}},
 		{Name: "lvmd-socket-dir",
 			VolumeSource: corev1.VolumeSource{
@@ -214,11 +214,11 @@ func getNodeInitContainer() *corev1.Container {
 	command := []string{
 		"sh",
 		"-c",
-		fmt.Sprintf("until [ -f %s ]; do echo waiting for lvmd config file; sleep 5; done", lvmdConfigFile),
+		fmt.Sprintf("until [ -f %s ]; do echo waiting for lvmd config file; sleep 5; done", LvmdConfigFile),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmdConfigFile)},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(LvmdConfigFile)},
 	}
 
 	fileChecker := &corev1.Container{
@@ -234,7 +234,7 @@ func getNodeInitContainer() *corev1.Container {
 func getLvmdContainer() *corev1.Container {
 	command := []string{
 		"/lvmd",
-		fmt.Sprintf("--config=%s", lvmdConfigFile),
+		fmt.Sprintf("--config=%s", LvmdConfigFile),
 		"--container=true",
 	}
 
@@ -251,7 +251,7 @@ func getLvmdContainer() *corev1.Container {
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(LVMdSocketPath)},
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmdConfigFile)},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(LvmdConfigFile)},
 	}
 
 	privilege := true
