@@ -33,43 +33,51 @@ func (c topolvmController) getName() string {
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
 	// get the desired state of topolvm controller deployment
-	controllerDeployment := getControllerDeployment(lvmCluster)
+	desiredDeployment := getControllerDeployment(lvmCluster)
+	existingDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      desiredDeployment.Name,
+			Namespace: desiredDeployment.Namespace,
+		},
+	}
 
-	result, err := cutil.CreateOrUpdate(ctx, r.Client, controllerDeployment, func() error { return nil })
+	result, err := cutil.CreateOrUpdate(ctx, r.Client, existingDeployment, func() error {
+		return c.setTopolvmControllerDesiredState(existingDeployment, desiredDeployment)
+	})
 
 	if err != nil {
-		r.Log.Error(err, "csi controller reconcile failure", "name", controllerDeployment.Name)
+		r.Log.Error(err, "csi controller reconcile failure", "name", desiredDeployment.Name)
 		return err
 	} else {
-		r.Log.Info("csi controller", "operation", result, "name", controllerDeployment.Name)
+		r.Log.Info("csi controller", "operation", result, "name", desiredDeployment.Name)
 	}
 
 	return nil
 }
 
 func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	controllerDeployment := &appsv1.Deployment{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: lvmCluster.Namespace}, controllerDeployment)
+	existingDeployment := &appsv1.Deployment{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: lvmCluster.Namespace}, existingDeployment)
 
 	if err != nil {
 		// already deleted in previous reconcile
 		if errors.IsNotFound(err) {
-			r.Log.Info("csi controller deleted", "TopolvmController", controllerDeployment.Name)
+			r.Log.Info("csi controller deleted", "TopolvmController", existingDeployment.Name)
 			return nil
 		}
-		r.Log.Error(err, "failed to retrieve csi controller deployment", "TopolvmController", controllerDeployment.Name)
+		r.Log.Error(err, "failed to retrieve csi controller deployment", "TopolvmController", existingDeployment.Name)
 		return err
 	}
 
 	// if not deleted, initiate deletion
-	if controllerDeployment.GetDeletionTimestamp().IsZero() {
-		if err = r.Client.Delete(ctx, controllerDeployment); err != nil {
-			r.Log.Error(err, "failed to delete topolvm controller deployment", "TopolvmController", controllerDeployment.Name)
+	if existingDeployment.GetDeletionTimestamp().IsZero() {
+		if err = r.Client.Delete(ctx, existingDeployment); err != nil {
+			r.Log.Error(err, "failed to delete topolvm controller deployment", "TopolvmController", existingDeployment.Name)
 			return err
 		}
 	} else {
 		// set deletion in-progress for next reconcile to confirm deletion
-		return fmt.Errorf("topolvm controller deployment %s is already marked for deletion", controllerDeployment.Name)
+		return fmt.Errorf("topolvm controller deployment %s is already marked for deletion", existingDeployment.Name)
 	}
 
 	return nil
@@ -77,6 +85,21 @@ func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Co
 
 func (c topolvmController) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	// TODO: Verify the status of controller plugin deployment and set the same on CR
+	return nil
+}
+
+func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *appsv1.Deployment) error {
+
+	// at creation, deep copy desired deployment into existing
+	if existing.CreationTimestamp.IsZero() {
+		desired.DeepCopyInto(existing)
+		return nil
+	}
+
+	// for update, topolvm controller is interested in only updating container images
+	// labels, volumes, service account etc can remain unchanged
+	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
+
 	return nil
 }
 
