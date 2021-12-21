@@ -52,6 +52,10 @@ var _ = Describe("LVMCluster controller", func() {
 	csiDriverName := types.NamespacedName{Name: TopolvmCSIDriverName}
 	csiDriverOut := &storagev1.CSIDriver{}
 
+	// VgManager Resource
+	vgManagerDaemonset := &appsv1.DaemonSet{}
+	vgManagerNamespacedName := types.NamespacedName{Name: VGManagerUnit, Namespace: testLvmClusterNamespace}
+
 	// Topolvm Controller Deployment
 	controllerName := types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: testLvmClusterNamespace}
 	controllerOut := &appsv1.Deployment{}
@@ -77,6 +81,12 @@ var _ = Describe("LVMCluster controller", func() {
 			By("confirming presence of CSIDriver resource")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("confirming presence of VgManager resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -110,6 +120,14 @@ var _ = Describe("LVMCluster controller", func() {
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 
+			// ensure that VgManager has owner reference of LVMCluster. (envTest does not support garbage collection)
+			By("confirming VgManager resource has owner reference of LVMCluster resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
+				return err == nil && vgManagerDaemonset.OwnerReferences[0].Name == lvmClusterIn.Name
+			}, timeout, interval).Should(BeTrue())
+
+			// auto deletion of Topolvm Controller deployment based on CR deletion
 			By("confirming absence of Topolvm Controller Deployment")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, controllerName, controllerOut)

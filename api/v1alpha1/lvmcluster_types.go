@@ -45,6 +45,10 @@ type DeviceClass struct {
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
+	// Tolerations to apply to nodes to act on
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
 	// TODO: add support for various LVM settings
 	// // Config for this deviceClass, lvm settings are a field here
 	// // +optional

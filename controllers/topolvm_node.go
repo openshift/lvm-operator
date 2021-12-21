@@ -19,6 +19,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -28,9 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"path/filepath"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"strings"
 )
 
 const (
@@ -94,11 +95,6 @@ func (n topolvmNode) ensureDeleted(r *LVMClusterReconciler, ctx context.Context,
 // status that changes only when the operands change.
 func (n topolvmNode) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	return nil
-}
-
-func extractNodeSelectorAndTolerations(lvmCluster lvmv1alpha1.LVMCluster) (*corev1.NodeSelector, []corev1.Toleration) {
-	// TODO: use the function defined in vgmanager.go ( lest se if we can move the function to common utils location)
-	return nil, nil
 }
 
 func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *v1.DaemonSet {
