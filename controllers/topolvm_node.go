@@ -24,7 +24,6 @@ import (
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,14 +46,45 @@ func (n topolvmNode) getName() string {
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;update;delete;get;list;watch
 
 func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	nodeDaemonSet := getNodeDaemonSet(lvmCluster)
-	//TODO: Use the mutate function to manage the changes in the CR (nodes, lvmd config)
-	result, err := cutil.CreateOrUpdate(ctx, r.Client, nodeDaemonSet, func() error { return nil })
+	unitLogger := r.Log.WithValues("topolvmNode", n.getName())
+
+	// get desired daemonSet spec
+	dsTemplate := getNodeDaemonSet(lvmCluster)
+	// create desired daemonSet or update mutable fields on existing one
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsTemplate.Name,
+			Namespace: dsTemplate.Namespace,
+		},
+	}
+	unitLogger.Info("running CreateOrUpdate")
+	result, err := cutil.CreateOrUpdate(ctx, r.Client, ds, func() error {
+		// at creation, deep copy the whole daemonSet
+		if ds.CreationTimestamp.IsZero() {
+			dsTemplate.DeepCopyInto(ds)
+			return nil
+		}
+		// if update, update only mutable fields
+		// For topolvm Node, we have containers, node selector and toleration terms
+
+		// containers
+		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
+
+		// tolerations
+		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
+
+		// nodeSelector if non-nil
+		if dsTemplate.Spec.Template.Spec.Affinity != nil {
+			setDaemonsetNodeSelector(dsTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, ds)
+		}
+		
+		return nil
+	})
 
 	if err != nil {
-		r.Log.Error(err, fmt.Sprintf("%s reconcile failure", topolvmNodeName), "name", nodeDaemonSet.Name)
+		r.Log.Error(err, fmt.Sprintf("%s reconcile failure", topolvmNodeName), "name", ds.Name)
 	} else {
-		r.Log.Info(topolvmNodeName, "operation", result, "name", nodeDaemonSet.Name)
+		r.Log.Info(topolvmNodeName, "operation", result, "name", ds.Name)
 	}
 	return err
 }
@@ -97,7 +127,7 @@ func (n topolvmNode) updateStatus(r *LVMClusterReconciler, ctx context.Context, 
 	return nil
 }
 
-func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *v1.DaemonSet {
+func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.DaemonSet {
 	hostPathDirectory := corev1.HostPathDirectory
 	hostPathDirectoryOrCreateType := corev1.HostPathDirectoryOrCreate
 	storageMedium := corev1.StorageMediumMemory
@@ -138,37 +168,29 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *v1.DaemonSet {
 
 	// Affinity and tolerations
 	nodeSelector, tolerations := extractNodeSelectorAndTolerations(*lvmCluster)
-	topolvmNodeAffinity := &corev1.Affinity{}
-	if nodeSelector != nil {
-		topolvmNodeAffinity = &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector},
-		}
-	}
+
 	topolvmNodeTolerations := []corev1.Toleration{{Operator: corev1.TolerationOpExists}}
 	if tolerations != nil {
 		topolvmNodeTolerations = tolerations
 	}
-
-	nodeDaemonSet := &v1.DaemonSet{
+	labels := map[string]string{
+		"app":                   topolvmNodeName,
+	}
+	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TopolvmNodeDaemonsetName,
 			Namespace: lvmCluster.Namespace,
+			Labels:    labels,
 		},
-		Spec: v1.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app.kubernetes.io/name": lvmCluster.Name,
-				},
-			},
-			UpdateStrategy: v1.DaemonSetUpdateStrategy{
-				Type: v1.RollingUpdateDaemonSetStrategyType,
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.RollingUpdateDaemonSetStrategyType,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: lvmCluster.Name,
-					Labels: map[string]string{
-						"app.kubernetes.io/name": lvmCluster.Name,
-					},
+					Name:   lvmCluster.Name,
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: TopolvmNodeServiceAccount,
@@ -177,11 +199,13 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *v1.DaemonSet {
 					Volumes:            volumes,
 					HostPID:            true,
 					Tolerations:        topolvmNodeTolerations,
-					Affinity:           topolvmNodeAffinity,
 				},
 			},
 		},
 	}
+
+	// set nodeSelector
+	setDaemonsetNodeSelector(nodeSelector, nodeDaemonSet)
 
 	return nodeDaemonSet
 }
