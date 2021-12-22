@@ -88,7 +88,7 @@ var (
 	NodeContainerName               = "topolvm-node"
 	TopolvmNodeContainerHealthzName = "healthz"
 	auxImage                        = "registry.access.redhat.com/ubi8/ubi-minimal"
-	lvmdConfigFile                  = "/etc/topolvm/lvmd.yaml"
+	LvmdConfigFile                  = "/etc/topolvm/lvmd.yaml"
 
 	// topoLVM Node resource requests/limits
 	TopolvmNodeMemRequest = "250Mi"
