@@ -14,6 +14,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -64,6 +65,16 @@ var _ = Describe("LVMCluster controller", func() {
 	csiNodeName := types.NamespacedName{Namespace: testLvmClusterNamespace, Name: TopolvmNodeDaemonsetName}
 	csiNodeOut := &appsv1.DaemonSet{}
 
+	// Topolvm Storage Classes
+	scNames := []types.NamespacedName{}
+	for _, deviceClass := range lvmClusterIn.Spec.DeviceClasses {
+		scNames = append(scNames, types.NamespacedName{
+			Name: fmt.Sprintf("topolvm-%s", deviceClass.Name),
+		},
+		)
+	}
+	scOut := &storagev1.StorageClass{}
+
 	Context("Reconciliation on creating an LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR creation, ", func() {
 			By("verifying CR status.Ready is set to true on reconciliation")
@@ -101,6 +112,15 @@ var _ = Describe("LVMCluster controller", func() {
 				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			By("confirming creation of TopolvmStorageClasses")
+			for _, scName := range scNames {
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, scName, scOut)
+					return err == nil
+				}, timeout, interval).Should(BeTrue())
+				scOut = &storagev1.StorageClass{}
+			}
 		})
 	})
 
@@ -139,6 +159,15 @@ var _ = Describe("LVMCluster controller", func() {
 				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
+
+			By("confirming absence of TopolvmStorageClasses")
+			for _, scName := range scNames {
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, scName, scOut)
+					return errors.IsNotFound(err)
+				}, timeout, interval).Should(BeTrue())
+				scOut = &storagev1.StorageClass{}
+			}
 
 			By("confirming absence of LVMCluster CR")
 			Eventually(func() bool {
