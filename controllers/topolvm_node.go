@@ -77,7 +77,7 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 		if dsTemplate.Spec.Template.Spec.Affinity != nil {
 			setDaemonsetNodeSelector(dsTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, ds)
 		}
-		
+
 		return nil
 	})
 
@@ -174,7 +174,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.DaemonSet {
 		topolvmNodeTolerations = tolerations
 	}
 	labels := map[string]string{
-		"app":                   topolvmNodeName,
+		"app": topolvmNodeName,
 	}
 	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -218,7 +218,8 @@ func getNodeInitContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-config-dir", MountPath: "/etc/topolvm"}}
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmdConfigFile)},
+	}
 
 	fileChecker := &corev1.Container{
 		Name:         "file-checker",
@@ -249,8 +250,9 @@ func getLvmdContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-socket-dir", MountPath: "/run/topolvm"},
-		{Name: "lvmd-config-dir", MountPath: "/etc/topolvm"}}
+		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(LVMdSocketPath)},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmdConfigFile)},
+	}
 
 	privilege := true
 	runUser := int64(0)
@@ -274,7 +276,7 @@ func getNodeContainer() *corev1.Container {
 
 	command := []string{
 		"/topolvm-node",
-		"--lvmd-socket=/run/lvmd/lvmd.sock",
+		fmt.Sprintf("--lvmd-socket=%s", LVMdSocketPath),
 	}
 
 	requirements := corev1.ResourceRequirements{
@@ -291,8 +293,8 @@ func getNodeContainer() *corev1.Container {
 	mountPropagationMode := corev1.MountPropagationBidirectional
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: "/run/topolvm"},
-		{Name: "lvmd-socket-dir", MountPath: "/run/lvmd"},
+		// parent dir for both csi and lvm sock file is same
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 		{Name: "pod-volumes-dir",
 			MountPath:        fmt.Sprintf("%spods", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 			MountPropagation: &mountPropagationMode},
@@ -336,12 +338,12 @@ func getNodeContainer() *corev1.Container {
 func getCsiRegistrarContainer() *corev1.Container {
 	command := []string{
 		"/csi-node-driver-registrar",
-		"--csi-address=/run/topolvm/csi-topolvm.sock",
+		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
 		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.cybozu.com/node/csi-topolvm.sock", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: "/run/topolvm"},
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 		{Name: "registration-dir", MountPath: "/registration"},
 	}
 
@@ -364,11 +366,11 @@ func getCsiRegistrarContainer() *corev1.Container {
 func getNodeLivenessProbeContainer() *corev1.Container {
 	command := []string{
 		"/livenessprobe",
-		"--csi-address=/run/topolvm/csi-topolvm.sock",
+		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: "/run/topolvm"},
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 	}
 
 	liveness := &corev1.Container{

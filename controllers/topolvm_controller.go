@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -199,7 +200,7 @@ func getControllerContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: "/run/topolvm"},
+		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 		{Name: "certs", MountPath: "/certs"},
 	}
 
@@ -247,7 +248,7 @@ func getCsiProvisionerContainer() *corev1.Container {
 
 	// csi provisioner container
 	command := []string{"/csi-provisioner",
-		"--csi-address=/run/topolvm/csi-topolvm.sock",
+		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
 		"--enable-capacity",
 		"--capacity-ownerref-level=2",
 		"--capacity-poll-interval=30s",
@@ -266,7 +267,7 @@ func getCsiProvisionerContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: "/run/topolvm"},
+		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 	}
 
 	env := []corev1.EnvVar{
@@ -304,11 +305,11 @@ func getCsiResizerContainer() *corev1.Container {
 	// csi resizer container
 	command := []string{
 		"/csi-resizer",
-		"--csi-address=/run/topolvm/csi-topolvm.sock",
+		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: "/run/topolvm"},
+		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 	}
 
 	csiResizer := &corev1.Container{
@@ -325,11 +326,11 @@ func getLivenessProbeContainer() *corev1.Container {
 	// csi liveness probe container
 	command := []string{
 		"/livenessprobe",
-		"--csi-address=/run/topolvm/csi-topolvm.sock",
+		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: "/run/topolvm"},
+		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
 	}
 
 	livenessProbe := &corev1.Container{
