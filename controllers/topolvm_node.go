@@ -77,7 +77,7 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 		if dsTemplate.Spec.Template.Spec.Affinity != nil {
 			setDaemonsetNodeSelector(dsTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, ds)
 		}
-		
+
 		return nil
 	})
 
@@ -174,7 +174,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.DaemonSet {
 		topolvmNodeTolerations = tolerations
 	}
 	labels := map[string]string{
-		"app":                   topolvmNodeName,
+		"app": topolvmNodeName,
 	}
 	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

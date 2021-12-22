@@ -189,4 +189,3 @@ func newVGManagerDaemonset(lvmCluster lvmv1alpha1.LVMCluster) appsv1.DaemonSet {
 	setDaemonsetNodeSelector(nodeSelector, &ds)
 	return ds
 }
-
