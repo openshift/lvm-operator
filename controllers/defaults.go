@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"os"
+
+	"github.com/topolvm/topolvm"
 )
 
 var (
@@ -93,6 +95,10 @@ var (
 	TopolvmNodeMemLimit   = "250Mi"
 	TopolvmNodeCPURequest = "250m"
 	TopolvmNodeCPULimit   = "250m"
+
+	// Defaults from topolvm project
+	TopolvmCSISockPath = topolvm.DefaultCSISocket
+	LVMdSocketPath     = topolvm.DefaultLVMdSocket
 )
 
 func GetEnvOrDefault(env string) string {
