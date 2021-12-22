@@ -99,6 +99,10 @@ var (
 	// Defaults from topolvm project
 	TopolvmCSISockPath = topolvm.DefaultCSISocket
 	LVMdSocketPath     = topolvm.DefaultLVMdSocket
+	DeviceClassKey     = topolvm.DeviceClassKey
+
+	// default fstype for topolvm storage classes
+	TopolvmFilesystemType = "xfs"
 )
 
 func GetEnvOrDefault(env string) string {
