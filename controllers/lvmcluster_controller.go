@@ -102,6 +102,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		&topolvmController{},
 		&topolvmNode{},
 		&vgManager{},
+		&topolvmStorageClass{},
 	}
 
 	//The resource was deleted
