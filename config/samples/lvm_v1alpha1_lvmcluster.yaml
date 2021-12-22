@@ -5,3 +5,4 @@ metadata:
 spec:
   deviceClasses:
   - name: vg1
+    default: true

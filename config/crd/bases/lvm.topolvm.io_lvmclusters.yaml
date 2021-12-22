@@ -41,6 +41,10 @@ spec:
                   to volumegroups that are used for creating lvm based PVs
                 items:
                   properties:
+                    default:
+                      description: Default flag to indicate that this device-class
+                        is used by default
+                      type: boolean
                     deviceSelector:
                       description: DeviceSelector is a set of rules that should match
                         for a device to be included in this TopoLVMCluster

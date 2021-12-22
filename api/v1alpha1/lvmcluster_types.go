@@ -37,6 +37,10 @@ type DeviceClass struct {
 	// Name of the class, the VG and possibly the storageclass.
 	Name string `json:"name,omitempty"`
 
+	// Default flag to indicate that this device-class is used by default
+	// +optional
+	Default bool `json:"default,omitempty"`
+
 	// DeviceSelector is a set of rules that should match for a device to be included in this TopoLVMCluster
 	// +optional
 	DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
