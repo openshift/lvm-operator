@@ -30,19 +30,17 @@ func (c csiDriver) getName() string {
 func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	csiDriverResource := getCSIDriverResource()
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, csiDriverResource, func() error {
+		// no need to mutate any field
 		return nil
 	})
-	// CSIDriver resource is an immutable resource and can have result either Created or Unchanged and it's clusterscoped
-	switch result {
-	case cutil.OperationResultCreated:
-		r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
-	case cutil.OperationResultNone:
-		r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
-	default:
+
+	if err != nil {
 		r.Log.Error(err, "csi driver reconcile failure", "name", csiDriverResource.Name)
-		return err
+	} else {
+		r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
 	}
-	return nil
+
+	return err
 }
 
 func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
@@ -64,13 +62,15 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 		if err = r.Client.Delete(ctx, csiDriverResource); err != nil {
 			r.Log.Error(err, "failed to delete topolvm csi driver", "TopolvmCSIDriverName", csiDriverResource.Name)
 			return err
+		} else {
+			r.Log.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
 		}
 	} else {
 		// set deletion in-progress for next reconcile to confirm deletion
 		return fmt.Errorf("topolvm csi driver %s is already marked for deletion", csiDriverResource.Name)
 	}
 
-	return nil
+	return err
 }
 
 func (c csiDriver) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {

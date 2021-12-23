@@ -48,12 +48,11 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 
 	if err != nil {
 		r.Log.Error(err, "csi controller reconcile failure", "name", desiredDeployment.Name)
-		return err
 	} else {
 		r.Log.Info("csi controller", "operation", result, "name", desiredDeployment.Name)
 	}
 
-	return nil
+	return err
 }
 
 func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
@@ -75,13 +74,15 @@ func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Co
 		if err = r.Client.Delete(ctx, existingDeployment); err != nil {
 			r.Log.Error(err, "failed to delete topolvm controller deployment", "TopolvmController", existingDeployment.Name)
 			return err
+		} else {
+			r.Log.Info("initiated topolvm controller deployment deletion", "TopolvmController", existingDeployment.Name)
 		}
 	} else {
 		// set deletion in-progress for next reconcile to confirm deletion
 		return fmt.Errorf("topolvm controller deployment %s is already marked for deletion", existingDeployment.Name)
 	}
 
-	return nil
+	return err
 }
 
 func (c topolvmController) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
