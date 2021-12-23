@@ -18,8 +18,6 @@ package controllers
 
 import (
 	"os"
-
-	"github.com/topolvm/topolvm"
 )
 
 var (
@@ -96,10 +94,10 @@ var (
 	TopolvmNodeCPURequest = "250m"
 	TopolvmNodeCPULimit   = "250m"
 
-	// Defaults from topolvm project
-	TopolvmCSISockPath = topolvm.DefaultCSISocket
-	LVMdSocketPath     = topolvm.DefaultLVMdSocket
-	DeviceClassKey     = topolvm.DeviceClassKey
+	// Defaults from https://github.com/red-hat-storage/topolvm/blob/main/constants.go
+	DefaultCSISocket  = "/run/topolvm/csi-topolvm.sock"
+	DefaultLVMdSocket = "/run/topolvm/lvmd.sock"
+	DeviceClassKey    = "topolvm.cybozu.com/device-class"
 
 	// default fstype for topolvm storage classes
 	TopolvmFilesystemType = "xfs"
