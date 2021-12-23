@@ -46,7 +46,12 @@ spec:
                         for a device to be included in this TopoLVMCluster
                       type: object
                     name:
-                      description: Name of the class, the VG and possibly the storageclass.
+                      description: 'Name of the class, the VG and possibly the storageclass.
+                        Validations to confirm that this field can be used as metadata.name
+                        field in storageclass ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209'
+                      maxLength: 245
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
                     nodeSelector:
                       description: NodeSelector chooses nodes
