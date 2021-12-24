@@ -5,16 +5,17 @@ kind: ServiceMonitor
 metadata:
   labels:
     control-plane: controller-manager
-  name: controller-manager-metrics-monitor
+  name: lvm-operator-controller-manager-metrics-monitor
   namespace: system
 spec:
   endpoints:
     - path: /metrics
-      port: https
-      scheme: https
+      port: topolvm-metrics
+      scheme: http
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
         insecureSkipVerify: true
   selector:
     matchLabels:
+      app.kubernetes.io/compose: metrics
       control-plane: controller-manager

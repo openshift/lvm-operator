@@ -17,8 +17,6 @@ namespace: lvm-operator-system
 #- ../webhook
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
 #- ../certmanager
-# [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'.
-#- ../prometheus
 
 # Protect the /metrics endpoint by putting it behind auth.
 # If you want your controller-manager to expose the /metrics
@@ -46,6 +44,7 @@ resources:
 - ../crd
 - ../rbac
 - ../manager
+- ../prometheus
 images:
 - name: rbac-proxy
   newName: gcr.io/kubebuilder/kube-rbac-proxy
