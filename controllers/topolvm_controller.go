@@ -200,7 +200,7 @@ func getControllerContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 		{Name: "certs", MountPath: "/certs"},
 	}
 
@@ -248,7 +248,7 @@ func getCsiProvisionerContainer() *corev1.Container {
 
 	// csi provisioner container
 	command := []string{"/csi-provisioner",
-		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
+		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 		"--enable-capacity",
 		"--capacity-ownerref-level=2",
 		"--capacity-poll-interval=30s",
@@ -267,7 +267,7 @@ func getCsiProvisionerContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 	}
 
 	env := []corev1.EnvVar{
@@ -305,11 +305,11 @@ func getCsiResizerContainer() *corev1.Container {
 	// csi resizer container
 	command := []string{
 		"/csi-resizer",
-		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
+		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 	}
 
 	csiResizer := &corev1.Container{
@@ -326,11 +326,11 @@ func getLivenessProbeContainer() *corev1.Container {
 	// csi liveness probe container
 	command := []string{
 		"/livenessprobe",
-		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
+		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "socket-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 	}
 
 	livenessProbe := &corev1.Container{

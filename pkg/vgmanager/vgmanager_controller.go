@@ -91,7 +91,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 
 	// load lvmd config
 	lvmdConfig := &lvmdCMD.Config{
-		SocketName: controllers.LVMdSocketPath,
+		SocketName: controllers.DefaultLVMdSocket,
 	}
 
 	cfgBytes, err := os.ReadFile(controllers.LvmdConfigFile)
