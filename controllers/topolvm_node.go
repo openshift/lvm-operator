@@ -250,7 +250,7 @@ func getLvmdContainer() *corev1.Container {
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(LVMdSocketPath)},
+		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(DefaultLVMdSocket)},
 		{Name: "lvmd-config-dir", MountPath: filepath.Dir(LvmdConfigFile)},
 	}
 
@@ -276,7 +276,7 @@ func getNodeContainer() *corev1.Container {
 
 	command := []string{
 		"/topolvm-node",
-		fmt.Sprintf("--lvmd-socket=%s", LVMdSocketPath),
+		fmt.Sprintf("--lvmd-socket=%s", DefaultLVMdSocket),
 	}
 
 	requirements := corev1.ResourceRequirements{
@@ -293,8 +293,8 @@ func getNodeContainer() *corev1.Container {
 	mountPropagationMode := corev1.MountPropagationBidirectional
 
 	volumeMounts := []corev1.VolumeMount{
-		// parent dir for both csi and lvm sock file is same
-		{Name: "node-plugin-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(DefaultCSISocket)},
+		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(DefaultLVMdSocket)},
 		{Name: "pod-volumes-dir",
 			MountPath:        fmt.Sprintf("%spods", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 			MountPropagation: &mountPropagationMode},
@@ -338,12 +338,12 @@ func getNodeContainer() *corev1.Container {
 func getCsiRegistrarContainer() *corev1.Container {
 	command := []string{
 		"/csi-node-driver-registrar",
-		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
+		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.cybozu.com/node/csi-topolvm.sock", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 		{Name: "registration-dir", MountPath: "/registration"},
 	}
 
@@ -366,11 +366,11 @@ func getCsiRegistrarContainer() *corev1.Container {
 func getNodeLivenessProbeContainer() *corev1.Container {
 	command := []string{
 		"/livenessprobe",
-		fmt.Sprintf("--csi-address=%s", TopolvmCSISockPath),
+		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: filepath.Dir(TopolvmCSISockPath)},
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 	}
 
 	liveness := &corev1.Container{
