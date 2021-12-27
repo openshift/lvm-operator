@@ -35,6 +35,11 @@ type LVMClusterSpec struct {
 
 type DeviceClass struct {
 	// Name of the class, the VG and possibly the storageclass.
+	// Validations to confirm that this field can be used as metadata.name field in storageclass
+	// ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209
+	// +kubebuilder:validation:MaxLength=245
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
 	Name string `json:"name,omitempty"`
 
 	// DeviceSelector is a set of rules that should match for a device to be included in this TopoLVMCluster
