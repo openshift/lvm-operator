@@ -1,0 +1,42 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: vg-manager-role
+rules:
+- apiGroups:
+  - lvm.topolvm.io
+  - apps
+  resources:
+  - lvmclusters
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - vg-manager
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
