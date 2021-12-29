@@ -14,9 +14,6 @@ metadata:
             "deviceClasses": [
               {
                 "name": "vg1"
-              },
-              {
-                "deviceSelector": null
               }
             ]
           }
@@ -31,6 +28,9 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - kind: LogicalVolume
+      name: logicalvolumes.topolvm.cybozu.com
+      version: v1
     - description: LVMCluster is the Schema for the lvmclusters API
       displayName: LVMCluster
       kind: LVMCluster
@@ -45,6 +45,29 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
         - apiGroups:
           - lvm.topolvm.io
           resources:
@@ -82,6 +105,16 @@ spec:
           - list
           - watch
         - apiGroups:
+          - storage.k8s.io
+          resources:
+          - storageclasses
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - watch
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews
@@ -93,9 +126,9 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: lvm-operator-controller-manager
+        serviceAccountName: controller-manager
       deployments:
-      - name: lvm-operator-controller-manager
+      - name: controller-manager
         spec:
           replicas: 1
           selector:
@@ -126,7 +159,15 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/nibalach/lvm-operator:t1
+                env:
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                envFrom:
+                - configMapRef:
+                    name: lvm-operator-manager-config
+                image: quay.io/ocs-dev/lvm-operator:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -151,7 +192,7 @@ spec:
                   allowPrivilegeEscalation: false
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: lvm-operator-controller-manager
+              serviceAccountName: controller-manager
               terminationGracePeriodSeconds: 10
       permissions:
       - rules:
@@ -186,7 +227,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: lvm-operator-controller-manager
+        serviceAccountName: controller-manager
     strategy: deployment
   installModes:
   - supported: true
