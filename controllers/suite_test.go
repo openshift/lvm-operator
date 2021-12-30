@@ -33,6 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -96,9 +97,10 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient.Create(ctx, testNamespace)).Should(Succeed())
 
 	err = (&LVMClusterReconciler{
-		Client: k8sManager.GetClient(),
-		Scheme: k8sManager.GetScheme(),
-		Log:    ctrl.Log.WithName("controllers").WithName("LvmCluster"),
+		Client:         k8sManager.GetClient(),
+		Scheme:         k8sManager.GetScheme(),
+		SecurityClient: secv1client.NewForConfigOrDie(k8sManager.GetConfig()),
+		Log:            ctrl.Log.WithName("controllers").WithName("LvmCluster"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
