@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"github.com/red-hat-storage/lvm-operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -45,7 +46,6 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -88,8 +88,9 @@ func main() {
 	}
 
 	if err = (&controllers.LVMClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		SecurityClient: secv1client.NewForConfigOrDie(mgr.GetConfig()),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
 		os.Exit(1)

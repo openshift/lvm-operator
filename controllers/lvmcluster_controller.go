@@ -21,8 +21,10 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/go-logr/logr"
+	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,19 +38,31 @@ var lvmClusterFinalizer = "lvmcluster.topolvm.io"
 
 const (
 	ControllerName = "lvmcluster-controller"
+
+	openshiftSCCPrivilegedName = "privileged"
+)
+
+type ClusterType string
+
+const (
+	ClusterTypeOCP   ClusterType = "openshift"
+	ClusterTypeOther ClusterType = "other"
 )
 
 // LVMClusterReconciler reconciles a LVMCluster object
 type LVMClusterReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Log    logr.Logger
+	Scheme         *runtime.Scheme
+	Log            logr.Logger
+	ClusterType    ClusterType
+	SecurityClient secv1client.SecurityV1Interface
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;create;update;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -74,7 +88,11 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
-
+	err = r.checkIfOpenshift(ctx)
+	if err != nil {
+		r.Log.Error(err, "failed to check cluster type")
+		return ctrl.Result{}, err
+	}
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
 
 	// Apply status changes
@@ -100,6 +118,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	resourceList := []resourceManager{
 		&csiDriver{},
 		&topolvmController{},
+		&openshiftSccs{},
 		&topolvmNode{},
 		&vgManager{},
 		&topolvmStorageClass{},
@@ -178,4 +197,31 @@ type resourceManager interface {
 	// avoid status fields like lastHeartbeatTime and have a
 	// status that changes only when the operands change.
 	updateStatus(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
+}
+
+// checkIfOpenshift checks to see if the operator is running on an OCP cluster.
+// It does this by querying for the "privileged" SCC which exists on all OCP clusters.
+func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
+	if r.ClusterType == "" {
+		// cluster type has not been determined yet
+		// Check if the privileged SCC exists on the cluster (this is one of the default SCCs)
+		_, err := r.SecurityClient.SecurityContextConstraints().Get(ctx, openshiftSCCPrivilegedName, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Not an Openshift cluster
+				r.ClusterType = ClusterTypeOther
+			} else {
+				// Something went wrong
+				r.Log.Error(err, "failed to get SCC", "Name", openshiftSCCPrivilegedName)
+				return err
+			}
+		} else {
+			r.ClusterType = ClusterTypeOCP
+		}
+	}
+	return nil
+}
+
+func IsOpenshift(r *LVMClusterReconciler) bool {
+	return r.ClusterType == ClusterTypeOCP
 }
