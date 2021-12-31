@@ -95,6 +95,15 @@ spec:
           - patch
           - update
         - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - create
+          - delete
+          - get
+          - update
+        - apiGroups:
           - storage.k8s.io
           resources:
           - csidrivers
