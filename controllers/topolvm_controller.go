@@ -34,7 +34,7 @@ func (c topolvmController) getName() string {
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(lvmCluster)
+	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace)
 	existingDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      desiredDeployment.Name,
@@ -57,7 +57,7 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 
 func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	existingDeployment := &appsv1.Deployment{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: lvmCluster.Namespace}, existingDeployment)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: r.Namespace}, existingDeployment)
 
 	if err != nil {
 		// already deleted in previous reconcile
@@ -105,7 +105,7 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 	return nil
 }
 
-func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.Deployment {
+func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *appsv1.Deployment {
 
 	// Topolvm CSI Controller Deployment
 	var replicas int32 = 1
@@ -129,7 +129,7 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.Deploym
 	controllerDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TopolvmControllerDeploymentName,
-			Namespace: lvmCluster.Namespace,
+			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -141,7 +141,7 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.Deploym
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      TopolvmControllerDeploymentName,
-					Namespace: lvmCluster.Namespace,
+					Namespace: namespace,
 					Labels: map[string]string{
 						AppAttr: TopolvmControllerDeploymentName,
 					},

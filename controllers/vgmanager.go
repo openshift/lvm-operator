@@ -43,7 +43,7 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 	unitLogger := r.Log.WithValues("resourceManager", v.getName())
 
 	// get desired daemonset spec
-	dsTemplate := newVGManagerDaemonset(*lvmCluster)
+	dsTemplate := newVGManagerDaemonset(*lvmCluster, r.Namespace)
 
 	// controller reference
 	err := ctrl.SetControllerReference(lvmCluster, &dsTemplate, r.Scheme)

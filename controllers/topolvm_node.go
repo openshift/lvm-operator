@@ -49,7 +49,7 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 	unitLogger := r.Log.WithValues("topolvmNode", n.getName())
 
 	// get desired daemonSet spec
-	dsTemplate := getNodeDaemonSet(lvmCluster)
+	dsTemplate := getNodeDaemonSet(lvmCluster, r.Namespace)
 	// create desired daemonSet or update mutable fields on existing one
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -93,7 +93,7 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 func (n topolvmNode) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	NodeDaemonSet := &appsv1.DaemonSet{}
 	err := r.Client.Get(ctx,
-		types.NamespacedName{Name: TopolvmNodeDaemonsetName, Namespace: lvmCluster.Namespace},
+		types.NamespacedName{Name: TopolvmNodeDaemonsetName, Namespace: r.Namespace},
 		NodeDaemonSet)
 
 	if err != nil {
@@ -127,7 +127,7 @@ func (n topolvmNode) updateStatus(r *LVMClusterReconciler, ctx context.Context, 
 	return nil
 }
 
-func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.DaemonSet {
+func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *appsv1.DaemonSet {
 	hostPathDirectory := corev1.HostPathDirectory
 	hostPathDirectoryOrCreateType := corev1.HostPathDirectoryOrCreate
 	storageMedium := corev1.StorageMediumMemory
@@ -179,7 +179,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster) *appsv1.DaemonSet {
 	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TopolvmNodeDaemonsetName,
-			Namespace: lvmCluster.Namespace,
+			Namespace: namespace,
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{

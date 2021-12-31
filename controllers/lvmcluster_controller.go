@@ -56,6 +56,7 @@ type LVMClusterReconciler struct {
 	Log            logr.Logger
 	ClusterType    ClusterType
 	SecurityClient secv1client.SecurityV1Interface
+	Namespace      string
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
