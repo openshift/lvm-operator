@@ -129,6 +129,13 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
+deploy-with-olm: kustomize ## Deploy controller to the K8s cluster via OLM
+	cd olm-deploy/ && $(KUSTOMIZE) edit set image catalog-img=${CATALOG_IMG}
+	$(KUSTOMIZE) build olm-deploy/ | sed "s/lvm-operator.v.*/lvm-operator.v${VERSION}/g" | kubectl create -f -
+
+undeploy-with-olm: ## Undeploy controller from the K8s cluster
+	$(KUSTOMIZE) build olm-deploy/ | kubectl delete -f -
+
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.

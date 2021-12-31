@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: lvm-catalogsource
+  namespace: openshift-storage
+spec:
+  sourceType: grpc
+  image: catalog-img
+  displayName: OpenShift Data Foundation
+  publisher: Red Hat

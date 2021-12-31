@@ -1,0 +1,12 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: lvm-operator
+  namespace: openshift-storage
+spec:
+  channel: alpha
+  installPlanApproval: Automatic
+  name: lvm-operator
+  source: lvm-catalogsource
+  sourceNamespace: openshift-storage
+  startingCSV: lvm-operator.v0.0.1
