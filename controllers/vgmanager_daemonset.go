@@ -17,10 +17,15 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+	"fmt"
+	"os"
+
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -112,17 +117,36 @@ var (
 )
 
 // newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(lvmCluster lvmv1alpha1.LVMCluster, namespace string) appsv1.DaemonSet {
+func newVGManagerDaemonset(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) (appsv1.DaemonSet, error) {
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	nodeSelector, tolerations := extractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{LVMDConfVol, DevHostDirVol, UDevHostDirVol, SysHostDirVol}
 	volumeMounts := []corev1.VolumeMount{LVMDConfVolMount, DevHostDirVolMount, UDevHostDirVolMount, SysHostDirVolMount}
 	privileged := true
 	var zero int64 = 0
+
+	// try to get vgmanager image from env and on absence get from running pod
+	// TODO: investigate why storing this env in a variable is failing tests
+	image := os.Getenv("VGMANAGER_IMAGE")
+	var err error
+	if image == "" {
+		image, err = getRunningPodImage(r, ctx)
+		if err != nil {
+			r.Log.Error(err, "failed to get image from running operator")
+			return appsv1.DaemonSet{}, err
+		}
+	}
+
+	r.Log.Info("creating VG manager deployment", "image", image)
+
+	command := []string{
+		"/vgmanager",
+	}
 	containers := []corev1.Container{
 		{
-			Name:  VGManagerUnit,
-			Image: VGManagerImage,
+			Name:    VGManagerUnit,
+			Image:   image,
+			Command: command,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: &privileged,
 				RunAsUser:  &zero,
@@ -138,7 +162,7 @@ func newVGManagerDaemonset(lvmCluster lvmv1alpha1.LVMCluster, namespace string) 
 					},
 				},
 				{
-					Name: "WATCH_NAMESPACE",
+					Name: "POD_NAMESPACE",
 					ValueFrom: &corev1.EnvVarSource{
 						FieldRef: &corev1.ObjectFieldSelector{
 							FieldPath: "metadata.namespace",
@@ -163,7 +187,7 @@ func newVGManagerDaemonset(lvmCluster lvmv1alpha1.LVMCluster, namespace string) 
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      VGManagerUnit,
-			Namespace: namespace,
+			Namespace: r.Namespace,
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
@@ -187,5 +211,28 @@ func newVGManagerDaemonset(lvmCluster lvmv1alpha1.LVMCluster, namespace string) 
 
 	// set nodeSelector
 	setDaemonsetNodeSelector(nodeSelector, &ds)
-	return ds
+	return ds, nil
+}
+
+func getRunningPodImage(r *LVMClusterReconciler, ctx context.Context) (string, error) {
+
+	// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		return "", fmt.Errorf("failed to get pod name env variable")
+	}
+
+	pod := &corev1.Pod{}
+	if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: r.Namespace}, pod); err != nil {
+		return "", fmt.Errorf("failed to get pod %s in namespace %s", podName, r.Namespace)
+	}
+
+	for _, c := range pod.Spec.Containers {
+		if c.Name == LVMOperatorContainerName {
+			return c.Image, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
+
 }

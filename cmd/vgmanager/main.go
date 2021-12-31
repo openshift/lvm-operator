@@ -67,7 +67,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         false,
-		Namespace:              os.Getenv("WATCH_NAMESPACE"),
+		Namespace:              os.Getenv("POD_NAMESPACE"),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

@@ -98,7 +98,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
-build-vgmanager: generate fmt vet ## Build manager binary.
+build-vgmanager: generate fmt vet ## Build vg manager binary.
 	go build -o bin/vgmanager cmd/vgmanager/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -107,12 +107,19 @@ run: manifests generate fmt vet ## Run a controller from your host.
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
-docker-build-vgmanager:
+docker-build-vgmanager: ## Build docker image with vgmanager.
 	docker build -f Dockerfile.vgmanager -t ${VGMANAGER_IMG} .
+
+docker-build-combined: ## Build docker image with manager and vgmanager
+	docker build -f Dockerfile.combined -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
+
+docker-push-vgmanager: ## Push docker image with the vgmanager.
 	docker push ${VGMANAGER_IMG}
+
+docker-push-combined: docker-push ## Push docker image containing both manager and vgmanager binaries
 
 ##@ Deployment
 
