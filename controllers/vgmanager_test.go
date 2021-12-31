@@ -36,9 +36,10 @@ func newFakeLVMClusterReconciler(t *testing.T, objs ...client.Object) *LVMCluste
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	return &LVMClusterReconciler{
-		Client: client,
-		Scheme: scheme,
-		Log:    logf.Log.WithName("LVMCLusterTest"),
+		Client:    client,
+		Scheme:    scheme,
+		Log:       logf.Log.WithName("LVMCLusterTest"),
+		Namespace: "default",
 	}
 }
 
