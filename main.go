@@ -39,9 +39,9 @@ import (
 )
 
 var (
-	scheme               = runtime.NewScheme()
-	setupLog             = ctrl.Log.WithName("setup")
-	watchNamespaceEnvVar = "WATCH_NAMESPACE"
+	scheme                  = runtime.NewScheme()
+	setupLog                = ctrl.Log.WithName("setup")
+	operatorNamespaceEnvVar = "POD_NAMESPACE"
 )
 
 func init() {
@@ -67,17 +67,19 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	watchNamespace, err := getWatchNamespace()
+	operatorNamespace, err := getOperatorNamespace()
 	if err != nil {
-		setupLog.Error(err, "unable to get WatchNamespace, "+
-			"the manager will watch and manage resources in all namespaces")
+		setupLog.Error(err, "unable to get operatorNamespace"+
+			"Exiting")
+		os.Exit(1)
 	}
+	setupLog.Info("Watching namespace ", operatorNamespace)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
-		Namespace:              watchNamespace,
+		Namespace:              operatorNamespace,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "1136b8a6.topolvm.io",
@@ -91,6 +93,7 @@ func main() {
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		SecurityClient: secv1client.NewForConfigOrDie(mgr.GetConfig()),
+		Namespace:      operatorNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
 		os.Exit(1)
@@ -113,14 +116,14 @@ func main() {
 	}
 }
 
-// getWatchNamespace returns the Namespace the operator should be watching for changes
-func getWatchNamespace() (string, error) {
-	// The env variable WATCH_NAMESPACE which specifies the Namespace to watch.
-	// An empty value means the operator is running with cluster scope.
+// getOperatorNamespace returns the Namespace the operator should be watching for changes
+func getOperatorNamespace() (string, error) {
+	// The env variable POD_NAMESPACE which specifies the Namespace the pod is running in
+	// and hence will watch.
 
-	ns, found := os.LookupEnv(watchNamespaceEnvVar)
+	ns, found := os.LookupEnv(operatorNamespaceEnvVar)
 	if !found {
-		return "", fmt.Errorf("%s not found", watchNamespaceEnvVar)
+		return "", fmt.Errorf("%s not found", operatorNamespaceEnvVar)
 	}
 	return ns, nil
 }

@@ -169,10 +169,10 @@ spec:
                 command:
                 - /manager
                 env:
-                - name: WATCH_NAMESPACE
+                - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:
-                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                      fieldPath: metadata.namespace
                 envFrom:
                 - configMapRef:
                     name: lvm-operator-manager-config

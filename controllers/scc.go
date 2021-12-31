@@ -45,7 +45,7 @@ func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Contex
 		r.Log.Info("not creating SCCs as this is not an Openshift cluster")
 		return nil
 	}
-	sccs := getAllSCCs(lvmCluster.Namespace)
+	sccs := getAllSCCs(r.Namespace)
 	for _, scc := range sccs {
 		_, err := r.SecurityClient.SecurityContextConstraints().Get(ctx, scc.Name, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
@@ -69,7 +69,7 @@ func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Contex
 func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	if IsOpenshift(r) {
 		var err error
-		sccs := getAllSCCs(lvmCluster.Namespace)
+		sccs := getAllSCCs(r.Namespace)
 		for _, scc := range sccs {
 			err = r.SecurityClient.SecurityContextConstraints().Delete(ctx, scc.Name, metav1.DeleteOptions{})
 			if err != nil {
