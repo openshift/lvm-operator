@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- openshift-storage-namespace.yaml
+- openshift-storage-operatorgroup.yaml
+- lvm-operator-subscription.yaml
+- lvm-catalogsource.yaml
+
+# image configurations
+configurations:
+- lvm-catalogsource-image.yaml
+
+# replace catalogsource image
+images:
+- name: catalog-img
+  newName: quay.io/ocs-dev/lvm-operator-catalog
+  newTag: latest
+
+patches:
+- patch: |-
+    - op: replace
+      path: /spec/channel
+      value: alpha
+    - op: replace
+      path: /spec/startingCSV
+      value: lvm-operator.v0.0.1
+  target:
+    kind: Subscription
+    name: lvm-operator
