@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
@@ -72,6 +73,7 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 			},
 			Spec: testCase.lvmclusterSpec,
 		}
+		os.Setenv("VGMANAGER_IMAGE", "test")
 		r := newFakeLVMClusterReconciler(t, lvmcluster)
 		var unit resourceManager = vgManager{}
 		err := unit.ensureCreated(r, context.Background(), lvmcluster)

@@ -15,6 +15,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -75,6 +76,7 @@ var _ = Describe("LVMCluster controller", func() {
 	}
 	scOut := &storagev1.StorageClass{}
 
+	os.Setenv("VGMANAGER_IMAGE", "test")
 	Context("Reconciliation on creating an LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR creation, ", func() {
 			By("verifying CR status.Ready is set to true on reconciliation")
