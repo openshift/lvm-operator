@@ -31,15 +31,22 @@ import (
 	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
 
 const (
 	ControllerName = "vg-manager"
+)
+
+var (
+	vgFinalizer string
+	nodeName    = os.Getenv("NODE_NAME")
 )
 
 // SetupWithManager sets up the controller with the Manager.
@@ -74,6 +81,47 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	err := r.Client.Get(ctx, req.NamespacedName, lvmCluster)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if vgFinalizer == "" {
+		node := &corev1.Node{}
+		err = r.Client.Get(ctx, types.NamespacedName{Name: nodeName}, node)
+		if err != nil {
+			r.Log.Error(err, "failed to get node object", "node name", nodeName)
+			return ctrl.Result{}, err
+		}
+		vgFinalizer = fmt.Sprintf("node-uid/%s", node.UID)
+	}
+
+	// cleanup on current node when CR is deleted
+	if !lvmCluster.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(lvmCluster, vgFinalizer) {
+			// TODO: any possibility to make vgCleanup async?
+			err := vgCleanupAll(r, ctx)
+			if err != nil {
+				r.Log.Error(err, "failed to perform VG Cleanup", "node", nodeName)
+				return ctrl.Result{}, err
+			}
+
+			// remove finalizer after cleanup
+			controllerutil.RemoveFinalizer(lvmCluster, vgFinalizer)
+			if err := r.Client.Update(ctx, lvmCluster); err != nil {
+				r.Log.Error(err, "failed to remove vg finalizer", "node", nodeName, "LVMCluster", lvmCluster.Name, "finalizer", vgFinalizer)
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// set node uid as finalizer on CR
+	if !controllerutil.ContainsFinalizer(lvmCluster, vgFinalizer) {
+		controllerutil.AddFinalizer(lvmCluster, vgFinalizer)
+		if err = r.Client.Update(ctx, lvmCluster); err != nil {
+			r.Log.Error(err, "failed to update LVMCluster with vg finalizer", "LVMCluster CR", lvmCluster.Name, "finalizer", vgFinalizer)
+			return ctrl.Result{}, err
+		} else {
+			r.Log.Info("added vg finalizer to CR", "LVMCluster CR", lvmCluster.Name, "finalizer", vgFinalizer)
+		}
 	}
 
 	r.Log.Info("listing block devices")

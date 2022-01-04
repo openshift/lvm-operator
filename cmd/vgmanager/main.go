@@ -28,6 +28,7 @@ import (
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"github.com/red-hat-storage/lvm-operator/pkg/vgmanager"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -43,6 +44,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(topolvmv1.AddToScheme(scheme))
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
 }
 

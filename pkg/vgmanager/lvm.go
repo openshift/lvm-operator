@@ -28,17 +28,22 @@ import (
 	"github.com/red-hat-storage/lvm-operator/pkg/internal"
 )
 
+// TODO: Use json reporting format for LVM and remove parsing output line by line
+
 const (
 	// todo(rohan): make these paths configurable. I think they depend on the host OS
 	// this is why I copied the methods and didn't just import them from lvmd
 	lvmPath     = "/usr/sbin/lvm"
 	nsenterPath = "/usr/bin/nsenter"
+	vgremove    = "/usr/sbin/vgremove"
+	pvremove    = "/usr/sbin/pvremove"
 )
 
 type LVMAttr string
 
 var (
 	VGName LVMAttr = "vg_name"
+	PVName LVMAttr = "pv_name"
 )
 
 // LVInfo is a map of lv attributes to values.
@@ -50,11 +55,17 @@ var ErrNotFound = errors.New("not found")
 // VolumeGroup represents a volume group of linux lvm.
 type VolumeGroup struct {
 	name string
+	pvs  []string
 }
 
 // Name returns the volume group name.
 func (g *VolumeGroup) Name() string {
 	return g.name
+}
+
+// ListPV return flattened PV names in the volume group
+func (g *VolumeGroup) ListPV() []string {
+	return g.pvs
 }
 
 func (r *VGReconciler) addMatchingDevicesToVG(matchingDevices []internal.BlockDevice, vgName string) error {
@@ -94,6 +105,7 @@ func (r *VGReconciler) addMatchingDevicesToVG(matchingDevices []internal.BlockDe
 
 	return nil
 }
+
 func runCommandAsHost(cmd string, args ...string) *exec.Cmd {
 	args = append([]string{"-m", "-u", "-i", "-n", "-p", "-t", "1", cmd}, args...)
 	cmd = nsenterPath
@@ -104,6 +116,7 @@ func runCommandAsHost(cmd string, args ...string) *exec.Cmd {
 // FindVolumeGroup finds a named volume group.
 // name is volume group name to look up.
 func FindVolumeGroup(name string) (*VolumeGroup, error) {
+	// TODO: investigate whether maintaining a cache of volume groups is of any help?
 	groups, err := ListVolumeGroups()
 	if err != nil {
 		return nil, err
@@ -124,9 +137,54 @@ func ListVolumeGroups() ([]*VolumeGroup, error) {
 	}
 	groups := []*VolumeGroup{}
 	for _, info := range infoList {
-		groups = append(groups, &VolumeGroup{info["vg_name"]})
+		// get all PVs which are part of VG
+		pvList, err := parseOutput("pvs", "pv_name", "-S", fmt.Sprintf("vg_name=%s", info[VGName]))
+		if err != nil {
+			return nil, err
+		}
+		pvs := make([]string, 0, len(pvList))
+		for _, pv := range pvList {
+			pvs = append(pvs, pv[PVName])
+		}
+		groups = append(groups, &VolumeGroup{
+			name: info[VGName],
+			pvs:  pvs,
+		})
 	}
 	return groups, nil
+}
+
+// RemoveVolumeGroup removes volume group and physical volumes that are part of it
+func RemoveVolumeGroup(name string) error {
+
+	// find volume group which contains name and list of PVs belonging to VG
+	vg, err := FindVolumeGroup(name)
+	if err != nil {
+		return err
+	}
+
+	var stderr bytes.Buffer
+
+	// remove volume group
+	c := runCommandAsHost(vgremove, vg.Name(), "--nolock")
+	c.Stderr = &stderr
+	err = c.Run()
+	if err != nil {
+		return fmt.Errorf("error while removing volume group %s, failed with %s", vg.Name(), stderr.String())
+	}
+	stderr.Reset()
+
+	// remove PVs part of the volume group
+	args := append(vg.ListPV(), "--nolock")
+	c = runCommandAsHost(pvremove, args...)
+	c.Stderr = &stderr
+	err = c.Run()
+	if err != nil {
+		return fmt.Errorf("error while removing LVM PVs from volume group %s, failed with %s", vg.Name(), stderr.String())
+	}
+	stderr.Reset()
+
+	return nil
 }
 
 // wrapExecCommand calls cmd with args but wrapped to run

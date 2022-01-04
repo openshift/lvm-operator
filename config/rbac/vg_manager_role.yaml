@@ -33,3 +33,19 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - topolvm.cybozu.com
+  resources:
+  - logicalvolumes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
