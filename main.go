@@ -73,7 +73,7 @@ func main() {
 			"Exiting")
 		os.Exit(1)
 	}
-	setupLog.Info("Watching namespace ", operatorNamespace)
+	setupLog.Info("Watching namespace", "Namespace", operatorNamespace)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
