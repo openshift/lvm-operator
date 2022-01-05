@@ -109,7 +109,7 @@ var FilterMap = map[string]func(internal.BlockDevice) (bool, error){
 	},
 
 	noChildren: func(dev internal.BlockDevice) (bool, error) {
-		hasChildren, err := dev.HasChildren()
-		return !hasChildren, err
+		hasChildren := dev.HasChildren()
+		return !hasChildren, nil
 	},
 }
