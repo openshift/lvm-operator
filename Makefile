@@ -93,6 +93,31 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
+
+OPERATOR_NAMESPACE ?= openshift-storage
+TOPOLVM_CSI_IMAGE ?= quay.io/topolvm/topolvm:0.10.3
+CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
+CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
+CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+VGMANAGER_IMAGE ?= quay.io/ocs-dev/vgmanager:latest
+
+
+define MANAGER_ENV_VARS
+OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE)
+TOPOLVM_CSI_IMAGE=$(TOPOLVM_CSI_IMAGE)
+CSI_REGISTRAR_IMAGE=$(CSI_REGISTRAR_IMAGE)
+CSI_PROVISIONER_IMAGE=$(CSI_PROVISIONER_IMAGE)
+CSI_LIVENESSPROBE_IMAGE=$(CSI_LIVENESSPROBE_IMAGE)
+CSI_RESIZER_IMAGE=$(CSI_RESIZER_IMAGE)
+VGMANAGER_IMAGE=$(VGMANAGER_IMAGE)
+endef
+export MANAGER_ENV_VARS
+
+update-mgr-env: ## Feed env variables to the manager configmap
+	@echo "$$MANAGER_ENV_VARS" > config/manager/manager.env
+
+
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.
@@ -171,7 +196,7 @@ rm -rf $$TMP_DIR ;\
 endef
 
 .PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
+bundle: update-mgr-env manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
