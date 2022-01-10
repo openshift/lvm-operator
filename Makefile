@@ -196,7 +196,7 @@ endef
 
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
+bundle: update-mgr-env manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -235,7 +235,8 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.14.0/operator-sdk_$(GOOS)_$(GOARCH);\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v1.14.0/operator-sdk_$${OS}_$${ARCH};\
 	chmod +x $(OPERATOR_SDK) ;\
 	}
 else
