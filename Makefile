@@ -23,7 +23,7 @@ ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
-
+BUNDLE_PACKAGE ?= lvm-operator
 
 # Image URL to use all building/pushing image targets
 IMAGE_REGISTRY ?= quay.io
@@ -203,7 +203,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk ## Generate bundle manif
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
