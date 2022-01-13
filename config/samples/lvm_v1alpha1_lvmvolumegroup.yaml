@@ -1,0 +1,6 @@
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMVolumeGroup
+metadata:
+  name: lvmvolumegroup-sample
+spec:
+  # Add fields here
