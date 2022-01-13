@@ -56,11 +56,13 @@ type VGReconciler struct {
 	Log    logr.Logger
 	// map from KNAME of device to time when the device was first observed since the process started
 	deviceAgeMap *ageMap
+	executor     internal.Executor
 }
 
 func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log = log.FromContext(ctx).WithName(ControllerName)
 	r.Log.Info("reconciling", "lvmcluster", req)
+	r.executor = &internal.CommandExecutor{}
 	res, err := r.reconcile(ctx, req)
 	if err != nil {
 		r.Log.Error(err, "reconcile error")
@@ -78,13 +80,9 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 
 	r.Log.Info("listing block devices")
 	//  list block devices
-	blockDevices, badRows, err := internal.ListBlockDevices()
+	blockDevices, err := internal.ListBlockDevices(r.executor)
 	if err != nil {
-		msg := fmt.Sprintf("failed to list block devices: %v", err)
-		r.Log.Error(err, msg, "lsblk.BadRows", badRows)
-		return ctrl.Result{}, err
-	} else if len(badRows) > 0 {
-		r.Log.Error(err, "could not parse all the lsblk rows", "lsblk.BadRows", badRows)
+		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %v", err)
 	}
 
 	existingLvmdConfig := &lvmdCMD.Config{}
@@ -146,8 +144,8 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 			continue
 		}
 		if len(matchingDevices) > 0 {
-			// create/update VG and update lvmd config
-			err = r.addMatchingDevicesToVG(matchingDevices, deviceClass.Name)
+			// create/extend VG and update lvmd config
+			err = r.addDevicesToVG(deviceClass.Name, matchingDevices)
 			if err != nil {
 				r.Log.Error(err, "could not prepare volume group", "name", deviceClass.Name)
 				continue
@@ -175,6 +173,46 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		requeueAfter = time.Second * 30
 	}
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDevice) error {
+	if len(devices) < 1 {
+		return fmt.Errorf("can't create vg %q with 0 devices", vgName)
+	}
+
+	// check if volume group is already present
+	vgs, err := ListVolumeGroups(r.executor)
+	if err != nil {
+		return fmt.Errorf("failed to list volume groups. %v", err)
+	}
+
+	vgFound := false
+	for _, vg := range vgs {
+		if vg.Name == vgName {
+			vgFound = true
+		}
+	}
+
+	args := []string{vgName}
+	for _, device := range devices {
+		args = append(args, fmt.Sprintf("/dev/%s", device.KName))
+	}
+
+	var cmd string
+	if vgFound {
+		r.Log.Info("extending an existing volume group", "Name", vgName)
+		cmd = "/usr/sbin/vgextend"
+	} else {
+		r.Log.Info("creating a new volume group", "Name", vgName)
+		cmd = "/usr/sbin/vgcreate"
+	}
+
+	_, err = r.executor.ExecuteCommandWithOutputAsHost(cmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to create or extend volume group %q. %v", vgName, err)
+	}
+
+	return nil
 }
 
 // filterMatchingDevices returns unmatched and matched blockdevices
