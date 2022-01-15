@@ -9,7 +9,7 @@ rules:
   - lvm.topolvm.io
   - apps
   resources:
-  - lvmclusters
+  - lvmvolumegroups
   - daemonsets
   verbs:
   - create
@@ -22,13 +22,39 @@ rules:
 - apiGroups:
   - lvm.topolvm.io
   resources:
-  - lvmclusters/finalizers
+  - lvmvolumegroups/finalizers
   verbs:
   - update
 - apiGroups:
   - lvm.topolvm.io
   resources:
-  - lvmclusters/status
+  - lvmvolumegroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/status
   verbs:
   - get
   - patch
