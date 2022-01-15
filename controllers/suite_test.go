@@ -60,6 +60,7 @@ func TestAPIs(t *testing.T) {
 const (
 	testLvmClusterName      = "test-lvmcluster"
 	testLvmClusterNamespace = "openshift-storage"
+	testDeviceClassName     = "test"
 )
 
 var _ = BeforeSuite(func() {
