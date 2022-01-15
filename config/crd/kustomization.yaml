@@ -6,6 +6,7 @@ resources:
 # Topolvm CRD from https://github.com/red-hat-storage/topolvm/blob/main/config/crd/bases/topolvm.cybozu.com_logicalvolumes.yaml
 - bases/topolvm.cybozu.com_logicalvolumes.yaml
 - bases/lvm.topolvm.io_lvmvolumegroups.yaml
+- bases/lvm.topolvm.io_lvmvolumegroupnodestatuses.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -13,12 +14,14 @@ patchesStrategicMerge:
 # patches here are for enabling the conversion webhook for each CRD
 #- patches/webhook_in_lvmclusters.yaml
 #- patches/webhook_in_lvmvolumegroups.yaml
+#- patches/webhook_in_lvmvolumegroupnodestatuses.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
 # patches here are for enabling the CA injection for each CRD
 #- patches/cainjection_in_lvmclusters.yaml
 #- patches/cainjection_in_lvmvolumegroups.yaml
+#- patches/cainjection_in_lvmvolumegroupnodestatuses.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

@@ -2,4 +2,5 @@
 resources:
 - lvm_v1alpha1_lvmcluster.yaml
 - lvm_v1alpha1_lvmvolumegroup.yaml
+- lvm_v1alpha1_lvmvolumegroupnodestatus.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

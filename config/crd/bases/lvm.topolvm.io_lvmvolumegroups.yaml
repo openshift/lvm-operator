@@ -125,24 +125,6 @@ spec:
             type: object
           status:
             description: LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
-            properties:
-              nodeStatus:
-                description: NodeStatus contains the per node status of the VG
-                items:
-                  properties:
-                    node:
-                      description: Node is the name of the node where the VG is to
-                        be created
-                      type: string
-                    reason:
-                      description: Reason provides more detail on the VG creation
-                        status
-                      type: string
-                    status:
-                      description: Status tells if the VG was created on the node
-                      type: string
-                  type: object
-                type: array
             type: object
         type: object
     served: true
