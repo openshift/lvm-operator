@@ -75,8 +75,10 @@ func main() {
 	}
 
 	if err = (&vgmanager.VGReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		NodeName:  os.Getenv("NODE_NAME"),
+		Namespace: os.Getenv("POD_NAMESPACE"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
 		os.Exit(1)

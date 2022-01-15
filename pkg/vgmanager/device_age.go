@@ -24,7 +24,7 @@ import (
 var (
 	// deviceMinAge is the minimum age for a device to be considered safe to claim
 	// otherwise, it could be a device that some other entity has attached and we have not claimed.
-	deviceMinAge = time.Minute
+	deviceMinAge = time.Second * 30
 )
 
 // timeInterface exists so as it can be patched for testing purpose
