@@ -164,7 +164,7 @@ func getInitContainer() *corev1.Container {
 	command := []string{
 		"sh",
 		"-c",
-		"openssl req -nodes -x509 -newkey rsa:4096 -subj '/DC=self_signed_certificate' -keyout /certs/tls.key -out /certs/tls.crt -days 365",
+		"openssl req -nodes -x509 -newkey rsa:4096 -subj '/DC=self_signed_certificate' -keyout /certs/tls.key -out /certs/tls.crt -days 3650",
 	}
 
 	volumeMounts := []corev1.VolumeMount{
