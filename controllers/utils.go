@@ -25,11 +25,13 @@ import (
 // extractNodeSelectorAndTolerations combines and extracts scheduling parameters from the multiple deviceClass entries in an lvmCluster
 func extractNodeSelectorAndTolerations(lvmCluster *lvmv1alpha1.LVMCluster) (*corev1.NodeSelector, []corev1.Toleration) {
 	var nodeSelector *corev1.NodeSelector
-	var tolerations []corev1.Toleration
+
+	tolerations := lvmCluster.Spec.Tolerations
+
 	terms := make([]corev1.NodeSelectorTerm, 0)
 	matchAllNodes := false
 	for _, deviceClass := range lvmCluster.Spec.DeviceClasses {
-		tolerations = append(tolerations, deviceClass.Tolerations...)
+
 		if deviceClass.NodeSelector != nil {
 			terms = append(terms, deviceClass.NodeSelector.NodeSelectorTerms...)
 		} else {

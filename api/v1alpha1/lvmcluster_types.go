@@ -28,6 +28,9 @@ import (
 type LVMClusterSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Tolerations to apply to nodes to act on
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// DeviceClasses are a rules that assign local storage devices to volumegroups that are used for creating lvm based PVs
 	// +Optional
 	DeviceClasses []DeviceClass `json:"deviceClasses,omitempty"`
@@ -49,10 +52,6 @@ type DeviceClass struct {
 	// NodeSelector chooses nodes
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
-
-	// Tolerations to apply to nodes to act on
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// TODO: add support for various LVM settings
 	// // Config for this deviceClass, lvm settings are a field here

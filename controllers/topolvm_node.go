@@ -169,7 +169,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *app
 	// Affinity and tolerations
 	nodeSelector, tolerations := extractNodeSelectorAndTolerations(lvmCluster)
 
-	topolvmNodeTolerations := []corev1.Toleration{{Operator: corev1.TolerationOpExists}}
+	topolvmNodeTolerations := []corev1.Toleration{}
 	if tolerations != nil {
 		topolvmNodeTolerations = tolerations
 	}
