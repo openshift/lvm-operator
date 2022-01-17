@@ -41,17 +41,6 @@ type LVMVolumeGroupSpec struct {
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
 type LVMVolumeGroupStatus struct {
-	// NodeStatus contains the per node status of the VG
-	NodeStatus []NodeStatus `json:"nodeStatus,omitempty"`
-}
-
-type NodeStatus struct {
-	// Node is the name of the node where the VG is to be created
-	Node string `json:"node,omitempty"`
-	// Status tells if the VG was created on the node
-	Status string `json:"status,omitempty"`
-	// Reason provides more detail on the VG creation status
-	Reason string `json:"reason,omitempty"`
 }
 
 //+kubebuilder:object:root=true

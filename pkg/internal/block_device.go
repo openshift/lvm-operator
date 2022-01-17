@@ -25,7 +25,7 @@ type BlockDevice struct {
 	Model      string        `json:"model,omitempty"`
 	Vendor     string        `json:"vendor,omitempty"`
 	State      string        `json:"state,omitempty"`
-	FSType     string        `json:"fsType"`
+	FSType     string        `json:"fstype"`
 	Size       string        `json:"size"`
 	Children   []BlockDevice `json:"children,omitempty"`
 	Rotational string        `json:"rota"`
@@ -40,7 +40,7 @@ type BlockDevice struct {
 func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
-	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,RM,STATE,KNAME,SERIAL,PARTLABEL"
+	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,RM,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "-o", columns}
 
 	output, err := exec.ExecuteCommandWithOutput("lsblk", args...)

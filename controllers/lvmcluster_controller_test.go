@@ -46,7 +46,7 @@ var _ = Describe("LVMCluster controller", func() {
 			Namespace: testLvmClusterNamespace,
 		},
 		Spec: lvmv1alpha1.LVMClusterSpec{
-			DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: "test"}},
+			DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: testDeviceClassName}},
 		},
 	}
 
@@ -65,6 +65,9 @@ var _ = Describe("LVMCluster controller", func() {
 	// CSI Node resource
 	csiNodeName := types.NamespacedName{Namespace: testLvmClusterNamespace, Name: TopolvmNodeDaemonsetName}
 	csiNodeOut := &appsv1.DaemonSet{}
+
+	lvmVolumeGroupName := types.NamespacedName{Namespace: testLvmClusterNamespace, Name: testDeviceClassName}
+	lvmVolumeGroupOut := &lvmv1alpha1.LVMVolumeGroup{}
 
 	// Topolvm Storage Classes
 	scNames := []types.NamespacedName{}
@@ -115,6 +118,12 @@ var _ = Describe("LVMCluster controller", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
+			By("confirming the existence of LVMVolumeGroup resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
 			By("confirming creation of TopolvmStorageClasses")
 			for _, scName := range scNames {
 				Eventually(func() bool {
@@ -159,6 +168,12 @@ var _ = Describe("LVMCluster controller", func() {
 			By("confirming absence of CSI Node Resource")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+
+			By("confirming absence of LVMVolumeGroup Resource")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 

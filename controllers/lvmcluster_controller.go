@@ -63,6 +63,9 @@ type LVMClusterReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups/finalizers,verbs=update
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;create;update;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
@@ -117,19 +120,21 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
 func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
-	resourceList := []resourceManager{
-		&csiDriver{},
-		&topolvmController{},
-		&openshiftSccs{},
-		&topolvmNode{},
-		&vgManager{},
-		&topolvmStorageClass{},
-	}
 
 	//The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
-			for _, unit := range resourceList {
+			resourceDeletionList := []resourceManager{
+				&csiDriver{},
+				&topolvmController{},
+				&lvmVG{},
+				&openshiftSccs{},
+				&topolvmNode{},
+				&vgManager{},
+				&topolvmStorageClass{},
+			}
+
+			for _, unit := range resourceDeletionList {
 				err := unit.ensureDeleted(r, ctx, instance)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
@@ -153,8 +158,18 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		}
 	}
 
+	resourceCreationList := []resourceManager{
+		&csiDriver{},
+		&topolvmController{},
+		&openshiftSccs{},
+		&topolvmNode{},
+		&vgManager{},
+		&lvmVG{},
+		&topolvmStorageClass{},
+	}
+
 	// handle create/update
-	for _, unit := range resourceList {
+	for _, unit := range resourceCreationList {
 		err := unit.ensureCreated(r, ctx, instance)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)

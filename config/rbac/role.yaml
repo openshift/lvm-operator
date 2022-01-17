@@ -64,6 +64,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - security.openshift.io
   resources:
   - securitycontextconstraints

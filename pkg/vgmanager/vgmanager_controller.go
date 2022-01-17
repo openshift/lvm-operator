@@ -30,10 +30,12 @@ import (
 	"github.com/topolvm/topolvm/lvmd"
 	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
@@ -46,7 +48,7 @@ const (
 func (r *VGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.deviceAgeMap = newAgeMap(&wallTime{})
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&lvmv1alpha1.LVMCluster{}).
+		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Complete(r)
 }
 
@@ -57,11 +59,13 @@ type VGReconciler struct {
 	// map from KNAME of device to time when the device was first observed since the process started
 	deviceAgeMap *ageMap
 	executor     internal.Executor
+	NodeName     string
+	Namespace    string
 }
 
 func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log = log.FromContext(ctx).WithName(ControllerName)
-	r.Log.Info("reconciling", "lvmcluster", req)
+	r.Log.Info("reconciling", "lvmvolumegroup", req)
 	r.executor = &internal.CommandExecutor{}
 	res, err := r.reconcile(ctx, req)
 	if err != nil {
@@ -71,18 +75,60 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	return res, err
 
 }
+
+var reconcileInterval = time.Minute * 1
+var reconcileAgain ctrl.Result = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
+
+//TODO: Refactor this function to move the ctrl result to a single place
+
 func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	lvmCluster := &lvmv1alpha1.LVMCluster{}
-	err := r.Client.Get(ctx, req.NamespacedName, lvmCluster)
+
+	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
+	err := r.Client.Get(ctx, req.NamespacedName, volumeGroup)
 	if err != nil {
+		r.Log.Error(err, "failed to get LVMVolumeGroup", "VGName", req.Name)
 		return ctrl.Result{}, err
 	}
 
-	r.Log.Info("listing block devices")
+	//TODO: actually check the node against the nodeSelector.
+	node := &corev1.Node{}
+	nodeMatches, err := NodeSelectorMatchesNodeLabels(node, volumeGroup.Spec.NodeSelector)
+	if err != nil {
+		r.Log.Error(err, "failed to match nodeSelector to node labels", "VGName", volumeGroup.Name)
+		return reconcileAgain, err
+	}
+
+	if !nodeMatches {
+		//Nothing to be done on this node for the VG.
+		r.Log.Info("node does not match selector", "VGName", volumeGroup.Name)
+		return ctrl.Result{}, nil
+	}
+
+	r.Log.Info("listing block devices", "VGName", volumeGroup.Name)
+
 	//  list block devices
 	blockDevices, err := internal.ListBlockDevices(r.executor)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %v", err)
+		return reconcileAgain, fmt.Errorf("failed to list block devices: %v", err)
+	}
+
+	// filter out block devices
+	remainingValidDevices, delayedDevices, err := r.filterAvailableDevices(blockDevices)
+	if err != nil {
+		_ = err
+	}
+
+	var matchingDevices []internal.BlockDevice
+	_, matchingDevices, err = filterMatchingDevices(remainingValidDevices, volumeGroup)
+	if err != nil {
+		r.Log.Error(err, "could not filter matching devices", "VGName", volumeGroup.Name)
+		return reconcileAgain, err
+	}
+
+	status := &lvmv1alpha1.VGStatus{
+		Name:   req.Name,
+		Status: lvmv1alpha1.VGStatusReady,
+		Reason: "",
 	}
 
 	existingLvmdConfig := &lvmdCMD.Config{}
@@ -96,11 +142,11 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	if os.IsNotExist(err) {
 		r.Log.Info("lvmd config file doesn't exist, will create")
 	} else if err != nil {
-		return ctrl.Result{}, err
+		return reconcileAgain, err
 	} else {
 		err = yaml.Unmarshal(cfgBytes, &lvmdConfig)
 		if err != nil {
-			return ctrl.Result{}, err
+			return reconcileAgain, err
 		}
 		existingLvmdConfig = lvmdConfig
 	}
@@ -111,46 +157,49 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		deviceClassMap[deviceClass.Name] = i
 	}
 
-	// filter out block devices
-	remainingValidDevices, delayedDevices, err := r.filterAvailableDevices(blockDevices)
-	if err != nil {
-		_ = err
+	_, found := deviceClassMap[volumeGroup.Name]
+
+	if len(matchingDevices) == 0 {
+		r.Log.Info("no matching devices", "VGName", volumeGroup.Name)
+		if len(delayedDevices) > 0 {
+			return reconcileAgain, nil
+		} else {
+			if found {
+				// Update the status again just to be safe.
+				if statuserr := r.updateStatus(ctx, status, volumeGroup); statuserr != nil {
+					r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+					return reconcileAgain, nil
+				}
+
+			}
+			return ctrl.Result{}, nil
+		}
 	}
 
-	for _, deviceClass := range lvmCluster.Spec.DeviceClasses {
-		// ignore deviceClasses whose LabelSelector doesn't match this node
-		// NodeSelectorTerms.MatchExpressions are ORed
-		node := &corev1.Node{}
-		selectsNode, err := NodeSelectorMatchesNodeLabels(node, deviceClass.NodeSelector)
-		if err != nil {
-			r.Log.Error(err, "failed to match nodeSelector to node labels")
-			continue
-		}
-		if !(selectsNode && ToleratesTaints(deviceClass.Tolerations, node.Spec.Taints)) {
-			continue
-		}
-		_, found := deviceClassMap[deviceClass.Name]
+	// create/extend VG and update lvmd config
+	err = r.addDevicesToVG(volumeGroup.Name, matchingDevices)
+	if err != nil {
+		r.Log.Error(err, "failed to create/extend volume group", "VGName", volumeGroup.Name)
+
 		if !found {
-			lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, &lvmd.DeviceClass{
-				Name:        deviceClass.Name,
-				VolumeGroup: deviceClass.Name,
-				Default:     true,
-			})
+			status.Status = lvmv1alpha1.VGStatusFailed
+			status.Reason = "VGCreationFailed"
+		} else {
+			status.Status = lvmv1alpha1.VGStatusDegraded
+			status.Reason = "VGExtendFailed"
 		}
-		var matchingDevices []internal.BlockDevice
-		remainingValidDevices, matchingDevices, err = filterMatchingDevices(remainingValidDevices, deviceClass)
-		if err != nil {
-			r.Log.Error(err, "could not filterMatchingDevices")
-			continue
+		if statuserr := r.updateStatus(ctx, status, volumeGroup); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 		}
-		if len(matchingDevices) > 0 {
-			// create/extend VG and update lvmd config
-			err = r.addDevicesToVG(deviceClass.Name, matchingDevices)
-			if err != nil {
-				r.Log.Error(err, "could not prepare volume group", "name", deviceClass.Name)
-				continue
-			}
-		}
+		return reconcileAgain, err
+	}
+
+	if !found {
+		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, &lvmd.DeviceClass{
+			Name:        volumeGroup.Name,
+			VolumeGroup: volumeGroup.Name,
+			Default:     true,
+		})
 	}
 
 	// apply and save lvmconfig
@@ -158,17 +207,22 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	if !cmp.Equal(existingLvmdConfig, lvmdConfig) {
 		r.Log.Info("updating lvmd config")
 		out, err := yaml.Marshal(lvmdConfig)
-		if err != nil {
-			return ctrl.Result{}, err
+		if err == nil {
+			err = os.WriteFile(controllers.LvmdConfigFile, out, 0600)
 		}
-		err = os.WriteFile(controllers.LvmdConfigFile, out, 0600)
+
 		if err != nil {
-			return ctrl.Result{}, err
+			r.Log.Error(err, "failed to update lvmd.conf file", "VGName", volumeGroup.Name)
+			return reconcileAgain, err
 		}
 	}
 
+	if statuserr := r.updateStatus(ctx, status, volumeGroup); statuserr != nil {
+		r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+	}
+
 	// requeue faster if some devices are too recently observed to consume
-	requeueAfter := time.Minute * 2
+	requeueAfter := time.Minute * 1
 	if len(delayedDevices) > 0 {
 		requeueAfter = time.Second * 30
 	}
@@ -216,7 +270,8 @@ func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDev
 }
 
 // filterMatchingDevices returns unmatched and matched blockdevices
-func filterMatchingDevices(blockDevices []internal.BlockDevice, lvmCluster lvmv1alpha1.DeviceClass) ([]internal.BlockDevice, []internal.BlockDevice, error) {
+// TODO: Implement this
+func filterMatchingDevices(blockDevices []internal.BlockDevice, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, []internal.BlockDevice, error) {
 	// currently just match all devices
 	return []internal.BlockDevice{}, blockDevices, nil
 }
@@ -226,7 +281,7 @@ func NodeSelectorMatchesNodeLabels(node *corev1.Node, nodeSelector *corev1.NodeS
 		return true, nil
 	}
 	if node == nil {
-		return false, fmt.Errorf("the node var is nil")
+		return false, fmt.Errorf("node cannot be nil")
 	}
 
 	matches, err := corev1helper.MatchNodeSelectorTerms(node, nodeSelector)
@@ -242,4 +297,72 @@ func ToleratesTaints(tolerations []corev1.Toleration, taints []corev1.Taint) boo
 		}
 	}
 	return true
+}
+
+func setStatus(status *lvmv1alpha1.VGStatus, instance *lvmv1alpha1.LVMVolumeGroupNodeStatus) {
+	found := false
+
+	vgStatuses := instance.Spec.LVMVGStatus
+	for _, vgStatus := range vgStatuses {
+		if vgStatus.Name == status.Name {
+			found = true
+			vgStatus.Status = status.Status
+			vgStatus.Reason = status.Reason
+			break
+		}
+	}
+
+	if !found {
+		newStatus := &lvmv1alpha1.VGStatus{
+			Name:   status.Name,
+			Status: status.Status,
+			Reason: status.Reason,
+		}
+		vgStatuses = append(vgStatuses, *newStatus)
+		instance.Spec.LVMVGStatus = vgStatuses
+	}
+}
+
+func (r *VGReconciler) updateStatus(ctx context.Context, status *lvmv1alpha1.VGStatus, instance *lvmv1alpha1.LVMVolumeGroup) error {
+
+	vgNodeStatus := r.getNewNodeStatus(status)
+
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.NodeName,
+			Namespace: r.Namespace,
+		},
+	}
+
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, nodeStatus, func() error {
+		if nodeStatus.CreationTimestamp.IsZero() {
+			vgNodeStatus.DeepCopyInto(nodeStatus)
+			return nil
+		}
+		setStatus(status, nodeStatus)
+		return nil
+	})
+
+	if err != nil {
+		r.Log.Error(err, "failed to create or update lvmvolumegroupnodestatus", "name", vgNodeStatus.Name)
+		return err
+	} else if result != controllerutil.OperationResultNone {
+		r.Log.Info("lvmvolumegroupnodestatus modified", "operation", result, "name", vgNodeStatus.Name)
+	} else {
+		r.Log.Info("lvmvolumegroupnodestatus unchanged")
+	}
+	return err
+}
+
+func (r *VGReconciler) getNewNodeStatus(status *lvmv1alpha1.VGStatus) *lvmv1alpha1.LVMVolumeGroupNodeStatus {
+
+	vgNodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.NodeName,
+			Namespace: r.Namespace,
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupNodeStatusSpec{},
+	}
+	setStatus(status, vgNodeStatus)
+	return vgNodeStatus
 }

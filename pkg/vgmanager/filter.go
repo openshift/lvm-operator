@@ -57,7 +57,7 @@ DeviceLoop:
 				valid = false
 				continue DeviceLoop
 			} else if !valid {
-				filterLogger.Info("filter not passed")
+				filterLogger.Info("does not match filter")
 				continue DeviceLoop
 			}
 		}
