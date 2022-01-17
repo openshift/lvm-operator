@@ -15,7 +15,12 @@ spec:
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
         insecureSkipVerify: true
+    - path: /metrics
+      port: lvm-metrics
+      scheme: http
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        insecureSkipVerify: true
   selector:
     matchLabels:
       app.kubernetes.io/compose: metrics
-      control-plane: controller-manager
