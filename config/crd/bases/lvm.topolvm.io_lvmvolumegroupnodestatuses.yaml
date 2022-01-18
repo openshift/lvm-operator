@@ -42,6 +42,11 @@ spec:
                 description: NodeStatus contains the per node status of the VG
                 items:
                   properties:
+                    devices:
+                      description: Devices is the list of devices used by the VG
+                      items:
+                        type: string
+                      type: array
                     name:
                       description: Name is the name of the VG
                       type: string

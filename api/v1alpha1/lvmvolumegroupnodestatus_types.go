@@ -46,6 +46,8 @@ type VGStatus struct {
 	Status VGStatusType `json:"status,omitempty"`
 	// Reason provides more detail on the VG creation status
 	Reason string `json:"reason,omitempty"`
+	//Devices is the list of devices used by the VG
+	Devices []string `json:"devices,omitempty"`
 }
 
 // LVMVolumeGroupNodeStatusStatus defines the observed state of LVMVolumeGroupNodeStatus

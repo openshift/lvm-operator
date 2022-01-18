@@ -201,6 +201,12 @@ spec:
                         description: NodeStatus defines the observed state of the
                           deviceclass on the node
                         properties:
+                          devices:
+                            description: Devices is the list of devices used by the
+                              deviceclass
+                            items:
+                              type: string
+                            type: array
                           node:
                             description: Node is the name of the node
                             type: string

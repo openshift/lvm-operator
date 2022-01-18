@@ -214,12 +214,13 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 			if !ok {
 				vgNodeMap[item.Name] = []lvmv1alpha1.NodeStatus{
 					{
-						Node:   nodeItem.Name,
-						Status: item.Status,
+						Node:    nodeItem.Name,
+						Status:  item.Status,
+						Devices: item.Devices,
 					},
 				}
 			} else {
-				new := lvmv1alpha1.NodeStatus{Node: nodeItem.Name, Status: item.Status}
+				new := lvmv1alpha1.NodeStatus{Node: nodeItem.Name, Status: item.Status, Devices: item.Devices}
 				val = append(val, new)
 				vgNodeMap[item.Name] = val
 			}
