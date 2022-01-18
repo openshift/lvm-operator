@@ -66,6 +66,9 @@ type LVMClusterReconciler struct {
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups/finalizers,verbs=update
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;create;update;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
@@ -100,12 +103,9 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
 
-	// Apply status changes
-	statusError := r.Client.Status().Update(ctx, lvmCluster)
+	statusError := r.updateLVMClusterStatus(ctx, lvmCluster)
 	if statusError != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Error(statusError, "failed to update status")
-		}
+		r.Log.Error(statusError, "failed to update VG Node status")
 	}
 
 	// Reconcile errors have higher priority than status update errors
@@ -195,6 +195,53 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	//ToDo: Change the status to something useful
 	instance.Status.Ready = true
 	return ctrl.Result{}, nil
+}
+
+func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+
+	vgNodeMap := make(map[string][]lvmv1alpha1.NodeStatus)
+
+	vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
+	err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace))
+	if err != nil {
+		r.Log.Error(err, "failed to list LVMVolumeGroupNodeStatus")
+		return err
+	}
+
+	for _, nodeItem := range vgNodeStatusList.Items {
+		for _, item := range nodeItem.Spec.LVMVGStatus {
+			val, ok := vgNodeMap[item.Name]
+			if !ok {
+				vgNodeMap[item.Name] = []lvmv1alpha1.NodeStatus{
+					{
+						Node:   nodeItem.Name,
+						Status: item.Status,
+					},
+				}
+			} else {
+				new := lvmv1alpha1.NodeStatus{Node: nodeItem.Name, Status: item.Status}
+				val = append(val, new)
+				vgNodeMap[item.Name] = val
+			}
+		}
+	}
+
+	allVgStatuses := []lvmv1alpha1.DeviceClassStatus{}
+	for k := range vgNodeMap {
+		//r.Log.Info("vgnode map ", "key", k, "NodeStatus", vgNodeMap[k])
+		new := lvmv1alpha1.DeviceClassStatus{Name: k, NodeStatus: vgNodeMap[k]}
+		allVgStatuses = append(allVgStatuses, new)
+	}
+
+	instance.Status.DeviceClassStatuses = allVgStatuses
+	// Apply status changes
+	err = r.Client.Status().Update(ctx, instance)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			r.Log.Error(err, "failed to update status")
+		}
+	}
+	return err
 }
 
 // NOTE: when updating this, please also update doc/design/operator.md
