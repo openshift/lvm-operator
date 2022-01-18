@@ -158,6 +158,14 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	}
 
 	_, found := deviceClassMap[volumeGroup.Name]
+	if found {
+		volGrpHostInfo, err := GetVolumeGroup(r.executor, volumeGroup.Name)
+		if err != nil {
+			r.Log.Error(err, "failed to get volume group", "name", volumeGroup.Name)
+		} else {
+			status.Devices = volGrpHostInfo.PVs
+		}
+	}
 
 	if len(matchingDevices) == 0 {
 		r.Log.Info("no matching devices", "VGName", volumeGroup.Name)
@@ -215,6 +223,13 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 			r.Log.Error(err, "failed to update lvmd.conf file", "VGName", volumeGroup.Name)
 			return reconcileAgain, err
 		}
+	}
+
+	volGrpHostInfo, err := GetVolumeGroup(r.executor, volumeGroup.Name)
+	if err == nil {
+		status.Devices = volGrpHostInfo.PVs
+	} else {
+		r.Log.Error(err, "failed to get volume group", "name", volumeGroup.Name)
 	}
 
 	if statuserr := r.updateStatus(ctx, status, volumeGroup); statuserr != nil {
@@ -308,15 +323,17 @@ func setStatus(status *lvmv1alpha1.VGStatus, instance *lvmv1alpha1.LVMVolumeGrou
 			found = true
 			vgStatus.Status = status.Status
 			vgStatus.Reason = status.Reason
+			vgStatus.Devices = status.Devices
 			break
 		}
 	}
 
 	if !found {
 		newStatus := &lvmv1alpha1.VGStatus{
-			Name:   status.Name,
-			Status: status.Status,
-			Reason: status.Reason,
+			Name:    status.Name,
+			Status:  status.Status,
+			Reason:  status.Reason,
+			Devices: status.Devices,
 		}
 		vgStatuses = append(vgStatuses, *newStatus)
 		instance.Spec.LVMVGStatus = vgStatuses
