@@ -45,11 +45,11 @@ type DeviceClass struct {
 	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
 	Name string `json:"name,omitempty"`
 
-	// DeviceSelector is a set of rules that should match for a device to be included in this TopoLVMCluster
+	// DeviceSelector is a set of rules that should match for a device to be included in the LVMCluster
 	// +optional
 	DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
 
-	// NodeSelector chooses nodes
+	// NodeSelector chooses nodes on which to create the deviceclass
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
@@ -79,9 +79,27 @@ type LVMClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ready describes if the LvmCluster is ready.
+	// Ready describes if the LVMCluster is ready.
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+	// DeviceClassStatuses describes the status of all deviceClasses
+	DeviceClassStatuses []DeviceClassStatus `json:"deviceClassStatuses,omitempty"`
+}
+
+// DeviceClassStatus defines the observed status of the deviceclass across all nodes
+type DeviceClassStatus struct {
+	// Name is the name of the deviceclass
+	Name string `json:"name,omitempty"`
+	// NodeStatus tells if the deviceclass was created on the node
+	NodeStatus []NodeStatus `json:"nodeStatus,omitempty"`
+}
+
+// NodeStatus defines the observed state of the deviceclass on the node
+type NodeStatus struct {
+	// Node is the name of the node
+	Node string `json:"node,omitempty"`
+	// Status is the status of the VG on the node
+	Status VGStatusType `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

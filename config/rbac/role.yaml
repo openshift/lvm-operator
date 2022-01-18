@@ -66,6 +66,32 @@ rules:
 - apiGroups:
   - lvm.topolvm.io
   resources:
+  - lvmvolumegroupnodestatuses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
   - lvmvolumegroups
   verbs:
   - create

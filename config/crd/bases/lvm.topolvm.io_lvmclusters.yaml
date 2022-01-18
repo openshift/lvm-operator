@@ -43,7 +43,7 @@ spec:
                   properties:
                     deviceSelector:
                       description: DeviceSelector is a set of rules that should match
-                        for a device to be included in this TopoLVMCluster
+                        for a device to be included in the LVMCluster
                       type: object
                     name:
                       description: 'Name of the class, the VG and possibly the storageclass.
@@ -54,7 +54,8 @@ spec:
                       pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
                     nodeSelector:
-                      description: NodeSelector chooses nodes
+                      description: NodeSelector chooses nodes on which to create the
+                        deviceclass
                       properties:
                         nodeSelectorTerms:
                           description: Required. A list of node selector terms. The
@@ -184,8 +185,34 @@ spec:
           status:
             description: LVMClusterStatus defines the observed state of LVMCluster
             properties:
+              deviceClassStatuses:
+                description: DeviceClassStatuses describes the status of all deviceClasses
+                items:
+                  description: DeviceClassStatus defines the observed status of the
+                    deviceclass across all nodes
+                  properties:
+                    name:
+                      description: Name is the name of the deviceclass
+                      type: string
+                    nodeStatus:
+                      description: NodeStatus tells if the deviceclass was created
+                        on the node
+                      items:
+                        description: NodeStatus defines the observed state of the
+                          deviceclass on the node
+                        properties:
+                          node:
+                            description: Node is the name of the node
+                            type: string
+                          status:
+                            description: Status is the status of the VG on the node
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
               ready:
-                description: ready describes if the LvmCluster is ready.
+                description: Ready describes if the LVMCluster is ready.
                 type: boolean
             type: object
         type: object
