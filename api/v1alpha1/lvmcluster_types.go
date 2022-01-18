@@ -100,6 +100,8 @@ type NodeStatus struct {
 	Node string `json:"node,omitempty"`
 	// Status is the status of the VG on the node
 	Status VGStatusType `json:"status,omitempty"`
+	// Devices is the list of devices used by the deviceclass
+	Devices []string `json:"devices,omitempty"`
 }
 
 //+kubebuilder:object:root=true
