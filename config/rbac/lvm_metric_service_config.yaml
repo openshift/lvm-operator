@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lvm-node-metrics
+  namespace: system
+  labels:
+    app.kubernetes.io/compose: metrics
+spec:
+  selector:
+    exporter: lvm-operator
+  ports:
+    - name: lvm-metrics
+      protocol: TCP
+      port: 23532
+      targetPort: 23532

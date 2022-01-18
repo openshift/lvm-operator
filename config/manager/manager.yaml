@@ -21,6 +21,7 @@ spec:
     metadata:
       labels:
         control-plane: controller-manager
+        exporter: lvm-operator
     spec:
       securityContext:
         runAsNonRoot: true
@@ -66,5 +67,9 @@ spec:
         envFrom:
         - configMapRef:
             name: lvm-operator-manager-config
+      - command:
+        - /metricsexporter
+        image: controller:latest
+        name: metricsexporter
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

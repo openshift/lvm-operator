@@ -13,7 +13,12 @@ resources:
 - topolvm_controller_service_account.yaml
 - topolvm_controller_role.yaml
 - topolvm_controller_role_bindings.yaml
-# topolvm-node rbac
+# lvm-node metric rbac
+- lvm_metric_service_config.yaml
+- lvm_node_role_n_rolebindings.yaml
+# topolvm-node metric rbac
+- topolvm_metric_service_config.yaml
+- topolvm_node_role_n_rolebindings.yaml
 - topolvm_node_service_account.yaml
 - topolvm_node_role.yaml
 - topolvm_node_role_bindings.yaml

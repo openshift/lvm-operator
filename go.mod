@@ -9,6 +9,7 @@ require (
 	github.com/onsi/gomega v1.15.0
 	github.com/openshift/api v0.0.0-20211028023115-7224b732cc14
 	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
+	github.com/prometheus/client_golang v1.11.0
 	github.com/stretchr/testify v1.7.0
 	github.com/topolvm/topolvm v0.10.3
 	gotest.tools/v3 v3.0.3
