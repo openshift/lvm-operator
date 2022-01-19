@@ -30,6 +30,8 @@ commands_get=()
 
 # collect oc output of OC get commands
 commands_get+=("lvmcluster")
+commands_get+=("lvmvolumegroup")
+commands_get+=("lvmvolumegroupnodestatus")
 commands_get+=("logicalvolume")
 commands_get+=("pods -owide")
 commands_get+=("subscription")
@@ -44,6 +46,8 @@ commands_get+=("rolebinding")
 commands_desc=()
 commands_desc+=("lvmcluster")
 commands_desc+=("logicalvolume")
+commands_desc+=("lvmvolumegroup")
+commands_desc+=("lvmvolumegroupsnodestatus")
 commands_desc+=("pods")
 
 
@@ -65,7 +69,7 @@ done
 # Create the dir for oc_output
 mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${INSTALL_NAMESPACE}/oc_output/"
 
-# Run the Collection of Resources to list
+# Run the Collection of OC get commands
 for command_get in "${commands_get[@]}"; do
      echo "collecting oc command ${command_get}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
      COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${INSTALL_NAMESPACE}/oc_output/${command_get// /_}
@@ -81,7 +85,7 @@ for command_desc in "${commands_desc[@]}"; do
      { oc describe ${command_desc} -n ${INSTALL_NAMESPACE}; } >> "${COMMAND_OUTPUT_FILE}"
 done
 
-# NOTE: This is a temporary fix for collecting the storagecluster as we are not able to collect the storagecluster using the inspect command
+
 { oc get lvmclusters -n ${INSTALL_NAMESPACE} -o yaml; } > "$BASE_COLLECTION_PATH/namespaces/${INSTALL_NAMESPACE}/oc_output/lvmcluster.yaml" 2>&1
 
 
@@ -93,21 +97,6 @@ for resource in "${resources[@]}"; do
     echo "collecting dump of ${resource}" | tee -a  "${BASE_COLLECTION_PATH}/gather-debug.log"
     { oc adm --dest-dir="${BASE_COLLECTION_PATH}/namespaces/all/" inspect "${resource}" --all-namespaces --"${SINCE_TIME}"; } >> "${BASE_COLLECTION_PATH}/gather-debug.log" 2>&1
 done
-
-echo "collecting dump of openshift-dr-system namespace" | tee -a  "${BASE_COLLECTION_PATH}"/gather-debug.log
-oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect ns/"${RAMEN_NAMESPACE}" --"${SINCE_TIME}" >> "${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
-
-# Create the dir for oc_output for openshift-dr-system namespace
-mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${RAMEN_NAMESPACE}/oc_output/"
-
-# Run the Collection of Resources to list
-for dr_resource in "${dr_resources[@]}"; do
-     echo "collecting oc command ${dr-resource}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
-     COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${RAMEN_NAMESPACE}/oc_output/${dr_resource// /_}
-     # shellcheck disable=SC2086
-     { oc get ${dr_resource} -n ${RAMEN_NAMESPACE}; } >> "${COMMAND_OUTPUT_FILE}"
-done
-
 
 # For pvc of all namespaces
 echo "collecting dump of oc get pvc all namespaces" | tee -a  "${BASE_COLLECTION_PATH}/gather-debug.log"
