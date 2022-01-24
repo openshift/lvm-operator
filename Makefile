@@ -197,10 +197,14 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+.PHONY: rename-csv
+rename-csv: 
+	cp config/manifests/bases/clusterserviceversion.yaml.in config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
+	sed 's/@BUNDLE_PACKAGE@/$(BUNDLE_PACKAGE)/g' --in-place config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml 
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
+bundle: update-mgr-env manifests kustomize operator-sdk rename-csv ## Generate bundle manifests and metadata, then validate generated files.
+#	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
