@@ -3,10 +3,3 @@ resources:
 
 generatorOptions:
   disableNameSuffixHash: true
-
-configMapGenerator:
-- envs:
-  - manager.env
-  files:
-  - controller_manager_config.yaml
-  name: lvm-operator-manager-config
