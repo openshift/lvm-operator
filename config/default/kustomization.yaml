@@ -1,5 +1,5 @@
 # Adds namespace to all resources.
-namespace: lvm-operator-system
+namespace: openshift-storage
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
@@ -23,6 +23,7 @@ namespace: lvm-operator-system
 # endpoint w/o any authn/z, please comment the following line.
 patchesStrategicMerge:
 - manager_auth_proxy_patch.yaml
+- manager_custom_env.yaml
 
 # Mount the controller config file for loading manager configurations
 # through a ComponentConfig type

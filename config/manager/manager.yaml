@@ -64,9 +64,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        envFrom:
-        - configMapRef:
-            name: lvm-operator-manager-config
       - command:
         - /metricsexporter
         image: controller:latest

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        env:
+        - name: TOPOLVM_CSI_IMAGE
+          value: TOPOLVM_CSI_IMAGE_VAL
+        - name: CSI_LIVENESSPROBE_IMAGE
+          value: CSI_LIVENESSPROBE_IMAGE_VAL
+        - name: CSI_PROVISIONER_IMAGE
+          value: CSI_PROVISIONER_IMAGE_VAL
+        - name: CSI_REGISTRAR_IMAGE
+          value: CSI_REGISTRAR_IMAGE_VAL
+        - name: CSI_RESIZER_IMAGE
+          value: CSI_RESIZER_IMAGE_VAL
