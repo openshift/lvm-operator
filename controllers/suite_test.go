@@ -61,6 +61,7 @@ const (
 	testLvmClusterName      = "test-lvmcluster"
 	testLvmClusterNamespace = "openshift-storage"
 	testDeviceClassName     = "test"
+	testImageName           = "test"
 )
 
 var _ = BeforeSuite(func() {
@@ -103,6 +104,7 @@ var _ = BeforeSuite(func() {
 		SecurityClient: secv1client.NewForConfigOrDie(k8sManager.GetConfig()),
 		Namespace:      testLvmClusterNamespace,
 		Log:            ctrl.Log.WithName("controllers").WithName("LvmCluster"),
+		ImageName:      testImageName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
