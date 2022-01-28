@@ -336,8 +336,7 @@ func getNodeContainer() *corev1.Container {
 }
 
 func getCsiRegistrarContainer() *corev1.Container {
-	command := []string{
-		"/csi-node-driver-registrar",
+	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.cybozu.com/node/csi-topolvm.sock", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 	}
@@ -356,7 +355,7 @@ func getCsiRegistrarContainer() *corev1.Container {
 	csiRegistrar := &corev1.Container{
 		Name:         "csi-registrar",
 		Image:        CsiRegistrarImage,
-		Command:      command,
+		Args:         args,
 		Lifecycle:    &corev1.Lifecycle{PreStop: &corev1.Handler{Exec: &corev1.ExecAction{Command: preStopCmd}}},
 		VolumeMounts: volumeMounts,
 	}
@@ -364,8 +363,7 @@ func getCsiRegistrarContainer() *corev1.Container {
 }
 
 func getNodeLivenessProbeContainer() *corev1.Container {
-	command := []string{
-		"/livenessprobe",
+	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
 
@@ -376,7 +374,7 @@ func getNodeLivenessProbeContainer() *corev1.Container {
 	liveness := &corev1.Container{
 		Name:         "liveness-probe",
 		Image:        CsiLivenessProbeImage,
-		Command:      command,
+		Args:         args,
 		VolumeMounts: volumeMounts,
 	}
 	return liveness
