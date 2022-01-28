@@ -248,7 +248,7 @@ func getControllerContainer() *corev1.Container {
 func getCsiProvisionerContainer() *corev1.Container {
 
 	// csi provisioner container
-	command := []string{"/csi-provisioner",
+	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 		"--enable-capacity",
 		"--capacity-ownerref-level=2",
@@ -293,7 +293,7 @@ func getCsiProvisionerContainer() *corev1.Container {
 	csiProvisioner := &corev1.Container{
 		Name:         CsiProvisionerContainerName,
 		Image:        CsiProvisionerImage,
-		Command:      command,
+		Args:         args,
 		Resources:    resourceRequirements,
 		VolumeMounts: volumeMounts,
 		Env:          env,
@@ -304,8 +304,7 @@ func getCsiProvisionerContainer() *corev1.Container {
 func getCsiResizerContainer() *corev1.Container {
 
 	// csi resizer container
-	command := []string{
-		"/csi-resizer",
+	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
 
@@ -316,7 +315,7 @@ func getCsiResizerContainer() *corev1.Container {
 	csiResizer := &corev1.Container{
 		Name:         CsiResizerContainerName,
 		Image:        CsiResizerImage,
-		Command:      command,
+		Args:         args,
 		VolumeMounts: volumeMounts,
 	}
 	return csiResizer
@@ -325,8 +324,7 @@ func getCsiResizerContainer() *corev1.Container {
 func getLivenessProbeContainer() *corev1.Container {
 
 	// csi liveness probe container
-	command := []string{
-		"/livenessprobe",
+	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
 
@@ -337,7 +335,7 @@ func getLivenessProbeContainer() *corev1.Container {
 	livenessProbe := &corev1.Container{
 		Name:         CsiLivenessProbeContainerName,
 		Image:        CsiLivenessProbeImage,
-		Command:      command,
+		Args:         args,
 		VolumeMounts: volumeMounts,
 	}
 	return livenessProbe
