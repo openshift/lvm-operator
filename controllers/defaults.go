@@ -86,7 +86,6 @@ var (
 	CSIKubeletRootDir               = "/var/lib/kubelet/"
 	NodeContainerName               = "topolvm-node"
 	TopolvmNodeContainerHealthzName = "healthz"
-	auxImage                        = "registry.access.redhat.com/ubi8/ubi-minimal"
 	LvmdConfigFile                  = "/etc/topolvm/lvmd.yaml"
 
 	// topoLVM Node resource requests/limits

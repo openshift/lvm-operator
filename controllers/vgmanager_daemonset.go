@@ -18,14 +18,12 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -212,27 +210,4 @@ func newVGManagerDaemonset(r *LVMClusterReconciler, ctx context.Context, lvmClus
 	// set nodeSelector
 	setDaemonsetNodeSelector(nodeSelector, &ds)
 	return ds, nil
-}
-
-func getRunningPodImage(r *LVMClusterReconciler, ctx context.Context) (string, error) {
-
-	// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
-	podName := os.Getenv("POD_NAME")
-	if podName == "" {
-		return "", fmt.Errorf("failed to get pod name env variable")
-	}
-
-	pod := &corev1.Pod{}
-	if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: r.Namespace}, pod); err != nil {
-		return "", fmt.Errorf("failed to get pod %s in namespace %s", podName, r.Namespace)
-	}
-
-	for _, c := range pod.Spec.Containers {
-		if c.Name == LVMOperatorContainerName {
-			return c.Image, nil
-		}
-	}
-
-	return "", fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
-
 }

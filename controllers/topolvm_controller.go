@@ -34,7 +34,7 @@ func (c topolvmController) getName() string {
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace)
+	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName)
 	existingDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      desiredDeployment.Name,
@@ -105,8 +105,7 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 	return nil
 }
 
-func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *appsv1.Deployment {
-
+func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string) *appsv1.Deployment {
 	// Topolvm CSI Controller Deployment
 	var replicas int32 = 1
 	volumes := []corev1.Volume{
@@ -116,7 +115,7 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 
 	// TODO: Remove custom generation of TLS certs, current it's being used in topolvm controller manager
 	initContainers := []corev1.Container{
-		*getInitContainer(),
+		*getInitContainer(initImage),
 	}
 
 	// get all containers that are part of csi controller deployment
@@ -158,11 +157,11 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 	return controllerDeployment
 }
 
-func getInitContainer() *corev1.Container {
+func getInitContainer(initImage string) *corev1.Container {
 
 	// generation of tls certs
 	command := []string{
-		"sh",
+		"/usr/bin/bash",
 		"-c",
 		"openssl req -nodes -x509 -newkey rsa:4096 -subj '/DC=self_signed_certificate' -keyout /certs/tls.key -out /certs/tls.crt -days 3650",
 	}
@@ -173,7 +172,7 @@ func getInitContainer() *corev1.Container {
 
 	ssCertGenerator := &corev1.Container{
 		Name:         "self-signed-cert-generator",
-		Image:        "alpine/openssl",
+		Image:        initImage,
 		Command:      command,
 		VolumeMounts: volumeMounts,
 	}
