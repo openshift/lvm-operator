@@ -49,7 +49,8 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 	unitLogger := r.Log.WithValues("topolvmNode", n.getName())
 
 	// get desired daemonSet spec
-	dsTemplate := getNodeDaemonSet(lvmCluster, r.Namespace)
+	dsTemplate := getNodeDaemonSet(lvmCluster, r.Namespace, r.ImageName)
+
 	// create desired daemonSet or update mutable fields on existing one
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -127,7 +128,8 @@ func (n topolvmNode) updateStatus(r *LVMClusterReconciler, ctx context.Context, 
 	return nil
 }
 
-func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *appsv1.DaemonSet {
+func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string) *appsv1.DaemonSet {
+
 	hostPathDirectory := corev1.HostPathDirectory
 	hostPathDirectoryOrCreateType := corev1.HostPathDirectoryOrCreate
 	storageMedium := corev1.StorageMediumMemory
@@ -163,7 +165,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *app
 				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: storageMedium}}},
 	}
 
-	initContainers := []corev1.Container{*getNodeInitContainer()}
+	initContainers := []corev1.Container{*getNodeInitContainer(initImage)}
 	containers := []corev1.Container{*getLvmdContainer(), *getNodeContainer(), *getCsiRegistrarContainer(), *getNodeLivenessProbeContainer()}
 
 	// Affinity and tolerations
@@ -210,9 +212,9 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string) *app
 	return nodeDaemonSet
 }
 
-func getNodeInitContainer() *corev1.Container {
+func getNodeInitContainer(initImage string) *corev1.Container {
 	command := []string{
-		"sh",
+		"/usr/bin/bash",
 		"-c",
 		fmt.Sprintf("until [ -f %s ]; do echo waiting for lvmd config file; sleep 5; done", LvmdConfigFile),
 	}
@@ -223,7 +225,7 @@ func getNodeInitContainer() *corev1.Container {
 
 	fileChecker := &corev1.Container{
 		Name:         "file-checker",
-		Image:        auxImage,
+		Image:        initImage,
 		Command:      command,
 		VolumeMounts: volumeMounts,
 	}

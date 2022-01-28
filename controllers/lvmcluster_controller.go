@@ -19,9 +19,12 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/go-logr/logr"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
@@ -57,6 +60,7 @@ type LVMClusterReconciler struct {
 	ClusterType    ClusterType
 	SecurityClient secv1client.SecurityV1Interface
 	Namespace      string
+	ImageName      string
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -101,6 +105,13 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.Log.Error(err, "failed to check cluster type")
 		return ctrl.Result{}, err
 	}
+
+	err = r.getRunningPodImage(ctx)
+	if err != nil {
+		r.Log.Error(err, "failed to get operator image")
+		return ctrl.Result{}, err
+	}
+
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
 
 	statusError := r.updateLVMClusterStatus(ctx, lvmCluster)
@@ -289,4 +300,34 @@ func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
 
 func IsOpenshift(r *LVMClusterReconciler) bool {
 	return r.ClusterType == ClusterTypeOCP
+}
+
+// getRunningPodImage gets the operator image and set it in reconciler struct
+func (r *LVMClusterReconciler) getRunningPodImage(ctx context.Context) error {
+
+	if r.ImageName == "" {
+		// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
+		podName := os.Getenv("POD_NAME")
+		if podName == "" {
+			return fmt.Errorf("failed to get pod name env variable")
+		}
+
+		pod := &corev1.Pod{}
+		if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: r.Namespace}, pod); err != nil {
+			return fmt.Errorf("failed to get pod %s in namespace %s", podName, r.Namespace)
+		}
+
+		for _, c := range pod.Spec.Containers {
+			if c.Name == LVMOperatorContainerName {
+				r.ImageName = c.Image
+				return nil
+			}
+		}
+
+		return fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
+
+	}
+
+	return nil
+
 }
