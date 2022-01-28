@@ -23,6 +23,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o metricsexporter cmd/met
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM centos:8
+
+# Install required utilities
+RUN dnf install -y openssl && dnf clean all
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/vgmanager .
