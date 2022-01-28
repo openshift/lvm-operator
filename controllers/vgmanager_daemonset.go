@@ -17,7 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
 	"os"
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
@@ -115,7 +114,7 @@ var (
 )
 
 // newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) (appsv1.DaemonSet, error) {
+func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, vgImage string) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	nodeSelector, tolerations := extractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{LVMDConfVol, DevHostDirVol, UDevHostDirVol, SysHostDirVol}
@@ -126,16 +125,9 @@ func newVGManagerDaemonset(r *LVMClusterReconciler, ctx context.Context, lvmClus
 	// try to get vgmanager image from env and on absence get from running pod
 	// TODO: investigate why storing this env in a variable is failing tests
 	image := os.Getenv("VGMANAGER_IMAGE")
-	var err error
 	if image == "" {
-		image, err = getRunningPodImage(r, ctx)
-		if err != nil {
-			r.Log.Error(err, "failed to get image from running operator")
-			return appsv1.DaemonSet{}, err
-		}
+		image = vgImage
 	}
-
-	r.Log.Info("creating VG manager deployment", "image", image)
 
 	command := []string{
 		"/vgmanager",
@@ -185,7 +177,7 @@ func newVGManagerDaemonset(r *LVMClusterReconciler, ctx context.Context, lvmClus
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      VGManagerUnit,
-			Namespace: r.Namespace,
+			Namespace: namespace,
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
@@ -209,5 +201,5 @@ func newVGManagerDaemonset(r *LVMClusterReconciler, ctx context.Context, lvmClus
 
 	// set nodeSelector
 	setDaemonsetNodeSelector(nodeSelector, &ds)
-	return ds, nil
+	return ds
 }
