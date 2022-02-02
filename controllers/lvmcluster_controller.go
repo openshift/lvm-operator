@@ -245,7 +245,6 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	return err
 }
 
-// NOTE: when updating this, please also update doc/design/operator.md
 type resourceManager interface {
 
 	// getName should return a camelCase name of this unit of reconciliation
