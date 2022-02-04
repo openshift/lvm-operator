@@ -204,9 +204,9 @@ rm -rf $$TMP_DIR ;\
 endef
 
 .PHONY: rename-csv
-rename-csv: 
+rename-csv:
 	cp config/manifests/bases/clusterserviceversion.yaml.in config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
-	sed 's/@BUNDLE_PACKAGE@/$(BUNDLE_PACKAGE)/g' --in-place config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml 
+	sed 's/@BUNDLE_PACKAGE@/$(BUNDLE_PACKAGE)/g' --in-place config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
 
 .PHONY: bundle
 bundle: update-mgr-env manifests kustomize operator-sdk rename-csv ## Generate bundle manifests and metadata, then validate generated files.
