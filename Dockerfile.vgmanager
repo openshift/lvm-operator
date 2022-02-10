@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o vgmanager cmd/vgmanager
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM centos:8
+FROM centos:stream8
 WORKDIR /
 COPY --from=builder /workspace/vgmanager .
 USER 65532:65532
