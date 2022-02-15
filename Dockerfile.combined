@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o vgmanager cmd/vgmanager
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o metricsexporter cmd/metricsexporter/exporter.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM centos:stream8
+FROM quay.io/centos/centos:stream8
 
 # Install required utilities
 RUN dnf install -y openssl && dnf clean all

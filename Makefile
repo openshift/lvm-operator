@@ -142,7 +142,7 @@ docker-build: test ## Build docker image with the manager.
 docker-build-vgmanager: ## Build docker image with vgmanager.
 	docker build -f Dockerfile.vgmanager -t ${VGMANAGER_IMG} .
 
-docker-build-combined: ## Build docker image with manager and vgmanager
+docker-build-combined: test ## Build docker image with manager and vgmanager
 	docker build -f Dockerfile.combined -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.

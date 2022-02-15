@@ -41,4 +41,4 @@ jobs:
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
       - name: Build operator docker image
-        run: make docker-build
+        run: make docker-build-combined
