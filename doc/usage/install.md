@@ -29,7 +29,7 @@ When this is finished, you are ready to continue with the deploy steps
 If you are ok with using the prebuilt images, then just set your variable like this:
 
 ```
-export IMG=quay.io/mulbc/lvm-operator
+export IMG=quay.io/ocs-dev/lvm-operator
 ```
 
 ## Deploy
