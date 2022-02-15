@@ -318,12 +318,10 @@ func setStatus(status *lvmv1alpha1.VGStatus, instance *lvmv1alpha1.LVMVolumeGrou
 	found := false
 
 	vgStatuses := instance.Spec.LVMVGStatus
-	for _, vgStatus := range vgStatuses {
+	for i, vgStatus := range vgStatuses {
 		if vgStatus.Name == status.Name {
 			found = true
-			vgStatus.Status = status.Status
-			vgStatus.Reason = status.Reason
-			vgStatus.Devices = status.Devices
+			vgStatuses[i] = *status
 			break
 		}
 	}
