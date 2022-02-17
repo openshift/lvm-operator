@@ -31,9 +31,9 @@ type LVMClusterSpec struct {
 	// Tolerations to apply to nodes to act on
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-	// DeviceClasses are a rules that assign local storage devices to volumegroups that are used for creating lvm based PVs
+	// Storage describes the deviceClass configuration for local storage devices
 	// +Optional
-	DeviceClasses []DeviceClass `json:"deviceClasses,omitempty"`
+	Storage Storage `json:"storage,omitempty"`
 }
 
 type DeviceClass struct {
@@ -92,6 +92,12 @@ type DeviceClassStatus struct {
 	Name string `json:"name,omitempty"`
 	// NodeStatus tells if the deviceclass was created on the node
 	NodeStatus []NodeStatus `json:"nodeStatus,omitempty"`
+}
+
+type Storage struct {
+	// DeviceClasses are a rules that assign local storage devices to volumegroups that are used for creating lvm based PVs
+	// +Optional
+	DeviceClasses []DeviceClass `json:"deviceClasses,omitempty"`
 }
 
 // NodeStatus defines the observed state of the deviceclass on the node
