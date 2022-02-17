@@ -30,7 +30,7 @@ func extractNodeSelectorAndTolerations(lvmCluster *lvmv1alpha1.LVMCluster) (*cor
 
 	terms := make([]corev1.NodeSelectorTerm, 0)
 	matchAllNodes := false
-	for _, deviceClass := range lvmCluster.Spec.DeviceClasses {
+	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 
 		if deviceClass.NodeSelector != nil {
 			terms = append(terms, deviceClass.NodeSelector.NodeSelectorTerms...)
