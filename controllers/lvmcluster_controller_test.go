@@ -46,7 +46,9 @@ var _ = Describe("LVMCluster controller", func() {
 			Namespace: testLvmClusterNamespace,
 		},
 		Spec: lvmv1alpha1.LVMClusterSpec{
-			DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: testDeviceClassName}},
+			Storage: lvmv1alpha1.Storage{
+				DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: testDeviceClassName}},
+			},
 		},
 	}
 
@@ -71,7 +73,7 @@ var _ = Describe("LVMCluster controller", func() {
 
 	// Topolvm Storage Classes
 	scNames := []types.NamespacedName{}
-	for _, deviceClass := range lvmClusterIn.Spec.DeviceClasses {
+	for _, deviceClass := range lvmClusterIn.Spec.Storage.DeviceClasses {
 		scNames = append(scNames, types.NamespacedName{
 			Name: fmt.Sprintf("odf-lvm-%s", deviceClass.Name),
 		},
