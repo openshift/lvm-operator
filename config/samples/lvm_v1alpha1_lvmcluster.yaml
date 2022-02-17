@@ -3,5 +3,6 @@ kind: LVMCluster
 metadata:
   name: lvmcluster-sample
 spec:
-  deviceClasses:
-  - name: vg1
+  storage:
+    deviceClasses:
+    - name: vg1
