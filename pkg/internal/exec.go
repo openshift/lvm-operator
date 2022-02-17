@@ -8,6 +8,7 @@ import (
 
 var (
 	nsenterPath = "/usr/bin/nsenter"
+	losetupPath = "/usr/sbin/losetup"
 )
 
 // Executor is the  interface for running exec commands

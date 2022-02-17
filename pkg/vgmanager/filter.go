@@ -31,6 +31,7 @@ const (
 	noFilesystemSignature = "noFilesystemSignature"
 	noBindMounts          = "noBindMounts"
 	noChildren            = "noChildren"
+	usableLoopDevice      = "usableLoopDevice"
 )
 
 // filterAvailableDevices returns:
@@ -51,7 +52,7 @@ DeviceLoop:
 			var valid bool
 			var err error
 			filterLogger := devLogger.WithValues("filter.Name", name)
-			valid, err = filter(blockDevice)
+			valid, err = filter(blockDevice, r.executor)
 			if err != nil {
 				filterLogger.Error(err, "filter error")
 				valid = false
@@ -76,40 +77,50 @@ DeviceLoop:
 // These are passed the localv1alpha1.DeviceInclusionSpec to make testing easier,
 // but they aren't expected to use it
 // they verify that the device itself is good to use
-var FilterMap = map[string]func(internal.BlockDevice) (bool, error){
-	notReadOnly: func(dev internal.BlockDevice) (bool, error) {
+var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, error){
+	notReadOnly: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		readOnly, err := dev.IsReadOnly()
 		return !readOnly, err
 	},
 
-	notRemovable: func(dev internal.BlockDevice) (bool, error) {
+	notRemovable: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		removable, err := dev.IsRemovable()
 		return !removable, err
 	},
 
-	notSuspended: func(dev internal.BlockDevice) (bool, error) {
+	notSuspended: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		matched := dev.State != internal.StateSuspended
 		return matched, nil
 	},
 
-	noBiosBootInPartLabel: func(dev internal.BlockDevice) (bool, error) {
+	noBiosBootInPartLabel: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		biosBootInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("bios")) ||
 			strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("boot"))
 		return !biosBootInPartLabel, nil
 	},
 
-	noFilesystemSignature: func(dev internal.BlockDevice) (bool, error) {
+	noFilesystemSignature: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		matched := dev.FSType == ""
 		return matched, nil
 	},
 
-	noBindMounts: func(dev internal.BlockDevice) (bool, error) {
+	noBindMounts: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		hasBindMounts, _, err := dev.HasBindMounts()
 		return !hasBindMounts, err
 	},
 
-	noChildren: func(dev internal.BlockDevice) (bool, error) {
+	noChildren: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		hasChildren := dev.HasChildren()
 		return !hasChildren, nil
+	},
+
+	usableLoopDevice: func(dev internal.BlockDevice, executor internal.Executor) (bool, error) {
+		// if current device isn't a loop device no need to check for backing file
+		if dev.Type != internal.DeviceTypeLoop {
+			return true, nil
+		}
+
+		// check loop device isn't being used by kubernetes
+		return dev.IsUsableLoopDev(executor)
 	},
 }
