@@ -73,7 +73,7 @@ var _ = Describe("LVMCluster controller", func() {
 	scNames := []types.NamespacedName{}
 	for _, deviceClass := range lvmClusterIn.Spec.DeviceClasses {
 		scNames = append(scNames, types.NamespacedName{
-			Name: fmt.Sprintf("topolvm-%s", deviceClass.Name),
+			Name: fmt.Sprintf("odf-lvm-%s", deviceClass.Name),
 		},
 		)
 	}
