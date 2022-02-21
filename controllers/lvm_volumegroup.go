@@ -96,7 +96,7 @@ func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1
 
 	lvmVolumeGroups := []*lvmv1alpha1.LVMVolumeGroup{}
 
-	deviceClasses := instance.Spec.DeviceClasses
+	deviceClasses := instance.Spec.Storage.DeviceClasses
 	for _, deviceClass := range deviceClasses {
 		lvmVolumeGroup := &lvmv1alpha1.LVMVolumeGroup{
 			ObjectMeta: metav1.ObjectMeta{

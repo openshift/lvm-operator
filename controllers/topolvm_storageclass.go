@@ -49,7 +49,7 @@ func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.
 
 	// construct name of storage class based on CR spec deviceClass field and
 	// delete the corresponding storage class
-	for _, deviceClass := range lvmCluster.Spec.DeviceClasses {
+	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		sc := &storagev1.StorageClass{}
 		scName := fmt.Sprintf("topolvm-%s", deviceClass.Name)
 		err := r.Client.Get(ctx, types.NamespacedName{Name: scName}, sc)
@@ -90,7 +90,7 @@ func getTopolvmStorageClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.S
 	allowVolumeExpansion := true
 	volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
 
-	for _, deviceClass := range lvmCluster.Spec.DeviceClasses {
+	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("topolvm-%s", deviceClass.Name),
