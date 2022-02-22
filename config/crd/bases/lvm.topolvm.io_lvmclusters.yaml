@@ -36,111 +36,121 @@ spec:
           spec:
             description: LVMClusterSpec defines the desired state of LVMCluster
             properties:
-              deviceClasses:
-                description: DeviceClasses are a rules that assign local storage devices
-                  to volumegroups that are used for creating lvm based PVs
-                items:
-                  properties:
-                    deviceSelector:
-                      description: DeviceSelector is a set of rules that should match
-                        for a device to be included in the LVMCluster
-                      type: object
-                    name:
-                      description: 'Name of the class, the VG and possibly the storageclass.
-                        Validations to confirm that this field can be used as metadata.name
-                        field in storageclass ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209'
-                      maxLength: 245
-                      minLength: 1
-                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                      type: string
-                    nodeSelector:
-                      description: NodeSelector chooses nodes on which to create the
-                        deviceclass
+              storage:
+                description: Storage describes the deviceClass configuration for local
+                  storage devices
+                properties:
+                  deviceClasses:
+                    description: DeviceClasses are a rules that assign local storage
+                      devices to volumegroups that are used for creating lvm based
+                      PVs
+                    items:
                       properties:
-                        nodeSelectorTerms:
-                          description: Required. A list of node selector terms. The
-                            terms are ORed.
-                          items:
-                            description: A null or empty node selector term matches
-                              no objects. The requirements of them are ANDed. The
-                              TopologySelectorTerm type implements a subset of the
-                              NodeSelectorTerm.
-                            properties:
-                              matchExpressions:
-                                description: A list of node selector requirements
-                                  by node's labels.
-                                items:
-                                  description: A node selector requirement is a selector
-                                    that contains values, a key, and an operator that
-                                    relates the key and values.
-                                  properties:
-                                    key:
-                                      description: The label key that the selector
-                                        applies to.
-                                      type: string
-                                    operator:
-                                      description: Represents a key's relationship
-                                        to a set of values. Valid operators are In,
-                                        NotIn, Exists, DoesNotExist. Gt, and Lt.
-                                      type: string
-                                    values:
-                                      description: An array of string values. If the
-                                        operator is In or NotIn, the values array
-                                        must be non-empty. If the operator is Exists
-                                        or DoesNotExist, the values array must be
-                                        empty. If the operator is Gt or Lt, the values
-                                        array must have a single element, which will
-                                        be interpreted as an integer. This array is
-                                        replaced during a strategic merge patch.
-                                      items:
-                                        type: string
-                                      type: array
-                                  required:
-                                  - key
-                                  - operator
-                                  type: object
-                                type: array
-                              matchFields:
-                                description: A list of node selector requirements
-                                  by node's fields.
-                                items:
-                                  description: A node selector requirement is a selector
-                                    that contains values, a key, and an operator that
-                                    relates the key and values.
-                                  properties:
-                                    key:
-                                      description: The label key that the selector
-                                        applies to.
-                                      type: string
-                                    operator:
-                                      description: Represents a key's relationship
-                                        to a set of values. Valid operators are In,
-                                        NotIn, Exists, DoesNotExist. Gt, and Lt.
-                                      type: string
-                                    values:
-                                      description: An array of string values. If the
-                                        operator is In or NotIn, the values array
-                                        must be non-empty. If the operator is Exists
-                                        or DoesNotExist, the values array must be
-                                        empty. If the operator is Gt or Lt, the values
-                                        array must have a single element, which will
-                                        be interpreted as an integer. This array is
-                                        replaced during a strategic merge patch.
-                                      items:
-                                        type: string
-                                      type: array
-                                  required:
-                                  - key
-                                  - operator
-                                  type: object
-                                type: array
-                            type: object
-                          type: array
-                      required:
-                      - nodeSelectorTerms
+                        deviceSelector:
+                          description: DeviceSelector is a set of rules that should
+                            match for a device to be included in the LVMCluster
+                          type: object
+                        name:
+                          description: 'Name of the class, the VG and possibly the
+                            storageclass. Validations to confirm that this field can
+                            be used as metadata.name field in storageclass ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209'
+                          maxLength: 245
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                        nodeSelector:
+                          description: NodeSelector chooses nodes on which to create
+                            the deviceclass
+                          properties:
+                            nodeSelectorTerms:
+                              description: Required. A list of node selector terms.
+                                The terms are ORed.
+                              items:
+                                description: A null or empty node selector term matches
+                                  no objects. The requirements of them are ANDed.
+                                  The TopologySelectorTerm type implements a subset
+                                  of the NodeSelectorTerm.
+                                properties:
+                                  matchExpressions:
+                                    description: A list of node selector requirements
+                                      by node's labels.
+                                    items:
+                                      description: A node selector requirement is
+                                        a selector that contains values, a key, and
+                                        an operator that relates the key and values.
+                                      properties:
+                                        key:
+                                          description: The label key that the selector
+                                            applies to.
+                                          type: string
+                                        operator:
+                                          description: Represents a key's relationship
+                                            to a set of values. Valid operators are
+                                            In, NotIn, Exists, DoesNotExist. Gt, and
+                                            Lt.
+                                          type: string
+                                        values:
+                                          description: An array of string values.
+                                            If the operator is In or NotIn, the values
+                                            array must be non-empty. If the operator
+                                            is Exists or DoesNotExist, the values
+                                            array must be empty. If the operator is
+                                            Gt or Lt, the values array must have a
+                                            single element, which will be interpreted
+                                            as an integer. This array is replaced
+                                            during a strategic merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                  matchFields:
+                                    description: A list of node selector requirements
+                                      by node's fields.
+                                    items:
+                                      description: A node selector requirement is
+                                        a selector that contains values, a key, and
+                                        an operator that relates the key and values.
+                                      properties:
+                                        key:
+                                          description: The label key that the selector
+                                            applies to.
+                                          type: string
+                                        operator:
+                                          description: Represents a key's relationship
+                                            to a set of values. Valid operators are
+                                            In, NotIn, Exists, DoesNotExist. Gt, and
+                                            Lt.
+                                          type: string
+                                        values:
+                                          description: An array of string values.
+                                            If the operator is In or NotIn, the values
+                                            array must be non-empty. If the operator
+                                            is Exists or DoesNotExist, the values
+                                            array must be empty. If the operator is
+                                            Gt or Lt, the values array must have a
+                                            single element, which will be interpreted
+                                            as an integer. This array is replaced
+                                            during a strategic merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                type: object
+                              type: array
+                          required:
+                          - nodeSelectorTerms
+                          type: object
                       type: object
-                  type: object
-                type: array
+                    type: array
+                type: object
               tolerations:
                 description: Tolerations to apply to nodes to act on
                 items:

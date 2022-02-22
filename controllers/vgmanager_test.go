@@ -54,9 +54,11 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 		{
 			desc: "nil nodeSelector in any of the deviceClasses",
 			lvmclusterSpec: lvmv1alpha1.LVMClusterSpec{
-				DeviceClasses: []lvmv1alpha1.DeviceClass{
-					{NodeSelector: nil},
-					{},
+				Storage: lvmv1alpha1.Storage{
+					DeviceClasses: []lvmv1alpha1.DeviceClass{
+						{NodeSelector: nil},
+						{},
+					},
 				},
 			},
 			expectedTolerations: []corev1.Toleration{},
