@@ -44,8 +44,9 @@ metadata:
   # set the namespace to the operator namespace
   namespace: lvm-operator-system
 spec:
-  deviceClasses:
-  - name: vg1
+  storage:
+    deviceClasses:
+    - name: vg1
 EOF
 ```
 
