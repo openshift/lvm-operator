@@ -130,7 +130,7 @@ spec:
 ``` console
 # kubectl get storageclass
 NAME          PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-topolvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   31m
+odf-lvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   31m
 ```
 
 Note:
@@ -176,13 +176,13 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: topolvm-vg1
+  storageClassName: odf-lvm-vg1
 EOF
 ```
 ``` console
 kubectl get pvc
 NAME           STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvm-file-pvc   Pending                                      topolvm-vg1    12s
+lvm-file-pvc   Pending                                      odf-lvm-vg1    12s
 ```
 - In a multi node setup the `WaitForFirstConsumer` volume binding is used to
   take scheduling decisions of pod placement which usually prefers the node
@@ -218,7 +218,7 @@ app-file                              1/1     Running   0          2m6s
 
 kubectl get pvc
 NAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvm-file-pvc   Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            topolvm-vg1    5m55s
+lvm-file-pvc   Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            odf-lvm-vg1    5m55s
 ```
 - To create a PVC with `volumeMode: Block`, do the following:
 ``` yaml
@@ -235,7 +235,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: topolvm-vg1
+  storageClassName: odf-lvm-vg1
 ---
 apiVersion: v1
 kind: Pod
@@ -265,8 +265,8 @@ app-file                              1/1     Running   0          9m34s
 
 kubectl get pvc
 NAME            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvm-block-pvc   Bound    pvc-56fe959a-1184-4fa6-9d66-b69c06d43cf4   5Gi        RWO            topolvm-vg1    104s
-lvm-file-pvc    Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            topolvm-vg1    13m
+lvm-block-pvc   Bound    pvc-56fe959a-1184-4fa6-9d66-b69c06d43cf4   5Gi        RWO            odf-lvm-vg1    104s
+lvm-file-pvc    Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            odf-lvm-vg1    13m
 ```
 
 ### Monitoring and Metrics

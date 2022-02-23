@@ -79,7 +79,7 @@ After all Pods are running, you will get a storage class that you can use when c
 oc get sc
 
 NAME          PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-topolvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   3m44s
+odf-lvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   3m44s
 ```
 
 ## Test
@@ -97,7 +97,7 @@ metadata:
   labels:
     type: local
 spec:
-  storageClassName: topolvm-vg1
+  storageClassName: odf-lvm-vg1
   resources:
     requests:
       storage: 5Gi
@@ -113,7 +113,7 @@ You will see that the PVC will be stuck in the pending state:
 oc get pvc
 
 NAME     STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvmpvc   Pending                                      topolvm-vg1    7s
+lvmpvc   Pending                                      odf-lvm-vg1    7s
 ```
 
 That's because our Storage Class is waiting for a Pod that needs that PVC, before it is created. So let's create a Pod for this PVC.
@@ -147,7 +147,7 @@ After we added the Pod, the PVC will be bound and the Pod will eventually be Run
 oc get pvc,pods
 
 NAME                           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/lvmpvc   Bound    pvc-a37ef71c-a9b9-45d8-96e8-3b5ad30a84f6   5Gi        RWO            topolvm-vg1    3m2s
+persistentvolumeclaim/lvmpvc   Bound    pvc-a37ef71c-a9b9-45d8-96e8-3b5ad30a84f6   5Gi        RWO            odf-lvm-vg1    3m2s
 
 NAME         READY   STATUS    RESTARTS   AGE
 pod/lvmpod   1/1     Running   0          28s
