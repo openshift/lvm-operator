@@ -133,6 +133,9 @@ build: generate fmt vet ## Build manager binary.
 build-vgmanager: generate fmt vet ## Build vg manager binary.
 	go build -o bin/vgmanager cmd/vgmanager/main.go
 
+build-prometheus-alert-rules: jsonnet monitoring/mixin.libsonnet monitoring/alerts/alerts.jsonnet monitoring/alerts/*.libsonnet
+	$(JSONNET) -S monitoring/alerts/alerts.jsonnet > config/prometheus/prometheus_rules.yaml
+
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
@@ -189,6 +192,10 @@ ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
+JSONNET = $(shell pwd)/bin/jsonnet
+jsonnet: ## Download jsonnet locally if necessary.
+	$(call go-get-tool,$(JSONNET),github.com/google/go-jsonnet/cmd/jsonnet@latest)
+
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-get-tool
@@ -209,7 +216,7 @@ rename-csv:
 	sed 's/@BUNDLE_PACKAGE@/$(BUNDLE_PACKAGE)/g' --in-place config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize operator-sdk rename-csv ## Generate bundle manifests and metadata, then validate generated files.
+bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
