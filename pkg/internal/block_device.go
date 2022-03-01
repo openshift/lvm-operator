@@ -14,6 +14,12 @@ var (
 const (
 	// StateSuspended is a possible value of BlockDevice.State
 	StateSuspended = "suspended"
+
+	// DeviceTypeLoop is the device type for loop devices in lsblk output
+	DeviceTypeLoop = "loop"
+
+	// mount string to find if a path is part of kubernetes
+	pluginString = "plugins/kubernetes.io"
 )
 
 // BlockDevice is the a block device as output by lsblk.
@@ -54,6 +60,41 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	}
 
 	return blockDeviceMap["blockdevices"], nil
+}
+
+// IsUsableLoopDev returns true if the loop device isn't in use by Kubernetes
+// by matching the back file path against a standard string used to mount devices
+// from host into pods
+func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
+
+	// holds back-file string of the loop device
+	var loopDeviceMap map[string][]struct {
+		BackFile string `json:"back-file"`
+	}
+
+	usable := true
+
+	args := []string{fmt.Sprintf("/dev/%s", b.Name), "-O", "BACK-FILE", "--json"}
+
+	output, err := exec.ExecuteCommandWithOutput(losetupPath, args...)
+	if err != nil {
+		return usable, err
+	}
+
+	err = json.Unmarshal([]byte(output), &loopDeviceMap)
+	if err != nil {
+		return usable, err
+	}
+
+	for _, backFile := range loopDeviceMap["loopdevices"] {
+		if strings.Contains(backFile.BackFile, pluginString) {
+			// this loop device is being used by kubernetes and can't be
+			// added to volume group
+			usable = false
+		}
+	}
+
+	return usable, nil
 }
 
 // IsReadOnly checks is disk is read only
