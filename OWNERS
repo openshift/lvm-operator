@@ -1,6 +1,7 @@
 # approval == this is a good idea /approve
 approvers:
   - nbalacha
+  - agarwal-mudit
 # review == this code is good /lgtm
 reviewers:
   - nbalacha
@@ -8,3 +9,7 @@ reviewers:
   - leelavg
   - sp98
   - jmolmo
+  - iamniting
+  - Yuggupta27
+  - riya-singhal31
+  - agarwal-mudit
