@@ -4,8 +4,16 @@ Because there currently is no CI pipeline that builds this repo, you will either
 
 ## Preparations
 
-### Building the Operator yourself
+### Using the pre-built image
 
+You can use our prebuilt images, which are created with our CI pipeline:
+
+```
+export IMG=quay.io/ocs-dev/lvm-operator
+```
+
+<details><summary><strong>Building the Operator yourself</strong></summary>
+<p>
 Building the operator is easy. Just make sure you have docker or podman installed on your system and that you are logged into your registry (quay.io, docker, ...)
 
 Set the environment variable `IMG` to the new repository path where you want to host your image:
@@ -23,14 +31,8 @@ make docker-build-combined docker-push
 Ensure that the new repository in your registry is either set to public or that your target OpenShift cluster has read access to that repository.
 
 When this is finished, you are ready to continue with the deploy steps
-
-### Using the pre-built image
-
-If you are ok with using the prebuilt images, then just set your variable like this:
-
-```
-export IMG=quay.io/ocs-dev/lvm-operator
-```
+</p>
+</details>
 
 ## Deploy
 
