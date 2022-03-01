@@ -1,0 +1,26 @@
+"apiVersion": "monitoring.coreos.com/v1"
+"kind": "PrometheusRule"
+"metadata":
+  "name": "prometheus-lvmo-rules"
+"spec":
+  "groups":
+  - "name": "vg-alert.rules"
+    "rules":
+    - "alert": "VolumeGroupUsageAtThresholdNearFull"
+      "annotations":
+        "description": "VolumeGroup is nearing full. Data deletion or VolumeGroup expansion is required."
+        "message": "VolumeGroup {{ $labels.device_class }} utilization has crossed 75 % on node {{ $labels.node }}. Free up some space or expand the VolumeGroup."
+      "expr": |
+        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.75 and (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes <= 0.85
+      "for": "5m"
+      "labels":
+        "severity": "warning"
+    - "alert": "VolumeGroupUsageAtThresholdCritical"
+      "annotations":
+        "description": "VolumeGroup is critically full. Data deletion or VolumeGroup expansion is required."
+        "message": "VolumeGroup {{ $labels.device_class }} utilization has crossed 85 % on node {{ $labels.node }}. Free up some space or expand the VolumeGroup immediately."
+      "expr": |
+        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.85
+      "for": "5m"
+      "labels":
+        "severity": "critical"
