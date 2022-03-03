@@ -60,6 +60,10 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+
+IMAGE_BUILD_CMD ?= $(shell command -v docker 2>&1 >/dev/null && echo docker || echo podman)
+
+
 all: build
 
 ##@ General
@@ -140,19 +144,19 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	$(IMAGE_BUILD_CMD) build -t ${IMG} .
 
 docker-build-vgmanager: ## Build docker image with vgmanager.
-	docker build -f Dockerfile.vgmanager -t ${VGMANAGER_IMG} .
+	$(IMAGE_BUILD_CMD) build -f Dockerfile.vgmanager -t ${VGMANAGER_IMG} .
 
 docker-build-combined: test ## Build docker image with manager and vgmanager
-	docker build -f Dockerfile.combined -t ${IMG} .
+	$(IMAGE_BUILD_CMD) build -f Dockerfile.combined -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	$(IMAGE_BUILD_CMD) push ${IMG}
 
 docker-push-vgmanager: ## Push docker image with the vgmanager.
-	docker push ${VGMANAGER_IMG}
+	$(IMAGE_BUILD_CMD) push ${VGMANAGER_IMG}
 
 docker-push-combined: docker-push ## Push docker image containing both manager and vgmanager binaries
 
@@ -226,7 +230,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(IMAGE_BUILD_CMD) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
@@ -284,7 +288,7 @@ endif
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
 catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	$(OPM) index add --container-tool $(IMAGE_BUILD_CMD) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
 # Push the catalog image.
 .PHONY: catalog-push
