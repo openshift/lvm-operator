@@ -51,6 +51,16 @@ BUNDLE_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(BUNDLE_IMAGE_NAME):$(IMA
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
+# Each CSV has a replaces parameter that indicates which Operator it replaces.
+# This builds a graph of CSVs that can be queried by OLM, and updates can be
+# shared between channels. Channels can be thought of as entry points into
+# the graph of updates:
+REPLACES ?=
+
+# Creating the New CatalogSource requires publishing CSVs that replace one Operator,
+# but can skip several. This can be accomplished using the skipRange annotation:
+SKIP_RANGE ?=
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -236,6 +246,12 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
+	cd config/manifests/bases && \
+		rm -rf kustomization.yaml && \
+		$(KUSTOMIZE) create --resources $(BUNDLE_PACKAGE).clusterserviceversion.yaml && \
+		$(KUSTOMIZE) edit add annotation --force 'olm.skipRange':"$(SKIP_RANGE)" && \
+		$(KUSTOMIZE) edit add patch --name $(BUNDLE_PACKAGE).v0.0.0 --kind ClusterServiceVersion\
+		--patch '[{"op": "replace", "path": "/spec/replaces", "value": "$(REPLACES)"}]'
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
