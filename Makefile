@@ -64,6 +64,8 @@ SHELL = /usr/bin/env bash -o pipefail
 IMAGE_BUILD_CMD ?= $(shell command -v docker 2>&1 >/dev/null && echo docker || echo podman)
 
 
+MANAGER_NAME_PREFIX ?= lvm-operator-
+
 all: build
 
 ##@ General
@@ -169,7 +171,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
@@ -223,7 +225,7 @@ rename-csv:
 bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
