@@ -37,6 +37,11 @@ type LVMVolumeGroupSpec struct {
 	// // Config for this deviceClass, lvm settings are a field here
 	// // +optional
 	// Config *DeviceClassConfig `json:"config,omitempty"`
+
+	// ThinPoolConfig contains configurations for the thin-pool
+	// +kubebuilder:validation:Required
+	// +required
+	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
 }
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup

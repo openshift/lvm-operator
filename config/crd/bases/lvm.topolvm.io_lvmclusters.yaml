@@ -148,6 +148,32 @@ spec:
                           required:
                           - nodeSelectorTerms
                           type: object
+                        thinPoolConfig:
+                          description: ThinPoolConfig contains configurations for
+                            the thin-pool
+                          properties:
+                            name:
+                              description: Name of the thin pool to be created
+                              type: string
+                            overprovisionRatio:
+                              description: OverProvisionRatio is the factor by which
+                                additional storage can be provisioned compared to
+                                the available storage in the thin pool.
+                              minimum: 2
+                              type: integer
+                            sizePercent:
+                              description: SizePercent represents percentage of remaining
+                                space in the volume group that should be used for
+                                creating the thin pool.
+                              maximum: 90
+                              minimum: 10
+                              type: integer
+                          required:
+                          - name
+                          - overprovisionRatio
+                          type: object
+                      required:
+                      - thinPoolConfig
                       type: object
                     type: array
                 type: object

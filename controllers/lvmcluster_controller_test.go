@@ -47,7 +47,14 @@ var _ = Describe("LVMCluster controller", func() {
 		},
 		Spec: lvmv1alpha1.LVMClusterSpec{
 			Storage: lvmv1alpha1.Storage{
-				DeviceClasses: []lvmv1alpha1.DeviceClass{{Name: testDeviceClassName}},
+				DeviceClasses: []lvmv1alpha1.DeviceClass{{
+					Name: testDeviceClassName,
+					ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+						Name:               testThinPoolName,
+						SizePercent:        50,
+						OverprovisionRatio: 10,
+					},
+				}},
 			},
 		},
 	}

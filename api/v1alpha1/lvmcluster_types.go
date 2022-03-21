@@ -36,6 +36,27 @@ type LVMClusterSpec struct {
 	Storage Storage `json:"storage,omitempty"`
 }
 
+type ThinPoolConfig struct {
+	// Name of the thin pool to be created
+	// +kubebuilder:validation:Required
+	// +required
+	Name string `json:"name"`
+
+	// SizePercent represents percentage of remaining space in the volume group that should be used
+	// for creating the thin pool.
+	// +kubebuilder:validation:default=75
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=90
+	SizePercent int `json:"sizePercent,omitempty"`
+
+	// OverProvisionRatio is the factor by which additional storage can be provisioned compared to
+	// the available storage in the thin pool.
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Required
+	// +required
+	OverprovisionRatio int `json:"overprovisionRatio"`
+}
+
 type DeviceClass struct {
 	// Name of the class, the VG and possibly the storageclass.
 	// Validations to confirm that this field can be used as metadata.name field in storageclass
@@ -57,6 +78,11 @@ type DeviceClass struct {
 	// // Config for this deviceClass, lvm settings are a field here
 	// // +optional
 	// Config *DeviceClassConfig `json:"config,omitempty"`
+
+	// ThinPoolConfig contains configurations for the thin-pool
+	// +kubebuilder:validation:Required
+	// +required
+	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
 }
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned
