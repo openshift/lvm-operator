@@ -1,0 +1,1440 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: lvm-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: logicalvolumes.topolvm.cybozu.com
+spec:
+  group: topolvm.cybozu.com
+  names:
+    kind: LogicalVolume
+    listKind: LogicalVolumeList
+    plural: logicalvolumes
+    singular: logicalvolume
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: LogicalVolume is the Schema for the logicalvolumes API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: LogicalVolumeSpec defines the desired state of LogicalVolume
+            properties:
+              deviceClass:
+                type: string
+              name:
+                type: string
+              nodeName:
+                type: string
+              size:
+                anyOf:
+                - type: integer
+                - type: string
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
+            required:
+            - name
+            - nodeName
+            - size
+            type: object
+          status:
+            description: LogicalVolumeStatus defines the observed state of LogicalVolume
+            properties:
+              code:
+                description: A Code is an unsigned 32-bit error code as defined in the gRPC spec.
+                format: int32
+                type: integer
+              currentSize:
+                anyOf:
+                - type: integer
+                - type: string
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
+              message:
+                type: string
+              volumeID:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state of cluster Important: Run "make" to regenerate code after modifying this file'
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: lvmclusters.lvm.topolvm.io
+spec:
+  group: lvm.topolvm.io
+  names:
+    kind: LVMCluster
+    listKind: LVMClusterList
+    plural: lvmclusters
+    singular: lvmcluster
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: LVMCluster is the Schema for the lvmclusters API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: LVMClusterSpec defines the desired state of LVMCluster
+            properties:
+              storage:
+                description: Storage describes the deviceClass configuration for local storage devices
+                properties:
+                  deviceClasses:
+                    description: DeviceClasses are a rules that assign local storage devices to volumegroups that are used for creating lvm based PVs
+                    items:
+                      properties:
+                        deviceSelector:
+                          description: DeviceSelector is a set of rules that should match for a device to be included in the LVMCluster
+                          type: object
+                        name:
+                          description: 'Name of the class, the VG and possibly the storageclass. Validations to confirm that this field can be used as metadata.name field in storageclass ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209'
+                          maxLength: 245
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                        nodeSelector:
+                          description: NodeSelector chooses nodes on which to create the deviceclass
+                          properties:
+                            nodeSelectorTerms:
+                              description: Required. A list of node selector terms. The terms are ORed.
+                              items:
+                                description: A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
+                                properties:
+                                  matchExpressions:
+                                    description: A list of node selector requirements by node's labels.
+                                    items:
+                                      description: A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                                      properties:
+                                        key:
+                                          description: The label key that the selector applies to.
+                                          type: string
+                                        operator:
+                                          description: Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                          type: string
+                                        values:
+                                          description: An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                  matchFields:
+                                    description: A list of node selector requirements by node's fields.
+                                    items:
+                                      description: A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                                      properties:
+                                        key:
+                                          description: The label key that the selector applies to.
+                                          type: string
+                                        operator:
+                                          description: Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                          type: string
+                                        values:
+                                          description: An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                type: object
+                              type: array
+                          required:
+                          - nodeSelectorTerms
+                          type: object
+                      type: object
+                    type: array
+                type: object
+              tolerations:
+                description: Tolerations to apply to nodes to act on
+                items:
+                  description: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                      type: string
+                    operator:
+                      description: Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            description: LVMClusterStatus defines the observed state of LVMCluster
+            properties:
+              deviceClassStatuses:
+                description: DeviceClassStatuses describes the status of all deviceClasses
+                items:
+                  description: DeviceClassStatus defines the observed status of the deviceclass across all nodes
+                  properties:
+                    name:
+                      description: Name is the name of the deviceclass
+                      type: string
+                    nodeStatus:
+                      description: NodeStatus tells if the deviceclass was created on the node
+                      items:
+                        description: NodeStatus defines the observed state of the deviceclass on the node
+                        properties:
+                          devices:
+                            description: Devices is the list of devices used by the deviceclass
+                            items:
+                              type: string
+                            type: array
+                          node:
+                            description: Node is the name of the node
+                            type: string
+                          status:
+                            description: Status is the status of the VG on the node
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
+              ready:
+                description: Ready describes if the LVMCluster is ready.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+spec:
+  group: lvm.topolvm.io
+  names:
+    kind: LVMVolumeGroupNodeStatus
+    listKind: LVMVolumeGroupNodeStatusList
+    plural: lvmvolumegroupnodestatuses
+    singular: lvmvolumegroupnodestatus
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: LVMVolumeGroupNodeStatus is the Schema for the lvmvolumegroupnodestatuses API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: LVMVolumeGroupNodeStatusSpec defines the desired state of LVMVolumeGroupNodeStatus
+            properties:
+              nodeStatus:
+                description: NodeStatus contains the per node status of the VG
+                items:
+                  properties:
+                    devices:
+                      description: Devices is the list of devices used by the VG
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      description: Name is the name of the VG
+                      type: string
+                    reason:
+                      description: Reason provides more detail on the VG creation status
+                      type: string
+                    status:
+                      description: Status tells if the VG was created on the node
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            description: LVMVolumeGroupNodeStatusStatus defines the observed state of LVMVolumeGroupNodeStatus
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: lvmvolumegroups.lvm.topolvm.io
+spec:
+  group: lvm.topolvm.io
+  names:
+    kind: LVMVolumeGroup
+    listKind: LVMVolumeGroupList
+    plural: lvmvolumegroups
+    singular: lvmvolumegroup
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: LVMVolumeGroup is the Schema for the lvmvolumegroups API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: LVMVolumeGroupSpec defines the desired state of LVMVolumeGroup
+            properties:
+              deviceSelector:
+                description: DeviceSelector is a set of rules that should match for a device to be included in this TopoLVMCluster
+                type: object
+              nodeSelector:
+                description: NodeSelector chooses nodes
+                properties:
+                  nodeSelectorTerms:
+                    description: Required. A list of node selector terms. The terms are ORed.
+                    items:
+                      description: A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
+                      properties:
+                        matchExpressions:
+                          description: A list of node selector requirements by node's labels.
+                          items:
+                            description: A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                            properties:
+                              key:
+                                description: The label key that the selector applies to.
+                                type: string
+                              operator:
+                                description: Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                type: string
+                              values:
+                                description: An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchFields:
+                          description: A list of node selector requirements by node's fields.
+                          items:
+                            description: A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                            properties:
+                              key:
+                                description: The label key that the selector applies to.
+                                type: string
+                              operator:
+                                description: Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                type: string
+                              values:
+                                description: An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                required:
+                - nodeSelectorTerms
+                type: object
+            type: object
+          status:
+            description: LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: controller-manager
+  namespace: lvm-operator-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: topolvm-node
+  namespace: lvm-operator-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vg-manager
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-election-role
+  namespace: lvm-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: lvm-metrics
+  namespace: lvm-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: topolvm-csi-provisioner
+  namespace: lvm-operator-system
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - watch
+  - list
+  - delete
+  - update
+  - create
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csistoragecapacities
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: topolvm-csi-resizer
+  namespace: lvm-operator-system
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - watch
+  - list
+  - delete
+  - update
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: topolvm-leader-election
+  namespace: lvm-operator-system
+rules:
+- apiGroups:
+  - ""
+  - coordination.k8s.io
+  resources:
+  - configmaps
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: topolvm-metrics
+  namespace: lvm-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - create
+  - delete
+  - get
+  - update
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csidrivers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: topolvm-controller
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - delete
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  - csidrivers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - topolvm.cybozu.com
+  resources:
+  - logicalvolumes
+  - logicalvolumes/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: topolvm-csi-provisioner
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csinodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: topolvm-csi-resizer
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/status
+  verbs:
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: topolvm-node
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - topolvm.cybozu.com
+  resources:
+  - logicalvolumes
+  - logicalvolumes/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csidrivers
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: vg-manager-role
+rules:
+- apiGroups:
+  - lvm.topolvm.io
+  - apps
+  resources:
+  - lvmvolumegroups
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - lvm.topolvm.io
+  resources:
+  - lvmvolumegroupnodestatuses/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-election-rolebinding
+  namespace: lvm-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: lvm-metrics
+  namespace: lvm-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: lvm-metrics
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: topolvm-csi-provisioner
+  namespace: lvm-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: topolvm-csi-provisioner
+subjects:
+- kind: ServiceAccount
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: topolvm-csi-resizer
+  namespace: lvm-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: topolvm-csi-resizer
+subjects:
+- kind: ServiceAccount
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: topolvm-leader-election
+  namespace: lvm-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: topolvm-leader-election
+subjects:
+- kind: ServiceAccount
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: topolvm-metrics
+  namespace: lvm-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: topolvm-metrics
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: manager-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: proxy-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: topolvm-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topolvm-controller
+subjects:
+- kind: ServiceAccount
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: topolvm-csi-provisioner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topolvm-csi-provisioner
+subjects:
+- kind: ServiceAccount
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: topolvm-csi-resizer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topolvm-csi-resizer
+subjects:
+- kind: ServiceAccount
+  name: topolvm-controller
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: topolvm-node
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topolvm-node
+subjects:
+- kind: ServiceAccount
+  name: topolvm-node
+  namespace: lvm-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vg-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vg-manager-role
+subjects:
+- kind: ServiceAccount
+  name: vg-manager
+  namespace: lvm-operator-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: controller-manager-metrics-service
+  namespace: lvm-operator-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/compose: metrics
+  name: lvm-node-metrics
+  namespace: lvm-operator-system
+spec:
+  ports:
+  - name: lvm-metrics
+    port: 23532
+    protocol: TCP
+    targetPort: 23532
+  selector:
+    exporter: lvm-operator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/compose: metrics
+  name: topolvm-node-metrics
+  namespace: lvm-operator-system
+spec:
+  ports:
+  - name: topolvm-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: topolvm-node
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: lvm-operator-controller-manager
+  namespace: lvm-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        exporter: lvm-operator
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        command:
+        - /manager
+        env:
+        - name: TOPOLVM_CSI_IMAGE
+          value: quay.io/topolvm/topolvm:0.10.3
+        - name: CSI_LIVENESSPROBE_IMAGE
+          value: k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
+        - name: CSI_PROVISIONER_IMAGE
+          value: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+        - name: CSI_REGISTRAR_IMAGE
+          value: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
+        - name: CSI_RESIZER_IMAGE
+          value: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: quay.io/ocs-dev/lvm-operator:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 200m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      - command:
+        - /metricsexporter
+        image: quay.io/ocs-dev/lvm-operator:latest
+        name: metricsexporter
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: controller-manager
+      terminationGracePeriodSeconds: 10
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: prometheus-lvmo-rules
+  namespace: lvm-operator-system
+spec:
+  groups:
+  - name: vg-alert.rules
+    rules:
+    - alert: VolumeGroupUsageAtThresholdNearFull
+      annotations:
+        description: VolumeGroup is nearing full. Data deletion or VolumeGroup expansion is required.
+        message: VolumeGroup {{ "{{ $labels.device_class }}" }} utilization has crossed 75 % on node {{ "{{ $labels.node }}" }}. Free up some space or expand the VolumeGroup.
+      expr: |
+        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.75 and (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes <= 0.85
+      for: 5m
+      labels:
+        severity: warning
+    - alert: VolumeGroupUsageAtThresholdCritical
+      annotations:
+        description: VolumeGroup is critically full. Data deletion or VolumeGroup expansion is required.
+        message: VolumeGroup {{ "{{ $labels.device_class }}" }} utilization has crossed 85 % on node {{ "{{ $labels.node }}" }}. Free up some space or expand the VolumeGroup immediately.
+      expr: |
+        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.85
+      for: 5m
+      labels:
+        severity: critical
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: lvm-operator-controller-manager-metrics-monitor
+  namespace: lvm-operator-system
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    path: /metrics
+    port: topolvm-metrics
+    scheme: http
+    tlsConfig:
+      insecureSkipVerify: true
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    path: /metrics
+    port: lvm-metrics
+    scheme: http
+    tlsConfig:
+      insecureSkipVerify: true
+  selector:
+    matchLabels:
+      app.kubernetes.io/compose: metrics

@@ -175,6 +175,13 @@ deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s clust
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
+helm-chart: update-mgr-env manifests kustomize ## Create helm chart
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
+	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
+	$(KUSTOMIZE) build config/default > charts/templates/template.yaml
+	sed -i 's:{{:{{ "{{:g; s:}}:}}" }}:g' charts/templates/template.yaml
+	sed -i 's/^version.*/version: ${VERSION}/g' charts/Chart.yaml
+
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
