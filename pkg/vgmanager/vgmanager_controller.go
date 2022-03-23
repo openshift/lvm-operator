@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -90,12 +91,11 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	//TODO: actually check the node against the nodeSelector.
-	node := &corev1.Node{}
-	nodeMatches, err := NodeSelectorMatchesNodeLabels(node, volumeGroup.Spec.NodeSelector)
+	//Check if the VG nodeSelector matches the labels on this node
+	nodeMatches, err := r.matchesThisNode(ctx, volumeGroup.Spec.NodeSelector)
 	if err != nil {
 		r.Log.Error(err, "failed to match nodeSelector to node labels", "VGName", volumeGroup.Name)
-		return reconcileAgain, err
+		return ctrl.Result{}, err
 	}
 
 	if !nodeMatches {
@@ -380,4 +380,13 @@ func (r *VGReconciler) getNewNodeStatus(status *lvmv1alpha1.VGStatus) *lvmv1alph
 	}
 	setStatus(status, vgNodeStatus)
 	return vgNodeStatus
+}
+
+func (r *VGReconciler) matchesThisNode(ctx context.Context, selector *corev1.NodeSelector) (bool, error) {
+	node := &corev1.Node{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: r.NodeName}, node)
+	if err != nil {
+		return false, err
+	}
+	return NodeSelectorMatchesNodeLabels(node, selector)
 }
