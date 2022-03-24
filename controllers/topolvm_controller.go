@@ -216,7 +216,7 @@ func getControllerContainer() *corev1.Container {
 			},
 		},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/healthz",
 					Port: intstr.FromString(TopolvmControllerContainerHealthzName),
@@ -228,7 +228,7 @@ func getControllerContainer() *corev1.Container {
 			PeriodSeconds:       60,
 		},
 		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/metrics",
 					Port: intstr.IntOrString{
