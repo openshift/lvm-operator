@@ -101,7 +101,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -cover `go list ./... | grep -v "e2e"`
 
 
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -302,3 +302,14 @@ catalog-push: ## Push a catalog image.
 lvm-must-gather:
 	@echo "Building the lvm-must-gather image"
 	$(IMAGE_BUILD_CMD) build -f must-gather/Dockerfile -t "${MUST_GATHER_FULL_IMAGE_NAME}" must-gather/
+	
+# Variables required to run and build LVM end to end tests.
+LVM_OPERATOR_INSTALL ?= true
+LVM_OPERATOR_UNINSTALL ?= true
+
+# Build and run lvm tests.
+e2e-test:
+	@echo "build and run e2e tests"
+	cd e2e/lvm && ginkgo build
+	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(CHANNELS) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL)
+
