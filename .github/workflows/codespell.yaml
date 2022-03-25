@@ -17,6 +17,7 @@ jobs:
       - name: codespell
         uses: codespell-project/actions-codespell@master
         with:
+          exclude_file: go.sum
           check_filenames: true
           check_hidden: true
           skip: vendor

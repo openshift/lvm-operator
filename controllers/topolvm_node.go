@@ -323,7 +323,7 @@ func getNodeContainer() *corev1.Container {
 			ContainerPort: 9808,
 			Protocol:      corev1.ProtocolTCP}},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
 					Port: intstr.FromString(TopolvmNodeContainerHealthzName)}},
 			FailureThreshold:    3,
@@ -358,7 +358,7 @@ func getCsiRegistrarContainer() *corev1.Container {
 		Name:         "csi-registrar",
 		Image:        CsiRegistrarImage,
 		Args:         args,
-		Lifecycle:    &corev1.Lifecycle{PreStop: &corev1.Handler{Exec: &corev1.ExecAction{Command: preStopCmd}}},
+		Lifecycle:    &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: preStopCmd}}},
 		VolumeMounts: volumeMounts,
 	}
 	return csiRegistrar
