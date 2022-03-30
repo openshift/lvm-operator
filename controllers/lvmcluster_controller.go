@@ -86,8 +86,8 @@ type LVMClusterReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log = log.FromContext(ctx).WithName(ControllerName)
-	r.Log.Info("reconciling", "lvmcluster", req)
+	r.Log = log.Log.WithName(ControllerName).WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
+	r.Log.Info("reconciling")
 
 	// get lvmcluster
 	lvmCluster := &lvmv1alpha1.LVMCluster{}
@@ -148,25 +148,28 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 			for _, unit := range resourceDeletionList {
 				err := unit.ensureDeleted(r, ctx, instance)
 				if err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
+					r.Log.Error(err, "failed cleaning up", "resource", unit.getName())
+					return ctrl.Result{}, err
 				}
 			}
 			controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer)
 			if err := r.Client.Update(context.TODO(), instance); err != nil {
-				r.Log.Info("failed to remove finalizer from LvmCluster", "LvmCluster", instance.Name)
+				r.Log.Info("failed to remove finalizer from LvmCluster")
 				return reconcile.Result{}, err
 			}
 		}
+		r.Log.Info("successfully deleted LvmCluster")
 		return ctrl.Result{}, nil
 	}
 
 	if !controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
-		r.Log.Info("Finalizer not found for LvmCluster. Adding finalizer.", "LvmCluster", instance.Name)
+		r.Log.Info("finalizer not found for LvmCluster. Adding finalizer")
 		controllerutil.AddFinalizer(instance, lvmClusterFinalizer)
 		if err := r.Client.Update(context.TODO(), instance); err != nil {
-			r.Log.Info("failed to update LvmCluster with finalizer.", "LvmCluster", instance.Name)
+			r.Log.Error(err, "failed to update LvmCluster with finalizer")
 			return reconcile.Result{}, err
 		}
+		r.Log.Info("successfully added finalizer")
 	}
 
 	resourceCreationList := []resourceManager{
@@ -183,7 +186,8 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	for _, unit := range resourceCreationList {
 		err := unit.ensureCreated(r, ctx, instance)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed reconciling: %s %w", unit.getName(), err)
+			r.Log.Error(err, "failed to reconcile", "resource", unit.getName())
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -205,6 +209,9 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	*/
 	//ToDo: Change the status to something useful
 	instance.Status.Ready = true
+
+	r.Log.Info("successfully reconciled LvmCluster")
+
 	return ctrl.Result{}, nil
 }
 
@@ -252,8 +259,12 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 		if errors.IsNotFound(err) {
 			r.Log.Error(err, "failed to update status")
 		}
+		return err
 	}
-	return err
+
+	r.Log.Info("successfully updated the LvmCluster status")
+
+	return nil
 }
 
 // NOTE: when updating this, please also update doc/design/operator.md
@@ -286,12 +297,14 @@ func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
 			if errors.IsNotFound(err) {
 				// Not an Openshift cluster
 				r.ClusterType = ClusterTypeOther
+				r.Log.Info("openshiftSCC not found, setting cluster type to other")
 			} else {
 				// Something went wrong
 				r.Log.Error(err, "failed to get SCC", "Name", openshiftSCCPrivilegedName)
 				return err
 			}
 		} else {
+			r.Log.Info("openshiftSCC found, setting cluster type to openshift")
 			r.ClusterType = ClusterTypeOCP
 		}
 	}
@@ -309,12 +322,15 @@ func (r *LVMClusterReconciler) getRunningPodImage(ctx context.Context) error {
 		// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
 		podName := os.Getenv("POD_NAME")
 		if podName == "" {
-			return fmt.Errorf("failed to get pod name env variable")
+			err := fmt.Errorf("failed to get pod name env variable")
+			r.Log.Error(err, "POD_NAME env variable is not set")
+			return err
 		}
 
 		pod := &corev1.Pod{}
 		if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: r.Namespace}, pod); err != nil {
-			return fmt.Errorf("failed to get pod %s in namespace %s", podName, r.Namespace)
+			r.Log.Error(err, "failed to get pod", "pod", podName)
+			return err
 		}
 
 		for _, c := range pod.Spec.Containers {
@@ -324,10 +340,11 @@ func (r *LVMClusterReconciler) getRunningPodImage(ctx context.Context) error {
 			}
 		}
 
-		return fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
+		err := fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
+		r.Log.Error(err, "container image not found")
+		return err
 
 	}
 
 	return nil
-
 }

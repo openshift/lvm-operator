@@ -52,14 +52,16 @@ func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Contex
 			r.Log.Info("creating SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
 			_, err := r.SecurityClient.SecurityContextConstraints().Create(ctx, scc, metav1.CreateOptions{})
 			if err != nil {
-				return fmt.Errorf("failed to create SCC %q: %v", scc.Name, err)
+				r.Log.Error(err, "failed to create SCC", "SecurityContextConstraint", scc.Name)
+				return err
 			}
+			r.Log.Info("successfully created SCC", "SecurityContextConstraint", scc.Name)
 		} else if err == nil {
 			// Don't update the SCC
 			r.Log.Info("already exists", "SecurityContextConstraint", scc.Name)
 		} else {
-			r.Log.Error(err, "Something went wrong when checking for SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
-			return fmt.Errorf("something went wrong when checking for SCC %q: %v", scc.Name, err)
+			r.Log.Error(err, "something went wrong when checking for SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
+			return err
 		}
 	}
 
