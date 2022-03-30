@@ -1,4 +1,4 @@
-OCS must-gather
+LVM must-gather
 =================
 
 `lvm-must-gather` is a tool built on top of [OpenShift must-gather](https://github.com/openshift/must-gather)
@@ -6,7 +6,7 @@ that expands its capabilities to gather LVM Operator information.
 
 ### Usage
 ```sh
-oc adm must-gather --image=quay.io/ocs-dev/lvm-must-gather
+oc adm must-gather --image=quay.io/ocs-dev/lvm-must-gather:latest
 ```
 
 The command above will create a local directory with a dump of the lvm state.
@@ -30,6 +30,11 @@ Developers must follow these steps to make a change:
 6. Submit a pull request to the `red-hat-storage/lvm-operator` repository.
 7. Work with the community to make any necessary changes through the code
    review process (effectively repeating steps 3-7 as needed).
+
+To test the changes in must-gather follow these steps:
+1. Run `make lvm-must-gather`
+2. It will create an image named `quay.io/ocs-dev/lvm-must-gather:latest`
+3. Tag it and push it to your image repository to use it with the `oc adm` command
 
 #### Commit and Pull Request Messages
 
