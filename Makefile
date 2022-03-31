@@ -31,6 +31,8 @@ REGISTRY_NAMESPACE ?= ocs-dev
 IMAGE_TAG ?= latest
 IMAGE_NAME ?= lvm-operator
 VGMANAGER_IMAGE_NAME ?= vgmanager
+MUST_GATHER_IMAGE_NAME ?= lvm-must-gather
+MUST_GATHER_FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(MUST_GATHER_IMAGE_NAME):$(IMAGE_TAG)
 
 # IMG defines the image used for the operator.
 IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)
@@ -296,3 +298,7 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+lvm-must-gather:
+	@echo "Building the lvm-must-gather image"
+	$(IMAGE_BUILD_CMD) build -f must-gather/Dockerfile -t "${MUST_GATHER_FULL_IMAGE_NAME}" must-gather/
