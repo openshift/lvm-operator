@@ -73,12 +73,11 @@ func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Contex
 		for _, scc := range sccs {
 			err = r.SecurityClient.SecurityContextConstraints().Delete(ctx, scc.Name, metav1.DeleteOptions{})
 			if err != nil {
-				if errors.IsNotFound(err) {
-					r.Log.Info("SecurityContextConstraint is already deleted", "SecurityContextConstraint", scc.Name)
-					return nil
-				} else {
+				if !errors.IsNotFound(err) {
 					r.Log.Error(err, "failed to delete SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
+					return err
 				}
+				r.Log.Info("SecurityContextConstraint is already deleted", "SecurityContextConstraint", scc.Name)
 			}
 		}
 	}
