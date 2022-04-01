@@ -48,6 +48,7 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 
 		if err != nil {
 			r.Log.Error(err, "failed to reconcile LVMVolumeGroup", "name", volumeGroup.Name)
+			return err
 		} else {
 			r.Log.Info("LVMVolumeGroup", "operation", result, "name", volumeGroup.Name)
 		}
