@@ -204,6 +204,11 @@ JSONNET = $(shell pwd)/bin/jsonnet
 jsonnet: ## Download jsonnet locally if necessary.
 	$(call go-get-tool,$(JSONNET),github.com/google/go-jsonnet/cmd/jsonnet@latest)
 
+GINKGO = $(shell pwd)/bin/ginkgo
+ginkgo: ## Download ginkgo and gomega locally if necessary.
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
+	$(call go-get-tool,$(GOMEGA),github.com/onsi/gomega/...)
+
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-get-tool
@@ -308,8 +313,8 @@ LVM_OPERATOR_INSTALL ?= true
 LVM_OPERATOR_UNINSTALL ?= true
 
 # Build and run lvm tests.
-e2e-test:
+e2e-test: ginkgo
 	@echo "build and run e2e tests"
-	cd e2e/lvm && ginkgo build
+	cd e2e/lvm && $(GINKGO) build
 	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(CHANNELS) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL)
 
