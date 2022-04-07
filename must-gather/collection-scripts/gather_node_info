@@ -1,0 +1,46 @@
+#!/bin/bash
+# Expect base collection path as an argument
+BASE_COLLECTION_PATH=$1
+
+# Use PWD as base path if no argument is passed
+if [ "${BASE_COLLECTION_PATH}" = "" ]; then
+    BASE_COLLECTION_PATH=$(pwd)
+fi
+
+# Command List
+commands_get=()
+
+# lvm commands
+commands_get+=("lvs -a")
+commands_get+=("lvdisplay")
+commands_get+=("vgs")
+commands_get+=("vgdisplay")
+commands_get+=("pvs")
+commands_get+=("pvdisplay")
+commands_get+=("lvm version")
+commands_get+=("cat /etc/topolvm/lvmd.yaml")
+
+# collection path for lvm commands
+COMMAND_OUTPUT_FILE="${BASE_COLLECTION_PATH}/node_info"
+
+printf "collecting output of node related commands\n" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
+
+# Create the command, push all the commands to a temp file
+COMMAND_INPUT_FILE="${BASE_COLLECTION_PATH}/temp_file"
+printf "chroot /host" >> "${COMMAND_INPUT_FILE}"
+
+STRING="\\\n"
+for command_get in "${commands_get[@]}"; do
+    {
+        printf "\nprintf \"output of command: %s\"\n" "${command_get}"
+        printf "printf \"%s\"\n" "${STRING}"
+        printf "%s\n" "${command_get}"
+        printf "printf \"%s\"\n" "${STRING}"
+ } >> "${COMMAND_INPUT_FILE}"
+done
+
+node=$(oc get nodes -oname)
+
+{ timeout 120 cat "${COMMAND_INPUT_FILE}" | oc debug  -q "${node}" >> "${COMMAND_OUTPUT_FILE}"; }
+
+rm "${COMMAND_INPUT_FILE}"
