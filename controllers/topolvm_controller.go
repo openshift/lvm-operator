@@ -125,25 +125,27 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 		*getCsiResizerContainer(),
 		*getLivenessProbeContainer(),
 	}
+
+	labels := map[string]string{
+		DefaultLabelKey: TopolvmControllerLabelVal,
+	}
+
 	controllerDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TopolvmControllerDeploymentName,
 			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					AppAttr: TopolvmControllerDeploymentName,
-				},
+				MatchLabels: labels,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      TopolvmControllerDeploymentName,
 					Namespace: namespace,
-					Labels: map[string]string{
-						AppAttr: TopolvmControllerDeploymentName,
-					},
+					Labels:    labels,
 				},
 				Spec: corev1.PodSpec{
 					InitContainers:     initContainers,

@@ -176,7 +176,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 		topolvmNodeTolerations = tolerations
 	}
 	labels := map[string]string{
-		"app": topolvmNodeName,
+		DefaultLabelKey: TopolvmNodeLabelVal,
 	}
 	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
