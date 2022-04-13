@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,7 @@ import (
 	"github.com/go-logr/logr"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,6 +76,7 @@ type LVMClusterReconciler struct {
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;create;update;delete
+//+kubebuilder:rbac:groups=topolvm.cybozu.com,resources=logicalvolumes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -115,14 +118,12 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
 
 	statusError := r.updateLVMClusterStatus(ctx, lvmCluster)
-	if statusError != nil {
-		r.Log.Error(statusError, "failed to update VG Node status")
-	}
 
 	// Reconcile errors have higher priority than status update errors
 	if reconcileError != nil {
 		return result, reconcileError
-	} else if statusError != nil && errors.IsNotFound(statusError) {
+	} else if statusError != nil && !errors.IsNotFound(statusError) {
+		r.Log.Error(statusError, "failed to update LVMCluster status")
 		return result, statusError
 	} else {
 		return result, nil
@@ -134,32 +135,23 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	//The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
-		if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
-			resourceDeletionList := []resourceManager{
-				&csiDriver{},
-				&topolvmController{},
-				&lvmVG{},
-				&openshiftSccs{},
-				&topolvmNode{},
-				&vgManager{},
-				&topolvmStorageClass{},
-			}
-
-			for _, unit := range resourceDeletionList {
-				err := unit.ensureDeleted(r, ctx, instance)
-				if err != nil {
-					r.Log.Error(err, "failed cleaning up", "resource", unit.getName())
-					return ctrl.Result{}, err
-				}
-			}
-			controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer)
-			if err := r.Client.Update(context.TODO(), instance); err != nil {
-				r.Log.Info("failed to remove finalizer from LvmCluster")
-				return reconcile.Result{}, err
+		// Check for existing LogicalVolumes
+		lvsExist, err := r.logicalVolumesExist(ctx, instance)
+		if err != nil {
+			r.Log.Error(err, "failed to check if LogicalVolumes exist")
+		} else {
+			if lvsExist {
+				err = fmt.Errorf("found PVCs provisioned by topolvm")
+			} else {
+				r.Log.Info("processing LVMCluster deletion")
+				err = r.processDelete(ctx, instance)
 			}
 		}
-		r.Log.Info("successfully deleted LvmCluster")
-		return ctrl.Result{}, nil
+		if err != nil {
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, err
+		} else {
+			return reconcile.Result{}, nil
+		}
 	}
 
 	if !controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
@@ -207,7 +199,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	   		return ctrl.Result{}, fmt.Errorf("status update failed for %s: %w", strings.Join(failedStatusUpdates, ","), lastError)
 	   	}
 	*/
-	//ToDo: Change the status to something useful
+	// ToDo: Change the status to something useful
 	instance.Status.Ready = true
 
 	r.Log.Info("successfully reconciled LvmCluster")
@@ -344,6 +336,50 @@ func (r *LVMClusterReconciler) getRunningPodImage(ctx context.Context) error {
 		r.Log.Error(err, "container image not found")
 		return err
 
+	}
+
+	return nil
+}
+
+func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (bool, error) {
+
+	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
+
+	if err := r.Client.List(ctx, logicalVolumeList); err != nil {
+		r.Log.Error(err, "failed to get Topolvm LogicalVolume list")
+		return false, err
+	}
+	if len(logicalVolumeList.Items) > 0 {
+
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
+
+		resourceDeletionList := []resourceManager{
+			&topolvmStorageClass{},
+			&lvmVG{},
+			&topolvmController{},
+			&csiDriver{},
+			&openshiftSccs{},
+			&topolvmNode{},
+			&vgManager{},
+		}
+
+		for _, unit := range resourceDeletionList {
+			err := unit.ensureDeleted(r, ctx, instance)
+			if err != nil {
+				return fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
+			}
+		}
+		controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer)
+		if err := r.Client.Update(context.TODO(), instance); err != nil {
+			r.Log.Info("failed to remove finalizer from LVMCluster", "LvmCluster", instance.Name)
+			return err
+		}
 	}
 
 	return nil

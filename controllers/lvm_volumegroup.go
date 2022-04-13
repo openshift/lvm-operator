@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +28,8 @@ import (
 )
 
 const (
-	lvmVGName = "lvmvg-manager"
+	lvmVGName      = "lvmvg-manager"
+	lvmvgFinalizer = "lvm.openshift.io/lvmvolumegroup"
 )
 
 type lvmVG struct{}
@@ -61,6 +63,7 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 
 	existingLvmVg := &lvmv1alpha1.LVMVolumeGroup{}
 	vgcrs := c.getLvmVolumeGroups(r, lvmCluster)
+	allVGsDeleted := true
 
 	for _, vgcr := range vgcrs {
 		err := r.Client.Get(ctx, types.NamespacedName{Name: vgcr.Name, Namespace: vgcr.Namespace}, existingLvmVg)
@@ -82,8 +85,25 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 				return err
 			} else {
 				r.Log.Info("initiated LVMVolumeGroup deletion", "name", existingLvmVg.Name)
+				allVGsDeleted = false
+			}
+		} else {
+			// Has the VG been cleaned up on all hosts?
+			exists := doesVGExistOnHosts(existingLvmVg.Name, lvmCluster)
+			if !exists {
+				// Remove finalizer
+				cutil.RemoveFinalizer(existingLvmVg, lvmvgFinalizer)
+				err = r.Client.Update(ctx, existingLvmVg)
+				if err != nil {
+					return err
+				}
+			} else {
+				allVGsDeleted = false
 			}
 		}
+	}
+	if !allVGsDeleted {
+		return fmt.Errorf("waiting for all VGs to be deleted")
 	}
 	return nil
 }
@@ -103,6 +123,9 @@ func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      deviceClass.Name,
 				Namespace: r.Namespace,
+				Finalizers: []string{
+					lvmvgFinalizer,
+				},
 			},
 			Spec: lvmv1alpha1.LVMVolumeGroupSpec{
 				NodeSelector:   deviceClass.NodeSelector,
@@ -112,4 +135,15 @@ func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)
 	}
 	return lvmVolumeGroups
+}
+
+func doesVGExistOnHosts(volumeGroup string, instance *lvmv1alpha1.LVMCluster) bool {
+
+	dcStatuses := instance.Status.DeviceClassStatuses
+	for _, dc := range dcStatuses {
+		if dc.Name == volumeGroup {
+			return true
+		}
+	}
+	return false
 }
