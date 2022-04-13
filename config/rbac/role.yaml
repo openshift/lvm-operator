@@ -144,3 +144,11 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - topolvm.cybozu.com
+  resources:
+  - logicalvolumes
+  verbs:
+  - get
+  - list
+  - watch
