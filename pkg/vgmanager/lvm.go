@@ -112,14 +112,14 @@ func (vg VolumeGroup) Extend(exec internal.Executor, pvs []string) error {
 // Delete deletes a volume group and the physical volumes associated with it
 func (vg VolumeGroup) Delete(exec internal.Executor) error {
 	// Remove Volume Group
-	vgArgs := []string{vg.Name, "--nolocking"}
+	vgArgs := []string{vg.Name}
 	_, err := exec.ExecuteCommandWithOutputAsHost(vgRemoveCmd, vgArgs...)
 	if err != nil {
 		return fmt.Errorf("failed to remove volume group %q. %v", vg.Name, err)
 	}
 
 	// Remove physical volumes
-	pvArgs := append(vg.PVs, "--nolocking")
+	pvArgs := vg.PVs
 	_, err = exec.ExecuteCommandWithOutputAsHost(pvRemoveCmd, pvArgs...)
 	if err != nil {
 		return fmt.Errorf("failed to remove physical volumes for the volume group %q. %v", vg.Name, err)
