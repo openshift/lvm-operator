@@ -50,13 +50,10 @@ commands_desc+=("lvmvolumegroup")
 commands_desc+=("lvmvolumegroupsnodestatus")
 commands_desc+=("pods")
 
-
-
 # collect yaml output of OC commands
 oc_yamls=()
 oc_yamls+=("csv")
 oc_yamls+=("installplan")
-
 
 echo "collecting dump of namespace" | tee -a  "${BASE_COLLECTION_PATH}"/gather-debug.log
 oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect ns/"${INSTALL_NAMESPACE}" --"${SINCE_TIME}" >> "${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
@@ -102,3 +99,9 @@ done
 echo "collecting dump of oc get pvc all namespaces" | tee -a  "${BASE_COLLECTION_PATH}/gather-debug.log"
 { oc get pvc --all-namespaces; } >> "${BASE_COLLECTION_PATH}/namespaces/all/pvc_all_namespaces"
 { oc adm --dest-dir="${BASE_COLLECTION_PATH}/namespaces/all/" inspect pvc --all-namespaces --"${SINCE_TIME}"; } >> "${BASE_COLLECTION_PATH}/gather-debug.log" 2>&1
+
+# For snapshot of all namespaces
+echo "collecting dump of snapshot information for all namespaces" | tee -a  "${BASE_COLLECTION_PATH}/gather-debug.log"
+{ oc get volumesnapshot --all-namespaces; } >> "${BASE_COLLECTION_PATH}/namespaces/all/get_volumesnapshot_all_namespaces"
+{ oc describe volumesnapshot --all-namespaces; } >> "${BASE_COLLECTION_PATH}/namespaces/all/desc_volumesnapshot_all_namespaces"
+{ oc adm --dest-dir="${BASE_COLLECTION_PATH}/namespaces/all/" inspect volumesnapshot --all-namespaces --"${SINCE_TIME}"; } >> "${BASE_COLLECTION_PATH}/gather-debug.log" 2>&1
