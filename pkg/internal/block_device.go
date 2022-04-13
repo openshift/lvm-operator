@@ -18,6 +18,9 @@ const (
 	// DeviceTypeLoop is the device type for loop devices in lsblk output
 	DeviceTypeLoop = "loop"
 
+	// DeviceTypeROM is the device type for ROM devices in lsblk output
+	DeviceTypeROM = "rom"
+
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
 )
@@ -36,7 +39,6 @@ type BlockDevice struct {
 	Children   []BlockDevice `json:"children,omitempty"`
 	Rotational string        `json:"rota"`
 	ReadOnly   string        `json:"ro,omitempty"`
-	Removable  string        `json:"rm,omitempty"`
 	PathByID   string        `json:"pathByID,omitempty"`
 	Serial     string        `json:"serial,omitempty"`
 	PartLabel  string        `json:"partLabel,omitempty"`
@@ -46,7 +48,7 @@ type BlockDevice struct {
 func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
-	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,RM,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
+	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "-o", columns}
 
 	output, err := exec.ExecuteCommandWithOutput("lsblk", args...)
@@ -100,11 +102,6 @@ func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
 // IsReadOnly checks is disk is read only
 func (b BlockDevice) IsReadOnly() (bool, error) {
 	return parseBitBool(b.ReadOnly)
-}
-
-// IsRemovable checks if a disk is removable
-func (b BlockDevice) IsRemovable() (bool, error) {
-	return parseBitBool(b.Removable)
 }
 
 // HasChildren checks if the disk has partitions

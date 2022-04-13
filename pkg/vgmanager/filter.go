@@ -25,13 +25,12 @@ import (
 const (
 	// filter names:
 	notReadOnly           = "notReadOnly"
-	notRemovable          = "notRemovable"
 	notSuspended          = "notSuspended"
 	noBiosBootInPartLabel = "noBiosBootInPartLabel"
 	noFilesystemSignature = "noFilesystemSignature"
 	noBindMounts          = "noBindMounts"
 	noChildren            = "noChildren"
-	usableLoopDevice      = "usableLoopDevice"
+	usableDeviceType      = "usableDeviceType"
 )
 
 // filterAvailableDevices returns:
@@ -83,11 +82,6 @@ var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, 
 		return !readOnly, err
 	},
 
-	notRemovable: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		removable, err := dev.IsRemovable()
-		return !removable, err
-	},
-
 	notSuspended: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
 		matched := dev.State != internal.StateSuspended
 		return matched, nil
@@ -114,13 +108,15 @@ var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, 
 		return !hasChildren, nil
 	},
 
-	usableLoopDevice: func(dev internal.BlockDevice, executor internal.Executor) (bool, error) {
-		// if current device isn't a loop device no need to check for backing file
-		if dev.Type != internal.DeviceTypeLoop {
+	usableDeviceType: func(dev internal.BlockDevice, executor internal.Executor) (bool, error) {
+		switch dev.Type {
+		case internal.DeviceTypeLoop:
+			// check loop device isn't being used by kubernetes
+			return dev.IsUsableLoopDev(executor)
+		case internal.DeviceTypeROM:
+			return false, nil
+		default:
 			return true, nil
 		}
-
-		// check loop device isn't being used by kubernetes
-		return dev.IsUsableLoopDev(executor)
 	},
 }
