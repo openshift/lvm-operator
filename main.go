@@ -35,6 +35,7 @@ import (
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"github.com/red-hat-storage/lvm-operator/controllers"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -47,6 +48,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(topolvmv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

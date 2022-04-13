@@ -35,6 +35,7 @@ import (
 
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -82,6 +83,8 @@ var _ = BeforeSuite(func() {
 	err = lvmv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = topolvmv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
