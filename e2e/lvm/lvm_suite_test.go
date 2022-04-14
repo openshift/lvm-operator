@@ -24,7 +24,6 @@ var _ = AfterSuite(func() {
 	tests.AfterTestSuiteCleanup()
 })
 
-// Test to validate all the resources created by LVMO.
 var _ = Describe("Validation test", func() {
 	Context("Validate LVMCluster reconciliation", func() {
 		It("Should validate LVMCluster reconciliation", func() {
