@@ -103,6 +103,12 @@ var (
 
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
+
+	// default labels and values
+	DefaultLabelKey           = "app.lvm.openshift.io"
+	TopolvmControllerLabelVal = "topolvm-controller"
+	TopolvmNodeLabelVal       = "topolvm-node"
+	VGManagerLabelVal         = "vg-manager"
 )
 
 func GetEnvOrDefault(env string) string {

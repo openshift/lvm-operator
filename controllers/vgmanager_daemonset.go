@@ -171,8 +171,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 		},
 	}
 	labels := map[string]string{
-		"app":                   VGManagerUnit,
-		"topolvm.io/lvmcluster": lvmCluster.Name,
+		DefaultLabelKey: VGManagerLabelVal,
 	}
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
