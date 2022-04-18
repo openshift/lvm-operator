@@ -105,7 +105,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 
 OPERATOR_NAMESPACE ?= openshift-storage
-TOPOLVM_CSI_IMAGE ?= quay.io/topolvm/topolvm:0.10.3
+TOPOLVM_CSI_IMAGE ?= quay.io/topolvm/topolvm:0.11.0
 CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
 CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
 CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
@@ -307,7 +307,7 @@ catalog-push: ## Push a catalog image.
 lvm-must-gather:
 	@echo "Building the lvm-must-gather image"
 	$(IMAGE_BUILD_CMD) build -f must-gather/Dockerfile -t "${MUST_GATHER_FULL_IMAGE_NAME}" must-gather/
-	
+
 # Variables required to run and build LVM end to end tests.
 LVM_OPERATOR_INSTALL ?= true
 LVM_OPERATOR_UNINSTALL ?= true
@@ -317,4 +317,3 @@ e2e-test: ginkgo
 	@echo "build and run e2e tests"
 	cd e2e/lvm && $(GINKGO) build
 	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(CHANNELS) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL)
-
