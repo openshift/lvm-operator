@@ -27,7 +27,11 @@ func ValidateLVMvg() error {
 	lvmVG := lvmv1alpha1.LVMVolumeGroup{}
 
 	Eventually(func() bool {
+		debug("%s \n", "Starting function - vg")
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: lvmVolumeGroupName, Namespace: InstallNamespace}, &lvmVG)
+		if err != nil {
+			debug("LVMVolumeGroup: %s\n", err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -40,7 +44,11 @@ func ValidateStorageClass() error {
 	sc := storagev1.StorageClass{}
 
 	Eventually(func() bool {
+		debug("%s\n", "Starting function - sc")
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: storageClassName}, &sc)
+		if err != nil {
+			debug("StorageClass : %s\n", err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -53,7 +61,11 @@ func ValidateCSIDriver() error {
 	cd := storagev1.CSIDriver{}
 
 	Eventually(func() bool {
+		debug("%s\n", "Starting function - cd")
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: csiDriverName, Namespace: InstallNamespace}, &cd)
+		if err != nil {
+			debug("CSIDriver : %s\n", err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -65,10 +77,26 @@ func ValidateCSIDriver() error {
 func ValidateTopolvmNode() error {
 	ds := appsv1.DaemonSet{}
 	Eventually(func() bool {
+		debug("%s\n", "Starting function - topolvmnode")
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
-		return err == nil
+		if err != nil {
+			debug("topolvmNode : %s\n", err.Error())
+			return false
+		}
+		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
 	}, timeout, interval).Should(BeTrue())
 	debug("TopoLVM node found\n")
+
+	/* 	// checking for the ready status
+	   	Eventually(func() bool {
+	   		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
+	   		if err != nil {
+	   			debug("topolvmNode : %s", err.Error())
+	   			return
+	   		}
+	   		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+	   	}, timeout, interval).Should(BeTrue())
+	   	debug("Status is ready\n") */
 
 	return nil
 }
@@ -78,7 +106,11 @@ func ValidateVGManager() error {
 	ds := appsv1.DaemonSet{}
 
 	Eventually(func() bool {
+		debug("%s\n", "Starting function - vgmanager")
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: vgManagerDaemonsetName, Namespace: InstallNamespace}, &ds)
+		if err != nil {
+			debug("vgmanager : %s\n", err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 	debug("VG manager found\n")
@@ -91,7 +123,11 @@ func ValidateTopolvmController() error {
 	dep := appsv1.Deployment{}
 
 	Eventually(func() bool {
+		debug("%s\n", "Starting function - topolvmcontroller")
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmCtrlDeploymentName, Namespace: InstallNamespace}, &dep)
+		if err != nil {
+			debug("topolvmcontroller : %s\n", err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
