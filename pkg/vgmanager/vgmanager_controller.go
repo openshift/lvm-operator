@@ -303,6 +303,25 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		return nil
 	}
 
+	// Delete thin pool
+	if volumeGroup.Spec.ThinPoolConfig != nil {
+		thinPoolName := volumeGroup.Spec.ThinPoolConfig.Name
+		lvExists, err := LVExists(r.executor, thinPoolName, volumeGroup.Name)
+		if err != nil {
+			return fmt.Errorf("failed to check existence of thin pool %q in volume group %q. %v", thinPoolName, volumeGroup.Name, err)
+		}
+
+		if lvExists {
+			err := DeleteLV(r.executor, thinPoolName, volumeGroup.Name)
+			if err != nil {
+				return fmt.Errorf("failed to delete thin pool %q in volume group %q. %v", thinPoolName, volumeGroup.Name, err)
+			}
+			r.Log.Info("thin pool deleted in the volume group.", "VGName", volumeGroup.Name, "ThinPool", thinPoolName)
+		} else {
+			r.Log.Info("thin pool not found in the volume group.", "VGName", volumeGroup.Name, "ThinPool", thinPoolName)
+		}
+	}
+
 	err = vg.Delete(r.executor)
 	if err != nil {
 		return fmt.Errorf("failed to delete volume group. %q, %v", volumeGroup.Name, err)
