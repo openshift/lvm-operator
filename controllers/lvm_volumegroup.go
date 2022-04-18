@@ -130,6 +130,7 @@ func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1
 			Spec: lvmv1alpha1.LVMVolumeGroupSpec{
 				NodeSelector:   deviceClass.NodeSelector,
 				DeviceSelector: deviceClass.DeviceSelector,
+				ThinPoolConfig: deviceClass.ThinPoolConfig,
 			},
 		}
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)

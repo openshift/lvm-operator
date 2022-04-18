@@ -37,6 +37,9 @@ const (
 	vgExtendCmd = "/usr/sbin/vgextend"
 	vgRemoveCmd = "/usr/sbin/vgremove"
 	pvRemoveCmd = "/usr/sbin/pvremove"
+	lvCreateCmd = "/usr/sbin/lvcreate"
+	lvRemoveCmd = "/usr/sbin/lvremove"
+	lvChangeCmd = "/usr/sbin/lvchange"
 )
 
 // vgsOutput represents the output of the `vgs --reportformat json` command
@@ -55,6 +58,18 @@ type pvsOutput struct {
 			Name   string `json:"pv_name"`
 			VgName string `json:"vg_name"`
 		} `json:"pv"`
+	} `json:"report"`
+}
+
+// lvsOutput represents the output of the `lvs --reportformat json` command
+type lvsOutput struct {
+	Report []struct {
+		Lv []struct {
+			Name     string `json:"lv_name"`
+			VgName   string `json:"vg_name"`
+			PoolName string `json:"pool_lv"`
+			LvAttr   string `json:"lv_attr"`
+		} `json:"lv"`
 	} `json:"report"`
 }
 
@@ -212,6 +227,70 @@ func ListVolumeGroups(exec internal.Executor) ([]VolumeGroup, error) {
 	}
 
 	return vgList, nil
+}
+
+// ListLogicalVolumes returns list of logical volumes for a volume group
+func ListLogicalVolumes(exec internal.Executor, vgName string) ([]string, error) {
+	res, err := GetLVSOutput(exec, vgName)
+	if err != nil {
+		return []string{}, err
+	}
+
+	lvs := []string{}
+	for _, report := range res.Report {
+		for _, lv := range report.Lv {
+			lvs = append(lvs, lv.Name)
+		}
+	}
+	return lvs, nil
+}
+
+// GetLVSOutput returns the output for `lvs` command in json format
+func GetLVSOutput(exec internal.Executor, vgName string) (*lvsOutput, error) {
+	res := new(lvsOutput)
+	args := []string{
+		"lvs", "-S", fmt.Sprintf("vgname=%s", vgName), "--reportformat", "json",
+	}
+	if err := execute(exec, res, args...); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// LVExists checks if a logical volume exists in a volume group
+func LVExists(exec internal.Executor, lvName, vgName string) (bool, error) {
+	lvs, err := ListLogicalVolumes(exec, vgName)
+	if err != nil {
+		return false, err
+	}
+
+	for _, lv := range lvs {
+		if lv == lvName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// DeleteLV deactivates the logical volume and deletes it
+func DeleteLV(exec internal.Executor, lvName, vgName string) error {
+	lv := fmt.Sprintf("%s/%s", vgName, lvName)
+
+	// deactivate logical volume
+	_, err := exec.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-an", lv)
+	if err != nil {
+		return fmt.Errorf("failed to deactivate thin pool %q in volume group %q. %v", lvName, vgName, err)
+	}
+
+	// delete logical volume
+	_, err = exec.ExecuteCommandWithOutputAsHost(lvRemoveCmd, lv)
+	if err != nil {
+		return fmt.Errorf("failed to delete logical volume %q in volume group %q. %v", lvName, vgName, err)
+	}
+
+	return nil
 }
 
 func execute(exec internal.Executor, v interface{}, args ...string) error {
