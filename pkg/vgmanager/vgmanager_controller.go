@@ -74,10 +74,10 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	err := r.Client.Get(ctx, req.NamespacedName, volumeGroup)
 	if err != nil {
 		r.Log.Error(err, "failed to get LVMVolumeGroup", "VGName", req.Name)
-		if !errors.IsNotFound(err) {
-			return reconcileAgain, err
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
+		return reconcileAgain, err
 	}
 	// Check if the nodeSelector matches the labels on this node
 	nodeMatches, err := r.matchesThisNode(ctx, volumeGroup.Spec.NodeSelector)
