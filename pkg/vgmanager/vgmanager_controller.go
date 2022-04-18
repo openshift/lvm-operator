@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -43,7 +44,8 @@ import (
 )
 
 const (
-	ControllerName = "vg-manager"
+	ControllerName   = "vg-manager"
+	DefaultChunkSize = "512"
 )
 
 // SetupWithManager sets up the controller with the Manager.
@@ -188,16 +190,30 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 	}
 
 	if !found {
-		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, &lvmd.DeviceClass{
-			Name:        volumeGroup.Name,
-			VolumeGroup: volumeGroup.Name,
-			Default:     true,
-		})
+		dc := &lvmd.DeviceClass{
+			Name:           volumeGroup.Name,
+			VolumeGroup:    volumeGroup.Name,
+			Default:        true,
+			ThinPoolConfig: &lvmd.ThinPoolConfig{},
+		}
+
+		if volumeGroup.Spec.ThinPoolConfig != nil {
+			dc.Type = lvmd.TypeThin
+			dc.ThinPoolConfig.Name = volumeGroup.Spec.ThinPoolConfig.Name
+			dc.ThinPoolConfig.OverprovisionRatio = float64(volumeGroup.Spec.ThinPoolConfig.OverprovisionRatio)
+		}
+
+		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
+	}
+
+	// Create thin pool
+	err = r.addThinPoolToVG(volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig)
+	if err != nil {
+		r.Log.Error(err, "failed to create thin pool", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
 	}
 
 	// apply and save lvmconfig
 	// pass config to configChannel only if config has changed
-
 	if !cmp.Equal(existingLvmdConfig, lvmdConfig) {
 		err := saveLVMDConfig(lvmdConfig)
 		if err != nil {
@@ -222,6 +238,35 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 		requeueAfter = time.Second * 30
 	}
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
+	resp, err := GetLVSOutput(r.executor, vgName)
+	if err != nil {
+		return fmt.Errorf("failed to list logical volumes in the volume group %q. %v", vgName, err)
+	}
+
+	for _, report := range resp.Report {
+		for _, lv := range report.Lv {
+			if lv.Name == config.Name {
+				if strings.Contains(lv.LvAttr, "t") {
+					r.Log.Info("lvm thinpool already exists", "VGName", vgName, "ThinPool", config.Name)
+					return nil
+				}
+
+				return fmt.Errorf("failed to create thin pool %q. Logical volume with same name already exists", config.Name)
+			}
+		}
+	}
+
+	args := []string{"-l", fmt.Sprintf("%d%%FREE", config.SizePercent), "-c", DefaultChunkSize, "-T", fmt.Sprintf("%s/%s", vgName, config.Name)}
+
+	_, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to create thin pool %q in the volume group %q. %v", config.Name, vgName, err)
+	}
+
+	return nil
 }
 
 func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {

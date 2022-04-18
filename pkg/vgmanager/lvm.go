@@ -37,6 +37,7 @@ const (
 	vgExtendCmd = "/usr/sbin/vgextend"
 	vgRemoveCmd = "/usr/sbin/vgremove"
 	pvRemoveCmd = "/usr/sbin/pvremove"
+	lvCreateCmd = "/usr/sbin/lvcreate"
 )
 
 // vgsOutput represents the output of the `vgs --reportformat json` command
@@ -54,6 +55,18 @@ type pvsOutput struct {
 		Pv []struct {
 			Name   string `json:"pv_name"`
 			VgName string `json:"vg_name"`
+		} `json:"pv"`
+	} `json:"report"`
+}
+
+// lvsOutput represents the output of the `lvs --reportformat json` command
+type lvsOutput struct {
+	Report []struct {
+		Lv []struct {
+			Name     string `json:"lv_name"`
+			VgName   string `json:"vg_name"`
+			PoolName string `json:"pool_lv"`
+			LvAttr   string `json:"lv_attr"`
 		} `json:"pv"`
 	} `json:"report"`
 }
@@ -212,6 +225,35 @@ func ListVolumeGroups(exec internal.Executor) ([]VolumeGroup, error) {
 	}
 
 	return vgList, nil
+}
+
+// ListLogicalVolumes returns list of logical volumes for a volume group
+func ListLogicalVolumes(exec internal.Executor, vgName string) ([]string, error) {
+	res, err := GetLVSOutput(exec, vgName)
+	if err != nil {
+		return []string{}, err
+	}
+
+	lvs := []string{}
+	for _, report := range res.Report {
+		for _, lv := range report.Lv {
+			lvs = append(lvs, lv.Name)
+		}
+	}
+	return lvs, nil
+}
+
+// GetLVSOutput returns the output for `lvs` command in json format
+func GetLVSOutput(exec internal.Executor, vgName string) (*lvsOutput, error) {
+	res := new(lvsOutput)
+	args := []string{
+		"lvs", "-S", fmt.Sprintf("vgname=%s", vgName), "--reportformat", "json",
+	}
+	if err := execute(exec, res, args...); err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func execute(exec internal.Executor, v interface{}, args ...string) error {
