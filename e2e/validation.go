@@ -7,8 +7,10 @@ import (
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -138,8 +140,33 @@ func ValidateTopolvmController() error {
 // Validate all the resources created by LVMO.
 func ValidateResources() error {
 
+	obj := lvmv1alpha1.LVMCluster{}
+	myclient := DeployManagerObj.GetCrClient()
+
+	debug("%s\n", "Getting lvmcluster")
+	err := myclient.Get(context.TODO(), types.NamespacedName{Name: "lvmcluster-sample", Namespace: InstallNamespace}, &obj)
+	if err != nil {
+		debug("lvmcluster : %s\n", err.Error())
+	} else {
+		debug("Found lvmcluster : %v\n", obj)
+
+	}
+
+	podlist := v1.PodList{}
+	debug("%s\n", "Getting lvm operator pod")
+	lo := &client.ListOptions{}
+	client.MatchingLabels{"control-plane": "controller-manager"}.ApplyToList(lo)
+
+	err = myclient.List(context.TODO(), &podlist, lo)
+	//podname := "lvm-operator-controller"
+	if err == nil {
+		for _, pod := range podlist.Items {
+			debug("\nPod Status %v\n", pod.Status)
+		}
+	}
+
 	// Validate CSI Driver
-	err := ValidateCSIDriver()
+	err = ValidateCSIDriver()
 	if err != nil {
 		return err
 	}
