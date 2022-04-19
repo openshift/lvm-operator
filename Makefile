@@ -311,9 +311,11 @@ lvm-must-gather:
 # Variables required to run and build LVM end to end tests.
 LVM_OPERATOR_INSTALL ?= true
 LVM_OPERATOR_UNINSTALL ?= true
+SUBSCRIPTION_CHANNEL ?= alpha
 
 # Build and run lvm tests.
 e2e-test: ginkgo
 	@echo "build and run e2e tests"
 	cd e2e/lvm && $(GINKGO) build
-	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(CHANNELS) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL)
+	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) -ginkgo.v
+

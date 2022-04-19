@@ -104,6 +104,7 @@ func NewDeployManager() (*DeployManager, error) {
 	// controller-runtime client
 	myScheme := runtime.NewScheme()
 	utilruntime.Must(lvmv1.AddToScheme(myScheme))
+	utilruntime.Must(scheme.AddToScheme(myScheme))
 	crClient, err := crclient.New(config, crclient.Options{Scheme: myScheme})
 	if err != nil {
 		return nil, err

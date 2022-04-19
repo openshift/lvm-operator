@@ -2,7 +2,6 @@ package lvm_test
 
 import (
 	"flag"
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -25,10 +24,12 @@ var _ = AfterSuite(func() {
 	tests.AfterTestSuiteCleanup()
 })
 
-var _ = Describe("lvmtest", func() {
-	Context("Run a dummy test", func() {
-		It("Should do nothing", func() {
-			fmt.Println("Do nothing")
+// Test to validate all the resources created by LVMO.
+var _ = Describe("Validation test", func() {
+	Context("Validate LVMCluster reconciliation", func() {
+		It("Should validate LVMCluster reconciliation", func() {
+			err := tests.ValidateResources()
+			Expect(err).To(BeNil())
 		})
 	})
 })
