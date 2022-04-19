@@ -18,6 +18,11 @@ func (t *DeployManager) GenerateLVMCluster() *v1alpha1.LVMCluster {
 				DeviceClasses: []v1alpha1.DeviceClass{
 					{
 						Name: "vg1",
+						ThinPoolConfig: &v1alpha1.ThinPoolConfig{
+							Name:               "mytp1",
+							SizePercent:        50,
+							OverprovisionRatio: 50,
+						},
 					},
 				},
 			},
