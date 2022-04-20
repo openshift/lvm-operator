@@ -22,6 +22,9 @@ var LvmSubscriptionChannel string
 // DeployManager is the suite global DeployManager
 var DeployManagerObj *deploymanager.DeployManager
 
+// StorageClass is the name of the storage class the test suite installs
+const StorageClass = "odf-lvm-vg1"
+
 // SuiteFailed indicates whether any test in the current suite has failed
 var SuiteFailed = false
 
