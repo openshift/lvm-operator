@@ -5,7 +5,7 @@ data:
   CSI_REGISTRAR_IMAGE: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
   CSI_RESIZER_IMAGE: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
   OPERATOR_NAMESPACE: openshift-storage
-  TOPOLVM_CSI_IMAGE: quay.io/topolvm/topolvm:0.10.3
+  TOPOLVM_CSI_IMAGE: quay.io/topolvm/topolvm:0.11.0
   VGMANAGER_IMAGE: quay.io/ocs-dev/vgmanager:latest
   controller_manager_config.yaml: |
     apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
