@@ -313,10 +313,22 @@ func getCsiResizerContainer() *corev1.Container {
 		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
 	}
 
+	resourceRequirements := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiResizerCPULimit),
+			corev1.ResourceMemory: resource.MustParse(TopolvmCsiResizerMemLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiResizerCPURequest),
+			corev1.ResourceMemory: resource.MustParse(TopolvmCsiResizerMemRequest),
+		},
+	}
+
 	csiResizer := &corev1.Container{
 		Name:         CsiResizerContainerName,
 		Image:        CsiResizerImage,
 		Args:         args,
+		Resources:    resourceRequirements,
 		VolumeMounts: volumeMounts,
 	}
 	return csiResizer
