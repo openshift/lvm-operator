@@ -76,6 +76,11 @@ var (
 	TopolvmCsiProvisionerCPURequest = "100m"
 	TopolvmCsiProvisionerCPULimit   = "100m"
 
+	TopolvmCsiResizerMemRequest = "100Mi"
+	TopolvmCsiResizerMemLimit   = "100Mi"
+	TopolvmCsiResizerCPURequest = "100m"
+	TopolvmCsiResizerCPULimit   = "100m"
+
 	// CSI Provisioner requires below environment values to make use of CSIStorageCapacity
 	PodNameEnv   = "POD_NAME"
 	NameSpaceEnv = "NAMESPACE"
