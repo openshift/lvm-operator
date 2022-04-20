@@ -26,6 +26,8 @@ var DeployManagerObj *deploymanager.DeployManager
 // SuiteFailed indicates whether any test in the current suite has failed
 var SuiteFailed = false
 
+const StorageClass = "odf-lvm-vg1"
+
 func init() {
 	flag.StringVar(&LvmCatalogSourceImage, "lvm-catalog-image", "", "The LVM CatalogSource container image to use in the deployment")
 	flag.StringVar(&LvmSubscriptionChannel, "lvm-subscription-channel", "", "The subscription channel to revise updates from")
