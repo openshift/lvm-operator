@@ -9,6 +9,7 @@ import (
 
 // TestNamespace is the namespace we run all the tests in.
 const TestNamespace = "lvm-endtoendtest"
+const InstallNamespace = "openshift-storage"
 
 var lvmOperatorInstall bool
 var lvmOperatorUninstall bool
