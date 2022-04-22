@@ -319,3 +319,5 @@ e2e-test: ginkgo
 	cd e2e/lvm && $(GINKGO) build
 	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) -ginkgo.v
 
+
+#Nothing much
