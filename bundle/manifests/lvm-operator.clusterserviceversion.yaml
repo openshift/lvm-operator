@@ -285,7 +285,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
-                image: quay.io/nibalach/lvm-operator:e2e
+                image: quay.io/ocs-dev/lvm-operator:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -310,7 +310,7 @@ spec:
                   allowPrivilegeEscalation: false
               - command:
                 - /metricsexporter
-                image: quay.io/nibalach/lvm-operator:e2e
+                image: quay.io/ocs-dev/lvm-operator:latest
                 name: metricsexporter
                 resources: {}
               securityContext:
