@@ -24,27 +24,14 @@ metadata:
               ]
             }
           }
-        },
-        {
-          "apiVersion": "lvm.topolvm.io/v1alpha1",
-          "kind": "LVMVolumeGroup",
-          "metadata": {
-            "name": "lvmvolumegroup-sample"
-          },
-          "spec": null
-        },
-        {
-          "apiVersion": "lvm.topolvm.io/v1alpha1",
-          "kind": "LVMVolumeGroupNodeStatus",
-          "metadata": {
-            "name": "lvmvolumegroupnodestatus-sample"
-          },
-          "spec": null
         }
       ]
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.13.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    categories: Storage
+    operatorframework.io/suggested-namespace: openshift-storage
+    operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.cybozu.com", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
   name: lvm-operator.v0.0.1
   namespace: placeholder
 spec:
