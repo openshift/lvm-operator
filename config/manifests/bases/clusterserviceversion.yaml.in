@@ -4,6 +4,9 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
+    categories: Storage
+    operatorframework.io/suggested-namespace: openshift-storage
+    operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.cybozu.com", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
   name: @BUNDLE_PACKAGE@.v0.0.0
   namespace: placeholder
 spec:
