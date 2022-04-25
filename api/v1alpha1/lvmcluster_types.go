@@ -44,7 +44,7 @@ type ThinPoolConfig struct {
 
 	// SizePercent represents percentage of remaining space in the volume group that should be used
 	// for creating the thin pool.
-	// +kubebuilder:validation:default=75
+	// +kubebuilder:default=75
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=90
 	SizePercent int `json:"sizePercent,omitempty"`
