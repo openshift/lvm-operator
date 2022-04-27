@@ -5,7 +5,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: topolvm-node
-    namespace: system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
