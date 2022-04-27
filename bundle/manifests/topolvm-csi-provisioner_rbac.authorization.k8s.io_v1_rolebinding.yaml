@@ -10,4 +10,3 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: topolvm-controller
-  namespace: openshift-storage
