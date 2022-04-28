@@ -265,6 +265,8 @@ spec:
                   value: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
                 - name: CSI_RESIZER_IMAGE
                   value: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+                - name: CSI_SNAPSHOTTER_IMAGE
+                  value: k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:

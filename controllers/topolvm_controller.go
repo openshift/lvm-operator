@@ -124,6 +124,7 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 		*getCsiProvisionerContainer(),
 		*getCsiResizerContainer(),
 		*getLivenessProbeContainer(),
+		*getCsiSnapshotterContainer(),
 	}
 
 	labels := map[string]string{
@@ -332,6 +333,38 @@ func getCsiResizerContainer() *corev1.Container {
 		VolumeMounts: volumeMounts,
 	}
 	return csiResizer
+}
+
+func getCsiSnapshotterContainer() *corev1.Container {
+
+	args := []string{
+		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
+	}
+
+	resourceRequirements := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiSnapshotterCPULimit),
+			corev1.ResourceMemory: resource.MustParse(TopolvmCsiSnapshotterMemLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiSnapshotterCPURequest),
+			corev1.ResourceMemory: resource.MustParse(TopolvmCsiSnapshotterMemRequest),
+		},
+	}
+
+	csiSnapshotter := &corev1.Container{
+		Name:         CsiSnapshotterContainerName,
+		Image:        CsiSnapshotterImage,
+		Args:         args,
+		VolumeMounts: volumeMounts,
+		Resources:    resourceRequirements,
+	}
+
+	return csiSnapshotter
 }
 
 func getLivenessProbeContainer() *corev1.Container {

@@ -110,6 +110,7 @@ CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
 CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
 CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
 CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1
 VGMANAGER_IMAGE ?= quay.io/ocs-dev/vgmanager:latest
 
 
@@ -120,6 +121,7 @@ CSI_REGISTRAR_IMAGE=$(CSI_REGISTRAR_IMAGE)
 CSI_PROVISIONER_IMAGE=$(CSI_PROVISIONER_IMAGE)
 CSI_LIVENESSPROBE_IMAGE=$(CSI_LIVENESSPROBE_IMAGE)
 CSI_RESIZER_IMAGE=$(CSI_RESIZER_IMAGE)
+CSI_SNAPSHOTTER_IMAGE=$(CSI_SNAPSHOTTER_IMAGE)
 endef
 export MANAGER_ENV_VARS
 
@@ -131,6 +133,7 @@ update-mgr-env: ## Feed env variables to the manager configmap
 	sed 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_REGISTRAR_IMAGE_VAL|$(CSI_REGISTRAR_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
+	sed 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 
 
 ##@ Build

@@ -19,3 +19,5 @@ spec:
           value: CSI_REGISTRAR_IMAGE_VAL
         - name: CSI_RESIZER_IMAGE
           value: CSI_RESIZER_IMAGE_VAL
+        - name: CSI_SNAPSHOTTER_IMAGE
+          value: CSI_SNAPSHOTTER_IMAGE_VAL

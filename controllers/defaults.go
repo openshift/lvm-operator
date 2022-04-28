@@ -28,6 +28,7 @@ var (
 		"CSI_PROVISIONER_IMAGE":   "k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0",
 		"CSI_LIVENESSPROBE_IMAGE": "k8s.gcr.io/sig-storage/livenessprobe:v2.5.0",
 		"CSI_RESIZER_IMAGE":       "k8s.gcr.io/sig-storage/csi-resizer:v1.3.0",
+		"CSI_SNAPSHOTTER_IMAGE":   "k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1",
 
 		// not being used, only for reference
 		"VGMANAGER_IMAGE": "quay.io/ocs-dev/vgmanager:latest",
@@ -41,6 +42,7 @@ var (
 	CsiProvisionerImage   = GetEnvOrDefault("CSI_PROVISIONER_IMAGE")
 	CsiLivenessProbeImage = GetEnvOrDefault("CSI_LIVENESSPROBE_IMAGE")
 	CsiResizerImage       = GetEnvOrDefault("CSI_RESIZER_IMAGE")
+	CsiSnapshotterImage   = GetEnvOrDefault("CSI_SNAPSHOTTER_IMAGE")
 
 	TopolvmCSIDriverName = "topolvm.cybozu.com"
 
@@ -57,6 +59,7 @@ var (
 	CsiRegistrarContainerName       = "csi-registrar"
 	CsiResizerContainerName         = "csi-resizer"
 	CsiProvisionerContainerName     = "csi-provisioner"
+	CsiSnapshotterContainerName     = "csi-snapshotter"
 	CsiLivenessProbeContainerName   = "liveness-probe"
 
 	// CSI Controller health endpoints
@@ -80,6 +83,11 @@ var (
 	TopolvmCsiResizerMemLimit   = "100Mi"
 	TopolvmCsiResizerCPURequest = "100m"
 	TopolvmCsiResizerCPULimit   = "100m"
+
+	TopolvmCsiSnapshotterMemRequest = "100Mi"
+	TopolvmCsiSnapshotterMemLimit   = "100Mi"
+	TopolvmCsiSnapshotterCPURequest = "100m"
+	TopolvmCsiSnapshotterCPULimit   = "100m"
 
 	// CSI Provisioner requires below environment values to make use of CSIStorageCapacity
 	PodNameEnv   = "POD_NAME"
