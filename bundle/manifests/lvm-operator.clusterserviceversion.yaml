@@ -244,7 +244,7 @@ spec:
                 - /manager
                 env:
                 - name: TOPOLVM_CSI_IMAGE
-                  value: quay.io/topolvm/topolvm:0.11.0
+                  value: quay.io/ocs-dev/topolvm:latest
                 - name: CSI_LIVENESSPROBE_IMAGE
                   value: k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
                 - name: CSI_PROVISIONER_IMAGE
