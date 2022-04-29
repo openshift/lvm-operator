@@ -32,5 +32,5 @@
      into a single configmap involves extra processing to segment the config
      according to the node and save that before being consumed by lvmd
   2. Multiple configmaps: Although this is doable having multiple configmaps
-     limts topolvm nodeplugin not to be deployed as a daemonset since configmap
+     limits topolvm nodeplugin not to be deployed as a daemonset since configmap
      should be unique for a daemonset
