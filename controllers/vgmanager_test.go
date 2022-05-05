@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,6 +34,9 @@ func newFakeLVMClusterReconciler(t *testing.T, objs ...client.Object) *LVMCluste
 
 	err = storagev1.AddToScheme(scheme)
 	assert.NilError(t, err, "adding storagev1 to scheme")
+
+	err = snapapi.AddToScheme(scheme)
+	assert.NilError(t, err, "adding snapshot api to scheme")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
