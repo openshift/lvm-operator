@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/go-logr/logr v1.2.0
 	github.com/google/go-cmp v0.5.6
+	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.1.3
 	github.com/onsi/gomega v1.17.0
