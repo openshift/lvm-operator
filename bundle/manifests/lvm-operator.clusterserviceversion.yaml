@@ -227,12 +227,12 @@ spec:
           replicas: 1
           selector:
             matchLabels:
-              control-plane: controller-manager
+              app.kubernetes.io/name: lvm-operator
           strategy: {}
           template:
             metadata:
               labels:
-                control-plane: controller-manager
+                app.kubernetes.io/name: lvm-operator
                 exporter: lvm-operator
             spec:
               containers:
