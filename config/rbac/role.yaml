@@ -125,6 +125,16 @@ rules:
   - get
   - update
 - apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
   - storage.k8s.io
   resources:
   - csidrivers
