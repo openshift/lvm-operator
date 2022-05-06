@@ -149,8 +149,6 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		}
 		if err != nil {
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, err
-		} else {
-			return reconcile.Result{}, nil
 		}
 	}
 
