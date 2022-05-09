@@ -6,7 +6,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	tests "github.com/red-hat-storage/lvm-operator/e2e"
 )
 
@@ -24,12 +23,7 @@ var _ = AfterSuite(func() {
 	tests.AfterTestSuiteCleanup()
 })
 
-// Test to validate all the resources created by LVMO.
-var _ = Describe("Validation test", func() {
-	Context("Validate LVMCluster reconciliation", func() {
-		It("Should validate LVMCluster reconciliation", func() {
-			err := tests.ValidateResources()
-			Expect(err).To(BeNil())
-		})
-	})
+var _ = Describe("LVMO e2e tests", func() {
+	Context("LVMCluster reconciliation", tests.ValidateResources)
+	Context("PVC tests", PVCTest)
 })

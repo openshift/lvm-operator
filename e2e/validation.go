@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -23,7 +24,7 @@ const (
 )
 
 // function to validate LVMVolume group.
-func ValidateLVMvg() error {
+func validateLVMvg() error {
 	lvmVG := lvmv1alpha1.LVMVolumeGroup{}
 
 	Eventually(func() bool {
@@ -36,7 +37,7 @@ func ValidateLVMvg() error {
 }
 
 // function to validate storage class.
-func ValidateStorageClass() error {
+func validateStorageClass() error {
 	sc := storagev1.StorageClass{}
 
 	Eventually(func() bool {
@@ -49,7 +50,7 @@ func ValidateStorageClass() error {
 }
 
 // function to validate CSI Driver.
-func ValidateCSIDriver() error {
+func validateCSIDriver() error {
 	cd := storagev1.CSIDriver{}
 
 	Eventually(func() bool {
@@ -62,7 +63,7 @@ func ValidateCSIDriver() error {
 }
 
 // function to validate TopoLVM node.
-func ValidateTopolvmNode() error {
+func validateTopolvmNode() error {
 	ds := appsv1.DaemonSet{}
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
@@ -85,7 +86,7 @@ func ValidateTopolvmNode() error {
 }
 
 // function to validate vg manager resource.
-func ValidateVGManager() error {
+func validateVGManager() error {
 	ds := appsv1.DaemonSet{}
 
 	Eventually(func() bool {
@@ -98,7 +99,7 @@ func ValidateVGManager() error {
 }
 
 // function to validate TopoLVM Deployment.
-func ValidateTopolvmController() error {
+func validateTopolvmController() error {
 	dep := appsv1.Deployment{}
 
 	Eventually(func() bool {
@@ -111,40 +112,34 @@ func ValidateTopolvmController() error {
 }
 
 // Validate all the resources created by LVMO.
-func ValidateResources() error {
+func ValidateResources() {
 
-	// Validate CSI Driver
-	err := ValidateCSIDriver()
-	if err != nil {
-		return err
-	}
+	Describe("Validate LVMCluster reconciliation", func() {
+		It("Should check that LVMO resources have been created", func() {
+			By("Checking that CSIDriver has been created")
+			err := validateCSIDriver()
+			Expect(err).To(BeNil())
 
-	//Validate TopoLVM Controller
-	err = ValidateTopolvmController()
-	if err != nil {
-		return err
-	}
+			By("Checking that the topolvm-controller deployment has been created")
+			err = validateTopolvmController()
+			Expect(err).To(BeNil())
 
-	// Validate VG Manager Daemonset
-	err = ValidateVGManager()
-	if err != nil {
-		return err
-	}
-	// Validate LVMVg
-	err = ValidateLVMvg()
-	if err != nil {
-		return err
-	}
+			By("Checking that the vg-manager daemonset has been created")
+			err = validateVGManager()
+			Expect(err).To(BeNil())
 
-	// Validate Topolvm node
-	err = ValidateTopolvmNode()
-	if err != nil {
-		return err
-	}
-	// Validate Storage class
-	err = ValidateStorageClass()
-	if err != nil {
-		return err
-	}
-	return nil
+			By("Checking that the LVMVolumeGroup has been created")
+			err = validateLVMvg()
+			Expect(err).To(BeNil())
+
+			By("Checking that the topolvm-node daemonset has been created")
+			err = validateTopolvmNode()
+			Expect(err).To(BeNil())
+
+			By("Checking that the StorageClass has been created")
+			err = validateStorageClass()
+			Expect(err).To(BeNil())
+
+		})
+	})
 }
