@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"github.com/red-hat-storage/lvm-operator/controllers"
@@ -49,6 +50,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(topolvmv1.AddToScheme(scheme))
+	utilruntime.Must(snapapi.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
