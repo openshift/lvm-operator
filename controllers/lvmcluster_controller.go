@@ -172,6 +172,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		&vgManager{},
 		&lvmVG{},
 		&topolvmStorageClass{},
+		&topolvmVolumeSnapshotClass{},
 	}
 
 	// handle create/update
@@ -360,6 +361,7 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 
 		resourceDeletionList := []resourceManager{
+			&topolvmVolumeSnapshotClass{},
 			&topolvmStorageClass{},
 			&lvmVG{},
 			&topolvmController{},
