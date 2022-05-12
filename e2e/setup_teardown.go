@@ -1,9 +1,17 @@
 package e2e
 
-import "github.com/onsi/gomega"
+import (
+	"github.com/onsi/gomega"
+)
 
 // BeforeTestSuiteSetup is the function called to initialize the test environment.
 func BeforeTestSuiteSetup() {
+
+	if DiskInstall {
+		debug("Creating disk for e2e tests\n")
+		err := diskSetup()
+		gomega.Expect(err).To(gomega.BeNil())
+	}
 
 	SuiteFailed = true
 	if lvmOperatorInstall {
@@ -42,6 +50,12 @@ func AfterTestSuiteCleanup() {
 
 		debug("AfterTestSuite: uninstalling LVM Operator\n")
 		err = DeployManagerObj.UninstallLVM(LvmCatalogSourceImage, LvmSubscriptionChannel)
-		gomega.Expect(err).To(gomega.BeNil(), "error uninstalling LVM: %v", err)
+		gomega.Expect(err).To(gomega.BeNil(), "error uninstalling the LVM Operator: %v", err)
+	}
+
+	if DiskInstall {
+		debug("Cleaning up disk\n")
+		err = diskRemoval()
+		gomega.Expect(err).To(gomega.BeNil())
 	}
 }
