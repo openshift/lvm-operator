@@ -3,6 +3,7 @@ package deploymanager
 import (
 	"os"
 
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	lvmv1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,6 +106,7 @@ func NewDeployManager() (*DeployManager, error) {
 	myScheme := runtime.NewScheme()
 	utilruntime.Must(lvmv1.AddToScheme(myScheme))
 	utilruntime.Must(scheme.AddToScheme(myScheme))
+	utilruntime.Must(snapapi.AddToScheme(myScheme))
 	crClient, err := crclient.New(config, crclient.Options{Scheme: myScheme})
 	if err != nil {
 		return nil, err
