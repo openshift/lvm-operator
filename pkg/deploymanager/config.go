@@ -67,4 +67,5 @@ func NewDeployManager() (*DeployManager, error) {
 	return &DeployManager{
 		crClient: crClient,
 	}, nil
+
 }

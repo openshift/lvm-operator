@@ -92,7 +92,6 @@ func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscript
 		},
 	}
 	lvmSubscription.SetGroupVersionKind(schema.GroupVersionKind{Group: v1alpha1.SchemeGroupVersion.Group, Kind: "Subscription", Version: v1alpha1.SchemeGroupVersion.Version})
-
 	co.subscriptions = append(co.subscriptions, lvmSubscription)
 
 	return co

@@ -68,6 +68,5 @@ func (t *DeployManager) DeleteNamespaceAndWait(namespace string) error {
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, lastReason)
 	}
-
 	return nil
 }
