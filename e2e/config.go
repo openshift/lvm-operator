@@ -20,6 +20,9 @@ var LvmCatalogSourceImage string
 // LvmSubscriptionChannel is the name of the lvm subscription channel
 var LvmSubscriptionChannel string
 
+// DiskInstall indicates whether disks are needed to be installed.
+var DiskInstall bool
+
 // DeployManager is the suite global DeployManager
 var DeployManagerObj *deploymanager.DeployManager
 
@@ -33,6 +36,7 @@ func init() {
 	flag.StringVar(&LvmSubscriptionChannel, "lvm-subscription-channel", "", "The subscription channel to revise updates from")
 	flag.BoolVar(&lvmOperatorInstall, "lvm-operator-install", true, "Install the LVM operator before starting tests")
 	flag.BoolVar(&lvmOperatorUninstall, "lvm-operator-uninstall", true, "Uninstall the LVM cluster and operator after test completion")
+	flag.BoolVar(&DiskInstall, "disk-install", false, "Create and attach disks to the nodes. This currently only works with AWS")
 
 	d, err := deploymanager.NewDeployManager()
 	if err != nil {

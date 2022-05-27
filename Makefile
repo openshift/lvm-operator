@@ -317,8 +317,11 @@ LVM_OPERATOR_INSTALL ?= true
 LVM_OPERATOR_UNINSTALL ?= true
 SUBSCRIPTION_CHANNEL ?= alpha
 
+# Handles only AWS as of now.
+DISK_INSTALL ?= false
+
 # Build and run lvm tests.
 e2e-test: ginkgo
 	@echo "build and run e2e tests"
 	cd e2e/lvm && $(GINKGO) build
-	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) -ginkgo.v
+	cd e2e/lvm && ./lvm.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) --disk-install=$(DISK_INSTALL) -ginkgo.v

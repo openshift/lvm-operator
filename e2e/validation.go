@@ -87,16 +87,15 @@ func validateTopolvmNode() error {
 	}, timeout, interval).Should(BeTrue())
 	debug("TopoLVM node found\n")
 
-	/* 	// checking for the ready status
-	   	Eventually(func() bool {
-	   		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
-	   		if err != nil {
-	   			debug("topolvmNode : %s", err.Error())
-	   			return
-	   		}
-	   		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-	   	}, timeout, interval).Should(BeTrue())
-	   	debug("Status is ready\n") */
+	// checking for the ready status
+	Eventually(func() bool {
+		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
+		if err != nil {
+			debug("topolvmNode : %s", err.Error())
+		}
+		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+	}, timeout, interval).Should(BeTrue())
+	debug("TopolvmNode Status is ready\n")
 
 	return nil
 }
