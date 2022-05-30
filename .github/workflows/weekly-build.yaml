@@ -48,4 +48,4 @@ jobs:
         run: make docker-build-combined IMG=${{env.IMG}}
 
       - name: Publish operator image
-        run: docker push IMG=${{env.IMG}}
+        run: make docker-push IMG=${{env.IMG}}
