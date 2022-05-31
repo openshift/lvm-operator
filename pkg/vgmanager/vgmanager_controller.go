@@ -259,7 +259,7 @@ func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPo
 		}
 	}
 
-	args := []string{"-l", fmt.Sprintf("%d%%FREE", config.SizePercent), "-c", DefaultChunkSize, "-T", fmt.Sprintf("%s/%s", vgName, config.Name)}
+	args := []string{"-l", fmt.Sprintf("%d%%FREE", config.SizePercent), "-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, config.Name)}
 
 	_, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
 	if err != nil {
