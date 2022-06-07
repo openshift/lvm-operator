@@ -11,7 +11,7 @@
         "description": "VolumeGroup is nearing full. Data deletion or VolumeGroup expansion is required."
         "message": "VolumeGroup {{ $labels.device_class }} utilization has crossed 75 % on node {{ $labels.node }}. Free up some space or expand the VolumeGroup."
       "expr": |
-        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.75 and (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes <= 0.85
+        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.75 and (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes <= 0.85 and topolvm_thinpool_data_percent > 75.00  and topolvm_thinpool_data_percent < 85.00
       "for": "5m"
       "labels":
         "severity": "warning"
@@ -20,7 +20,7 @@
         "description": "VolumeGroup is critically full. Data deletion or VolumeGroup expansion is required."
         "message": "VolumeGroup {{ $labels.device_class }} utilization has crossed 85 % on node {{ $labels.node }}. Free up some space or expand the VolumeGroup immediately."
       "expr": |
-        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.85
+        (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > 0.85 and topolvm_thinpool_data_percent > 85.00
       "for": "5m"
       "labels":
         "severity": "critical"
