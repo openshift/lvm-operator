@@ -1,31 +1,11 @@
 package e2e
 
 import (
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// GetSamplePVC returns a sample pvc.
-func GetSamplePVC(storageClass, quantity, name string, volumemode k8sv1.PersistentVolumeMode) *k8sv1.PersistentVolumeClaim {
-	pvc := &k8sv1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: TestNamespace,
-		},
-		Spec: k8sv1.PersistentVolumeClaimSpec{
-			StorageClassName: &storageClass,
-			AccessModes:      []k8sv1.PersistentVolumeAccessMode{k8sv1.ReadWriteOnce},
-			VolumeMode:       &volumemode,
-			Resources: k8sv1.ResourceRequirements{
-				Requests: k8sv1.ResourceList{
-					k8sv1.ResourceStorage: resource.MustParse(quantity),
-				},
-			},
-		},
-	}
-	return pvc
-}
 
 // GetSamplePod returns a sample pod.
 func GetSamplePod(name, pvcName string) *k8sv1.Pod {
@@ -60,4 +40,57 @@ func GetSamplePod(name, pvcName string) *k8sv1.Pod {
 		},
 	}
 	return pod
+}
+
+// GetSampleVolumeSnapshot creates and returns the VolumeSnapshot for the provided PVC.
+func GetSampleVolumeSnapshot(name string, storageClass string) *snapapi.VolumeSnapshot {
+	vs := &snapapi.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			// name = name of pvc + snapshot
+			Name:      name + "snapshot",
+			Namespace: TestNamespace,
+		},
+		Spec: snapapi.VolumeSnapshotSpec{
+			VolumeSnapshotClassName: &storageClass,
+			Source: snapapi.VolumeSnapshotSource{
+				PersistentVolumeClaimName: &name,
+			},
+		},
+	}
+	return vs
+}
+
+// GetSamplePvc returns restore or clone of the pvc based on the kind(kindName) provided.
+func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, storageClass string, sourceType string) *k8sv1.PersistentVolumeClaim {
+	var kindName string
+	if sourceType == "clone" {
+		kindName = "PersistentVolumeClaim"
+	} else if sourceType == "restore" {
+		kindName = "VolumeSnapshot"
+	} else {
+		// DataSource not required in case of creating a simple PVC
+		kindName = ""
+	}
+
+	pvc := &k8sv1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name + sourceType,
+			Namespace: TestNamespace,
+		},
+		Spec: k8sv1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+			AccessModes:      []k8sv1.PersistentVolumeAccessMode{k8sv1.ReadWriteOnce},
+			VolumeMode:       &volumemode,
+			Resources: k8sv1.ResourceRequirements{
+				Requests: k8sv1.ResourceList{
+					k8sv1.ResourceStorage: resource.MustParse(size),
+				},
+			},
+			DataSource: &k8sv1.TypedLocalObjectReference{
+				Name: name,
+				Kind: kindName,
+			},
+		},
+	}
+	return pvc
 }
