@@ -13,7 +13,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 	github.com/operator-framework/api v0.14.0
 	github.com/operator-framework/operator-lifecycle-manager v0.20.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/stretchr/testify v1.7.0
 	github.com/topolvm/topolvm v0.11.0
 	gotest.tools/v3 v3.0.3
