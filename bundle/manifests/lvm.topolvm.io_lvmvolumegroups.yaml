@@ -133,7 +133,7 @@ spec:
                     minimum: 2
                     type: integer
                   sizePercent:
-                    default: 75
+                    default: 90
                     description: SizePercent represents percentage of remaining space
                       in the volume group that should be used for creating the thin
                       pool.
