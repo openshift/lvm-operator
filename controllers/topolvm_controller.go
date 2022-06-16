@@ -371,6 +371,16 @@ func getCsiSnapshotterContainer() *corev1.Container {
 }
 
 func getLivenessProbeContainer() *corev1.Container {
+	resourceRequirements := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPULimit),
+			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPURequest),
+			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemRequest),
+		},
+	}
 
 	// csi liveness probe container
 	args := []string{
@@ -386,6 +396,7 @@ func getLivenessProbeContainer() *corev1.Container {
 		Image:        CsiLivenessProbeImage,
 		Args:         args,
 		VolumeMounts: volumeMounts,
+		Resources:    resourceRequirements,
 	}
 	return livenessProbe
 }
