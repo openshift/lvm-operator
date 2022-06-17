@@ -30,7 +30,7 @@ func (s topolvmStorageClass) getName() string {
 func (s topolvmStorageClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
 	// one storage class for every deviceClass based on CR is created
-	topolvmStorageClasses := getTopolvmStorageClasses(lvmCluster)
+	topolvmStorageClasses := getTopolvmStorageClasses(r, ctx, lvmCluster)
 	for _, sc := range topolvmStorageClasses {
 
 		// we anticipate no edits to storage class
@@ -85,15 +85,36 @@ func (s topolvmStorageClass) updateStatus(r *LVMClusterReconciler, ctx context.C
 	return nil
 }
 
-func getTopolvmStorageClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
-	sc := []*storagev1.StorageClass{}
+func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
+
+	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
 	allowVolumeExpansion := true
 	volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
+	defaultStorageClassName := ""
+	setDefaultStorageClass := true
 
+	// Mark the first lvmo storage class default if no other storageclasses exist on the cluster
+	scList := &storagev1.StorageClassList{}
+	err := r.Client.List(ctx, scList)
+
+	if err != nil {
+		r.Log.Error(err, "failed to list storage classes. Not setting any storageclass as the default")
+		setDefaultStorageClass = false
+	} else {
+		for _, sc := range scList.Items {
+			v := sc.Annotations[defaultSCAnnotation]
+			if v == "true" {
+				defaultStorageClassName = sc.Name
+				break
+			}
+		}
+	}
+	sc := []*storagev1.StorageClass{}
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
+		scName := "odf-lvm-" + deviceClass.Name
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("odf-lvm-%s", deviceClass.Name),
+				Name: scName,
 				Annotations: map[string]string{
 					"description": "Provides RWO and RWOP Filesystem & Block volumes",
 				},
@@ -105,6 +126,11 @@ func getTopolvmStorageClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.S
 				DeviceClassKey:              deviceClass.Name,
 				"csi.storage.k8s.io/fstype": TopolvmFilesystemType,
 			},
+		}
+		// reconcile will pick up any existing LVMO storage classes as well
+		if setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
+			storageClass.Annotations[defaultSCAnnotation] = "true"
+			defaultStorageClassName = scName
 		}
 		sc = append(sc, storageClass)
 	}
