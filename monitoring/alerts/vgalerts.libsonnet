@@ -7,7 +7,7 @@
           {
             alert: 'VolumeGroupUsageAtThresholdNearFull',
             expr: |||
-              (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > %(vgUsageThresholdNearFull)0.2f and (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes <= %(vgUsageThresholdCritical)0.2f
+              (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > %(vgUsageThresholdNearFull)0.2f and (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes <= %(vgUsageThresholdCritical)0.2f and topolvm_thinpool_data_percent > %(thinPoolUsageThresholdNearFull)0.2f  and topolvm_thinpool_data_percent < %(thinPoolUsageThresholdCritical)0.2f
             ||| % $._config,
             'for': $._config.volumegroupUsageThresholdAlertTime,
             labels: {
@@ -21,7 +21,7 @@
           {
             alert: 'VolumeGroupUsageAtThresholdCritical',
             expr: |||
-              (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > %(vgUsageThresholdCritical)0.2f
+              (topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)/topolvm_volumegroup_size_bytes > %(vgUsageThresholdCritical)0.2f and topolvm_thinpool_data_percent > %(thinPoolUsageThresholdCritical)0.2f
             ||| % $._config,
             'for': $._config.volumegroupUsageThresholdAlertTime,
             labels: {
