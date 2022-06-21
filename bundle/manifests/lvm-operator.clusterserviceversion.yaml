@@ -327,18 +327,24 @@ spec:
                   periodSeconds: 10
                 resources:
                   limits:
-                    cpu: 200m
+                    cpu: 100m
                     memory: 100Mi
                   requests:
-                    cpu: 100m
-                    memory: 20Mi
+                    cpu: 50m
+                    memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
               - command:
                 - /metricsexporter
                 image: quay.io/ocs-dev/lvm-operator:latest
                 name: metricsexporter
-                resources: {}
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 100Mi
+                  requests:
+                    cpu: 30m
+                    memory: 30Mi
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: controller-manager
