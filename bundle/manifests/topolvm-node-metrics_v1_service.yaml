@@ -4,6 +4,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/compose: metrics
+    app.kubernetes.io/part-of: odf-lvm-provisioner
   name: topolvm-node-metrics
 spec:
   ports:
@@ -12,6 +13,6 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    app.lvm.openshift.io: topolvm-node
+    app.kubernetes.io/name: topolvm-node
 status:
   loadBalancer: {}
