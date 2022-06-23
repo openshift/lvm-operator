@@ -44,13 +44,12 @@ var (
 	CsiLivenessProbeImage = GetEnvOrDefault("CSI_LIVENESSPROBE_IMAGE")
 	CsiResizerImage       = GetEnvOrDefault("CSI_RESIZER_IMAGE")
 	CsiSnapshotterImage   = GetEnvOrDefault("CSI_SNAPSHOTTER_IMAGE")
+)
 
+const (
 	TopolvmCSIDriverName = "topolvm.cybozu.com"
 
 	VGManagerServiceAccount = "vg-manager"
-
-	// Topolvm deployment label
-	AppAttr = "app.kubernetes.io/name"
 
 	TopolvmControllerServiceAccount = "topolvm-controller"
 
@@ -118,11 +117,23 @@ var (
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
 
-	// default labels and values
-	DefaultLabelKey           = "app.lvm.openshift.io"
+	// labels and values
+
+	// AppKubernetesPartOfLabel is the Kubernetes recommended part-of label
+	AppKubernetesPartOfLabel = "app.kubernetes.io/part-of"
+	// AppKubernetesNameLabel is the Kubernetes recommended name label
+	AppKubernetesNameLabel = "app.kubernetes.io/name"
+	// AppKubernetesManagedByLabel is the Kubernetes recommended managed-by label
+	AppKubernetesManagedByLabel = "app.kubernetes.io/managed-by"
+	// AppKubernetesComponentLabel is the Kubernetes recommended component label
+	AppKubernetesComponentLabel = "app.kubernetes.io/component"
+
 	TopolvmControllerLabelVal = "topolvm-controller"
 	TopolvmNodeLabelVal       = "topolvm-node"
 	VGManagerLabelVal         = "vg-manager"
+	ManagedByLabelVal         = "lvm-operator"
+	PartOfLabelVal            = "odf-lvm-provisioner"
+	CsiDriverComponentVal     = "topolvm-csi-driver"
 )
 
 func GetEnvOrDefault(env string) string {
