@@ -5,9 +5,10 @@ metadata:
   namespace: system
   labels:
     app.kubernetes.io/compose: metrics
+    app.kubernetes.io/part-of: odf-lvm-provisioner
 spec:
   selector:
-    app.lvm.openshift.io: topolvm-node
+    app.kubernetes.io/name: topolvm-node
   ports:
     - name: topolvm-metrics
       protocol: TCP

@@ -171,7 +171,10 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 		},
 	}
 	labels := map[string]string{
-		DefaultLabelKey: VGManagerLabelVal,
+		AppKubernetesNameLabel:      VGManagerLabelVal,
+		AppKubernetesManagedByLabel: ManagedByLabelVal,
+		AppKubernetesPartOfLabel:    PartOfLabelVal,
+		AppKubernetesComponentLabel: VGManagerLabelVal,
 	}
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

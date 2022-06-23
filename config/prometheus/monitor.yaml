@@ -5,6 +5,7 @@ kind: ServiceMonitor
 metadata:
   labels:
     app.kubernetes.io/name: lvm-operator
+    app.kubernetes.io/part-of: odf-lvm-provisioner
   name: lvm-operator-controller-manager-metrics-monitor
   namespace: system
 spec:
