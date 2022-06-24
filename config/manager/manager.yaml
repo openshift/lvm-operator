@@ -21,6 +21,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: lvm-operator
+        app.kubernetes.io/part-of: odf-lvm-provisioner
+        app.kubernetes.io/component: lvm-operator
         exporter: lvm-operator
     spec:
       securityContext:
