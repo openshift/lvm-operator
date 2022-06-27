@@ -245,12 +245,12 @@ func getLvmdContainer() *corev1.Container {
 
 	resourceRequirements := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmNodeCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmNodeMemLimit),
+			corev1.ResourceCPU:    resource.MustParse(TopolvmdCPULimit),
+			corev1.ResourceMemory: resource.MustParse(TopolvmdMemLimit),
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmNodeCPURequest),
-			corev1.ResourceMemory: resource.MustParse(TopolvmNodeMemRequest),
+			corev1.ResourceCPU:    resource.MustParse(TopolvmdCPURequest),
+			corev1.ResourceMemory: resource.MustParse(TopolvmdMemRequest),
 		},
 	}
 
@@ -357,17 +357,40 @@ func getCsiRegistrarContainer() *corev1.Container {
 		"rm -rf /registration/topolvm.cybozu.com /registration/topolvm.cybozu.com-reg.sock",
 	}
 
+	requirements := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(CSIRegistrarCPULimit),
+			corev1.ResourceMemory: resource.MustParse(CSIRegistrarMemLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(CSIRegistrarCPURequest),
+			corev1.ResourceMemory: resource.MustParse(CSIRegistrarMemRequest),
+		},
+	}
+
 	csiRegistrar := &corev1.Container{
 		Name:         "csi-registrar",
 		Image:        CsiRegistrarImage,
 		Args:         args,
 		Lifecycle:    &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: preStopCmd}}},
 		VolumeMounts: volumeMounts,
+		Resources:    requirements,
 	}
 	return csiRegistrar
 }
 
 func getNodeLivenessProbeContainer() *corev1.Container {
+	resourceRequirements := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPULimit),
+			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPURequest),
+			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemRequest),
+		},
+	}
+
 	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
 	}
@@ -381,6 +404,7 @@ func getNodeLivenessProbeContainer() *corev1.Container {
 		Image:        CsiLivenessProbeImage,
 		Args:         args,
 		VolumeMounts: volumeMounts,
+		Resources:    resourceRequirements,
 	}
 	return liveness
 }
