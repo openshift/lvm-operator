@@ -128,7 +128,10 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 	}
 
 	labels := map[string]string{
-		DefaultLabelKey: TopolvmControllerLabelVal,
+		AppKubernetesNameLabel:      TopolvmControllerLabelVal,
+		AppKubernetesManagedByLabel: ManagedByLabelVal,
+		AppKubernetesPartOfLabel:    PartOfLabelVal,
+		AppKubernetesComponentLabel: CsiDriverComponentVal,
 	}
 
 	controllerDeployment := &appsv1.Deployment{
