@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/onsi/ginkgo"
 	deploymanager "github.com/red-hat-storage/lvm-operator/pkg/deploymanager"
 )
 
@@ -43,4 +44,9 @@ func init() {
 		panic(fmt.Sprintf("failed to initialize DeployManager: %v", err))
 	}
 	DeployManagerObj = d
+}
+
+//nolint:errcheck
+func debug(msg string, args ...interface{}) {
+	ginkgo.GinkgoWriter.Write([]byte(fmt.Sprintf(msg, args...)))
 }
