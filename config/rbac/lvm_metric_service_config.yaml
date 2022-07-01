@@ -5,6 +5,7 @@ metadata:
   namespace: system
   labels:
     app.kubernetes.io/compose: metrics
+    app.kubernetes.io/part-of: odf-lvm-provisioner
 spec:
   selector:
     exporter: lvm-operator

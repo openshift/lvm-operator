@@ -21,6 +21,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: lvm-operator
+        app.kubernetes.io/part-of: odf-lvm-provisioner
+        app.kubernetes.io/component: lvm-operator
         exporter: lvm-operator
     spec:
       securityContext:
@@ -50,11 +52,11 @@ spec:
           periodSeconds: 10
         resources:
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 100Mi
           requests:
-            cpu: 100m
-            memory: 20Mi
+            cpu: 50m
+            memory: 50Mi
         env:
         - name: POD_NAMESPACE
           valueFrom:
@@ -68,5 +70,12 @@ spec:
         - /metricsexporter
         image: controller:latest
         name: metricsexporter
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 30m
+            memory: 30Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

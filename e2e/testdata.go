@@ -43,17 +43,16 @@ func GetSamplePod(name, pvcName string) *k8sv1.Pod {
 }
 
 // GetSampleVolumeSnapshot creates and returns the VolumeSnapshot for the provided PVC.
-func GetSampleVolumeSnapshot(name string, storageClass string) *snapapi.VolumeSnapshot {
+func GetSampleVolumeSnapshot(sourceName string, storageClass string) *snapapi.VolumeSnapshot {
 	vs := &snapapi.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			// name = name of pvc + snapshot
-			Name:      name + "snapshot",
+			Name:      sourceName,
 			Namespace: TestNamespace,
 		},
 		Spec: snapapi.VolumeSnapshotSpec{
 			VolumeSnapshotClassName: &storageClass,
 			Source: snapapi.VolumeSnapshotSource{
-				PersistentVolumeClaimName: &name,
+				PersistentVolumeClaimName: &sourceName,
 			},
 		},
 	}
@@ -61,20 +60,11 @@ func GetSampleVolumeSnapshot(name string, storageClass string) *snapapi.VolumeSn
 }
 
 // GetSamplePvc returns restore or clone of the pvc based on the kind(kindName) provided.
-func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, storageClass string, sourceType string) *k8sv1.PersistentVolumeClaim {
-	var kindName string
-	if sourceType == "clone" {
-		kindName = "PersistentVolumeClaim"
-	} else if sourceType == "restore" {
-		kindName = "VolumeSnapshot"
-	} else {
-		// DataSource not required in case of creating a simple PVC
-		kindName = ""
-	}
+func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, storageClass string, sourceType, sourceName string) *k8sv1.PersistentVolumeClaim {
 
 	pvc := &k8sv1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name + sourceType,
+			Name:      name,
 			Namespace: TestNamespace,
 		},
 		Spec: k8sv1.PersistentVolumeClaimSpec{
@@ -86,11 +76,14 @@ func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, stor
 					k8sv1.ResourceStorage: resource.MustParse(size),
 				},
 			},
-			DataSource: &k8sv1.TypedLocalObjectReference{
-				Name: name,
-				Kind: kindName,
-			},
 		},
+	}
+
+	if sourceType != "" && sourceName != "" {
+		pvc.Spec.DataSource = &k8sv1.TypedLocalObjectReference{
+			Name: sourceName,
+			Kind: sourceType,
+		}
 	}
 	return pvc
 }

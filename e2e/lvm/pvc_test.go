@@ -35,7 +35,7 @@ func PVCTest() {
 		Context("create pvc, pod, snapshots, clones", func() {
 			It("Tests PVC operations for VolumeMode=file system", func() {
 				By("Creating pvc and pod")
-				pvc = tests.GetSamplePvc(size, "lvmfilepvc", k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "")
+				pvc = tests.GetSamplePvc(size, "lvmfilepvc", k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "", "")
 				pod = tests.GetSamplePod("lvmfilepod", pvc.Name)
 				err := client.Create(ctx, pvc)
 				Expect(err).To(BeNil())
@@ -62,7 +62,7 @@ func PVCTest() {
 				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
 
 				By("Creating a clone of the file-pvc")
-				clonePvc = tests.GetSamplePvc(size, pvc.Name, k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "clone")
+				clonePvc = tests.GetSamplePvc(size, pvc.Name, k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "PersistentVolumeClaim", pvc.Name)
 				err = client.Create(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
@@ -78,7 +78,7 @@ func PVCTest() {
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for file-pvc")
-				restorePvc = tests.GetSamplePvc(size, pvc.Name+"snapshot", k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "restore")
+				restorePvc = tests.GetSamplePvc(size, pvc.Name, k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "VolumeSnapshot", pvc.Name)
 				err = client.Create(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
@@ -124,7 +124,7 @@ func PVCTest() {
 
 			It("Tests PVC operations for VolumeMode=Block", func() {
 				By("Creating pvc and pod")
-				pvc = tests.GetSamplePvc(size, "lvmblockpvc", k8sv1.PersistentVolumeBlock, tests.StorageClass, "")
+				pvc = tests.GetSamplePvc(size, "lvmblockpvc", k8sv1.PersistentVolumeBlock, tests.StorageClass, "", "")
 				pod = tests.GetSamplePod("lvmblockpod", pvc.Name)
 				err := client.Create(ctx, pvc)
 				Expect(err).To(BeNil())
@@ -151,7 +151,7 @@ func PVCTest() {
 				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
 
 				By("Creating a clone of the block-pvc")
-				clonePvc = tests.GetSamplePvc(size, pvc.Name, k8sv1.PersistentVolumeBlock, tests.StorageClass, "clone")
+				clonePvc = tests.GetSamplePvc(size, pvc.Name, k8sv1.PersistentVolumeBlock, tests.StorageClass, "PersistentVolumeClaim", pvc.Name)
 				err = client.Create(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
@@ -167,7 +167,7 @@ func PVCTest() {
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for block-pvc")
-				restorePvc = tests.GetSamplePvc(size, pvc.Name+"snapshot", k8sv1.PersistentVolumeBlock, tests.StorageClass, "restore")
+				restorePvc = tests.GetSamplePvc(size, pvc.Name, k8sv1.PersistentVolumeBlock, tests.StorageClass, "VolumeSnapshot", pvc.Name)
 				err = client.Create(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)

@@ -258,7 +258,9 @@ spec:
           - create
         serviceAccountName: controller-manager
       deployments:
-      - name: lvm-operator-controller-manager
+      - label:
+          app.kubernetes.io/name: lvm-operator
+        name: lvm-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -268,22 +270,12 @@ spec:
           template:
             metadata:
               labels:
+                app.kubernetes.io/component: lvm-operator
                 app.kubernetes.io/name: lvm-operator
+                app.kubernetes.io/part-of: odf-lvm-provisioner
                 exporter: lvm-operator
             spec:
               containers:
-              - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources: {}
               - args:
                 - --health-probe-bind-address=:8081
                 - --metrics-bind-address=127.0.0.1:8080
@@ -327,18 +319,36 @@ spec:
                   periodSeconds: 10
                 resources:
                   limits:
-                    cpu: 200m
+                    cpu: 100m
                     memory: 100Mi
                   requests:
-                    cpu: 100m
-                    memory: 20Mi
+                    cpu: 50m
+                    memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources: {}
               - command:
                 - /metricsexporter
                 image: quay.io/ocs-dev/lvm-operator:latest
                 name: metricsexporter
-                resources: {}
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 100Mi
+                  requests:
+                    cpu: 30m
+                    memory: 30Mi
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: controller-manager

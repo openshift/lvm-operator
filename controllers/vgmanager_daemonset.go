@@ -22,6 +22,7 @@ import (
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -132,6 +133,17 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	command := []string{
 		"/vgmanager",
 	}
+
+	resourceRequirements := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(VgManagerCPULimit),
+			corev1.ResourceMemory: resource.MustParse(VgManagerMemLimit),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(VgManagerCPURequest),
+			corev1.ResourceMemory: resource.MustParse(VgManagerMemRequest),
+		},
+	}
 	containers := []corev1.Container{
 		{
 			Name:    VGManagerUnit,
@@ -142,6 +154,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 				RunAsUser:  &zero,
 			},
 			VolumeMounts: volumeMounts,
+			Resources:    resourceRequirements,
 			Env: []corev1.EnvVar{
 				{
 					Name: "NODE_NAME",
@@ -171,7 +184,10 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 		},
 	}
 	labels := map[string]string{
-		DefaultLabelKey: VGManagerLabelVal,
+		AppKubernetesNameLabel:      VGManagerLabelVal,
+		AppKubernetesManagedByLabel: ManagedByLabelVal,
+		AppKubernetesPartOfLabel:    PartOfLabelVal,
+		AppKubernetesComponentLabel: VGManagerLabelVal,
 	}
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

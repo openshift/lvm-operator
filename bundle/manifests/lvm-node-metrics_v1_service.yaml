@@ -4,6 +4,7 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/compose: metrics
+    app.kubernetes.io/part-of: odf-lvm-provisioner
   name: lvm-node-metrics
 spec:
   ports:
