@@ -36,11 +36,9 @@ spec:
             properties:
               accessType:
                 description: '''accessType'' specifies how the user intends to consume
-                  the snapshot logical volume. Allowed values are: "ro" (read-only)
-                  and "rw" (read-write). Since the kubernetes snapshots are Read-Only,
-                  set accessType as ''ro'' to activate thin-snapshots as read-only
-                  volumes. On the other hand, set accessType as ''rw'' to activate
-                  thin-snapshots as read-write volumes.'
+                  the snapshot logical volume. Set to "ro" when creating a snapshot
+                  and to "rw" when restoring a snapshot or creating a clone. This
+                  field is populated only when LogicalVolume has a source.'
                 type: string
               deviceClass:
                 type: string
@@ -54,13 +52,10 @@ spec:
                 - type: string
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
-              sourceID:
-                description: '''sourceID'' specifies the volumeID of the parent logical
-                  volume; if present.'
-                type: string
-              type:
-                description: '''type'' specifies the logical volume type. Can be ''thin-snapshot''
-                  or left empty in case of a regular volume.'
+              source:
+                description: '''source'' specifies the logicalvolume name of the source;
+                  if present. This field is populated only when LogicalVolume has
+                  a source.'
                 type: string
             required:
             - name
