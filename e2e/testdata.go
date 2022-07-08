@@ -7,6 +7,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var snapAPIGroup = "snapshot.storage.k8s.io"
+
 // GetSamplePod returns a sample pod.
 func GetSamplePod(name, pvcName string) *k8sv1.Pod {
 	pod := &k8sv1.Pod{
@@ -43,10 +45,10 @@ func GetSamplePod(name, pvcName string) *k8sv1.Pod {
 }
 
 // GetSampleVolumeSnapshot creates and returns the VolumeSnapshot for the provided PVC.
-func GetSampleVolumeSnapshot(sourceName string, storageClass string) *snapapi.VolumeSnapshot {
+func GetSampleVolumeSnapshot(snapshotName, sourceName string, storageClass string) *snapapi.VolumeSnapshot {
 	vs := &snapapi.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sourceName,
+			Name:      snapshotName,
 			Namespace: TestNamespace,
 		},
 		Spec: snapapi.VolumeSnapshotSpec{
@@ -59,9 +61,8 @@ func GetSampleVolumeSnapshot(sourceName string, storageClass string) *snapapi.Vo
 	return vs
 }
 
-// GetSamplePvc returns restore or clone of the pvc based on the kind(kindName) provided.
+// GetSamplePvc returns restore or clone of the pvc based on the kind provided.
 func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, storageClass string, sourceType, sourceName string) *k8sv1.PersistentVolumeClaim {
-
 	pvc := &k8sv1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -78,12 +79,20 @@ func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, stor
 			},
 		},
 	}
-
 	if sourceType != "" && sourceName != "" {
-		pvc.Spec.DataSource = &k8sv1.TypedLocalObjectReference{
-			Name: sourceName,
-			Kind: sourceType,
+		if sourceType == "VolumeSnapshot" {
+			pvc.Spec.DataSource = &k8sv1.TypedLocalObjectReference{
+				Name:     sourceName,
+				Kind:     sourceType,
+				APIGroup: &snapAPIGroup,
+			}
+		} else {
+			pvc.Spec.DataSource = &k8sv1.TypedLocalObjectReference{
+				Name: sourceName,
+				Kind: sourceType,
+			}
 		}
+
 	}
 	return pvc
 }
