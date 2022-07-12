@@ -146,11 +146,11 @@ func createAndAttachAWSVolumesForNode(nodeEntry nodeDisks, ec2Client *ec2.EC2) e
 	return nil
 }
 
-func getEC2Client(region string) (*ec2.EC2, error) {
+func getEC2Client(ctx context.Context, region string) (*ec2.EC2, error) {
 	// get AWS credentials
 	awsCreds := &corev1.Secret{}
 	secretName := types.NamespacedName{Name: "aws-creds", Namespace: "kube-system"}
-	err := DeployManagerObj.GetCrClient().Get(context.TODO(), secretName, awsCreds)
+	err := crClient.Get(ctx, secretName, awsCreds)
 	if err != nil {
 		return nil, err
 	}

@@ -9,12 +9,12 @@ import (
 
 var snapAPIGroup = "snapshot.storage.k8s.io"
 
-// GetSamplePod returns a sample pod.
-func GetSamplePod(name, pvcName string) *k8sv1.Pod {
+// getSamplePod returns a sample pod.
+func getSamplePod(name, pvcName string) *k8sv1.Pod {
 	pod := &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: TestNamespace,
+			Namespace: testNamespace,
 		},
 		Spec: k8sv1.PodSpec{
 			Volumes: []k8sv1.Volume{
@@ -44,12 +44,12 @@ func GetSamplePod(name, pvcName string) *k8sv1.Pod {
 	return pod
 }
 
-// GetSampleVolumeSnapshot creates and returns the VolumeSnapshot for the provided PVC.
-func GetSampleVolumeSnapshot(snapshotName, sourceName string, storageClass string) *snapapi.VolumeSnapshot {
+// getSampleVolumeSnapshot creates and returns the VolumeSnapshot for the provided PVC.
+func getSampleVolumeSnapshot(snapshotName, sourceName string, storageClass string) *snapapi.VolumeSnapshot {
 	vs := &snapapi.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      snapshotName,
-			Namespace: TestNamespace,
+			Namespace: testNamespace,
 		},
 		Spec: snapapi.VolumeSnapshotSpec{
 			VolumeSnapshotClassName: &storageClass,
@@ -61,12 +61,12 @@ func GetSampleVolumeSnapshot(snapshotName, sourceName string, storageClass strin
 	return vs
 }
 
-// GetSamplePvc returns restore or clone of the pvc based on the kind provided.
-func GetSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, storageClass string, sourceType, sourceName string) *k8sv1.PersistentVolumeClaim {
+// getSamplePvc returns restore or clone of the pvc based on the kind provided.
+func getSamplePvc(size, name string, volumemode k8sv1.PersistentVolumeMode, storageClass string, sourceType, sourceName string) *k8sv1.PersistentVolumeClaim {
 	pvc := &k8sv1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: TestNamespace,
+			Namespace: testNamespace,
 		},
 		Spec: k8sv1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,

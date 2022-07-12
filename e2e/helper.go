@@ -1,10 +1,11 @@
-package deploymanager
+package e2e
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/onsi/gomega"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,10 +13,10 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-// CreateNamespace creates a namespace in the cluster, ignoring if it already exists.
-func (t *DeployManager) CreateNamespace(namespace string) error {
+// createNamespace creates a namespace in the cluster, ignoring if it already exists.
+func createNamespace(ctx context.Context, namespace string) error {
 	label := make(map[string]string)
-	// Label required for monitoring this namespace
+	// label required for monitoring this namespace
 	label["openshift.io/cluster-monitoring"] = "true"
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -23,17 +24,17 @@ func (t *DeployManager) CreateNamespace(namespace string) error {
 			Labels: label,
 		},
 	}
-	err := t.crClient.Create(context.TODO(), ns)
+	err := crClient.Create(ctx, ns)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
 	return nil
 }
 
-// DeleteNamespaceAndWait deletes a namespace and waits on it to terminate.
-func (t *DeployManager) DeleteNamespaceAndWait(namespace string) error {
+// deleteNamespaceAndWait deletes a namespace and waits on it to terminate.
+func deleteNamespaceAndWait(ctx context.Context, namespace string) error {
 	label := make(map[string]string)
-	// Label required for monitoring this namespace
+	// label required for monitoring this namespace
 	label["openshift.io/cluster-monitoring"] = "true"
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -41,18 +42,16 @@ func (t *DeployManager) DeleteNamespaceAndWait(namespace string) error {
 			Labels: label,
 		},
 	}
-	err := t.crClient.Delete(context.TODO(), ns)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
+	err := crClient.Delete(ctx, ns)
+	gomega.Expect(err).To(gomega.BeNil())
 
 	lastReason := ""
 	timeout := 600 * time.Second
 	interval := 10 * time.Second
 
-	// Wait for namespace to terminate
+	// wait for namespace to terminate
 	err = utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
-		err = t.crClient.Get(context.TODO(), types.NamespacedName{Name: namespace, Namespace: namespace}, ns)
+		err = crClient.Get(ctx, types.NamespacedName{Name: namespace, Namespace: namespace}, ns)
 		if err != nil && !errors.IsNotFound(err) {
 			lastReason = fmt.Sprintf("Error talking to k8s apiserver: %v", err)
 			return false, nil

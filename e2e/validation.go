@@ -27,11 +27,11 @@ const (
 )
 
 // function to validate LVMVolume group.
-func validateLVMvg() error {
+func validateLVMvg(ctx context.Context) error {
 	lvmVG := lvmv1alpha1.LVMVolumeGroup{}
 
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: lvmVolumeGroupName, Namespace: InstallNamespace}, &lvmVG)
+		err := crClient.Get(ctx, types.NamespacedName{Name: lvmVolumeGroupName, Namespace: installNamespace}, &lvmVG)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -40,11 +40,11 @@ func validateLVMvg() error {
 }
 
 // function to validate storage class.
-func validateStorageClass() error {
+func validateStorageClass(ctx context.Context) error {
 	sc := storagev1.StorageClass{}
 
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: storageClassName, Namespace: InstallNamespace}, &sc)
+		err := crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -53,11 +53,11 @@ func validateStorageClass() error {
 }
 
 // function to validate volume snapshot class.
-func ValidateVolumeSnapshotClass() error {
+func validateVolumeSnapshotClass(ctx context.Context) error {
 	vsc := snapapi.VolumeSnapshotClass{}
 
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: volumeSnapshotClassName}, &vsc)
+		err := crClient.Get(ctx, types.NamespacedName{Name: volumeSnapshotClassName}, &vsc)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -66,11 +66,11 @@ func ValidateVolumeSnapshotClass() error {
 }
 
 // function to validate CSI Driver.
-func validateCSIDriver() error {
+func validateCSIDriver(ctx context.Context) error {
 	cd := storagev1.CSIDriver{}
 
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: csiDriverName, Namespace: InstallNamespace}, &cd)
+		err := crClient.Get(ctx, types.NamespacedName{Name: csiDriverName, Namespace: installNamespace}, &cd)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -79,17 +79,17 @@ func validateCSIDriver() error {
 }
 
 // function to validate TopoLVM node.
-func validateTopolvmNode() error {
+func validateTopolvmNode(ctx context.Context) error {
 	ds := appsv1.DaemonSet{}
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
+		err := crClient.Get(ctx, types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: installNamespace}, &ds)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 	debug("TopoLVM node found\n")
 
 	// checking for the ready status
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
+		err := crClient.Get(ctx, types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: installNamespace}, &ds)
 		if err != nil {
 			debug("topolvmNode : %s", err.Error())
 		}
@@ -101,11 +101,11 @@ func validateTopolvmNode() error {
 }
 
 // function to validate vg manager resource.
-func validateVGManager() error {
+func validateVGManager(ctx context.Context) error {
 	ds := appsv1.DaemonSet{}
 
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: vgManagerDaemonsetName, Namespace: InstallNamespace}, &ds)
+		err := crClient.Get(ctx, types.NamespacedName{Name: vgManagerDaemonsetName, Namespace: installNamespace}, &ds)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 	debug("VG manager found\n")
@@ -114,11 +114,11 @@ func validateVGManager() error {
 }
 
 // function to validate TopoLVM Deployment.
-func validateTopolvmController() error {
+func validateTopolvmController(ctx context.Context) error {
 	dep := appsv1.Deployment{}
 
 	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmCtrlDeploymentName, Namespace: InstallNamespace}, &dep)
+		err := crClient.Get(ctx, types.NamespacedName{Name: topolvmCtrlDeploymentName, Namespace: installNamespace}, &dep)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -127,36 +127,37 @@ func validateTopolvmController() error {
 }
 
 // Validate all the resources created by LVMO.
-func ValidateResources() {
+func validateResources() {
 
+	var ctx = context.Background()
 	Describe("Validate LVMCluster reconciliation", func() {
 		It("Should check that LVMO resources have been created", func() {
 			By("Checking that CSIDriver has been created")
-			err := validateCSIDriver()
+			err := validateCSIDriver(ctx)
 			Expect(err).To(BeNil())
 
 			By("Checking that the topolvm-controller deployment has been created")
-			err = validateTopolvmController()
+			err = validateTopolvmController(ctx)
 			Expect(err).To(BeNil())
 
 			By("Checking that the vg-manager daemonset has been created")
-			err = validateVGManager()
+			err = validateVGManager(ctx)
 			Expect(err).To(BeNil())
 
 			By("Checking that the LVMVolumeGroup has been created")
-			err = validateLVMvg()
+			err = validateLVMvg(ctx)
 			Expect(err).To(BeNil())
 
 			By("Checking that the topolvm-node daemonset has been created")
-			err = validateTopolvmNode()
+			err = validateTopolvmNode(ctx)
 			Expect(err).To(BeNil())
 
 			By("Checking that the StorageClass has been created")
-			err = validateStorageClass()
+			err = validateStorageClass(ctx)
 			Expect(err).To(BeNil())
 
 			By("Checking that the VolumeSnapshotClass has been created")
-			err = ValidateVolumeSnapshotClass()
+			err = validateVolumeSnapshotClass(ctx)
 			Expect(err).To(BeNil())
 		})
 	})

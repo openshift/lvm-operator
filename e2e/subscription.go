@@ -1,4 +1,4 @@
-package deploymanager
+package e2e
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
-	crClient "sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type clusterObjects struct {
@@ -25,12 +25,11 @@ type clusterObjects struct {
 	subscriptions  []v1alpha1.Subscription
 }
 
-// Generating the cluster objects.
-func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) *clusterObjects {
-
+// generateClusterObjects generates the cluster objects required for deploying the operator using OLM.
+func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) *clusterObjects {
 	co := &clusterObjects{}
 	label := make(map[string]string)
-	// Label required for monitoring this namespace
+	// label required for monitoring this namespace
 	label["openshift.io/cluster-monitoring"] = "true"
 
 	// Namespaces
@@ -40,7 +39,7 @@ func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscript
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   InstallNamespace,
+			Name:   installNamespace,
 			Labels: label,
 		},
 	})
@@ -49,10 +48,10 @@ func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscript
 	lvmOG := v1.OperatorGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "openshift-storage-operatorgroup",
-			Namespace: InstallNamespace,
+			Namespace: installNamespace,
 		},
 		Spec: v1.OperatorGroupSpec{
-			TargetNamespaces: []string{InstallNamespace},
+			TargetNamespaces: []string{installNamespace},
 		},
 	}
 	lvmOG.SetGroupVersionKind(schema.GroupVersionKind{Group: v1.SchemeGroupVersion.Group, Kind: "OperatorGroup", Version: v1.SchemeGroupVersion.Version})
@@ -63,7 +62,7 @@ func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscript
 	lvmCatalog := v1alpha1.CatalogSource{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "lvm-catalogsource",
-			Namespace: InstallNamespace,
+			Namespace: installNamespace,
 		},
 		Spec: v1alpha1.CatalogSourceSpec{
 			SourceType:  v1alpha1.SourceTypeGrpc,
@@ -80,13 +79,13 @@ func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscript
 	lvmSubscription := v1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "lvm-operator",
-			Namespace: InstallNamespace,
+			Namespace: installNamespace,
 		},
 		Spec: &v1alpha1.SubscriptionSpec{
 			Channel:                subscriptionChannel,
 			InstallPlanApproval:    "Automatic",
 			CatalogSource:          "lvm-catalogsource",
-			CatalogSourceNamespace: InstallNamespace,
+			CatalogSourceNamespace: installNamespace,
 			// Upstream package name is lvm-operator (downstream will be odf-lvm-operator)
 			Package: "lvm-operator",
 		},
@@ -97,11 +96,10 @@ func (t *DeployManager) generateClusterObjects(lvmCatalogImage string, subscript
 	return co
 }
 
-// Waiting for LVM catalog source.
-func (t *DeployManager) waitForLVMCatalogSource() error {
+// waitForLVMCatalogSource waits for LVM catalog source.
+func waitForLVMCatalogSource(ctx context.Context) error {
 	timeout := 300 * time.Second
 	interval := 10 * time.Second
-
 	lastReason := ""
 
 	labelSelector, err := labels.Parse("olm.catalogSource in (lvm-catalogsource)")
@@ -111,9 +109,9 @@ func (t *DeployManager) waitForLVMCatalogSource() error {
 	err = utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
 
 		pods := &k8sv1.PodList{}
-		err = t.crClient.List(context.TODO(), pods, &crClient.ListOptions{
+		err = crClient.List(ctx, pods, &crclient.ListOptions{
 			LabelSelector: labelSelector,
-			Namespace:     InstallNamespace,
+			Namespace:     installNamespace,
 		})
 		if err != nil {
 			lastReason = fmt.Sprintf("error talking to k8s apiserver: %v", err)
@@ -149,8 +147,8 @@ func (t *DeployManager) waitForLVMCatalogSource() error {
 	return nil
 }
 
-// WaitForLVMOperator waits for the lvm-operator to come online.
-func (t *DeployManager) waitForLVMOperator() error {
+// waitForLVMOperator waits for the lvm-operator to come online.
+func waitForLVMOperator(ctx context.Context) error {
 	deployments := []string{"lvm-operator-controller-manager"}
 
 	timeout := 1000 * time.Second
@@ -161,7 +159,7 @@ func (t *DeployManager) waitForLVMOperator() error {
 	err := utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
 		for _, name := range deployments {
 			deployment := &appsv1.Deployment{}
-			err = t.crClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: InstallNamespace}, deployment)
+			err = crClient.Get(ctx, types.NamespacedName{Name: name, Namespace: installNamespace}, deployment)
 			if err != nil {
 				lastReason = fmt.Sprintf("waiting on deployment %s to be created", name)
 				return false, nil
@@ -192,11 +190,11 @@ func (t *DeployManager) waitForLVMOperator() error {
 	return nil
 }
 
-// Deploying the cluster objects.
-func (t *DeployManager) deployClusterObjects(co *clusterObjects) error {
+// deployClusterObjects deploys the cluster objects.
+func deployClusterObjects(ctx context.Context, co *clusterObjects) error {
 
 	for _, namespace := range co.namespaces {
-		err := t.CreateNamespace(namespace.Name)
+		err := createNamespace(ctx, namespace.Name)
 		if err != nil {
 			return err
 		}
@@ -205,8 +203,8 @@ func (t *DeployManager) deployClusterObjects(co *clusterObjects) error {
 	for _, operatorGroup := range co.operatorGroups {
 		operatorGroup := operatorGroup
 		operatorGroups := &v1.OperatorGroupList{}
-		err := t.crClient.List(context.TODO(), operatorGroups, &crClient.ListOptions{
-			Namespace: InstallNamespace,
+		err := crClient.List(ctx, operatorGroups, &crclient.ListOptions{
+			Namespace: installNamespace,
 		})
 		if err != nil {
 			return err
@@ -221,7 +219,7 @@ func (t *DeployManager) deployClusterObjects(co *clusterObjects) error {
 			// Skip this one, so we don't make the system bad.
 			continue
 		}
-		err = t.crClient.Create(context.TODO(), &operatorGroup)
+		err = crClient.Create(ctx, &operatorGroup)
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
@@ -229,28 +227,28 @@ func (t *DeployManager) deployClusterObjects(co *clusterObjects) error {
 
 	for _, catalogSource := range co.catalogSources {
 		catalogSource := catalogSource
-		err := t.crClient.Create(context.TODO(), &catalogSource)
+		err := crClient.Create(ctx, &catalogSource)
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 	}
 
 	// Wait for catalog source before posting subscription
-	err := t.waitForLVMCatalogSource()
+	err := waitForLVMCatalogSource(ctx)
 	if err != nil {
 		return err
 	}
 
 	for _, subscription := range co.subscriptions {
 		subscription := subscription
-		err := t.crClient.Create(context.TODO(), &subscription)
+		err := crClient.Create(ctx, &subscription)
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 	}
 
 	// Wait on lvm-operator to come online.
-	err = t.waitForLVMOperator()
+	err = waitForLVMOperator(ctx)
 	if err != nil {
 		return err
 	}
@@ -258,15 +256,15 @@ func (t *DeployManager) deployClusterObjects(co *clusterObjects) error {
 	return nil
 }
 
-// DeployLVMWithOLM deploys lvm operator via an olm subscription.
-func (t *DeployManager) DeployLVMWithOLM(lvmCatalogImage string, subscriptionChannel string) error {
+// deployLVMWithOLM deploys lvm operator via an olm subscription.
+func deployLVMWithOLM(ctx context.Context, lvmCatalogImage string, subscriptionChannel string) error {
 
 	if lvmCatalogImage == "" {
 		return fmt.Errorf("catalog registry images not supplied")
 	}
 
-	co := t.generateClusterObjects(lvmCatalogImage, subscriptionChannel)
-	err := t.deployClusterObjects(co)
+	co := generateClusterObjects(lvmCatalogImage, subscriptionChannel)
+	err := deployClusterObjects(ctx, co)
 	if err != nil {
 		return err
 	}
@@ -274,12 +272,12 @@ func (t *DeployManager) DeployLVMWithOLM(lvmCatalogImage string, subscriptionCha
 	return nil
 }
 
-// DeleteClusterObjects deletes remaining operator manifests.
-func (t *DeployManager) deleteClusterObjects(co *clusterObjects) error {
+// deleteClusterObjects deletes remaining operator manifests.
+func deleteClusterObjects(ctx context.Context, co *clusterObjects) error {
 
 	for _, operatorGroup := range co.operatorGroups {
 		operatorgroup := operatorGroup
-		err := t.crClient.Delete(context.TODO(), &operatorgroup)
+		err := crClient.Delete(ctx, &operatorgroup)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -288,7 +286,7 @@ func (t *DeployManager) deleteClusterObjects(co *clusterObjects) error {
 
 	for _, catalogSource := range co.catalogSources {
 		catalogsource := catalogSource
-		err := t.crClient.Delete(context.TODO(), &catalogsource)
+		err := crClient.Delete(ctx, &catalogsource)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -296,7 +294,7 @@ func (t *DeployManager) deleteClusterObjects(co *clusterObjects) error {
 
 	for _, subscription := range co.subscriptions {
 		subs := subscription
-		err := t.crClient.Delete(context.TODO(), &subs)
+		err := crClient.Delete(ctx, &subs)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -305,16 +303,16 @@ func (t *DeployManager) deleteClusterObjects(co *clusterObjects) error {
 	return nil
 }
 
-// UninstallLVM uninstalls lvm operator.
-func (t *DeployManager) UninstallLVM(lvmCatalogImage string, subscriptionChannel string) error {
+// uninstallLVM uninstalls lvm operator.
+func uninstallLVM(ctx context.Context, lvmCatalogImage string, subscriptionChannel string) error {
 	// Delete remaining operator manifests
-	co := t.generateClusterObjects(lvmCatalogImage, subscriptionChannel)
-	err := t.deleteClusterObjects(co)
+	co := generateClusterObjects(lvmCatalogImage, subscriptionChannel)
+	err := deleteClusterObjects(ctx, co)
 	if err != nil {
 		return err
 	}
 	for _, namespace := range co.namespaces {
-		err = t.DeleteNamespaceAndWait(namespace.Name)
+		err = deleteNamespaceAndWait(ctx, namespace.Name)
 		if err != nil {
 			return err
 		}

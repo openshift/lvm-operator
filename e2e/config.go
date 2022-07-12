@@ -3,44 +3,77 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"os"
 
-	deploymanager "github.com/red-hat-storage/lvm-operator/pkg/deploymanager"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	operatorv1 "github.com/operator-framework/api/pkg/operators/v1"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	lvmv1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TestNamespace is the namespace we run all the tests in.
-const TestNamespace = "lvm-endtoendtest"
-const InstallNamespace = "openshift-storage"
+const (
+	// testNamespace is the namespace we run all the tests in.
+	testNamespace = "lvm-endtoendtest"
+	// installNamespace is the namespace we installs the operator in.
+	installNamespace = "openshift-storage"
+	// storageClass is the name of the lvm storage class.
+	storageClass = "odf-lvm-vg1"
+)
 
-var lvmOperatorInstall bool
-var lvmOperatorUninstall bool
-
-// LVMCatalogSourceImage is the LVM CatalogSource container image to use in the deployment
-var LvmCatalogSourceImage string
-
-// LvmSubscriptionChannel is the name of the lvm subscription channel
-var LvmSubscriptionChannel string
-
-// DiskInstall indicates whether disks are needed to be installed.
-var DiskInstall bool
-
-// DeployManager is the suite global DeployManager
-var DeployManagerObj *deploymanager.DeployManager
-
-// SuiteFailed indicates whether any test in the current suite has failed
-var SuiteFailed = false
-
-const StorageClass = "odf-lvm-vg1"
+var (
+	// lvmCatalogSourceImage is the LVM CatalogSource container image to use in the deployment
+	lvmCatalogSourceImage string
+	// lvmSubscriptionChannel is the name of the lvm subscription channel
+	lvmSubscriptionChannel string
+	// diskInstall indicates whether disks are needed to be installed.
+	diskInstall          bool
+	lvmOperatorInstall   bool
+	lvmOperatorUninstall bool
+	scheme               = runtime.NewScheme()
+	crClient             crclient.Client
+)
 
 func init() {
-	flag.StringVar(&LvmCatalogSourceImage, "lvm-catalog-image", "", "The LVM CatalogSource container image to use in the deployment")
-	flag.StringVar(&LvmSubscriptionChannel, "lvm-subscription-channel", "", "The subscription channel to revise updates from")
+	flag.StringVar(&lvmCatalogSourceImage, "lvm-catalog-image", "", "The LVM CatalogSource container image to use in the deployment")
+	flag.StringVar(&lvmSubscriptionChannel, "lvm-subscription-channel", "", "The subscription channel to revise updates from")
 	flag.BoolVar(&lvmOperatorInstall, "lvm-operator-install", true, "Install the LVM operator before starting tests")
 	flag.BoolVar(&lvmOperatorUninstall, "lvm-operator-uninstall", true, "Uninstall the LVM cluster and operator after test completion")
-	flag.BoolVar(&DiskInstall, "disk-install", false, "Create and attach disks to the nodes. This currently only works with AWS")
+	flag.BoolVar(&diskInstall, "disk-install", false, "Create and attach disks to the nodes. This currently only works with AWS")
 
-	d, err := deploymanager.NewDeployManager()
+	utilruntime.Must(k8sscheme.AddToScheme(scheme))
+	utilruntime.Must(lvmv1.AddToScheme(scheme))
+	utilruntime.Must(operatorv1.AddToScheme(scheme))
+	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(snapapi.AddToScheme(scheme))
+
+	kubeconfig := os.Getenv("KUBECONFIG")
+	config, err := getKubeconfig(kubeconfig)
 	if err != nil {
-		panic(fmt.Sprintf("failed to initialize DeployManager: %v", err))
+		panic(fmt.Sprintf("Failed to set kubeconfig: %v", err))
 	}
-	DeployManagerObj = d
+
+	crClient, err = crclient.New(config, crclient.Options{Scheme: scheme})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to set client: %v", err))
+	}
+}
+
+func getKubeconfig(kubeconfig string) (*rest.Config, error) {
+	var config *rest.Config
+	var err error
+	if kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	} else {
+		config, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		return config, nil
+	}
+	return config, err
 }
