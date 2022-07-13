@@ -3,7 +3,7 @@
 # Controllers and their managed resources
 
 
-- **lvmcluster-controller:** Running in the operator deployment, it will create all resources that are don't require information from the node. When applicable, the health of the underlying resource is updated in the LVMCluster status and errors are also exposed as events. Overall success also passed on as an event.:
+- **lvmcluster-controller:** Running in the operator deployment, it will create all resources that don't require information from the node. When applicable, the health of the underlying resource is updated in the LVMCluster status and errors are also exposed as events. Overall success also passed on as an event.:
     - vgmanager daemonset
     - lvmd daemonset
     - CSIDriver CR
