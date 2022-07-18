@@ -17,12 +17,18 @@ limitations under the License.
 package v1alpha1
 
 import (
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const (
+	// ConditionLVMClusterValid communicates if LVMCluster CR is invalid
+	ConditionLVMClusterValid conditionsv1.ConditionType = "LVMClusterValid"
+)
 
 // LVMClusterSpec defines the desired state of LVMCluster
 type LVMClusterSpec struct {
@@ -90,6 +96,12 @@ type DeviceSelector struct {
 	// MinSize is the minimum size of the device which needs to be included. Defaults to `1Gi` if empty
 	// +optional
 	// MinSize *resource.Quantity `json:"minSize,omitempty"`
+
+	// A list of device paths which would be chosen for creating Volume Group.
+	// For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
+	// We discourage using the device names as they can change over node restarts.
+	// +optional
+	Paths []string `json:"paths,omitempty"`
 }
 
 // type DeviceClassConfig struct {
@@ -108,6 +120,11 @@ type LVMClusterStatus struct {
 	// Ready describes if the LVMCluster is ready.
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// Conditions describes the state of the resource.
+	// +optional
+	Conditions []conditionsv1.Condition `json:"conditions,omitempty"`
+
 	// DeviceClassStatuses describes the status of all deviceClasses
 	DeviceClassStatuses []DeviceClassStatus `json:"deviceClassStatuses,omitempty"`
 }
@@ -132,6 +149,8 @@ type NodeStatus struct {
 	Node string `json:"node,omitempty"`
 	// Status is the status of the VG on the node
 	Status VGStatusType `json:"status,omitempty"`
+	// Reason provides more detail on the VG creation status
+	Reason string `json:"reason,omitempty"`
 	// Devices is the list of devices used by the deviceclass
 	Devices []string `json:"devices,omitempty"`
 }
