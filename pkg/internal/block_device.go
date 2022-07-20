@@ -23,6 +23,9 @@ const (
 
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
+
+	DiskByNamePrefix = "/dev"
+	DiskByPathPrefix = "/dev/disk/by-path"
 )
 
 // BlockDevice is the a block device as output by lsblk.
@@ -39,9 +42,12 @@ type BlockDevice struct {
 	Children   []BlockDevice `json:"children,omitempty"`
 	Rotational string        `json:"rota"`
 	ReadOnly   string        `json:"ro,omitempty"`
-	PathByID   string        `json:"pathByID,omitempty"`
 	Serial     string        `json:"serial,omitempty"`
 	PartLabel  string        `json:"partLabel,omitempty"`
+
+	// DiskByPath is not part of lsblk output
+	// fetch and set it only if specified in the CR
+	DiskByPath string
 }
 
 // ListBlockDevices using the lsblk command

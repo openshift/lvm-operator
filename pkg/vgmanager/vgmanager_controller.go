@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -373,7 +374,11 @@ func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDev
 
 	args := []string{vgName}
 	for _, device := range devices {
-		args = append(args, fmt.Sprintf("/dev/%s", device.KName))
+		if device.DiskByPath != "" {
+			args = append(args, device.DiskByPath)
+		} else {
+			args = append(args, fmt.Sprintf("/dev/%s", device.KName))
+		}
 	}
 
 	var cmd string
@@ -393,11 +398,84 @@ func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDev
 	return nil
 }
 
-// filterMatchingDevices returns unmatched and matched blockdevices
-// TODO: Implement this
-func filterMatchingDevices(blockDevices []internal.BlockDevice, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, []internal.BlockDevice, error) {
-	// currently just match all devices
-	return []internal.BlockDevice{}, blockDevices, nil
+// filterMatchingDevices returns matched blockdevices
+func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
+
+	var filteredBlockDevices []internal.BlockDevice
+
+	if volumeGroup.Spec.DeviceSelector != nil && len(volumeGroup.Spec.DeviceSelector.Paths) > 0 {
+		vgs, err := ListVolumeGroups(r.executor)
+		if err != nil {
+			return []internal.BlockDevice{}, fmt.Errorf("failed to list volume groups. %v", err)
+		}
+
+		for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+			diskName, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				err = fmt.Errorf("unable to find symlink for disk path %s: %v", path, err)
+				return []internal.BlockDevice{}, err
+			}
+
+			isAlreadyExist := isDeviceAlreadyPartOfVG(vgs, diskName, volumeGroup)
+			if isAlreadyExist {
+				continue
+			}
+
+			baseDiskName := filepath.Base(diskName)
+			blockDevice, ok := hasExactDisk(blockDevices, baseDiskName)
+
+			if filepath.Dir(path) == internal.DiskByPathPrefix {
+				// handle disk by path here such as /dev/disk/by-path/pci-0000:87:00.0-nvme-1
+				if ok {
+					blockDevice.DiskByPath = path
+					filteredBlockDevices = append(filteredBlockDevices, blockDevice)
+				} else {
+					err = fmt.Errorf("can not find device path %s, device name %s in the available block devices", path, diskName)
+					return []internal.BlockDevice{}, err
+				}
+			} else if filepath.Dir(path) == internal.DiskByNamePrefix {
+				// handle disk by names here such as /dev/nvme0n1
+				if ok {
+					filteredBlockDevices = append(filteredBlockDevices, blockDevice)
+				} else {
+					err := fmt.Errorf("can not find device name %s in the available block devices", path)
+					return []internal.BlockDevice{}, err
+				}
+			} else {
+				err = fmt.Errorf("unsupported disk path format %s. only '/dev/disk/by-path' and '/dev/' links are currently supported", path)
+				return []internal.BlockDevice{}, err
+			}
+		}
+
+		return filteredBlockDevices, nil
+	}
+
+	// return all available block devices if none is specified in the CR
+	return blockDevices, nil
+}
+
+func hasExactDisk(blockDevices []internal.BlockDevice, deviceName string) (internal.BlockDevice, bool) {
+	for _, blockDevice := range blockDevices {
+		if blockDevice.KName == deviceName {
+			return blockDevice, true
+		}
+	}
+	return internal.BlockDevice{}, false
+}
+
+func isDeviceAlreadyPartOfVG(vgs []VolumeGroup, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
+
+	for _, vg := range vgs {
+		if vg.Name == volumeGroup.Name {
+			for _, pv := range vg.PVs {
+				if pv == diskName {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func NodeSelectorMatchesNodeLabels(node *corev1.Node, nodeSelector *corev1.NodeSelector) (bool, error) {
@@ -469,7 +547,7 @@ func (r *VGReconciler) getMatchingDevicesForVG(volumeGroup *lvmv1alpha1.LVMVolum
 	}
 
 	var matchingDevices []internal.BlockDevice
-	_, matchingDevices, err = filterMatchingDevices(remainingValidDevices, volumeGroup)
+	matchingDevices, err = r.filterMatchingDevices(remainingValidDevices, volumeGroup)
 	if err != nil {
 		r.Log.Error(err, "could not filter matching devices", "VGName", volumeGroup.Name)
 		return nil, nil, err
