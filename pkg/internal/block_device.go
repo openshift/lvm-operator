@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 )
 
@@ -68,6 +69,28 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	}
 
 	return blockDeviceMap["blockdevices"], nil
+}
+
+func ListDiskByPath(exec Executor) (map[string]string, error) {
+
+	devices := make(map[string]string)
+
+	diskByPathDir := filepath.Join(DiskByPathPrefix, "/*")
+
+	paths, err := filepath.Glob(diskByPathDir)
+	if err != nil {
+		return nil, fmt.Errorf("could not list devices in %q: %w", diskByPathDir, err)
+	}
+
+	for _, path := range paths {
+		diskName, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return nil, fmt.Errorf("could not eval symLink %q:%w", path, err)
+		}
+		devices[diskName] = path
+	}
+
+	return devices, nil
 }
 
 // IsUsableLoopDev returns true if the loop device isn't in use by Kubernetes
