@@ -1,25 +1,21 @@
-package lvm_test
+package e2e
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	tests "github.com/red-hat-storage/lvm-operator/e2e"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
-	timeout  = time.Minute * 5
-	interval = time.Second * 30
-	size     = "5Gi"
+	size = "5Gi"
 )
 
-func PVCTest() {
+func pvcTest() {
 
 	Describe("PVC Tests", func() {
 		var pvc *k8sv1.PersistentVolumeClaim
@@ -29,184 +25,183 @@ func PVCTest() {
 		var clonePod *k8sv1.Pod
 		var restorePvc *k8sv1.PersistentVolumeClaim
 		var restorePod *k8sv1.Pod
-		client := tests.DeployManagerObj.GetCrClient()
-		ctx := context.TODO()
+		ctx := context.Background()
 
 		Context("create pvc, pod, snapshots, clones", func() {
 			It("Tests PVC operations for VolumeMode=file system", func() {
 				By("Creating pvc and pod")
-				pvc = tests.GetSamplePvc(size, "lvmfilepvc", k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "", "")
-				pod = tests.GetSamplePod("lvmfilepod", pvc.Name)
-				err := client.Create(ctx, pvc)
+				pvc = getSamplePvc(size, "lvmfilepvc", k8sv1.PersistentVolumeFilesystem, storageClass, "", "")
+				pod = getSamplePod("lvmfilepod", pvc.Name)
+				err := crClient.Create(ctx, pvc)
 				Expect(err).To(BeNil())
-				err = client.Create(ctx, pod)
+				err = crClient.Create(ctx, pod)
 				Expect(err).To(BeNil())
 
 				By("Verifying that the PVC(file system) is bound and the Pod is running")
 				Eventually(func() bool {
-					err := client.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, pvc)
+					err := crClient.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, pvc)
 					return err == nil && pvc.Status.Phase == k8sv1.ClaimBound
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("PVC %s is bound\n", pvc.Name)
 
 				Eventually(func() bool {
-					err = client.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod)
+					err = crClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod)
 					return err == nil && pod.Status.Phase == k8sv1.PodRunning
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Pod %s is running\n", pod.Name)
 
 				By("Creating a Snapshot of the file-pvc")
-				snapshot = tests.GetSampleVolumeSnapshot(pvc.Name+"-snapshot", pvc.Name, tests.StorageClass)
-				err = client.Create(ctx, snapshot)
+				snapshot = getSampleVolumeSnapshot(pvc.Name+"-snapshot", pvc.Name, storageClass)
+				err = crClient.Create(ctx, snapshot)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
 
 				By("Creating a clone of the file-pvc")
-				clonePvc = tests.GetSamplePvc(size, pvc.Name+"-clone", k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "PersistentVolumeClaim", pvc.Name)
-				err = client.Create(ctx, clonePvc)
+				clonePvc = getSamplePvc(size, pvc.Name+"-clone", k8sv1.PersistentVolumeFilesystem, storageClass, "PersistentVolumeClaim", pvc.Name)
+				err = crClient.Create(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
 
-				clonePod = tests.GetSamplePod("clone-lvmfilepod", clonePvc.Name)
-				err = client.Create(ctx, clonePod)
+				clonePod = getSamplePod("clone-lvmfilepod", clonePvc.Name)
+				err = crClient.Create(ctx, clonePod)
 				Expect(err).To(BeNil())
 
 				Eventually(func() bool {
-					err := client.Get(ctx, types.NamespacedName{Name: clonePvc.Name, Namespace: clonePvc.Namespace}, clonePvc)
+					err := crClient.Get(ctx, types.NamespacedName{Name: clonePvc.Name, Namespace: clonePvc.Namespace}, clonePvc)
 					return err == nil && clonePvc.Status.Phase == k8sv1.ClaimBound
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for file-pvc")
-				restorePvc = tests.GetSamplePvc(size, pvc.Name+"-restore", k8sv1.PersistentVolumeFilesystem, tests.StorageClass, "VolumeSnapshot", snapshot.Name)
-				err = client.Create(ctx, restorePvc)
+				restorePvc = getSamplePvc(size, pvc.Name+"-restore", k8sv1.PersistentVolumeFilesystem, storageClass, "VolumeSnapshot", snapshot.Name)
+				err = crClient.Create(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
 
-				restorePod = tests.GetSamplePod("restore-lvmfilepod", restorePvc.Name)
-				err = client.Create(ctx, restorePod)
+				restorePod = getSamplePod("restore-lvmfilepod", restorePvc.Name)
+				err = crClient.Create(ctx, restorePod)
 				Expect(err).To(BeNil())
 
 				Eventually(func() bool {
-					err := client.Get(ctx, types.NamespacedName{Name: restorePvc.Name, Namespace: restorePvc.Namespace}, restorePvc)
+					err := crClient.Get(ctx, types.NamespacedName{Name: restorePvc.Name, Namespace: restorePvc.Namespace}, restorePvc)
 					return err == nil && restorePvc.Status.Phase == k8sv1.ClaimBound
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Restored PVC %s is bound\n", restorePvc.Name)
 
-				err = client.Delete(ctx, clonePod)
+				err = crClient.Delete(ctx, clonePod)
 				Expect(err).To(BeNil())
 				fmt.Printf("Pod %s is deleted\n", clonePod.Name)
 
-				err = client.Delete(ctx, clonePvc)
+				err = crClient.Delete(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Clone PVC %s is deleted\n", clonePvc.Name)
 
-				err = client.Delete(ctx, restorePod)
+				err = crClient.Delete(ctx, restorePod)
 				Expect(err).To(BeNil())
 				fmt.Printf("Pod %s is deleted\n", restorePod.Name)
 
-				err = client.Delete(ctx, restorePvc)
+				err = crClient.Delete(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Restored Snapshot %s is deleted\n", restorePvc.Name)
 
-				err = client.Delete(ctx, snapshot)
+				err = crClient.Delete(ctx, snapshot)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is deleted\n", snapshot.Name)
 
-				err = client.Delete(ctx, pod)
+				err = crClient.Delete(ctx, pod)
 				Expect(err).To(BeNil())
 				fmt.Printf("Pod %s is deleted\n", pod.Name)
 
-				err = client.Delete(ctx, pvc)
+				err = crClient.Delete(ctx, pvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("PVC %s is deleted\n", pvc.Name)
 			})
 
 			It("Tests PVC operations for VolumeMode=Block", func() {
 				By("Creating pvc and pod")
-				pvc = tests.GetSamplePvc(size, "lvmblockpvc", k8sv1.PersistentVolumeBlock, tests.StorageClass, "", "")
-				pod = tests.GetSamplePod("lvmblockpod", pvc.Name)
-				err := client.Create(ctx, pvc)
+				pvc = getSamplePvc(size, "lvmblockpvc", k8sv1.PersistentVolumeBlock, storageClass, "", "")
+				pod = getSamplePod("lvmblockpod", pvc.Name)
+				err := crClient.Create(ctx, pvc)
 				Expect(err).To(BeNil())
-				err = client.Create(ctx, pod)
+				err = crClient.Create(ctx, pod)
 				Expect(err).To(BeNil())
 
 				By("Verifying that the PVC(block) is bound and the Pod is running")
 				Eventually(func() bool {
-					err := client.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, pvc)
+					err := crClient.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, pvc)
 					return err == nil && pvc.Status.Phase == k8sv1.ClaimBound
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("PVC %s is bound\n", pvc.Name)
 
 				Eventually(func() bool {
-					err = client.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod)
+					err = crClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, pod)
 					return err == nil && pod.Status.Phase == k8sv1.PodRunning
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Pod %s is running\n", pod.Name)
 
 				By("Creating a Snapshot of the block-pvc")
-				snapshot = tests.GetSampleVolumeSnapshot(pvc.Name+"-snapshot", pvc.Name, tests.StorageClass)
-				err = client.Create(ctx, snapshot)
+				snapshot = getSampleVolumeSnapshot(pvc.Name+"-snapshot", pvc.Name, storageClass)
+				err = crClient.Create(ctx, snapshot)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
 
 				By("Creating a clone of the block-pvc")
-				clonePvc = tests.GetSamplePvc(size, pvc.Name+"-clone", k8sv1.PersistentVolumeBlock, tests.StorageClass, "PersistentVolumeClaim", pvc.Name)
-				err = client.Create(ctx, clonePvc)
+				clonePvc = getSamplePvc(size, pvc.Name+"-clone", k8sv1.PersistentVolumeBlock, storageClass, "PersistentVolumeClaim", pvc.Name)
+				err = crClient.Create(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
 
-				clonePod = tests.GetSamplePod("clone-lvmblockpod", clonePvc.Name)
-				err = client.Create(ctx, clonePod)
+				clonePod = getSamplePod("clone-lvmblockpod", clonePvc.Name)
+				err = crClient.Create(ctx, clonePod)
 				Expect(err).To(BeNil())
 
 				Eventually(func() bool {
-					err := client.Get(ctx, types.NamespacedName{Name: clonePvc.Name, Namespace: clonePvc.Namespace}, clonePvc)
+					err := crClient.Get(ctx, types.NamespacedName{Name: clonePvc.Name, Namespace: clonePvc.Namespace}, clonePvc)
 					return err == nil && clonePvc.Status.Phase == k8sv1.ClaimBound
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for block-pvc")
-				restorePvc = tests.GetSamplePvc(size, pvc.Name+"-restore", k8sv1.PersistentVolumeBlock, tests.StorageClass, "VolumeSnapshot", snapshot.Name)
-				err = client.Create(ctx, restorePvc)
+				restorePvc = getSamplePvc(size, pvc.Name+"-restore", k8sv1.PersistentVolumeBlock, storageClass, "VolumeSnapshot", snapshot.Name)
+				err = crClient.Create(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
 
-				restorePod = tests.GetSamplePod("restore-lvmblockpod", restorePvc.Name)
-				err = client.Create(ctx, restorePod)
+				restorePod = getSamplePod("restore-lvmblockpod", restorePvc.Name)
+				err = crClient.Create(ctx, restorePod)
 				Expect(err).To(BeNil())
 
 				Eventually(func() bool {
-					err := client.Get(ctx, types.NamespacedName{Name: restorePvc.Name, Namespace: restorePvc.Namespace}, restorePvc)
+					err := crClient.Get(ctx, types.NamespacedName{Name: restorePvc.Name, Namespace: restorePvc.Namespace}, restorePvc)
 					return err == nil && restorePvc.Status.Phase == k8sv1.ClaimBound
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Restored PVC %s is bound\n", restorePod.Name)
 
-				err = client.Delete(ctx, clonePod)
+				err = crClient.Delete(ctx, clonePod)
 				Expect(err).To(BeNil())
 				fmt.Printf("Pod %s is deleted\n", clonePod.Name)
 
-				err = client.Delete(ctx, clonePvc)
+				err = crClient.Delete(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Clone PVC %s is deleted\n", clonePvc.Name)
 
-				err = client.Delete(ctx, restorePod)
+				err = crClient.Delete(ctx, restorePod)
 				Expect(err).To(BeNil())
 				fmt.Printf("Pod %s is deleted\n", restorePod.Name)
 
-				err = client.Delete(ctx, restorePvc)
+				err = crClient.Delete(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Restored Snapshot %s is deleted\n", restorePvc.Name)
 
-				err = client.Delete(ctx, snapshot)
+				err = crClient.Delete(ctx, snapshot)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is deleted\n", snapshot.Name)
 
-				err = client.Delete(ctx, pod)
+				err = crClient.Delete(ctx, pod)
 				Expect(err).To(BeNil())
 				fmt.Printf("Pod %s is deleted\n", pod.Name)
 
-				err = client.Delete(ctx, pvc)
+				err = crClient.Delete(ctx, pvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("PVC %s is deleted\n", pvc.Name)
 			})

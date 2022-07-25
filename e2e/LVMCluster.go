@@ -1,4 +1,4 @@
-package deploymanager
+package e2e
 
 import (
 	"context"
@@ -11,11 +11,11 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (t *DeployManager) GenerateLVMCluster() *v1alpha1.LVMCluster {
+func generateLVMCluster() *v1alpha1.LVMCluster {
 	lvmClusterRes := &v1alpha1.LVMCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "lvmcluster-sample",
-			Namespace: InstallNamespace,
+			Namespace: installNamespace,
 		},
 		Spec: v1alpha1.LVMClusterSpec{
 			Storage: v1alpha1.Storage{
@@ -35,17 +35,17 @@ func (t *DeployManager) GenerateLVMCluster() *v1alpha1.LVMCluster {
 	return lvmClusterRes
 }
 
-// Creates a sample CR.
-func (t *DeployManager) StartLVMCluster() error {
-	lvmClusterRes := t.GenerateLVMCluster()
-	return t.crClient.Create(context.TODO(), lvmClusterRes)
+// startLVMCluster creates a sample CR.
+func startLVMCluster(ctx context.Context) error {
+	lvmClusterRes := generateLVMCluster()
+	return crClient.Create(ctx, lvmClusterRes)
 }
 
-// Deletes a sample CR.
-func (t *DeployManager) DeleteLVMCluster() error {
-	lvmClusterRes := t.GenerateLVMCluster()
+// deleteLVMCluster deletes a sample CR.
+func deleteLVMCluster(ctx context.Context) error {
+	lvmClusterRes := generateLVMCluster()
 	cluster := &v1alpha1.LVMCluster{}
-	err := t.crClient.Delete(context.TODO(), lvmClusterRes)
+	err := crClient.Delete(ctx, lvmClusterRes)
 	if err != nil {
 		return err
 	}
@@ -53,9 +53,9 @@ func (t *DeployManager) DeleteLVMCluster() error {
 	timeout := 600 * time.Second
 	interval := 10 * time.Second
 
-	// Wait for LVMCluster to be deleted
+	// wait for LVMCluster to be deleted
 	err = utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
-		err = t.crClient.Get(context.TODO(), types.NamespacedName{Name: lvmClusterRes.Name, Namespace: InstallNamespace}, cluster)
+		err = crClient.Get(ctx, types.NamespacedName{Name: lvmClusterRes.Name, Namespace: installNamespace}, cluster)
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
 		}

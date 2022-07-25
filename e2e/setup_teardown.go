@@ -1,61 +1,60 @@
 package e2e
 
 import (
+	"context"
+
 	"github.com/onsi/gomega"
 )
 
-// BeforeTestSuiteSetup is the function called to initialize the test environment.
-func BeforeTestSuiteSetup() {
+// beforeTestSuiteSetup is the function called to initialize the test environment.
+func beforeTestSuiteSetup(ctx context.Context) {
 
-	if DiskInstall {
+	if diskInstall {
 		debug("Creating disk for e2e tests\n")
-		err := diskSetup()
+		err := diskSetup(ctx)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
 
-	SuiteFailed = true
 	if lvmOperatorInstall {
 		debug("BeforeTestSuite: deploying LVM Operator\n")
-		err := DeployManagerObj.DeployLVMWithOLM(LvmCatalogSourceImage, LvmSubscriptionChannel)
+		err := deployLVMWithOLM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
 
 	debug("BeforeTestSuite: starting LVM Cluster\n")
-	err := DeployManagerObj.StartLVMCluster()
+	err := startLVMCluster(ctx)
 	gomega.Expect(err).To(gomega.BeNil())
 
-	debug("BeforeTestSuite: creating Namespace %s\n", TestNamespace)
-	err = DeployManagerObj.CreateNamespace(TestNamespace)
+	debug("BeforeTestSuite: creating Namespace %s\n", testNamespace)
+	err = createNamespace(ctx, testNamespace)
 	gomega.Expect(err).To(gomega.BeNil())
-
-	SuiteFailed = false
 
 	debug("------------------------------\n")
 
 }
 
-// AfterTestSuiteCleanup is the function called to tear down the test environment.
-func AfterTestSuiteCleanup() {
+// afterTestSuiteCleanup is the function called to tear down the test environment.
+func afterTestSuiteCleanup(ctx context.Context) {
 
 	debug("\n------------------------------\n")
 
-	debug("AfterTestSuite: deleting Namespace %s\n", TestNamespace)
-	err := DeployManagerObj.DeleteNamespaceAndWait(TestNamespace)
+	debug("AfterTestSuite: deleting Namespace %s\n", testNamespace)
+	err := deleteNamespaceAndWait(ctx, testNamespace)
 	gomega.Expect(err).To(gomega.BeNil())
 
 	if lvmOperatorUninstall {
-		debug("AfterTestSuite: deleting default LVM CLuster\n")
-		err := DeployManagerObj.DeleteLVMCluster()
+		debug("AfterTestSuite: deleting default LVM Cluster\n")
+		err := deleteLVMCluster(ctx)
 		gomega.Expect(err).To(gomega.BeNil())
 
 		debug("AfterTestSuite: uninstalling LVM Operator\n")
-		err = DeployManagerObj.UninstallLVM(LvmCatalogSourceImage, LvmSubscriptionChannel)
+		err = uninstallLVM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
 		gomega.Expect(err).To(gomega.BeNil(), "error uninstalling the LVM Operator: %v", err)
 	}
 
-	if DiskInstall {
+	if diskInstall {
 		debug("Cleaning up disk\n")
-		err = diskRemoval()
+		err = diskRemoval(ctx)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
 }

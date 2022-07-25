@@ -1,12 +1,12 @@
-package lvm_test
+package e2e
 
 import (
+	"context"
 	"flag"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	tests "github.com/red-hat-storage/lvm-operator/e2e"
 )
 
 func TestLvm(t *testing.T) {
@@ -16,14 +16,14 @@ func TestLvm(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	tests.BeforeTestSuiteSetup()
+	beforeTestSuiteSetup(context.Background())
 })
 
 var _ = AfterSuite(func() {
-	tests.AfterTestSuiteCleanup()
+	afterTestSuiteCleanup(context.Background())
 })
 
 var _ = Describe("LVMO e2e tests", func() {
-	Context("LVMCluster reconciliation", tests.ValidateResources)
-	Context("PVC tests", PVCTest)
+	Context("LVMCluster reconciliation", validateResources)
+	Context("PVC tests", pvcTest)
 })

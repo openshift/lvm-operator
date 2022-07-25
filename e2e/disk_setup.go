@@ -10,11 +10,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func diskSetup() error {
+func diskSetup(ctx context.Context) error {
 
 	// get nodes
 	nodeList := &corev1.NodeList{}
-	err := DeployManagerObj.GetCrClient().List(context.TODO(), nodeList, client.HasLabels{labelNodeRoleWorker})
+	err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})
 	if err != nil {
 		fmt.Printf("failed to list nodes\n")
 		return err
@@ -26,7 +26,7 @@ func diskSetup() error {
 
 	// initialize client
 	fmt.Printf("initialize ec2 creds\n")
-	ec2Client, err := getEC2Client(region)
+	ec2Client, err := getEC2Client(ctx, region)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "getEC2Client")
 
 	// represents the disk layout to setup on the nodes.
@@ -50,10 +50,10 @@ func diskSetup() error {
 	return nil
 }
 
-func diskRemoval() error {
+func diskRemoval(ctx context.Context) error {
 	// get nodes
 	nodeList := &corev1.NodeList{}
-	err := DeployManagerObj.GetCrClient().List(context.TODO(), nodeList, client.HasLabels{labelNodeRoleWorker})
+	err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})
 	if err != nil {
 		fmt.Printf("failed to list nodes\n")
 		return err
@@ -64,7 +64,7 @@ func diskRemoval() error {
 
 	// initialize client
 	fmt.Printf("initialize ec2 creds\n")
-	ec2Client, err := getEC2Client(region)
+	ec2Client, err := getEC2Client(ctx, region)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "getEC2Client")
 
 	// cleaning disk
