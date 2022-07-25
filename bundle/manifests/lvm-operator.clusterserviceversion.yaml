@@ -258,9 +258,7 @@ spec:
           - create
         serviceAccountName: controller-manager
       deployments:
-      - label:
-          app.kubernetes.io/name: lvm-operator
-        name: lvm-operator-controller-manager
+      - name: lvm-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -277,6 +275,18 @@ spec:
             spec:
               containers:
               - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources: {}
+              - args:
                 - --health-probe-bind-address=:8081
                 - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
@@ -286,15 +296,15 @@ spec:
                 - name: TOPOLVM_CSI_IMAGE
                   value: quay.io/ocs-dev/topolvm:latest
                 - name: CSI_LIVENESSPROBE_IMAGE
-                  value: k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
+                  value: registry.k8s.io/sig-storage/livenessprobe:v2.5.0
                 - name: CSI_PROVISIONER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+                  value: registry.k8s.io/sig-storage/csi-provisioner:v3.0.0
                 - name: CSI_REGISTRAR_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
+                  value: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.3.0
                 - name: CSI_RESIZER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+                  value: registry.k8s.io/sig-storage/csi-resizer:v1.3.0
                 - name: CSI_SNAPSHOTTER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1
+                  value: registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -326,18 +336,6 @@ spec:
                     memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
-              - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources: {}
               - command:
                 - /metricsexporter
                 image: quay.io/ocs-dev/lvm-operator:latest

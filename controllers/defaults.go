@@ -25,11 +25,11 @@ var (
 		"OPERATOR_NAMESPACE": "openshift-storage",
 		// TODO: Switch to upstream topolvm image once PR https://github.com/topolvm/topolvm/pull/463 is merged
 		"TOPOLVM_CSI_IMAGE":       "quay.io/ocs-dev/topolvm:latest",
-		"CSI_REGISTRAR_IMAGE":     "k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0",
-		"CSI_PROVISIONER_IMAGE":   "k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0",
-		"CSI_LIVENESSPROBE_IMAGE": "k8s.gcr.io/sig-storage/livenessprobe:v2.5.0",
-		"CSI_RESIZER_IMAGE":       "k8s.gcr.io/sig-storage/csi-resizer:v1.3.0",
-		"CSI_SNAPSHOTTER_IMAGE":   "k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1",
+		"CSI_REGISTRAR_IMAGE":     "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.3.0",
+		"CSI_PROVISIONER_IMAGE":   "registry.k8s.io/sig-storage/csi-provisioner:v3.0.0",
+		"CSI_LIVENESSPROBE_IMAGE": "registry.k8s.io/sig-storage/livenessprobe:v2.5.0",
+		"CSI_RESIZER_IMAGE":       "registry.k8s.io/sig-storage/csi-resizer:v1.3.0",
+		"CSI_SNAPSHOTTER_IMAGE":   "registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1",
 
 		// not being used, only for reference
 		"VGMANAGER_IMAGE": "quay.io/ocs-dev/vgmanager:latest",
