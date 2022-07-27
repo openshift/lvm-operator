@@ -310,6 +310,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 				vgNodeMap[item.Name] = []lvmv1alpha1.NodeStatus{
 					{
 						Node:    nodeItem.Name,
+						Reason:  item.Reason,
 						Status:  item.Status,
 						Devices: item.Devices,
 					},
