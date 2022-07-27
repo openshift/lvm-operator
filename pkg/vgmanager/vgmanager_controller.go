@@ -376,7 +376,7 @@ func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDev
 		if device.DiskByPath != "" {
 			args = append(args, device.DiskByPath)
 		} else {
-			args = append(args, fmt.Sprintf("/dev/%s", device.KName))
+			args = append(args, device.KName)
 		}
 	}
 
@@ -420,8 +420,7 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 				continue
 			}
 
-			baseDiskName := filepath.Base(diskName)
-			blockDevice, ok := hasExactDisk(blockDevices, baseDiskName)
+			blockDevice, ok := hasExactDisk(blockDevices, diskName)
 
 			if filepath.Dir(path) == internal.DiskByPathPrefix {
 				// handle disk by path here such as /dev/disk/by-path/pci-0000:87:00.0-nvme-1

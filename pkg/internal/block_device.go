@@ -56,7 +56,7 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
-	args := []string{"--json", "-o", columns}
+	args := []string{"--json", "--paths", "-o", columns}
 
 	output, err := exec.ExecuteCommandWithOutput("lsblk", args...)
 	if err != nil {
@@ -105,7 +105,7 @@ func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
 
 	usable := true
 
-	args := []string{fmt.Sprintf("/dev/%s", b.Name), "-O", "BACK-FILE", "--json"}
+	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
 
 	output, err := exec.ExecuteCommandWithOutput(losetupPath, args...)
 	if err != nil {
@@ -152,7 +152,7 @@ func (b BlockDevice) HasBindMounts() (bool, string, error) {
 			mountInfoList := strings.Split(mountInfo, " ")
 			if len(mountInfoList) >= 10 {
 				// device source is 4th field for bind mounts and 10th for regular mounts
-				if mountInfoList[3] == fmt.Sprintf("/%s", b.KName) || mountInfoList[9] == fmt.Sprintf("/dev/%s", b.KName) {
+				if mountInfoList[3] == fmt.Sprintf("/%s", filepath.Base(b.KName)) || mountInfoList[9] == b.KName {
 					return true, mountInfoList[4], nil
 				}
 			}
