@@ -32,6 +32,7 @@ import (
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -113,6 +114,39 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		r.Log.Error(err, "failed to get operator image")
 		return ctrl.Result{}, err
+	}
+
+	// verify node filter
+	nodes := &corev1.NodeList{}
+	err = r.Client.List(ctx, nodes)
+	if err != nil {
+		r.Log.Error(err, "failed to list nodes")
+		return ctrl.Result{}, err
+	}
+
+	if len(nodes.Items) == 0 {
+		return ctrl.Result{}, fmt.Errorf("no nodes are available")
+	}
+
+	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
+		var matches bool
+		for i := range nodes.Items {
+			matches, err = verifyNodeSelector(&nodes.Items[i], deviceClass.NodeSelector)
+			if err != nil {
+				r.Log.Error(err, "failed to verify node selector")
+				return ctrl.Result{}, err
+			}
+
+			if matches {
+				break
+			}
+		}
+
+		// return error if none of the nodes match the nodeSelector for a deviceClass
+		if !matches {
+			r.Log.Error(err, "failed to get any matching nodes for the node selector", "deviceClass", deviceClass)
+			return ctrl.Result{}, err
+		}
 	}
 
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
@@ -385,4 +419,16 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 	}
 
 	return nil
+}
+
+// verfiyNodeSelector returns true if node selector matches any node
+func verifyNodeSelector(node *corev1.Node, nodeSelector *corev1.NodeSelector) (bool, error) {
+	if nodeSelector == nil {
+		return true, nil
+	}
+	if node == nil {
+		return false, fmt.Errorf("the node var is nil")
+	}
+
+	return v1helper.MatchNodeSelectorTerms(node, nodeSelector)
 }
