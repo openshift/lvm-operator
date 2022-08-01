@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +54,15 @@ var _ = Describe("LVMCluster controller", func() {
 						Name:               testThinPoolName,
 						SizePercent:        50,
 						OverprovisionRatio: 10,
+					},
+					NodeSelector: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{Key: hostNameLabel, Operator: corev1.NodeSelectorOpIn, Values: []string{"node1"}},
+								},
+							},
+						},
 					},
 				}},
 			},

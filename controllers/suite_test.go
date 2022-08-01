@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -65,6 +66,7 @@ const (
 	testLvmClusterNamespace = "openshift-storage"
 	testDeviceClassName     = "test"
 	testImageName           = "test"
+	hostNameLabel           = "kubernetes.io/hostname"
 )
 
 var _ = BeforeSuite(func() {
@@ -110,6 +112,19 @@ var _ = BeforeSuite(func() {
 	testNamespace := &corev1.Namespace{}
 	testNamespace.Name = testLvmClusterNamespace
 	Expect(k8sClient.Create(ctx, testNamespace)).Should(Succeed())
+
+	testNode := &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Node",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				hostNameLabel: "node1",
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, testNode)).Should(Succeed())
 
 	err = (&LVMClusterReconciler{
 		Client:         k8sManager.GetClient(),
