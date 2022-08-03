@@ -69,6 +69,10 @@ func pvcTest() {
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Pod %s is running\n", pod.Name)
 
+				By("Writing data to pod")
+				err = writeDataInPod(pod, "file")
+				Expect(err).To(BeNil())
+
 				By("Creating a Snapshot of the file-pvc")
 				snapshotYaml := fmt.Sprintf(volumeSnapshotYAMLTemplate, "lvmfilepvc-snapshot", testNamespace, snapshotClass, "lvmfilepvc")
 				snapshot, err = getVolumeSnapshot(snapshotYaml)
@@ -113,6 +117,11 @@ func pvcTest() {
 				podVolumeMountYaml = fmt.Sprintf(podVolumeFSYAMLTemplate, "restore-lvmfilepod", testNamespace, "lvmfilepvc-restore")
 				restorePod, err = getPod(podVolumeMountYaml)
 				err = crClient.Create(ctx, restorePod)
+				Expect(err).To(BeNil())
+
+				// check for content in snapshot-pod
+				By("Validating data in snapshot-restore")
+				err = validateDataInPod(pod, "file")
 				Expect(err).To(BeNil())
 
 				Eventually(func() bool {
@@ -175,6 +184,10 @@ func pvcTest() {
 				}, timeout, interval).Should(BeTrue())
 				fmt.Printf("Pod %s is running\n", pod.Name)
 
+				By("Writing data to pod")
+				err = writeDataInPod(pod, "block")
+				Expect(err).To(BeNil())
+
 				By("Creating a Snapshot of the block-pvc")
 				snapshotYaml := fmt.Sprintf(volumeSnapshotYAMLTemplate, "lvmblockpvc-snapshot", testNamespace, snapshotClass, "lvmblockpvc")
 				snapshot, err = getVolumeSnapshot(snapshotYaml)
@@ -219,6 +232,11 @@ func pvcTest() {
 				podVolumeBlockYaml = fmt.Sprintf(podVolumeBlockYAMLTemplate, "restore-lvmblockpod", testNamespace, "lvmblockpvc-restore")
 				restorePod, err = getPod(podVolumeBlockYaml)
 				err = crClient.Create(ctx, restorePod)
+				Expect(err).To(BeNil())
+
+				// check for content in snapshot-pod
+				By("Validating data in snapshot-restore")
+				err = validateDataInPod(pod, "block")
 				Expect(err).To(BeNil())
 
 				Eventually(func() bool {

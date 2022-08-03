@@ -3,6 +3,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -41,7 +43,15 @@ var (
 	scheme               = runtime.NewScheme()
 	crClient             crclient.Client
 	deserializer         runtime.Decoder
+	parameterCodec       runtime.ParameterCodec
+	clientset            *kubernetes.Clientset
+	config               *rest.Config
 )
+
+// GetParameterCodec is the function used to retrieve the parameterCodec
+func GetParameterCodec() runtime.ParameterCodec {
+	return parameterCodec
+}
 
 func init() {
 	flag.StringVar(&lvmCatalogSourceImage, "lvm-catalog-image", "", "The LVM CatalogSource container image to use in the deployment")
@@ -56,8 +66,11 @@ func init() {
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapapi.AddToScheme(scheme))
 
+	parameterCodec = runtime.NewParameterCodec(scheme)
+
 	kubeconfig := os.Getenv("KUBECONFIG")
-	config, err := getKubeconfig(kubeconfig)
+	var err error
+	config, err = getKubeconfig(kubeconfig)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to set kubeconfig: %v", err))
 	}
@@ -65,6 +78,11 @@ func init() {
 	crClient, err = crclient.New(config, crclient.Options{Scheme: scheme})
 	if err != nil {
 		panic(fmt.Sprintf("Failed to set client: %v", err))
+	}
+
+	clientset, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	deserializer = serializer.NewCodecFactory(scheme).UniversalDeserializer()
