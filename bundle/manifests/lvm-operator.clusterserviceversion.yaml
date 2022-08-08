@@ -256,7 +256,7 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: controller-manager
+        serviceAccountName: lvm-controller-manager
       deployments:
       - label:
           app.kubernetes.io/name: lvm-operator
@@ -276,6 +276,18 @@ spec:
                 exporter: lvm-operator
             spec:
               containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources: {}
               - args:
                 - --health-probe-bind-address=:8081
                 - --metrics-bind-address=127.0.0.1:8080
@@ -326,18 +338,6 @@ spec:
                     memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
-              - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources: {}
               - command:
                 - /metricsexporter
                 image: quay.io/ocs-dev/lvm-operator:latest
@@ -351,7 +351,7 @@ spec:
                     memory: 30Mi
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: controller-manager
+              serviceAccountName: lvm-controller-manager
               terminationGracePeriodSeconds: 10
       permissions:
       - rules:
@@ -386,7 +386,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: controller-manager
+        serviceAccountName: lvm-controller-manager
     strategy: deployment
   installModes:
   - supported: true
