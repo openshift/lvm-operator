@@ -1,0 +1,16 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  volumeMode: %s
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: %s
+  dataSource:
+    name: %s
+    kind: PersistentVolumeClaim

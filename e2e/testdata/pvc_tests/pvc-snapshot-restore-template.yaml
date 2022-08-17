@@ -1,0 +1,17 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: %s
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: %s 
+  dataSource:
+    name: %s
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io

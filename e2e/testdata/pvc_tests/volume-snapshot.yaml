@@ -1,0 +1,10 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: lvfilepvc-snapshot
+  namespace: lvm-endtoendtest
+spec:
+  volumeSnapshotClassName: odf-lvm-vg1
+  source:
+    persistentVolumeClaimName: lvmfilepvc
+
