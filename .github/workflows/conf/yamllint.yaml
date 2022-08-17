@@ -6,6 +6,7 @@ yaml-files:
   - '.yamllint'
 ignore: |
   vendor
+  e2e/testdata/pvc_tests
 rules:
   braces: enable
   brackets: enable

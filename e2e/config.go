@@ -10,6 +10,7 @@ import (
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	lvmv1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -24,6 +25,8 @@ const (
 	installNamespace = "openshift-storage"
 	// storageClass is the name of the lvm storage class.
 	storageClass = "odf-lvm-vg1"
+	// snapshotClass is the name of the lvm snapshot class.
+	snapshotClass = "odf-lvm-vg1"
 )
 
 var (
@@ -37,6 +40,7 @@ var (
 	lvmOperatorUninstall bool
 	scheme               = runtime.NewScheme()
 	crClient             crclient.Client
+	deserializer         runtime.Decoder
 )
 
 func init() {
@@ -62,6 +66,8 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to set client: %v", err))
 	}
+
+	deserializer = serializer.NewCodecFactory(scheme).UniversalDeserializer()
 }
 
 func getKubeconfig(kubeconfig string) (*rest.Config, error) {
