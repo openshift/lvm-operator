@@ -92,12 +92,24 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	r.Log = log.Log.WithName(ControllerName).WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
 	r.Log.Info("reconciling")
 
+	// Checks that only a single LVMCluster instance exists
+	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
+	if err := r.Client.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
+		r.Log.Error(err, "failed to list LVMCluster instances")
+		return ctrl.Result{}, err
+	}
+	if size := len(lvmClusterList.Items); size > 1 {
+		err := fmt.Errorf("there should be a single LVMCluster, %d items found", size)
+		r.Log.Error(err, "multiple LVMCluster instances found")
+		return ctrl.Result{}, err
+	}
+
 	// get lvmcluster
 	lvmCluster := &lvmv1alpha1.LVMCluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, lvmCluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Info("lvmCluster instance not found")
+			r.Log.Info("LVMCluster instance not found")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
