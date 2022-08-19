@@ -16,7 +16,7 @@ import (
 
 const (
 	timeout                   = time.Minute * 15
-	interval                  = time.Second * 30
+	interval                  = time.Second * 10
 	lvmVolumeGroupName        = "vg1"
 	storageClassName          = "odf-lvm-vg1"
 	volumeSnapshotClassName   = "odf-lvm-vg1"
