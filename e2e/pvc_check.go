@@ -79,7 +79,10 @@ func pvcTest() {
 				By("Verifying that the Snapshot is ready")
 				Eventually(func() bool {
 					err := crClient.Get(ctx, types.NamespacedName{Name: snapshot.Name, Namespace: snapshot.Namespace}, snapshot)
-					return err == nil && *snapshot.Status.ReadyToUse
+					if err == nil && snapshot.Status != nil && snapshot.Status.ReadyToUse != nil {
+						return *snapshot.Status.ReadyToUse
+					}
+					return false
 				}, timeout, interval).Should(BeTrue())
 
 				By("Creating a clone of the filesystem pvc")
@@ -182,7 +185,10 @@ func pvcTest() {
 				By("Verifying that the Snapshot is ready")
 				Eventually(func() bool {
 					err := crClient.Get(ctx, types.NamespacedName{Name: snapshot.Name, Namespace: snapshot.Namespace}, snapshot)
-					return err == nil && *snapshot.Status.ReadyToUse
+					if err == nil && snapshot.Status != nil && snapshot.Status.ReadyToUse != nil {
+						return *snapshot.Status.ReadyToUse
+					}
+					return false
 				}, timeout, interval).Should(BeTrue())
 
 				By("Creating a clone of the block-pvc")
