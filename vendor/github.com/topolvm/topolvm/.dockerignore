@@ -1,0 +1,11 @@
+.git
+bin
+build
+charts
+config
+deploy
+docs
+e2e
+example
+include
+testbin

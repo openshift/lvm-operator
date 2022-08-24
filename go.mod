@@ -12,7 +12,6 @@ require (
 	github.com/openshift/api v0.0.0-20211028023115-7224b732cc14
 	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 	github.com/operator-framework/api v0.14.0
-	github.com/operator-framework/operator-lifecycle-manager v0.20.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/stretchr/testify v1.7.0
 	github.com/topolvm/topolvm v0.11.1
@@ -57,6 +56,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/huandu/xstrings v1.3.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
