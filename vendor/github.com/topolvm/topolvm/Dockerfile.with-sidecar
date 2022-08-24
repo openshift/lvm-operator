@@ -1,0 +1,20 @@
+ARG IMAGE_PREFIX
+
+# Build Container
+FROM golang:1.17-buster AS build-env
+
+COPY . /workdir
+WORKDIR /workdir
+
+RUN make csi-sidecars
+
+# TopoLVM container
+FROM ${IMAGE_PREFIX}topolvm:devel
+
+COPY --from=build-env /workdir/build/csi-provisioner /csi-provisioner
+COPY --from=build-env /workdir/build/csi-node-driver-registrar /csi-node-driver-registrar
+COPY --from=build-env /workdir/build/csi-resizer /csi-resizer
+COPY --from=build-env /workdir/build/csi-snapshotter /csi-snapshotter
+COPY --from=build-env /workdir/build/livenessprobe /livenessprobe
+
+ENTRYPOINT ["/hypertopolvm"]
