@@ -26,4 +26,5 @@ var _ = AfterSuite(func() {
 var _ = Describe("LVMO e2e tests", func() {
 	Context("LVMCluster reconciliation", validateResources)
 	Context("PVC tests", pvcTest)
+	Context("Ephemeral volume tests", ephemeralTest)
 })
