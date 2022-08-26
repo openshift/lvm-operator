@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -251,7 +252,11 @@ func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPo
 			if lv.Name == config.Name {
 				if strings.Contains(lv.LvAttr, "t") {
 					r.Log.Info("lvm thinpool already exists", "VGName", vgName, "ThinPool", config.Name)
-					return nil
+					err = r.extendThinPool(vgName, lv.LvSize, config)
+					if err != nil {
+						r.Log.Error(err, "failed to extend the lvm thinpool", "VGName", vgName, "ThinPool", config.Name)
+					}
+					return err
 				}
 
 				return fmt.Errorf("failed to create thin pool %q. Logical volume with same name already exists", config.Name)
@@ -265,6 +270,45 @@ func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPo
 	if err != nil {
 		return fmt.Errorf("failed to create thin pool %q in the volume group %q. %v", config.Name, vgName, err)
 	}
+
+	return nil
+}
+
+func (r *VGReconciler) extendThinPool(vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
+
+	vg, err := GetVolumeGroup(r.executor, vgName)
+	if err != nil {
+		if err != ErrVolumeGroupNotFound {
+			return fmt.Errorf("failed to get volume group. %q, %v", vgName, err)
+		}
+		return nil
+	}
+
+	thinPoolSize, err := strconv.ParseFloat(lvSize[:len(lvSize)-1], 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse lvSize. %v", err)
+	}
+
+	vgSize, err := strconv.ParseFloat(vg.VgSize[:len(vg.VgSize)-1], 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse vgSize. %v", err)
+	}
+
+	// return if thinPoolSize does not require expansion
+	if config.SizePercent <= int((thinPoolSize/vgSize)*100) {
+		return nil
+	}
+
+	r.Log.Info("extending lvm thinpool ", "VGName", vgName, "ThinPool", config.Name)
+
+	args := []string{"-l", fmt.Sprintf("%d%%Vg", config.SizePercent), fmt.Sprintf("%s/%s", vgName, config.Name)}
+
+	_, err = r.executor.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to extend thin pool %q in the volume group %q. %v", config.Name, vgName, err)
+	}
+
+	r.Log.Info("successfully extended the thin pool in the volume group ", "thinpool", config.Name, "vgName", vgName)
 
 	return nil
 }

@@ -38,6 +38,7 @@ const (
 	vgRemoveCmd = "/usr/sbin/vgremove"
 	pvRemoveCmd = "/usr/sbin/pvremove"
 	lvCreateCmd = "/usr/sbin/lvcreate"
+	lvExtendCmd = "/usr/sbin/lvextend"
 	lvRemoveCmd = "/usr/sbin/lvremove"
 	lvChangeCmd = "/usr/sbin/lvchange"
 )
@@ -46,7 +47,8 @@ const (
 type vgsOutput struct {
 	Report []struct {
 		Vg []struct {
-			Name string `json:"vg_name"`
+			Name   string `json:"vg_name"`
+			VgSize string `json:"vg_size"`
 		} `json:"vg"`
 	} `json:"report"`
 }
@@ -69,6 +71,7 @@ type lvsOutput struct {
 			VgName   string `json:"vg_name"`
 			PoolName string `json:"pool_lv"`
 			LvAttr   string `json:"lv_attr"`
+			LvSize   string `json:"lv_size"`
 		} `json:"lv"`
 	} `json:"report"`
 }
@@ -77,6 +80,9 @@ type lvsOutput struct {
 type VolumeGroup struct {
 	// Name is the name of the volume group
 	Name string `json:"vg_name"`
+
+	// VgSize is the size of the volume group
+	VgSize string `json:"vg_size"`
 
 	// PVs is the list of physical volumes associated with the volume group
 	PVs []string `json:"pvs"`
@@ -148,7 +154,7 @@ func GetVolumeGroup(exec internal.Executor, name string) (*VolumeGroup, error) {
 
 	// TODO: Check if `vgs <vg_name> --reportformat json` can be used to filter out the exact volume group name.
 	args := []string{
-		"vgs", "--reportformat", "json",
+		"vgs", "--units", "g", "--reportformat", "json",
 	}
 	if err := execute(exec, res, args...); err != nil {
 		return nil, fmt.Errorf("failed to list volume groups. %v", err)
@@ -160,6 +166,7 @@ func GetVolumeGroup(exec internal.Executor, name string) (*VolumeGroup, error) {
 		for _, vg := range report.Vg {
 			if vg.Name == name {
 				volumeGroup.Name = vg.Name
+				volumeGroup.VgSize = vg.VgSize
 				vgFound = true
 				break
 			}
@@ -249,7 +256,7 @@ func ListLogicalVolumes(exec internal.Executor, vgName string) ([]string, error)
 func GetLVSOutput(exec internal.Executor, vgName string) (*lvsOutput, error) {
 	res := new(lvsOutput)
 	args := []string{
-		"lvs", "-S", fmt.Sprintf("vgname=%s", vgName), "--reportformat", "json",
+		"lvs", "-S", fmt.Sprintf("vgname=%s", vgName), "--units", "g", "--reportformat", "json",
 	}
 	if err := execute(exec, res, args...); err != nil {
 		return nil, err
