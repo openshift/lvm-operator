@@ -6,7 +6,7 @@ on:
   schedule:
     - cron: "0 23 * * 1"
 env:
-  GO_VERSION: "1.17"
+  GO_VERSION: "1.18"
   IMG: "quay.io/ocs-dev/lvm-operator:weekly"
 
 jobs:
