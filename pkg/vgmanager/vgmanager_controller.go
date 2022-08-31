@@ -728,3 +728,42 @@ func (r *VGReconciler) getAllLvmVolumeGroups(ctx context.Context) (map[string]*l
 
 	return lvmVolumeGroupsMap, nil
 }
+
+// filterAvailableDevices returns:
+// validDevices: the list of blockdevices considered available
+// delayedDevices: the list of blockdevices considered available, but first observed less than 'minDeviceAge' time ago
+// error
+func (r *VGReconciler) filterAvailableDevices(blockDevices []internal.BlockDevice) ([]internal.BlockDevice, []internal.BlockDevice, error) {
+	var availableDevices, delayedDevices []internal.BlockDevice
+	// using a label so `continue DeviceLoop` can be used to skip devices
+DeviceLoop:
+	for _, blockDevice := range blockDevices {
+
+		// store device in deviceAgeMap
+		r.deviceAgeMap.storeDeviceAge(blockDevice.KName)
+
+		devLogger := r.Log.WithValues("Device.Name", blockDevice.Name)
+		for name, filter := range FilterMap {
+			var valid bool
+			var err error
+			filterLogger := devLogger.WithValues("filter.Name", name)
+			valid, err = filter(blockDevice, r.executor)
+			if err != nil {
+				filterLogger.Error(err, "filter error")
+				valid = false
+				continue DeviceLoop
+			} else if !valid {
+				filterLogger.Info("does not match filter")
+				continue DeviceLoop
+			}
+		}
+		// check if the device is older than deviceMinAge
+		isOldEnough := r.deviceAgeMap.isOlderThan(blockDevice.KName)
+		if isOldEnough {
+			availableDevices = append(availableDevices, blockDevice)
+		} else {
+			delayedDevices = append(delayedDevices, blockDevice)
+		}
+	}
+	return availableDevices, delayedDevices, nil
+}
