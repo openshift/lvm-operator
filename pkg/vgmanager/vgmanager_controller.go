@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -116,14 +118,6 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 		return ctrl.Result{}, err
 	}
 
-	//Get the block devices that can be used for this volumegroup
-	matchingDevices, delayedDevices, err := r.getMatchingDevicesForVG(volumeGroup)
-	if err != nil {
-		// Failed to get devices for this vg. Reconcile again.
-		r.Log.Error(err, "failed to get block devices for volumegroup", "VGName", volumeGroup.Name)
-		return reconcileAgain, err
-	}
-
 	// Read the lvmd config file
 	lvmdConfig, err := loadLVMDConfig()
 	if err != nil {
@@ -148,18 +142,23 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 	}
 
 	status := &lvmv1alpha1.VGStatus{
-		Name:   req.Name,
-		Status: lvmv1alpha1.VGStatusReady,
-		Reason: "",
+		Name: req.Name,
 	}
 	_, found := deviceClassMap[volumeGroup.Name]
-	if found {
-		volGrpHostInfo, err := GetVolumeGroup(r.executor, volumeGroup.Name)
-		if err != nil {
-			r.Log.Error(err, "failed to get volume group from the host", "VGName", volumeGroup.Name)
-		} else {
-			status.Devices = volGrpHostInfo.PVs
+
+	//Get the block devices that can be used for this volumegroup
+	matchingDevices, delayedDevices, err := r.getMatchingDevicesForVG(volumeGroup)
+	if err != nil {
+		r.Log.Error(err, "failed to get block devices for volumegroup", "name", volumeGroup.Name)
+
+		status.Reason = err.Error()
+		if statuserr := r.updateStatus(ctx, status); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+			return reconcileAgain, nil
 		}
+
+		// Failed to get devices for this vg. Reconcile again.
+		return reconcileAgain, err
 	}
 
 	if len(matchingDevices) == 0 {
@@ -170,7 +169,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 
 		if found {
 			// Update the status again just to be safe.
-			if statuserr := r.updateStatus(ctx); statuserr != nil {
+			if statuserr := r.updateStatus(ctx, nil); statuserr != nil {
 				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
 				return reconcileAgain, nil
 			}
@@ -181,9 +180,11 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 	// create/extend VG and update lvmd config
 	err = r.addDevicesToVG(volumeGroup.Name, matchingDevices)
 	if err != nil {
+		status.Reason = err.Error()
+
 		r.Log.Error(err, "failed to create/extend volume group", "VGName", volumeGroup.Name)
 
-		if statuserr := r.updateStatus(ctx); statuserr != nil {
+		if statuserr := r.updateStatus(ctx, status); statuserr != nil {
 			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 		}
 		return reconcileAgain, err
@@ -224,7 +225,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 	}
 
 	if err == nil {
-		if statuserr := r.updateStatus(ctx); statuserr != nil {
+		if statuserr := r.updateStatus(ctx, nil); statuserr != nil {
 			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 			return reconcileAgain, nil
 		}
@@ -251,7 +252,11 @@ func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPo
 			if lv.Name == config.Name {
 				if strings.Contains(lv.LvAttr, "t") {
 					r.Log.Info("lvm thinpool already exists", "VGName", vgName, "ThinPool", config.Name)
-					return nil
+					err = r.extendThinPool(vgName, lv.LvSize, config)
+					if err != nil {
+						r.Log.Error(err, "failed to extend the lvm thinpool", "VGName", vgName, "ThinPool", config.Name)
+					}
+					return err
 				}
 
 				return fmt.Errorf("failed to create thin pool %q. Logical volume with same name already exists", config.Name)
@@ -265,6 +270,45 @@ func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPo
 	if err != nil {
 		return fmt.Errorf("failed to create thin pool %q in the volume group %q. %v", config.Name, vgName, err)
 	}
+
+	return nil
+}
+
+func (r *VGReconciler) extendThinPool(vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
+
+	vg, err := GetVolumeGroup(r.executor, vgName)
+	if err != nil {
+		if err != ErrVolumeGroupNotFound {
+			return fmt.Errorf("failed to get volume group. %q, %v", vgName, err)
+		}
+		return nil
+	}
+
+	thinPoolSize, err := strconv.ParseFloat(lvSize[:len(lvSize)-1], 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse lvSize. %v", err)
+	}
+
+	vgSize, err := strconv.ParseFloat(vg.VgSize[:len(vg.VgSize)-1], 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse vgSize. %v", err)
+	}
+
+	// return if thinPoolSize does not require expansion
+	if config.SizePercent <= int((thinPoolSize/vgSize)*100) {
+		return nil
+	}
+
+	r.Log.Info("extending lvm thinpool ", "VGName", vgName, "ThinPool", config.Name)
+
+	args := []string{"-l", fmt.Sprintf("%d%%Vg", config.SizePercent), fmt.Sprintf("%s/%s", vgName, config.Name)}
+
+	_, err = r.executor.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to extend thin pool %q in the volume group %q. %v", config.Name, vgName, err)
+	}
+
+	r.Log.Info("successfully extended the thin pool in the volume group ", "thinpool", config.Name, "vgName", vgName)
 
 	return nil
 }
@@ -346,7 +390,7 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		}
 	}
 
-	if statuserr := r.updateStatus(ctx); statuserr != nil {
+	if statuserr := r.updateStatus(ctx, nil); statuserr != nil {
 		r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 		return statuserr
 	}
@@ -373,7 +417,11 @@ func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDev
 
 	args := []string{vgName}
 	for _, device := range devices {
-		args = append(args, fmt.Sprintf("/dev/%s", device.KName))
+		if device.DiskByPath != "" {
+			args = append(args, device.DiskByPath)
+		} else {
+			args = append(args, device.KName)
+		}
 	}
 
 	var cmd string
@@ -393,11 +441,83 @@ func (r *VGReconciler) addDevicesToVG(vgName string, devices []internal.BlockDev
 	return nil
 }
 
-// filterMatchingDevices returns unmatched and matched blockdevices
-// TODO: Implement this
-func filterMatchingDevices(blockDevices []internal.BlockDevice, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, []internal.BlockDevice, error) {
-	// currently just match all devices
-	return []internal.BlockDevice{}, blockDevices, nil
+// filterMatchingDevices returns matched blockdevices
+func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
+
+	var filteredBlockDevices []internal.BlockDevice
+
+	if volumeGroup.Spec.DeviceSelector != nil && len(volumeGroup.Spec.DeviceSelector.Paths) > 0 {
+		vgs, err := ListVolumeGroups(r.executor)
+		if err != nil {
+			return []internal.BlockDevice{}, fmt.Errorf("failed to list volume groups. %v", err)
+		}
+
+		for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+			diskName, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				err = fmt.Errorf("unable to find symlink for disk path %s: %v", path, err)
+				return []internal.BlockDevice{}, err
+			}
+
+			isAlreadyExist := isDeviceAlreadyPartOfVG(vgs, diskName, volumeGroup)
+			if isAlreadyExist {
+				continue
+			}
+
+			blockDevice, ok := hasExactDisk(blockDevices, diskName)
+
+			if filepath.Dir(path) == internal.DiskByPathPrefix {
+				// handle disk by path here such as /dev/disk/by-path/pci-0000:87:00.0-nvme-1
+				if ok {
+					blockDevice.DiskByPath = path
+					filteredBlockDevices = append(filteredBlockDevices, blockDevice)
+				} else {
+					err = fmt.Errorf("can not find device path %s, device name %s in the available block devices", path, diskName)
+					return []internal.BlockDevice{}, err
+				}
+			} else if filepath.Dir(path) == internal.DiskByNamePrefix {
+				// handle disk by names here such as /dev/nvme0n1
+				if ok {
+					filteredBlockDevices = append(filteredBlockDevices, blockDevice)
+				} else {
+					err := fmt.Errorf("can not find device name %s in the available block devices", path)
+					return []internal.BlockDevice{}, err
+				}
+			} else {
+				err = fmt.Errorf("unsupported disk path format %s. only '/dev/disk/by-path' and '/dev/' links are currently supported", path)
+				return []internal.BlockDevice{}, err
+			}
+		}
+
+		return filteredBlockDevices, nil
+	}
+
+	// return all available block devices if none is specified in the CR
+	return blockDevices, nil
+}
+
+func hasExactDisk(blockDevices []internal.BlockDevice, deviceName string) (internal.BlockDevice, bool) {
+	for _, blockDevice := range blockDevices {
+		if blockDevice.KName == deviceName {
+			return blockDevice, true
+		}
+	}
+	return internal.BlockDevice{}, false
+}
+
+func isDeviceAlreadyPartOfVG(vgs []VolumeGroup, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
+
+	for _, vg := range vgs {
+		if vg.Name == volumeGroup.Name {
+			for _, pv := range vg.PVs {
+				if pv == diskName {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func NodeSelectorMatchesNodeLabels(node *corev1.Node, nodeSelector *corev1.NodeSelector) (bool, error) {
@@ -469,7 +589,7 @@ func (r *VGReconciler) getMatchingDevicesForVG(volumeGroup *lvmv1alpha1.LVMVolum
 	}
 
 	var matchingDevices []internal.BlockDevice
-	_, matchingDevices, err = filterMatchingDevices(remainingValidDevices, volumeGroup)
+	matchingDevices, err = r.filterMatchingDevices(remainingValidDevices, volumeGroup)
 	if err != nil {
 		r.Log.Error(err, "could not filter matching devices", "VGName", volumeGroup.Name)
 		return nil, nil, err
@@ -478,7 +598,8 @@ func (r *VGReconciler) getMatchingDevicesForVG(volumeGroup *lvmv1alpha1.LVMVolum
 	return matchingDevices, delayedDevices, nil
 }
 
-func (r *VGReconciler) generateVolumeGroupNodeStatus() (*lvmv1alpha1.LVMVolumeGroupNodeStatus, error) {
+func (r *VGReconciler) generateVolumeGroupNodeStatus(deviceNameAndPaths map[string]string,
+	lvmVolumeGroups map[string]*lvmv1alpha1.LVMVolumeGroup, vgStatus *lvmv1alpha1.VGStatus) (*lvmv1alpha1.LVMVolumeGroupNodeStatus, error) {
 
 	vgs, err := ListVolumeGroups(r.executor)
 	if err != nil {
@@ -488,13 +609,51 @@ func (r *VGReconciler) generateVolumeGroupNodeStatus() (*lvmv1alpha1.LVMVolumeGr
 	//lvmvgstatus := vgNodeStatus.Spec.LVMVGStatus
 	var statusarr []lvmv1alpha1.VGStatus
 
+	var vgExists bool
+
 	for _, vg := range vgs {
+		// Add pvs as per volumeGroup CR if path is given add path else add name
+		diskPattern := internal.DiskByNamePrefix
+
+		lvmVolumeGroup, ok := lvmVolumeGroups[vg.Name]
+		if !ok {
+			continue
+		}
+
+		deviceSelector := lvmVolumeGroup.Spec.DeviceSelector
+		if deviceSelector != nil && len(deviceSelector.Paths) > 0 {
+			if filepath.Dir(deviceSelector.Paths[0]) == internal.DiskByPathPrefix {
+				diskPattern = internal.DiskByPathPrefix
+			}
+		}
+
+		devices := []string{}
+		if diskPattern == internal.DiskByPathPrefix {
+			for _, pv := range vg.PVs {
+				devices = append(devices, deviceNameAndPaths[pv])
+			}
+		} else {
+			devices = vg.PVs
+		}
+
 		newStatus := &lvmv1alpha1.VGStatus{
 			Name:    vg.Name,
-			Reason:  "test",
-			Devices: vg.PVs,
+			Devices: devices,
+			Status:  lvmv1alpha1.VGStatusReady,
 		}
+
+		if vgStatus != nil && vgStatus.Name == vg.Name {
+			vgExists = true
+			newStatus.Status = lvmv1alpha1.VGStatusDegraded
+			newStatus.Reason = vgStatus.Reason
+		}
+
 		statusarr = append(statusarr, *newStatus)
+	}
+
+	if vgStatus != nil && !vgExists {
+		vgStatus.Status = lvmv1alpha1.VGStatusFailed
+		statusarr = append(statusarr, *vgStatus)
 	}
 
 	vgNodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
@@ -510,9 +669,19 @@ func (r *VGReconciler) generateVolumeGroupNodeStatus() (*lvmv1alpha1.LVMVolumeGr
 	return vgNodeStatus, nil
 }
 
-func (r *VGReconciler) updateStatus(ctx context.Context) error {
+func (r *VGReconciler) updateStatus(ctx context.Context, vgStatus *lvmv1alpha1.VGStatus) error {
 
-	vgNodeStatus, err := r.generateVolumeGroupNodeStatus()
+	deviceNameAndPaths, err := internal.ListDiskByPath(r.executor)
+	if err != nil {
+		return err
+	}
+
+	lvmVolumeGroups, err := r.getAllLvmVolumeGroups(ctx)
+	if err != nil {
+		return err
+	}
+
+	vgNodeStatus, err := r.generateVolumeGroupNodeStatus(deviceNameAndPaths, lvmVolumeGroups, vgStatus)
 
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
 		ObjectMeta: metav1.ObjectMeta{
@@ -540,4 +709,22 @@ func (r *VGReconciler) updateStatus(ctx context.Context) error {
 		r.Log.Info("lvmvolumegroupnodestatus unchanged")
 	}
 	return err
+}
+
+func (r *VGReconciler) getAllLvmVolumeGroups(ctx context.Context) (map[string]*lvmv1alpha1.LVMVolumeGroup, error) {
+
+	lvmVolumeGroupsMap := make(map[string]*lvmv1alpha1.LVMVolumeGroup)
+
+	lvmVolumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
+	err := r.Client.List(ctx, lvmVolumeGroups, &client.ListOptions{Namespace: r.Namespace})
+	if err != nil {
+		r.Log.Error(err, "failed to list LVMVolumeGroups")
+		return nil, err
+	}
+
+	for i := range lvmVolumeGroups.Items {
+		lvmVolumeGroupsMap[lvmVolumeGroups.Items[i].Name] = &lvmVolumeGroups.Items[i]
+	}
+
+	return lvmVolumeGroupsMap, nil
 }

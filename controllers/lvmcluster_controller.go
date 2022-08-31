@@ -115,6 +115,13 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
+
+	err = r.verifyLvmClusterSpec(ctx, lvmCluster)
+	if err != nil {
+		r.Log.Error(err, "failed to verify LVMCluster")
+		return ctrl.Result{}, err
+	}
+
 	err = r.checkIfOpenshift(ctx)
 	if err != nil {
 		r.Log.Error(err, "failed to check cluster type")
@@ -220,6 +227,71 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	return ctrl.Result{}, nil
 }
 
+func (r *LVMClusterReconciler) verifyLvmClusterSpec(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+
+	err := r.verifyLvmClusterDeviceClasses(ctx, instance)
+	if err != nil {
+		// Apply status changes
+		updateErr := r.Client.Status().Update(ctx, instance)
+		if updateErr != nil {
+			r.Log.Error(updateErr, "failed to update LVMCluster status")
+			return updateErr
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (r *LVMClusterReconciler) verifyLvmClusterDeviceClasses(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+
+	// make sure no device overlap with another VGs
+	// use map to find the duplicate entries for paths
+	/*
+		{
+		  "nodeSelector1": {
+		        "/dev/sda": "vg1",
+		        "/dev/sdb": "vg1"
+		    },
+		    "nodeSelector2": {
+		        "/dev/sda": "vg1",
+		        "/dev/sdb": "vg1"
+		    }
+		}
+	*/
+	devices := make(map[string]map[string]string)
+
+	for _, deviceClass := range instance.Spec.Storage.DeviceClasses {
+		if deviceClass.DeviceSelector != nil {
+			nodeSelector := deviceClass.NodeSelector.String()
+			for _, path := range deviceClass.DeviceSelector.Paths {
+				if val, ok := devices[nodeSelector][path]; ok {
+					var err error
+					if val != deviceClass.Name {
+						err = fmt.Errorf("Error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
+					} else {
+						err = fmt.Errorf("Error: device path %s is specified at multiple places in deviceClass %s", path, val)
+					}
+					r.Log.Error(err, "failed to verify device paths")
+
+					setLVMClusterCRvalidCondition(&instance.Status.Conditions, corev1.ConditionFalse, "CRInvalid", err.Error())
+					return err
+				}
+
+				if devices[nodeSelector] == nil {
+					devices[nodeSelector] = make(map[string]string)
+				}
+
+				devices[nodeSelector][path] = deviceClass.Name
+			}
+		}
+	}
+
+	setLVMClusterCRvalidCondition(&instance.Status.Conditions, corev1.ConditionTrue, "CRValid", "LVMCluster CR is validated successfully")
+
+	return nil
+}
+
 func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 
 	vgNodeMap := make(map[string][]lvmv1alpha1.NodeStatus)
@@ -238,6 +310,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 				vgNodeMap[item.Name] = []lvmv1alpha1.NodeStatus{
 					{
 						Node:    nodeItem.Name,
+						Reason:  item.Reason,
 						Status:  item.Status,
 						Devices: item.Devices,
 					},

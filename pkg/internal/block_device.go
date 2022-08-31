@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 )
 
@@ -39,6 +40,9 @@ const (
 
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
+
+	DiskByNamePrefix = "/dev"
+	DiskByPathPrefix = "/dev/disk/by-path"
 )
 
 // BlockDevice is the a block device as output by lsblk.
@@ -55,9 +59,12 @@ type BlockDevice struct {
 	Children   []BlockDevice `json:"children,omitempty"`
 	Rotational string        `json:"rota"`
 	ReadOnly   string        `json:"ro,omitempty"`
-	PathByID   string        `json:"pathByID,omitempty"`
 	Serial     string        `json:"serial,omitempty"`
 	PartLabel  string        `json:"partLabel,omitempty"`
+
+	// DiskByPath is not part of lsblk output
+	// fetch and set it only if specified in the CR
+	DiskByPath string
 }
 
 // ListBlockDevices using the lsblk command
@@ -65,7 +72,7 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
-	args := []string{"--json", "-o", columns}
+	args := []string{"--json", "--paths", "-o", columns}
 
 	output, err := exec.ExecuteCommandWithOutput("lsblk", args...)
 	if err != nil {
@@ -80,6 +87,28 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	return blockDeviceMap["blockdevices"], nil
 }
 
+func ListDiskByPath(exec Executor) (map[string]string, error) {
+
+	devices := make(map[string]string)
+
+	diskByPathDir := filepath.Join(DiskByPathPrefix, "/*")
+
+	paths, err := filepath.Glob(diskByPathDir)
+	if err != nil {
+		return nil, fmt.Errorf("could not list devices in %q: %w", diskByPathDir, err)
+	}
+
+	for _, path := range paths {
+		diskName, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return nil, fmt.Errorf("could not eval symLink %q:%w", path, err)
+		}
+		devices[diskName] = path
+	}
+
+	return devices, nil
+}
+
 // IsUsableLoopDev returns true if the loop device isn't in use by Kubernetes
 // by matching the back file path against a standard string used to mount devices
 // from host into pods
@@ -92,7 +121,7 @@ func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
 
 	usable := true
 
-	args := []string{fmt.Sprintf("/dev/%s", b.Name), "-O", "BACK-FILE", "--json"}
+	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
 
 	output, err := exec.ExecuteCommandWithOutput(losetupPath, args...)
 	if err != nil {
@@ -139,7 +168,7 @@ func (b BlockDevice) HasBindMounts() (bool, string, error) {
 			mountInfoList := strings.Split(mountInfo, " ")
 			if len(mountInfoList) >= 10 {
 				// device source is 4th field for bind mounts and 10th for regular mounts
-				if mountInfoList[3] == fmt.Sprintf("/%s", b.KName) || mountInfoList[9] == fmt.Sprintf("/dev/%s", b.KName) {
+				if mountInfoList[3] == fmt.Sprintf("/%s", filepath.Base(b.KName)) || mountInfoList[9] == b.KName {
 					return true, mountInfoList[4], nil
 				}
 			}

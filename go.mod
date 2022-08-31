@@ -3,6 +3,7 @@ module github.com/red-hat-storage/lvm-operator
 go 1.17
 
 require (
+	github.com/aws/aws-sdk-go v1.44.10
 	github.com/go-logr/logr v1.2.3
 	github.com/google/go-cmp v0.5.8
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
@@ -11,6 +12,7 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/openshift/api v0.0.0-20211028023115-7224b732cc14
 	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
+	github.com/openshift/custom-resource-status v1.1.2
 	github.com/operator-framework/api v0.14.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/stretchr/testify v1.7.0
@@ -23,8 +25,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.2
 	sigs.k8s.io/yaml v1.3.0
 )
-
-require github.com/aws/aws-sdk-go v1.44.10
 
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect
