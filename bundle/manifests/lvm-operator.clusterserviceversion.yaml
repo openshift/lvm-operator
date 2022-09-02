@@ -54,7 +54,7 @@ metadata:
           }
         }
     operatorframework.io/suggested-namespace: openshift-storage
-    operators.operatorframework.io/builder: operator-sdk-v1.21.0
+    operators.operatorframework.io/builder: operator-sdk-v1.23.0
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.cybozu.com",
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
