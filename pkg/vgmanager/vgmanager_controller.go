@@ -264,8 +264,12 @@ func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPo
 		}
 	}
 
-	args := []string{"-l", fmt.Sprintf("%d%%FREE", config.SizePercent), "-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, config.Name)}
-
+	zeroFlag := "y"
+	if config.DisableZeroing {
+		zeroFlag = "n"
+	}
+	args := []string{"-l", fmt.Sprintf("%d%%FREE", config.SizePercent), "-c", fmt.Sprintf("%d", config.ChunkSize), "-Z", zeroFlag, "-T", fmt.Sprintf("%s/%s", vgName, config.Name)}
+	r.Log.Info("thin pool creation ", "args", args)
 	_, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create thin pool %q in the volume group %q. %v", config.Name, vgName, err)

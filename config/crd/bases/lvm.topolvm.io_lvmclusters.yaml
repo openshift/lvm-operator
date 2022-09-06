@@ -161,6 +161,16 @@ spec:
                           description: ThinPoolConfig contains configurations for
                             the thin-pool
                           properties:
+                            chunksize:
+                              default: 64
+                              description: ChunkSize is the size of the thin pool
+                                chunks in KiB. The value must be a multiple of 64KiB.
+                                The default value is set to 64KiB
+                              type: integer
+                            disableZeroing:
+                              description: DisableZeroing determines whether the bool
+                                will be created with zeroing enabled.
+                              type: boolean
                             name:
                               description: Name of the thin pool to be created
                               type: string

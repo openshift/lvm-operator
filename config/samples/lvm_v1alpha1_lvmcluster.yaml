@@ -10,3 +10,4 @@ spec:
         name: thin-pool-1
         sizePercent: 90
         overprovisionRatio: 10
+        chunksize: 128

@@ -61,6 +61,16 @@ type ThinPoolConfig struct {
 	// +kubebuilder:validation:Required
 	// +required
 	OverprovisionRatio int `json:"overprovisionRatio"`
+
+	// ChunkSize is the size of the thin pool chunks in KiB. The value must be a multiple of 64KiB.
+	// The default value is set to 64KiB
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=64
+	ChunkSize uint `json:"chunksize,omitempty"`
+
+	// DisableZeroing determines whether the bool will be created with zeroing enabled.
+	// +kubebuilder:validation:Optional
+	DisableZeroing bool `json:"disableZeroing,omitempty"`
 }
 
 type DeviceClass struct {
