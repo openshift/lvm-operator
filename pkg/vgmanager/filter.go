@@ -76,6 +76,8 @@ var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, 
 			return dev.IsUsableLoopDev(executor)
 		case internal.DeviceTypeROM:
 			return false, nil
+		case internal.DeviceTypeLVM:
+			return false, nil
 		default:
 			return true, nil
 		}
