@@ -38,6 +38,9 @@ const (
 	// DeviceTypeROM is the device type for ROM devices in lsblk output
 	DeviceTypeROM = "rom"
 
+	// DeviceTypeLVM is the device type for lvm devices in lsblk output
+	DeviceTypeLVM = "lvm"
+
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
 
