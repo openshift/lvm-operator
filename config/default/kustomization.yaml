@@ -24,6 +24,8 @@ namespace: lvm-operator-system
 patchesStrategicMerge:
 - manager_auth_proxy_patch.yaml
 - manager_custom_env.yaml
+- manager_webhook_patch.yaml
+- webhookcainjection_patch.yaml
 
 # Mount the controller config file for loading manager configurations
 # through a ComponentConfig type
@@ -46,6 +48,7 @@ resources:
 - ../rbac
 - ../manager
 - ../prometheus
+- ../webhook
 images:
 - name: rbac-proxy
   newName: gcr.io/kubebuilder/kube-rbac-proxy

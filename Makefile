@@ -183,6 +183,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
+	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
@@ -232,6 +233,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
+	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
