@@ -47,7 +47,7 @@ import (
 
 const (
 	ControllerName   = "vg-manager"
-	DefaultChunkSize = "512"
+	DefaultChunkSize = "128"
 )
 
 // SetupWithManager sets up the controller with the Manager.
