@@ -34,6 +34,7 @@ import (
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
+
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	"github.com/red-hat-storage/lvm-operator/controllers"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
@@ -100,6 +101,10 @@ func main() {
 		Namespace:      operatorNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
+		os.Exit(1)
+	}
+	if err = (&lvmv1alpha1.LVMCluster{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "LVMCluster")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
