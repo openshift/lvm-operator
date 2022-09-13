@@ -62,9 +62,8 @@ type BlockDevice struct {
 	Serial     string        `json:"serial,omitempty"`
 	PartLabel  string        `json:"partLabel,omitempty"`
 
-	// DiskByPath is not part of lsblk output
-	// fetch and set it only if specified in the CR
-	DiskByPath string
+	// DevicePath is the path given by user
+	DevicePath string
 }
 
 // ListBlockDevices using the lsblk command
