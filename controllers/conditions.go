@@ -15,21 +15,3 @@ limitations under the License.
 */
 
 package controllers
-
-import (
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
-	corev1 "k8s.io/api/core/v1"
-
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
-)
-
-func setLVMClusterCRvalidCondition(conditions *[]conditionsv1.Condition,
-	status corev1.ConditionStatus, reason string, message string) {
-
-	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
-		Type:    lvmv1alpha1.ConditionLVMClusterValid,
-		Status:  status,
-		Reason:  reason,
-		Message: message,
-	})
-}
