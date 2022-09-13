@@ -25,11 +25,6 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-const (
-	// ConditionLVMClusterValid communicates if LVMCluster CR is invalid
-	ConditionLVMClusterValid conditionsv1.ConditionType = "LVMClusterValid"
-)
-
 // LVMClusterSpec defines the desired state of LVMCluster
 type LVMClusterSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
