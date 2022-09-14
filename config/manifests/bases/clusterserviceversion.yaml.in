@@ -33,6 +33,10 @@ metadata:
     repository: https://github.com/red-hat-storage/lvm-operator
     operatorframework.io/suggested-namespace: openshift-storage
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.cybozu.com", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+  labels:
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.ppc64le: supported
+    operatorframework.io/arch.s390x: supported
   name: @BUNDLE_PACKAGE@.v0.0.0
   namespace: placeholder
 spec:
