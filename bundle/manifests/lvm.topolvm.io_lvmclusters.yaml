@@ -295,6 +295,9 @@ spec:
               ready:
                 description: Ready describes if the LVMCluster is ready.
                 type: boolean
+              state:
+                description: State describes the LVMCluster state.
+                type: string
             type: object
         type: object
     served: true
