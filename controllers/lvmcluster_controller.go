@@ -213,8 +213,6 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	   		return ctrl.Result{}, fmt.Errorf("status update failed for %s: %w", strings.Join(failedStatusUpdates, ","), lastError)
 	   	}
 	*/
-	// ToDo: Change the status to something useful
-	instance.Status.Ready = true
 
 	r.Log.Info("successfully reconciled LvmCluster")
 
