@@ -65,6 +65,7 @@ const (
 	testLvmClusterNamespace = "openshift-storage"
 	testDeviceClassName     = "test"
 	testImageName           = "test"
+	testNodeName            = "test-node"
 )
 
 var _ = BeforeSuite(func() {
