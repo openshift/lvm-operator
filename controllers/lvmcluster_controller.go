@@ -232,29 +232,26 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 
 	for _, nodeItem := range vgNodeStatusList.Items {
 		for _, item := range nodeItem.Spec.LVMVGStatus {
-			val, ok := vgNodeMap[item.Name]
-			if !ok {
-				vgNodeMap[item.Name] = []lvmv1alpha1.NodeStatus{
-					{
-						Node:    nodeItem.Name,
-						Reason:  item.Reason,
-						Status:  item.Status,
-						Devices: item.Devices,
-					},
-				}
-			} else {
-				new := lvmv1alpha1.NodeStatus{Node: nodeItem.Name, Status: item.Status, Devices: item.Devices}
-				val = append(val, new)
-				vgNodeMap[item.Name] = val
-			}
+
+			vgNodeMap[item.Name] = append(vgNodeMap[item.Name],
+				lvmv1alpha1.NodeStatus{
+					Node:    nodeItem.Name,
+					Reason:  item.Reason,
+					Status:  item.Status,
+					Devices: item.Devices,
+				},
+			)
 		}
 	}
 
 	allVgStatuses := []lvmv1alpha1.DeviceClassStatus{}
-	for k := range vgNodeMap {
-		//r.Log.Info("vgnode map ", "key", k, "NodeStatus", vgNodeMap[k])
-		new := lvmv1alpha1.DeviceClassStatus{Name: k, NodeStatus: vgNodeMap[k]}
-		allVgStatuses = append(allVgStatuses, new)
+	for key, val := range vgNodeMap {
+		allVgStatuses = append(allVgStatuses,
+			lvmv1alpha1.DeviceClassStatus{
+				Name:       key,
+				NodeStatus: val,
+			},
+		)
 	}
 
 	instance.Status.DeviceClassStatuses = allVgStatuses
