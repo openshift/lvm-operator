@@ -32,6 +32,7 @@ import (
 	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -78,6 +79,7 @@ type LVMClusterReconciler struct {
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;create;update;delete
 //+kubebuilder:rbac:groups=topolvm.cybozu.com,resources=logicalvolumes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -230,8 +232,27 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 		return err
 	}
 
+	expectedVgCount, err := r.getExpectedVgCount(ctx, instance)
+	if err != nil {
+		r.Log.Error(err, "failed to calculate expected VG count")
+		return err
+	}
+
+	var statusVgCount int
+	var isReady, isDegraded, isFailed bool
+
 	for _, nodeItem := range vgNodeStatusList.Items {
 		for _, item := range nodeItem.Spec.LVMVGStatus {
+
+			statusVgCount++
+
+			if item.Status == lvmv1alpha1.VGStatusReady {
+				isReady = true
+			} else if item.Status == lvmv1alpha1.VGStatusDegraded {
+				isDegraded = true
+			} else if item.Status == lvmv1alpha1.VGStatusFailed {
+				isFailed = true
+			}
 
 			vgNodeMap[item.Name] = append(vgNodeMap[item.Name],
 				lvmv1alpha1.NodeStatus{
@@ -242,6 +263,18 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 				},
 			)
 		}
+	}
+
+	instance.Status.State = lvmv1alpha1.LVMStatusProgressing
+	instance.Status.Ready = false
+
+	if isFailed {
+		instance.Status.State = lvmv1alpha1.LVMStatusFailed
+	} else if isDegraded {
+		instance.Status.State = lvmv1alpha1.LVMStatusDegraded
+	} else if isReady && expectedVgCount == statusVgCount {
+		instance.Status.State = lvmv1alpha1.LVMStatusReady
+		instance.Status.Ready = true
 	}
 
 	allVgStatuses := []lvmv1alpha1.DeviceClassStatus{}
@@ -267,6 +300,39 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	r.Log.Info("successfully updated the LvmCluster status")
 
 	return nil
+}
+
+func (r *LVMClusterReconciler) getExpectedVgCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
+
+	var vgCount int
+
+	nodeList := &corev1.NodeList{}
+	err := r.Client.List(ctx, nodeList)
+	if err != nil {
+		r.Log.Error(err, "failed to list Nodes")
+		return 0, err
+	}
+
+	for _, deviceClass := range instance.Spec.Storage.DeviceClasses {
+		if deviceClass.NodeSelector == nil {
+			vgCount += len(nodeList.Items)
+			continue
+		}
+
+		for i := range nodeList.Items {
+			matches, err := corev1helper.MatchNodeSelectorTerms(&nodeList.Items[i], deviceClass.NodeSelector)
+			if err != nil {
+				r.Log.Error(err, "failed to match node selector")
+				return 0, err
+			}
+
+			if matches {
+				vgCount++
+			}
+		}
+	}
+
+	return vgCount, nil
 }
 
 // NOTE: when updating this, please also update doc/design/operator.md
