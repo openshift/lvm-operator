@@ -64,11 +64,13 @@ func pvcTest() {
 				By("Creating a pvc and pod")
 				filePvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmfilepvc", testNamespace, "Filesystem", storageClass)
 				pvc, err = getPVC(filePvcYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, pvc)
 				Expect(err).To(BeNil())
 
 				podVolumeMountYaml := fmt.Sprintf(podVolumeFSYAMLTemplate, "lvmfilepod", testNamespace, "lvmfilepvc")
 				pod, err = getPod(podVolumeMountYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, pod)
 				Expect(err).To(BeNil())
 
@@ -88,6 +90,7 @@ func pvcTest() {
 				By("Creating a Snapshot of the file-pvc")
 				snapshotYaml := fmt.Sprintf(volumeSnapshotYAMLTemplate, "lvmfilepvc-snapshot", testNamespace, snapshotClass, "lvmfilepvc")
 				snapshot, err = getVolumeSnapshot(snapshotYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, snapshot)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
@@ -104,12 +107,14 @@ func pvcTest() {
 				By("Creating a clone of the filesystem pvc")
 				pvcCloneYaml := fmt.Sprintf(pvcCloneYAMLTemplate, "lvmfilepvc-clone", testNamespace, "Filesystem", storageClass, "lvmfilepvc")
 				clonePvc, err = getPVC(pvcCloneYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
 
 				podVolumeMountYaml = fmt.Sprintf(podVolumeFSYAMLTemplate, "clone-lvmfilepod", testNamespace, "lvmfilepvc-clone")
 				clonePod, err = getPod(podVolumeMountYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePod)
 				Expect(err).To(BeNil())
 
@@ -122,12 +127,14 @@ func pvcTest() {
 				By("Restore Snapshot for file-pvc")
 				pvcRestoreYaml := fmt.Sprintf(pvcSnapshotRestoreYAMLTemplate, "lvmfilepvc-restore", testNamespace, "Filesystem", storageClass, "lvmfilepvc-snapshot")
 				restorePvc, err = getPVC(pvcRestoreYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
 
 				podVolumeMountYaml = fmt.Sprintf(podVolumeFSYAMLTemplate, "restore-lvmfilepod", testNamespace, "lvmfilepvc-restore")
 				restorePod, err = getPod(podVolumeMountYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePod)
 				Expect(err).To(BeNil())
 
@@ -170,11 +177,13 @@ func pvcTest() {
 				By("Creating pvc and pod")
 				blockPvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmblockpvc", testNamespace, "Block", storageClass)
 				pvc, err = getPVC(blockPvcYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, pvc)
 				Expect(err).To(BeNil())
 
 				podVolumeBlockYaml := fmt.Sprintf(podVolumeBlockYAMLTemplate, "lvmblockpod", testNamespace, "lvmblockpvc")
 				pod, err = getPod(podVolumeBlockYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, pod)
 				Expect(err).To(BeNil())
 
@@ -194,6 +203,7 @@ func pvcTest() {
 				By("Creating a Snapshot of the block-pvc")
 				snapshotYaml := fmt.Sprintf(volumeSnapshotYAMLTemplate, "lvmblockpvc-snapshot", testNamespace, snapshotClass, "lvmblockpvc")
 				snapshot, err = getVolumeSnapshot(snapshotYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, snapshot)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
@@ -210,12 +220,14 @@ func pvcTest() {
 				By("Creating a clone of the block-pvc")
 				pvcCloneYaml := fmt.Sprintf(pvcCloneYAMLTemplate, "lvmblockpvc-clone", testNamespace, "Block", storageClass, "lvmblockpvc")
 				clonePvc, err = getPVC(pvcCloneYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
 
 				podVolumeBlockYaml = fmt.Sprintf(podVolumeBlockYAMLTemplate, "clone-lvmblockpod", testNamespace, "lvmblockpvc-clone")
 				clonePod, err = getPod(podVolumeBlockYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePod)
 				Expect(err).To(BeNil())
 
@@ -228,12 +240,14 @@ func pvcTest() {
 				By("Restore Snapshot for block-pvc")
 				pvcRestoreYaml := fmt.Sprintf(pvcSnapshotRestoreYAMLTemplate, "lvmblockpvc-restore", testNamespace, "Block", storageClass, "lvmblockpvc-snapshot")
 				restorePvc, err = getPVC(pvcRestoreYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePvc)
 				Expect(err).To(BeNil())
 				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
 
 				podVolumeBlockYaml = fmt.Sprintf(podVolumeBlockYAMLTemplate, "restore-lvmblockpod", testNamespace, "lvmblockpvc-restore")
 				restorePod, err = getPod(podVolumeBlockYaml)
+				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePod)
 				Expect(err).To(BeNil())
 
