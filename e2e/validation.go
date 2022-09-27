@@ -30,10 +30,13 @@ func ValidateLVMvg() error {
 
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: lvmVolumeGroupName, Namespace: InstallNamespace}, &lvmVG)
+		if err != nil {
+			debug("Error getting LVMVolumeGroup %s: %s\n", lvmVolumeGroupName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
-	debug("VG found\n")
+	debug("LvmVolumeGroup found\n")
 	return nil
 }
 
@@ -43,10 +46,13 @@ func ValidateStorageClass() error {
 
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: storageClassName, Namespace: InstallNamespace}, &sc)
+		if err != nil {
+			debug("Error getting StorageClass %s: %s\n", storageClassName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
-	debug("SC found\n")
+	debug("StorageClass found\n")
 	return nil
 }
 
@@ -56,6 +62,9 @@ func ValidateVolumeSnapshotClass() error {
 
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: volumeSnapshotClassName}, &vsc)
+		if err != nil {
+			debug("Error getting VolumeSnapshotClass %s: %s\n", volumeSnapshotClassName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -69,10 +78,13 @@ func ValidateCSIDriver() error {
 
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: csiDriverName, Namespace: InstallNamespace}, &cd)
+		if err != nil {
+			debug("Error getting CSIDriver %s: %s\n", csiDriverName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
-	debug("CSI Driver found\n")
+	debug("CSIDriver found\n")
 	return nil
 }
 
@@ -81,20 +93,22 @@ func ValidateTopolvmNode() error {
 	ds := appsv1.DaemonSet{}
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
+		if err != nil {
+			debug("Error getting TopoLVM node daemonset %s: %s\n", topolvmNodeDaemonSetName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
-	debug("TopoLVM node found\n")
+	debug("TopoLVM node daemonset found\n")
 
-	/* 	// checking for the ready status
-	   	Eventually(func() bool {
-	   		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
-	   		if err != nil {
-	   			debug("topolvmNode : %s", err.Error())
-	   			return
-	   		}
-	   		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-	   	}, timeout, interval).Should(BeTrue())
-	   	debug("Status is ready\n") */
+	// checking for the ready status
+	Eventually(func() bool {
+		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
+		if err != nil {
+			debug("Error getting TopoLVM node daemonset %s: %s\n", topolvmNodeDaemonSetName, err.Error())
+		}
+		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+	}, timeout, interval).Should(BeTrue())
+	debug("TopoLVM node daemonset : Status is ready\n")
 
 	return nil
 }
@@ -105,9 +119,12 @@ func ValidateVGManager() error {
 
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: vgManagerDaemonsetName, Namespace: InstallNamespace}, &ds)
+		if err != nil {
+			debug("Error getting VG manager daemonset %s: %s\n", vgManagerDaemonsetName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
-	debug("VG manager found\n")
+	debug("VG manager daemonset found\n")
 
 	return nil
 }
@@ -118,6 +135,9 @@ func ValidateTopolvmController() error {
 
 	Eventually(func() bool {
 		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmCtrlDeploymentName, Namespace: InstallNamespace}, &dep)
+		if err != nil {
+			debug("Error getting TopoLVM controller deployment %s: %s\n", topolvmCtrlDeploymentName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 

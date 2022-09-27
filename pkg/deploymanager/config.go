@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -105,6 +106,7 @@ func NewDeployManager() (*DeployManager, error) {
 	myScheme := runtime.NewScheme()
 	utilruntime.Must(lvmv1.AddToScheme(myScheme))
 	utilruntime.Must(scheme.AddToScheme(myScheme))
+	utilruntime.Must(snapapi.AddToScheme(myScheme))
 	crClient, err := crclient.New(config, crclient.Options{Scheme: myScheme})
 	if err != nil {
 		return nil, err
