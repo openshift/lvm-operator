@@ -30,6 +30,7 @@ metadata:
     categories: Storage
     containerImage: quay.io/ocs-dev/lvm-operator:latest
     description: The ODF LVM Operator manages local storage using LVM
+    olm.skipRange: ""
     operatorframework.io/cluster-monitoring: "true"
     operatorframework.io/initialization-resource: |-
       {
