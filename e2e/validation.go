@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	timeout                   = time.Minute * 15
-	interval                  = time.Second * 10
+	timeout                   = time.Minute * 10
+	interval                  = time.Second * 15
 	lvmVolumeGroupName        = "vg1"
 	storageClassName          = "odf-lvm-vg1"
 	volumeSnapshotClassName   = "odf-lvm-vg1"
@@ -48,6 +48,9 @@ func validateLVMvg(ctx context.Context) error {
 
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: lvmVolumeGroupName, Namespace: installNamespace}, &lvmVG)
+		if err != nil {
+			debug("Error getting LVMVolumeGroup %s: %s\n", lvmVolumeGroupName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -61,6 +64,9 @@ func validateStorageClass(ctx context.Context) error {
 
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+		if err != nil {
+			debug("Error getting StorageClass %s: %s\n", storageClassName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -74,6 +80,9 @@ func validateVolumeSnapshotClass(ctx context.Context) error {
 
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: volumeSnapshotClassName}, &vsc)
+		if err != nil {
+			debug("Error getting VolumeSnapshotClass %s: %s\n", volumeSnapshotClassName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
@@ -87,10 +96,13 @@ func validateCSIDriver(ctx context.Context) error {
 
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: csiDriverName, Namespace: installNamespace}, &cd)
+		if err != nil {
+			debug("Error getting CSIDriver %s: %s\n", csiDriverName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
-	debug("CSI Driver found\n")
+	debug("CSIDriver found\n")
 	return nil
 }
 
@@ -99,19 +111,22 @@ func validateTopolvmNode(ctx context.Context) error {
 	ds := appsv1.DaemonSet{}
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: installNamespace}, &ds)
+		if err != nil {
+			debug("Error getting TopoLVM node daemonset %s: %s\n", topolvmNodeDaemonSetName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
-	debug("TopoLVM node found\n")
+	debug("TopoLVM node daemonset found\n")
 
 	// checking for the ready status
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: installNamespace}, &ds)
 		if err != nil {
-			debug("topolvmNode : %s", err.Error())
+			debug("Error getting TopoLVM node daemonset %s: %s\n", topolvmNodeDaemonSetName, err.Error())
 		}
 		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
 	}, timeout, interval).Should(BeTrue())
-	debug("TopolvmNode Status is ready\n")
+	debug("TopoLVM node pods are ready\n")
 
 	return nil
 }
@@ -122,9 +137,12 @@ func validateVGManager(ctx context.Context) error {
 
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: vgManagerDaemonsetName, Namespace: installNamespace}, &ds)
+		if err != nil {
+			debug("Error getting vg manager daemonset %s: %s\n", vgManagerDaemonsetName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
-	debug("VG manager found\n")
+	debug("VG manager daemonset found\n")
 
 	return nil
 }
@@ -135,10 +153,13 @@ func validateTopolvmController(ctx context.Context) error {
 
 	Eventually(func() bool {
 		err := crClient.Get(ctx, types.NamespacedName{Name: topolvmCtrlDeploymentName, Namespace: installNamespace}, &dep)
+		if err != nil {
+			debug("Error getting TopoLVM controller deployment %s: %s\n", topolvmCtrlDeploymentName, err.Error())
+		}
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
-	debug("topolvm-controller deployment found\n")
+	debug("TopoLVM controller deployment found\n")
 	return nil
 }
 
