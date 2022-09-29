@@ -674,6 +674,16 @@ DeviceLoop:
 		// store device in deviceAgeMap
 		r.deviceAgeMap.storeDeviceAge(blockDevice.KName)
 
+		// check for partitions recursively
+		if blockDevice.HasChildren() {
+			childAvailableDevices, childDelayedDevices, err := r.filterAvailableDevices(blockDevice.Children)
+			if err != nil {
+				return []internal.BlockDevice{}, []internal.BlockDevice{}, err
+			}
+			availableDevices = append(availableDevices, childAvailableDevices...)
+			delayedDevices = append(delayedDevices, childDelayedDevices...)
+		}
+
 		devLogger := r.Log.WithValues("Device.Name", blockDevice.Name)
 		for name, filter := range FilterMap {
 			var valid bool
