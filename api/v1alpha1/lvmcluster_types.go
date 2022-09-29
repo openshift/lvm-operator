@@ -107,6 +107,19 @@ type DeviceSelector struct {
 // 	thinProvision bool `json:"thinProvision,omitempty"`
 // }
 
+type LVMStateType string
+
+const (
+	// LVMStatusProgressing means that the lvmcluster creation is in progress
+	LVMStatusProgressing LVMStateType = "Progressing"
+	// LVMStatusReady means that the lvmcluster has been created and is Ready
+	LVMStatusReady LVMStateType = "Ready"
+	// LVMStatusFailed means that the lvmcluster could not be created
+	LVMStatusFailed LVMStateType = "Failed"
+	// LVMStatusDegraded means that the lvmcluster has been created but is not using the specified config
+	LVMStatusDegraded LVMStateType = "Degraded"
+)
+
 // LVMClusterStatus defines the observed state of LVMCluster
 type LVMClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
@@ -115,6 +128,10 @@ type LVMClusterStatus struct {
 	// Ready describes if the LVMCluster is ready.
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// State describes the LVMCluster state.
+	// +optional
+	State LVMStateType `json:"state,omitempty"`
 
 	// Conditions describes the state of the resource.
 	// +optional
