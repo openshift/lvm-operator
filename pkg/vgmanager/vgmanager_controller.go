@@ -324,6 +324,12 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 	}
 	if lvmdConfig == nil {
 		r.Log.Info("lvmd config file does not exist")
+		// Remove the VG entry in the lvmvolumegroupnodestatus that was added to indicate the failures to the user.
+		// This allows the lvmcluster to get deleted and not stuck/wait forever as lvmcluster looks for the lvmvolumegroupnodestatus before deleting.
+		if statuserr := r.updateStatus(ctx, nil); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+			return statuserr
+		}
 		return nil
 	}
 	// To avoid having to iterate through device classes multiple times, map from name to config index
