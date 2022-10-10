@@ -7,6 +7,127 @@ This file itself is based on [Keep a CHANGELOG](https://keepachangelog.com/en/0.
 
 ## [Unreleased]
 
+## [0.15.1] - 2022-08-17
+
+### Fixed
+
+- Make lvm commands independent of the environment (#551) 
+
+## [0.15.0] - 2022-08-16
+
+### Added
+
+- Add ESASHIKA Kaoru as a reviewer (#533)
+- e2e tests for thin provisioning feature (#532)
+- additional metric for thin pools (#537)
+
+### Changed
+
+- support Kubernetes 1.24 (#529)
+- Use lvm JSON output (#501)
+- Drop a PVC finalizer to delete pods (#536)
+
+### Doc
+
+- doc: Add design doc for thin-snapshots (#446)
+- doc: Add design doc for thin-lv clones (#447)
+- Docs: delete description for inline ephemeral volume. (#543)
+- fix documentation link (#538)
+
+### Fixed
+
+- webhook: allow PVCs with storageClassName set to "" (#525)
+- lvm: disable activation skip (#534)
+- fix ci by adding Eventually to wait to start topolvm-controller (#542)
+- fix: ResizeLV does not check thinpool overprovisioned size (#540)
+
+### Contributors
+
+- @Yuggupta27
+- @tasleson
+- @nbalacha
+- @usefss
+
+## [0.14.1] - 2022-07-05
+
+### Fixed
+
+- mount: remove new UUID generation (#522)
+
+### Contributors
+
+- @Yuggupta27
+
+## [0.14.0] - 2022-07-04
+
+### Added
+
+- Add support to create PVC-PVC Clones for thin volumes (#498)
+- automate adding items to project (#504)
+- Update github-actions automatically (#505)
+- Add Nithya Balachandran as a reviewer (#506)
+
+### Changed
+
+- Removed: Inline Ephemeral Volume (#494)
+  - **BREAKING**: Inline Ephemeral Volume is no longer supported.
+- example: wait for topolvm controller mutating webhook to become ready (#500)
+- update how to maintain sidecar's RBAC (#508)
+- example: retry applying sample pods and pvcs manifest (#509)
+- Remove setup-python (#510)
+- Remove inline ephemeral volume logic (#519)
+
+### Contributors
+
+- @bells17
+- @Yuggupta27
+
+## [0.13.0] - 2022-06-20
+
+### Added
+
+ - Add support for creation of thin-snapshots (#463)
+
+### Contributors
+
+- @Yuggupta27
+- @nbalacha
+
+## [0.12.0] - 2022-06-03
+
+### Changed
+
+- Send VG metrics as part of ThinPool metrics (#481)
+  - **BREAKING**: `free_bytes` and `size_bytes` metrics report the VG's free space and size respectively even for thinpool.
+
+### Contributors
+
+- @leelavg
+
+## [0.11.1] - 2022-05-09
+
+### Changed
+
+- Modified to use ghcr.io as a container registry (#464)
+
+### Fixed
+
+- Modified to use k8s.io/utils/io.ConsistentRead (#465)
+- Set fail-fast option to false (#472)
+- Fix github user (#476)
+- fix: send correct proto.WatchResponse for thin and thick lvs (#467)
+- Fix sudo tests (#471)
+
+### Doc
+
+- nit: correct provisioner typo (#474)
+
+### Contributors
+
+- @bells17
+- @Yuggupta27
+- @leelavg
+
 ## [0.11.0] - 2022-04-14
 
 ### Added
@@ -453,7 +574,14 @@ Only cosmetic changes.
 
 This is the first release.
 
-[Unreleased]: https://github.com/topolvm/topolvm/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/topolvm/topolvm/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/topolvm/topolvm/compare/v0.15.0...v0.15.1
+[0.15.0]: https://github.com/topolvm/topolvm/compare/v0.14.1...v0.15.0
+[0.14.1]: https://github.com/topolvm/topolvm/compare/v0.14.0...v0.14.1
+[0.14.0]: https://github.com/topolvm/topolvm/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/topolvm/topolvm/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/topolvm/topolvm/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/topolvm/topolvm/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/topolvm/topolvm/compare/v0.10.6...v0.11.0
 [0.10.6]: https://github.com/topolvm/topolvm/compare/v0.10.5...v0.10.6
 [0.10.5]: https://github.com/topolvm/topolvm/compare/v0.10.4...v0.10.5
