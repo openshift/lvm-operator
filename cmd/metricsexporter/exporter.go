@@ -18,9 +18,9 @@ package main
 
 import (
 	"flag"
-	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -85,11 +85,12 @@ func main() {
 
 	// runtime loop
 	newLogger.Info("Starting lvm metric exporter at ", "address", exporterAddress)
-	ln, err := net.Listen("tcp", exporterAddress)
-	if err != nil {
-		newLogger.Error(err, "Error creating the listener")
+	server := &http.Server{
+		Addr:              exporterAddress,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
-	err = http.Serve(ln, nil)
+
+	err := server.ListenAndServe()
 	if err != nil {
 		newLogger.Error(err, "Error while serving requests")
 	}
