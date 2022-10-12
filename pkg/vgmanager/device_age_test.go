@@ -22,7 +22,7 @@ func Test_isOlderThan(t *testing.T) {
 		ageMap: map[string]time.Time{
 			"/dev/sdb": time.Now(),
 			"/dev/sdc": start.Add(-(time.Second + deviceMinAge)),
-			"/dev/sdd": start.Add((-1 / 2) * deviceMinAge),
+			"/dev/sdd": start.Add(-(deviceMinAge / 2)),
 		},
 	}
 
