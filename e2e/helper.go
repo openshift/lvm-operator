@@ -34,6 +34,9 @@ func createNamespace(ctx context.Context, namespace string) error {
 	label := make(map[string]string)
 	// label required for monitoring this namespace
 	label["openshift.io/cluster-monitoring"] = "true"
+	label["pod-security.kubernetes.io/enforce"] = "privileged"
+	label["security.openshift.io/scc.podSecurityLabelSync"] = "false"
+
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   namespace,
@@ -52,6 +55,9 @@ func deleteNamespaceAndWait(ctx context.Context, namespace string) error {
 	label := make(map[string]string)
 	// label required for monitoring this namespace
 	label["openshift.io/cluster-monitoring"] = "true"
+	label["pod-security.kubernetes.io/enforce"] = "baseline"
+	label["security.openshift.io/scc.podSecurityLabelSync"] = "false"
+
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   namespace,
