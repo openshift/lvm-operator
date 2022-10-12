@@ -30,7 +30,7 @@ import (
 func generateLVMCluster() *v1alpha1.LVMCluster {
 	lvmClusterRes := &v1alpha1.LVMCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "lvmcluster-sample",
+			Name:      "odf-lvmcluster",
 			Namespace: installNamespace,
 		},
 		Spec: v1alpha1.LVMClusterSpec{
@@ -40,8 +40,8 @@ func generateLVMCluster() *v1alpha1.LVMCluster {
 						Name: "vg1",
 						ThinPoolConfig: &v1alpha1.ThinPoolConfig{
 							Name:               "mytp1",
-							SizePercent:        50,
-							OverprovisionRatio: 50,
+							SizePercent:        90,
+							OverprovisionRatio: 5,
 						},
 					},
 				},
