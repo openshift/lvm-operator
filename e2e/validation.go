@@ -100,16 +100,6 @@ func ValidateTopolvmNode() error {
 	}, timeout, interval).Should(BeTrue())
 	debug("TopoLVM node daemonset found\n")
 
-	// checking for the ready status
-	Eventually(func() bool {
-		err := DeployManagerObj.GetCrClient().Get(context.TODO(), types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: InstallNamespace}, &ds)
-		if err != nil {
-			debug("Error getting TopoLVM node daemonset %s: %s\n", topolvmNodeDaemonSetName, err.Error())
-		}
-		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-	}, timeout, interval).Should(BeTrue())
-	debug("TopoLVM node daemonset : Status is ready\n")
-
 	return nil
 }
 
