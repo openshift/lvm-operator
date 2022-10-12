@@ -1,9 +1,9 @@
 ## Deploying LVMCluster CR
 
-This guide assumes you followed steps in [Readme][repo-readme] and LVM operator
+This guide assumes you followed steps in [Readme][repo-readme] and the LVM operator
 (hereafter LVMO) is running in your cluster.
 
-Below are the available disks in our test kubernetes cluster node and there are
+The available disks in our test kubernetes cluster node are listed below. There are
 no existing LVM Physical Volumes, Volume Groups and Logical Volumes
 
 ``` console
@@ -23,16 +23,16 @@ sh-4.4# vgs
 sh-4.4# lvs
 ```
 
-Here LVMO is installed in `lvm-operator-system` namespace via `make deploy`
-target and operations will not change if LVMO is installed in any other namespaces.
+In our setup, the LVMO is installed in `lvm-operator-system` namespace via the `make deploy`
+target. The same operations hold good if LVMO is installed in any other namespaces.
 
 ``` console
 kubectl get pods
-NAME                                 READY   STATUS    RESTARTS   AGE
-controller-manager-8bf864c85-8zjlp   3/3     Running   0          96s
+NAME                                              READY   STATUS    RESTARTS   AGE
+lvm-operator-controller-manager-8bf864c85-8zjlp   3/3     Running   0          96s
 ```
 
-After all containers in above listing is in `READY` state we can proceed with
+After all containers in the pod are in `READY` state we can proceed with
 deploying LVMCluster CR
 
 ``` yaml
@@ -47,30 +47,34 @@ spec:
   storage:
     deviceClasses:
     - name: vg1
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10    
 EOF
 ```
 
-- Ability to respect Node Selector, Tolerations and Device Selectors in above CR
-  is coming soon.
-- After deploying above CR all free disks will be used to create a volume
-  group, topolvm csi is deployed and all the corresponding resources are
-  created, including storage class for ready consumption of Persistent Volumes
-  based on Topolvm
+- After deploying the CR :
+  - an LVM volume group named vg1 will be created using all free disks on the cluster.
+  - a thinpool called thin-pool-1 will be created in vg1 with size equal to 90% of the vg.
+  - the topolvm csi plugin is deployed. The topolvm-controller-* and topolvm-node-* pods will start up.
+  - a storageclass and a volumesnapshotclass, both named odf-lvm-vg1, are created
+
 
 - Wait for all the pods to be in `READY` state
-- `topolvm-controller` and `topolvm-node` will be in `init` stage for a while
+- The `topolvm-controller` and `topolvm-node` pods will remain in `init` stage for a while
   awaiting creation of certs and creation of volume groups by `vg-manager`
   respectively
 
 ``` console
 kubectl get pods
 NAME                                  READY   STATUS    RESTARTS   AGE
-controller-manager-8bf864c85-8zjlp    3/3     Running   0          31m
+lvm-operator-controller-manager-8bf864c85-8zjlp    3/3     Running   0          31m
 topolvm-controller-694bc98b87-x6dxn   4/4     Running   0          10m
 topolvm-node-pbcth                    4/4     Running   0          10m
 vg-manager-f979f                      1/1     Running   0          10m
 ```
-When all pods are ready, the LVM physical volumes and volume groups should be
+When all pods are ready, the LVM physical volumes and volume groups will have been
 created on the host.
 
 ``` console
@@ -82,12 +86,14 @@ sh-4.4# pvs
 sh-4.4# vgs
   VG  #PV #LV #SN Attr   VSize  VFree 
   vg1   3   0   0 wz--n- <4.37t <4.37t
+sh-4.4# lvs
+  LV          VG  Attr       LSize  Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  thin-pool-1 vg1 twi-a-tz-- <3.93t             0.00   1.19      
 ```
 
 Confirm that the following resources have been created on the cluster:
 
-- When LVMCluster CR is deployed which contains details of all volume groups that
-  needs to be created across multiple nodes, two supporting Custom Resources
+- When the LVMCluster CR is deployed, two supporting, internal Custom Resources
   are created by LVMO
 - LVMVolumeGroup: CR created and managed by LVMO which tracks individual volume
   groups across multiple nodes
@@ -105,7 +111,7 @@ metadata:
 spec: {}
 ```
 - LVMVolumeGroupNodeStatus: CR created and managed by VG Manager which tracks
-  node status corresponding to multiple volume groups
+  the status of the volumegroups on a node
 ``` yaml
 # kubectl get lvmvolumegroupnodestatuses.lvm.topolvm.io kube-node -oyaml
 apiVersion: lvm.topolvm.io/v1alpha1
@@ -126,23 +132,29 @@ spec:
       name: vg1
       status: Ready
 ```
-- A storage class called `topolvm-<deviceclassname>` will be created
+- A StorageClass called `odf-lvm-<deviceclassname>` will be created
 ``` console
 # kubectl get storageclass
 NAME          PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
 odf-lvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   31m
 ```
+```
+- A Volumesnapshotclass called `odf-lvm-<deviceclassname>` will be created
+``` console
+# kubectl get volumesnapshotclass
+NAME          DRIVER               DELETIONPOLICY   AGE
+odf-lvm-vg1   topolvm.cybozu.com   Delete           24h
 
+```
 Note:
 - Reconciling multiple LVMCluster CRs by LVMO is not supported
 - Custom resources LVMVolumeGroup and LVMVolumeGroupNodeStatus are managed by
   LVMO and users should not edit them.
+- At present, there can only be one deviceClass entry in the LVMCluster CR.
 
-## Deploying PVC and App Pod
 
-- A successful reconciliation of LVMCluster CR will setup all the underlying
-  resources needed to be able to create a PVC and use it in app pod, the same
-  can be verified from LVMCluster CR status field
+
+- The status of the LVMCluster is available in the status field.
 ```json
 # kubectl get lvmclusters.lvm.topolvm.io -ojsonpath='{.items[*].status.deviceClassStatuses[*]}' | python3 -mjson.tool
 {
@@ -160,9 +172,11 @@ Note:
     ]
 }
 ```
-- Create a PVC using the StorageClass created for the deviceClass. The PVC will
-  not be bound until a pod claims the storage as the volume binding mode is set
-  to WaitForFirstConsumer.
+## Deploying PVC and App Pod
+
+- Create a PVC using the StorageClass. The PVC will not be bound until a pod 
+claims the storage as the volume binding mode is set to WaitForFirstConsumer.
+
 ```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -209,8 +223,7 @@ spec:
         claimName: lvm-file-pvc
 EOF
 ```
-- App pod should claim the PVC and be in `READY`, PVC will get bound to this
-  app
+- Once the pod is scheduled, the PVC is provisioned and bound.
 ``` console
 kubectl get pod | grep -E '^(app|NAME)'
 NAME                                  READY   STATUS    RESTARTS   AGE
@@ -294,11 +307,6 @@ topolvm_volumegroup_size_bytes{device_class="vg1",node="kube-node"} 4.8009597419
 
 ## Cleanup
 
-- Feature to auto cleanup volume groups after removing LVMCluster CR is coming
-  soon
-- Until then, please perform the following steps to cleanup the resources
-  created by the operator
-
 ### Steps
 
 1. Remove all the apps which are using PVCs created with topolvm
@@ -351,26 +359,8 @@ lvmcluster.lvm.topolvm.io "lvmcluster-sample" deleted
 
 kubectl get po
 NAME                                 READY   STATUS    RESTARTS   AGE
-controller-manager-8bf864c85-8zjlp   3/3     Running   0          125m
+lvm-operator-controller-manager-8bf864c85-8zjlp   3/3     Running   0          125m
 ```
-6. Login to the node and remove the LVM volume groups and physical volumes
-``` console
-sh-4.4# vgremove vg1 --nolock
-  WARNING: File locking is disabled.
-  Volume group "vg1" successfully removed
-sh-4.4# pvremove  /dev/nvme0n1 /dev/nvme1n1 /dev/nvme2n1 --nolock
-  WARNING: File locking is disabled.
-  Labels on physical volume "/dev/nvme0n1" successfully wiped.
-  Labels on physical volume "/dev/nvme1n1" successfully wiped.
-  Labels on physical volume "/dev/nvme2n1" successfully wiped.
-```
-7. Remove the lvmd.yaml config file from the node
-``` console
-sh-4.4# rm /etc/topolvm/lvmd.yaml 
-```
-Note:
-- Removal of volume groups, physical volumes and lvm config file is necessary
-  during cleanup or else LVMO fails to deploy Topolvm in next iteration.
 
 ## Uninstalling LVMO
 

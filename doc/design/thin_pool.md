@@ -1,7 +1,7 @@
 # LVMO: Thin provisioning
 
 ## Summary
-- LVM thin provisioning allows creation of volumes whose combined size is greater than that of the available storage.
+- LVM thin provisioning allows the creation of volumes whose combined virtual size is greater than that of the available storage.
 
 **Advantages**:
 - Storage space can be used more effectively. More users can be accommodated for the same amount of storage space when compared to thick provisioning. This significantly reduces upfront hardware cost for the storage admins.
@@ -20,9 +20,9 @@ The LVMO will create a thin-pool LV in the volume group in order to create thinl
 - The `deviceClass` API in the `LVMClusterSpec` will contain the mapping between a device-class and a thin-pool in volume group.
 - One device-class will be mapped to a single thin pool.
 - User should be able to configure the thin-pool size based on percentage of the available volume group size.
-- Default chunk size of the thin pool will be 512 kiB
+- Default chunk size of the thin pool will be 128 kiB
 - `lvmd.yaml` config file should be updated with the device class, volume group and thin-pool mapping.
-- Alerts should be triggered if a thin-pool `data` or `metadata` available size crosses a predefined threshold limit.
+- Alerts should be triggered if the thin-pool `data` or `metadata` usage crosses a predefined threshold limit.
 
 
 ## Design Details
@@ -41,7 +41,7 @@ The LVMO will create a thin-pool LV in the volume group in order to create thinl
 
 +   // SizePercent represents percentage of remaining space in the volume group that should be used
 +   // for creating the thin pool.
-+   // +kubebuilder:validation:default=75
++   // +kubebuilder:validation:default=90
 +   // +kubebuilder:validation:Minimum=10
 +   // +kubebuilder:validation:Maximum=90
 +   SizePercent int `json:"sizePercent,omitempty"`
@@ -69,7 +69,7 @@ type DeviceClass struct {
 - Following new fields will added to `DeviceClass` API
     - **ThinPoolConfig** API contains information related to a thin pool.These configuration options are:
         - **Name**: Name of the thin-pool
-        - **SizePercent**: Size of the thin pool to be created with respect to available free space in the volume group. It represents percentage value and not absolute size values. Size value should range between 10-90. It defaults to 75 if no value is provided.
+        - **SizePercent**: Size of the thin pool to be created with respect to available free space in the volume group. It represents percentage value and not absolute size values. Size value should range between 10-90. It defaults to 90 if no value is provided.
         - **OverprovisionRatio**: The factor by which additional storage can be provisioned compared to the available storage in the thin pool.
 
 - `LVMVolumeGroup` API changes:
@@ -100,7 +100,7 @@ type LVMVolumeGroupSpec struct {
     ```
     where:
     - Size is `LVMClusterSpec.Storage.DeviceClass.ThinPoolConfig.SizePercent`
-    - chunk size is 512KiB, which is the default.
+    - chunk size is 128KiB, which is the default.
 
 - VG manager will also update the `lvmd.yaml` file to map volume group and its thin-pool to the topolvm device class.
 - Sample `lvmd.yaml` config file
@@ -112,15 +112,15 @@ device-classes:
     type: thin
     thin-pool-config:
         name: pool0
-        overprovision-ratio: 50.0
+        overprovision-ratio: 5.0
 ```
 
 ### Monitoring and Alerts
 - Available thin-pool size (both data and metadata) should be provided by topolvm as prometheus metrics.
 - Threshold limits for the thin-pool should be provide as static values in the PrometheusRule.
-- If used size of data or metadata for a particular thin-pool crosses the threshold, then appropriate alerts should be triggered.
+- If the data or metadata usage for a particular thin-pool crosses a threshold, appropriate alerts should be triggered.
 
 
 ### Open questions
 - What should be the chunk size of the thin-pools?
-    - Use default size a 512 kiB for now.
+    - Use default size a 128 kiB for now.

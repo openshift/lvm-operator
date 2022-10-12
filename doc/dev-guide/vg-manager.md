@@ -2,11 +2,11 @@
 
 ## Creation
 
-- On LVMCluster CR creation `vg-manager` daemonset pods are created
-- They'll be run on all the nodes which matches the Node Selector specified in
-  the CR, as of now it's run on all schedulable nodes
-- A controller owner reference is set on the daemonset to be able to cleanup
-  itself when CR is deleted
+- `vg-manager` daemonset pods are created by the LVMCluster controller on LVMCluster CR creation 
+- They run on all nodes which match the Node Selector specified in
+  the CR. They run on all schedulable nodes if no nodeSelector is specified.
+- A controller owner reference is set on the daemonset so it is cleaned up
+  when the LVMCluster CR is deleted.
 
 ## Reconciliation
 
@@ -16,7 +16,7 @@
   by the LVMO.
 - The vg-manager will determine the disks that match the filters
   specified (currently not implemented) on the node it is running on and create
-  an LVM VG with them.
+  an LVM VG with them. It then creates the lvmd.yaml config file for lvmd. 
 - vg-manager also updates LVMVolumeGroupStatus with observed status of volume
   groups for the node on which it is running
 

@@ -8,18 +8,18 @@
   following resource units for setting up [Topolvm](topolvm-repo) CSI and all
   the supporting resources to use storage local to the node via Logical Volume
   Manager (lvm)
-- *csiDriver*: Reconciles topolvm CSI Driver
-- *topolvmController*: Reconciles topolvm controller plugin
+- *csiDriver*: Reconciles TopoLVM CSI Driver
+- *topolvmController*: Reconciles TopoLVM controller plugin
 - *lvmVG*: Reconciles volume groups from LVMCluster CR
 - *openshiftSccs*: Manages SCCs when the operator is run in Openshift
   environment
-- *topolvmNode*: Reconciles topolvm nodeplugin along with lvmd
+- *topolvmNode*: Reconciles TopoLVM nodeplugin along with lvmd
 - *vgManager*: Responsible for creation of Volume Groups
 - *topolvmStorageClass*: Manages storage class life cycle based on
   devicesClasses in LVMCluster CR
 - The LVMO creates an LVMVolumeGroup CR for each deviceClass in the
   LVMCluster CR. The LVMVolumeGroups are reconciled by the vgmanager controllers.
-- In addition to managing above resource units, lvmcluster-controller collates
+- In addition to managing the above resource units, lvmcluster-controller collates
   the status of deviceClasses across nodes from LVMVolumeGroupNodeStatus and
   updates status of LVMCluster CR
 - `resourceManager` interface is defined in
@@ -28,7 +28,7 @@
 
 Note:
 - Above names refers to the struct which satisfies `resourceManager` interface
-- Please refer to topolvm [design][topolvm-design] doc to know more about Topolvm
+- Please refer to the topolvm [design][topolvm-design] doc to know more about TopoLVM
   CSI
 - Any new resource units should also implement `resourceManager` interface
 
@@ -38,9 +38,9 @@ Note:
   created and managed across nodes with custom node selector, toleration and
   device selectors
 - Should be created and edited by user in operator installed namespace
-- Only a single CR instance with a single volume group containing all available
-  disks across schedulable nodes is supported and implementation respecting
-  tolerations, device and node selector fields is coming soon
+- Only a single CR instance with a single volume group is supported.
+- The user can choose to specify the devices to be used for the volumegroup. 
+- All available disks will be used if no devicePaths are specified,.
 - All fields in `status` are updated based on the status of volume groups
   creation across nodes
 
