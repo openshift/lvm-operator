@@ -20,4 +20,5 @@ jobs:
           exclude_file: go.sum
           check_filenames: true
           check_hidden: true
-          skip: vendor
+          skip: ./vendor,./LICENSE
+          ignore_words_list: ro
