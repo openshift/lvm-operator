@@ -3,15 +3,15 @@
 # Controllers and their managed resources
 
 
-- **lvmcluster-controller:** Running in the operator deployment, it will create all resources that don't require information from the node. When applicable, the health of the underlying resource is updated in the LVMCluster status and errors are also exposed as events. Overall success also passed on as an event.:
+- **lvmcluster-controller:** Running in the operator deployment, it will create all resources that don't require information from the node. When applicable, the health of the underlying resource is updated in the LVMCluster status.:
     - vgmanager daemonset
     - lvmd daemonset
-    - CSIDriver CR
-    - CSI Driver Controller Deployment (controller is the name of the csi-component)
-    - CSI Driver Daemonset
+    - TopoLVM CSIDriver CR
+    - TopoLVM CSI Driver Controller Deployment (controller is the name of the csi-component)
+    - TopoLVM CSI Driver Node Daemonset
       - needs an initContainer to block until lvmd config file is read
-- **The vg-manager:** A daemonset with one instance per selected node, will create all resources that require knowledge from the node. Errors and PVs being added to a volumegroup will be passed on as events.
-    - volumegroups
+- **The vg-manager:** A daemonset with one instance per selected node, it will create all resources that require knowledge from the node.
+    - volumegroups and thinpools
     - lvmd config file
 
 
