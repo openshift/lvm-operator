@@ -55,7 +55,7 @@ metadata:
         }
     operatorframework.io/suggested-namespace: openshift-storage
     operators.operatorframework.io/builder: operator-sdk-v1.23.0
-    operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.cybozu.com",
+    operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/red-hat-storage/lvm-operator
@@ -70,7 +70,7 @@ spec:
   customresourcedefinitions:
     owned:
     - kind: LogicalVolume
-      name: logicalvolumes.topolvm.cybozu.com
+      name: logicalvolumes.topolvm.io
       version: v1
     - description: LVMCluster is the Schema for the lvmclusters API
       displayName: LVMCluster
@@ -249,7 +249,7 @@ spec:
           - list
           - watch
         - apiGroups:
-          - topolvm.cybozu.com
+          - topolvm.io
           resources:
           - logicalvolumes
           verbs:
