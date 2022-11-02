@@ -19,21 +19,16 @@ type LogicalVolumeSpec struct {
 	Size        resource.Quantity `json:"size"`
 	DeviceClass string            `json:"deviceClass,omitempty"`
 
-	// 'type' specifies the logical volume type.
-	// Can be 'thin-snapshot' or left empty in case of a regular volume.
+	// 'source' specifies the logicalvolume name of the source; if present.
+	// This field is populated only when LogicalVolume has a source.
 	// +kubebuilder:validation:Optional
-	Type string `json:"type"`
-
-	// 'sourceID' specifies the volumeID of the parent logical volume; if present.
-	// +kubebuilder:validation:Optional
-	SourceID string `json:"sourceID"`
+	Source string `json:"source,omitempty"`
 
 	//'accessType' specifies how the user intends to consume the snapshot logical volume.
-	// Allowed values are: "ro" (read-only) and "rw" (read-write).
-	// Since the kubernetes snapshots are Read-Only, set accessType as 'ro' to activate thin-snapshots as read-only volumes.
-	// On the other hand, set accessType as 'rw' to activate thin-snapshots as read-write volumes.
+	// Set to "ro" when creating a snapshot and to "rw" when restoring a snapshot or creating a clone.
+	// This field is populated only when LogicalVolume has a source.
 	// +kubebuilder:validation:Optional
-	AccessType string `json:"accessType"`
+	AccessType string `json:"accessType,omitempty"`
 }
 
 // LogicalVolumeStatus defines the observed state of LogicalVolume
@@ -64,7 +59,7 @@ func (lv *LogicalVolume) IsCompatibleWith(lv2 *LogicalVolume) bool {
 	if lv.Spec.Name != lv2.Spec.Name {
 		return false
 	}
-	if lv.Spec.SourceID != lv2.Spec.SourceID {
+	if lv.Spec.Source != lv2.Spec.Source {
 		return false
 	}
 	if lv.Spec.Size.Cmp(lv2.Spec.Size) != 0 {

@@ -3,6 +3,8 @@ kind: Namespace
 metadata:
   labels:
     app.kubernetes.io/name: lvm-operator
+    pod-security.kubernetes.io/enforce: "privileged"
+    openshift.io/cluster-monitoring: "true"
   name: system
 ---
 apiVersion: apps/v1
