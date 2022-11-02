@@ -130,7 +130,7 @@ spec:
 ``` console
 # kubectl get storageclass
 NAME          PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-odf-lvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   31m
+odf-lvm-vg1   topolvm.io           Delete          WaitForFirstConsumer   true                   31m
 ```
 
 Note:
@@ -315,7 +315,7 @@ persistentvolumeclaim "lvm-block-pvc" deleted
 ```
 2. Make sure there are no `logicalvolumes` CRs which were created by topolvm
 ``` console
-kubectl get logicalvolumes.topolvm.cybozu.com 
+kubectl get logicalvolumes.topolvm.io 
 No resources found
 ```
 3. Take a json dump of LVMCluster CR contents. It has the list of VGs and PVs
