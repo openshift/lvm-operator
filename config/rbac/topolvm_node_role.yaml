@@ -14,7 +14,7 @@ rules:
     - update
     - patch
 - apiGroups:
-    - topolvm.cybozu.com
+    - topolvm.io
   resources:
     - logicalvolumes
     - logicalvolumes/status

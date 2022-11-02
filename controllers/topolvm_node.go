@@ -143,7 +143,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 		{Name: "node-plugin-dir",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: fmt.Sprintf("%splugins/topolvm.cybozu.com/node", getAbsoluteKubeletPath(CSIKubeletRootDir)),
+					Path: fmt.Sprintf("%splugins/topolvm.io/node", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 					Type: &hostPathDirectoryOrCreateType}}},
 		{Name: "csi-plugin-dir",
 			VolumeSource: corev1.VolumeSource{
@@ -343,7 +343,7 @@ func getNodeContainer() *corev1.Container {
 func getCsiRegistrarContainer() *corev1.Container {
 	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
-		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.cybozu.com/node/csi-topolvm.sock", getAbsoluteKubeletPath(CSIKubeletRootDir)),
+		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.io/node/csi-topolvm.sock", getAbsoluteKubeletPath(CSIKubeletRootDir)),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
@@ -354,7 +354,7 @@ func getCsiRegistrarContainer() *corev1.Container {
 	preStopCmd := []string{
 		"/bin/sh",
 		"-c",
-		"rm -rf /registration/topolvm.cybozu.com /registration/topolvm.cybozu.com-reg.sock",
+		"rm -rf /registration/topolvm.io /registration/topolvm.io-reg.sock",
 	}
 
 	requirements := corev1.ResourceRequirements{
