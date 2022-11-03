@@ -32,6 +32,7 @@ metadata:
         }
     repository: https://github.com/red-hat-storage/lvm-operator
     operatorframework.io/suggested-namespace: openshift-storage
+    operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.cybozu.com", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
   labels:
     operatorframework.io/arch.amd64: supported
