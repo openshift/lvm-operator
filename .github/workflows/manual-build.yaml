@@ -13,9 +13,6 @@ on:
       tag:
         description: 'Additional tag for the build (such as alpha, beta, etc.) - Optional'
         default: ''
-env:
-  OPERATOR_IMG: "quay.io/lvmo/lvm-operator"
-  OPERATOR_BUNDLE_IMG: "quay.io/lvmo/lvm-operator-bundle"
 
 jobs:
   build-and-publish-image:
@@ -61,20 +58,32 @@ jobs:
         id: prep
         run: |
           TAG=${{ github.event.inputs.branch }}-${{ steps.date.outputs.date }}
-          echo "img-tag=${TAG}" >> $GITHUB_OUTPUT
+          LATEST_TAG=latest
+          OPERATOR_IMG=quay.io/${{ github.event.inputs.registry_namespace }}/lvm-operator:${TAG}
+          OPERATOR_IMG_LATEST="quay.io/${{ github.event.inputs.registry_namespace }}/lvm-operator:${LATEST}"
+          OPERATOR_BUNDLE_IMG="quay.io/${{ github.event.inputs.registry_namespace }}/lvm-operator-bundle:${TAG}"
+          OPERATOR_BUNDLE_IMG_LATEST="quay.io/${{ github.event.inputs.registry_namespace }}/lvm-operator-bundle:${TAG}"
+          echo "op-latest=${OPERATOR_IMG_LATEST}" >> $GITHUB_OUTPUT
+          echo "bundle-latest=${OPERATOR_BUNDLE_IMG_LATEST}" >> $GITHUB_OUTPUT
+          echo "op-img=${OPERATOR_IMG}" >> $GITHUB_OUTPUT
+          echo "bundle-img=${OPERATOR_BUNDLE_IMG}" >> $GITHUB_OUTPUT
 
       - name: Build and publish operator image
         env:
           REGISTRY_NAMESPACE: ${{ github.event.inputs.registry_namespace }}
-          IMAGE_TAG: ${{ steps.prep.outputs.img-tag }}
+          IMG: ${{ steps.prep.outputs.op-img }}
         run: |
           make docker-build-combined
           make docker-push
+          docker tag ${{ steps.prep.outputs.op-img }} {{ steps.prep.outputs.op-latest }}
+          docker push ${{ steps.prep.outputs.op-latest }}
 
       - name: Build and publish operator bundle image
         env:
           REGISTRY_NAMESPACE: ${{ github.event.inputs.registry_namespace }}
-          IMAGE_TAG: ${{ steps.prep.outputs.img-tag }}
+          BUNDLE_IMG: ${{ steps.prep.outputs.bundle-img }}
         run: |
           make bundle bundle-build
           make bundle-push
+          docker tag ${{ steps.prep.outputs.bundle-img }} ${{ steps.prep.outputs.bundle-latest }}
+          docker push ${{ steps.prep.outputs.bundle-latest }}
