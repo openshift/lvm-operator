@@ -1,34 +1,39 @@
-name: Manual Operator Build Dispatch
+name: manual-operator-build-push
 
 on:
+  workflow_call:
   workflow_dispatch:
     inputs:
       branch:
         description: 'Branch to Build From'
         required: true
+      registry_namespace:
+        description: quay registry repository ns
+        default: lvmo
       tag:
         description: 'Additional tag for the build (such as alpha, beta, etc.) - Optional'
         default: ''
 env:
-  GO_VERSION: "1.18"
-  IMG: "quay.io/lvmo/lvm-operator"
+  OPERATOR_IMG: "quay.io/lvmo/lvm-operator"
+  OPERATOR_BUNDLE_IMG: "quay.io/lvmo/lvm-operator-bundle"
 
 jobs:
   build-and-publish-image:
     name: Build and publish the LVMO image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           ref: ${{ github.event.inputs.branch }}
-      - uses: actions/checkout@v2
 
       # 'test' is a sub-target of 'docker-build' and so cache go build & mod
       - id: go-cache-paths
         run: |
-          echo "::set-output name=go-build::$(go env GOCACHE)"
-          echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+          echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
+
       - name: Go Build Cache
         uses: actions/cache@v2
         with:
@@ -45,21 +50,31 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: quay.io
-          username: ${{ secrets.QUAY_LVMO_ROBOT_NAME_2 }}
-          password: ${{ secrets.QUAY_LVMO_ROBOT_TOKEN_2 }}
+          username: ${{ secrets.QUAY_LVMO_ROBOT_NAME }}
+          password: ${{ secrets.QUAY_LVMO_ROBOT_TOKEN }}
 
       - name: Get Current Date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y%m%d')"
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
       - name: Prepare image tag
         id: prep
         run: |
-          LVMO_OPERATOR_IMAGE=${{env.IMG}}:${{ github.event.inputs.branch }}-${{ steps.date.outputs.date }}
-          echo ::set-output name=operator-img::${LVMO_OPERATOR_IMAGE}
+          TAG=${{ github.event.inputs.branch }}-${{ steps.date.outputs.date }}
+          echo "img-tag=${TAG}" >> $GITHUB_OUTPUT
 
-      - name: Build operator docker image
-        run: make docker-build-combined IMG=${{steps.prep.outputs.operator-img}}
+      - name: Build and publish operator image
+        env:
+          REGISTRY_NAMESPACE: ${{ github.event.inputs.registry_namespace }}
+          IMAGE_TAG: ${{ steps.prep.outputs.img-tag }}
+        run: |
+          make docker-build-combined
+          make docker-push
 
-      - name: Publish operator image
-        run: make docker-push IMG=${{steps.prep.outputs.operator-img}}
+      - name: Build and publish operator bundle image
+        env:
+          REGISTRY_NAMESPACE: ${{ github.event.inputs.registry_namespace }}
+          IMAGE_TAG: ${{ steps.prep.outputs.img-tag }}
+        run: |
+          make bundle bundle-build
+          make bundle-push
