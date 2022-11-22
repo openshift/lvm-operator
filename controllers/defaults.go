@@ -47,7 +47,7 @@ var (
 )
 
 const (
-	TopolvmCSIDriverName = "topolvm.cybozu.com"
+	TopolvmCSIDriverName = "topolvm.io"
 
 	VGManagerServiceAccount = "vg-manager"
 
@@ -129,7 +129,7 @@ const (
 
 	DefaultCSISocket  = "/run/topolvm/csi-topolvm.sock"
 	DefaultLVMdSocket = "/run/lvmd/lvmd.sock"
-	DeviceClassKey    = "topolvm.cybozu.com/device-class"
+	DeviceClassKey    = "topolvm.io/device-class"
 
 	// default fstype for topolvm storage classes
 	TopolvmFilesystemType = "xfs"

@@ -79,7 +79,7 @@ After all Pods are running, you will get a storage class that you can use when c
 oc get sc
 
 NAME          PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-odf-lvm-vg1   topolvm.cybozu.com   Delete          WaitForFirstConsumer   true                   3m44s
+odf-lvm-vg1   topolvm.io           Delete          WaitForFirstConsumer   true                   3m44s
 ```
 
 ## Test

@@ -36,7 +36,7 @@ const (
 	lvmVolumeGroupName        = "vg1"
 	storageClassName          = "odf-lvm-vg1"
 	volumeSnapshotClassName   = "odf-lvm-vg1"
-	csiDriverName             = "topolvm.cybozu.com"
+	csiDriverName             = "topolvm.io"
 	topolvmNodeDaemonSetName  = "topolvm-node"
 	topolvmCtrlDeploymentName = "topolvm-controller"
 	vgManagerDaemonsetName    = "vg-manager"

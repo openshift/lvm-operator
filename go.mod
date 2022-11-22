@@ -13,16 +13,16 @@ require (
 	github.com/openshift/api v0.0.0-20211028023115-7224b732cc14
 	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 	github.com/openshift/custom-resource-status v1.1.2
-	github.com/operator-framework/api v0.14.0
+	github.com/operator-framework/api v0.17.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/stretchr/testify v1.7.0
-	github.com/topolvm/topolvm v0.11.1
+	github.com/topolvm/topolvm v0.15.4-0.20221116041433-d58476400ff1
 	gotest.tools/v3 v3.0.3
-	k8s.io/api v0.24.0
-	k8s.io/apimachinery v0.24.0
-	k8s.io/client-go v0.24.0
+	k8s.io/api v0.24.2
+	k8s.io/apimachinery v0.24.2
+	k8s.io/client-go v0.24.2
 	k8s.io/component-helpers v0.23.4
-	sigs.k8s.io/controller-runtime v0.11.2
+	sigs.k8s.io/controller-runtime v0.12.1
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -97,7 +97,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220421151946-72621c1f0bd3 // indirect
-	google.golang.org/grpc v1.46.0 // indirect
+	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -113,5 +113,3 @@ require (
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
-
-replace github.com/topolvm/topolvm => github.com/red-hat-storage/topolvm v0.11.1-0.20220429122749-ebdea64ffc67

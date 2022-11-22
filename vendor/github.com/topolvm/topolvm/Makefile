@@ -2,11 +2,11 @@
 
 CONTROLLER_RUNTIME_VERSION=$(shell awk '/sigs\.k8s\.io\/controller-runtime/ {print substr($$2, 2)}' go.mod)
 CONTROLLER_TOOLS_VERSION=$(shell awk '/sigs\.k8s\.io\/controller-tools/ {print substr($$2, 2)}' go.mod)
-CSI_VERSION=1.5.0
-PROTOC_VERSION=3.19.3
-KIND_VERSION=v0.11.1
-HELM_VERSION=3.8.0
-HELM_DOCS_VERSION=1.7.0
+CSI_VERSION=1.6.0
+PROTOC_VERSION=21.2
+KIND_VERSION=v0.14.0
+HELM_VERSION=3.9.0
+HELM_DOCS_VERSION=1.11.0
 YQ_VERSION=4.18.1
 GINKGO_VERSION := $(shell awk '/github.com\/onsi\/ginkgo/ {print substr($$2, 2)}' go.mod)
 
@@ -15,7 +15,6 @@ CURL := curl -sSLf
 BINDIR := $(shell pwd)/bin
 CONTROLLER_GEN := $(BINDIR)/controller-gen
 STATICCHECK := $(BINDIR)/staticcheck
-NILERR := $(BINDIR)/nilerr
 PROTOC := PATH=$(BINDIR):$(PATH) $(BINDIR)/protoc -I=$(shell pwd)/include:.
 PACKAGES := unzip lvm2 xfsprogs thin-provisioning-tools
 ENVTEST_ASSETS_DIR := $(shell pwd)/testbin
@@ -30,11 +29,7 @@ BUILD_TARGET=hypertopolvm
 TOPOLVM_VERSION ?= devel
 IMAGE_TAG ?= latest
 
-## for custom build kind node
-## ignore if you do not need a custom image
-KIND_NODE_VERSION=v1.21.1
-
-ENVTEST_KUBERNETES_VERSION=1.23
+ENVTEST_KUBERNETES_VERSION=1.24
 
 PROTOC_GEN_GO_VERSION := $(shell awk '/google.golang.org\/protobuf/ {print substr($$2, 2)}' go.mod)
 PROTOC_GEN_DOC_VERSION := $(shell awk '/github.com\/pseudomuto\/protoc-gen-doc/ {print substr($$2, 2)}' go.mod)
@@ -43,6 +38,22 @@ PROTOC_GEN_GO_GRPC_VERSION := $(shell awk '/google.golang.org\/grpc\/cmd\/protoc
 # Set the shell used to bash for better error handling.
 SHELL = /bin/bash
 .SHELLFLAGS = -e -o pipefail -c
+
+define CRD_TEMPLATE
+{{ if not .Values.useLegacy }}
+%s
+{{ end }}
+
+endef
+export CRD_TEMPLATE
+
+define LEGACY_CRD_TEMPLATE
+{{ if .Values.useLegacy }}
+%s
+{{ end }}
+
+endef
+export LEGACY_CRD_TEMPLATE
 
 ##@ General
 
@@ -88,32 +99,41 @@ PROTOBUF_GEN = csi/csi.pb.go csi/csi_grpc.pb.go \
 	lvmd/proto/lvmd.pb.go lvmd/proto/lvmd_grpc.pb.go docs/lvmd-protocol.md
 
 .PHONY: manifests
-manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: generate-legacy-api ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) \
 		crd:crdVersions=v1 \
 		rbac:roleName=topolvm-controller \
 		webhook \
 		paths="./api/...;./controllers;./hook;./driver/k8s;./pkg/..." \
 		output:crd:artifacts:config=config/crd/bases
-	$(BINDIR)/yq eval 'del(.status)' config/crd/bases/topolvm.cybozu.com_logicalvolumes.yaml > charts/topolvm/crds/topolvm.cybozu.com_logicalvolumes.yaml
+	$(BINDIR)/yq eval 'del(.status)' config/crd/bases/topolvm.io_logicalvolumes.yaml | xargs -d"	" printf "$$CRD_TEMPLATE" > charts/topolvm/templates/crds/topolvm.io_logicalvolumes.yaml
+	$(BINDIR)/yq eval 'del(.status)' config/crd/bases/topolvm.cybozu.com_logicalvolumes.yaml | xargs -d"	" printf "$$LEGACY_CRD_TEMPLATE" > charts/topolvm/templates/crds/topolvm.cybozu.com_logicalvolumes.yaml
 
-.PHONY: generate
-generate: $(PROTOBUF_GEN) ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+.PHONY: generate-api ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate-api: 
 	$(CONTROLLER_GEN) object:headerFile="./hack/boilerplate.go.txt" paths="./api/..."
 
-.PHONY: check-uncommitted
-check-uncommitted: ## Check if latest generated artifacts are committed.
-	$(MAKE) manifests
-	find . -name "*.pb.go" -delete
-	$(MAKE) generate
+.PHONY: generate-legacy-api
+generate-legacy-api: ## Generate legacy api code.
+	mkdir -p api/legacy/v1
+	cp -r api/v1/* api/legacy/v1
+	sed -i -e 's/topolvm.io/topolvm.cybozu.com/g' api/legacy/v1/groupversion_info.go
+
+.PHONY: generate-helm-docs
+generate-helm-docs:
 	./bin/helm-docs -c charts/topolvm/
+
+.PHONY: generate
+generate: $(PROTOBUF_GEN) manifests generate-api generate-helm-docs
+
+.PHONY: check-uncommitted
+check-uncommitted: generate ## Check if latest generated artifacts are committed.
 	git diff --exit-code --name-only
 
 .PHONY: lint
 lint: ## Run lint
 	test -z "$$(gofmt -s -l . | grep -vE '^vendor|^api/v1/zz_generated.deepcopy.go' | tee /dev/stderr)"
 	$(STATICCHECK) ./...
-	test -z "$$($(NILERR) ./... 2>&1 | tee /dev/stderr)"
 	go vet ./...
 	test -z "$$(go vet ./... | grep -v '^vendor' | tee /dev/stderr)"
 
@@ -122,7 +142,14 @@ test: lint ## Run lint and unit tests.
 	go install ./...
 
 	mkdir -p $(ENVTEST_ASSETS_DIR)
-	source <($(BINDIR)/setup-envtest use $(ENVTEST_KUBERNETES_VERSION) --bin-dir=$(ENVTEST_ASSETS_DIR) -p env); GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn go test -race -v ./...
+	source <($(BINDIR)/setup-envtest use $(ENVTEST_KUBERNETES_VERSION) --bin-dir=$(ENVTEST_ASSETS_DIR) -p env); GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn go test -count=1 -race -v ./...
+
+groupname-test: ## Run unit tests that depends on the groupname.
+	go install ./...
+
+	mkdir -p $(ENVTEST_ASSETS_DIR)
+	source <($(BINDIR)/setup-envtest use $(ENVTEST_KUBERNETES_VERSION) --bin-dir=$(ENVTEST_ASSETS_DIR) -p env); GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn TEST_LEGACY=true go test -count=1 -race -v ./client/*
+	TEST_LEGACY=true go test -count=1 -race -v ./constants*.go
 
 .PHONY: clean
 clean: ## Clean working directory.
@@ -143,7 +170,7 @@ build/hypertopolvm: $(GO_FILES)
 	mkdir -p build
 	go build -o $@ -ldflags "-w -s -X github.com/topolvm/topolvm.Version=$(TOPOLVM_VERSION)" ./pkg/hypertopolvm
 
-build/lvmd:
+build/lvmd: $(GO_FILES)
 	mkdir -p build
 	CGO_ENABLED=0 go build -o $@ -ldflags "-w -s -X github.com/topolvm/topolvm.Version=$(TOPOLVM_VERSION)" ./pkg/lvmd
 
@@ -176,7 +203,6 @@ install-kind:
 .PHONY: tools
 tools: install-kind ## Install development tools.
 	GOBIN=$(BINDIR) go install honnef.co/go/tools/cmd/staticcheck@latest
-	GOBIN=$(BINDIR) go install github.com/gostaticanalysis/nilerr/cmd/nilerr@latest
 	# Follow the official documentation to install the `latest` version, because explicitly specifying the version will get an error.
 	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION)
@@ -201,8 +227,3 @@ setup: ## Setup local environment.
 	$(SUDO) apt-get update
 	$(SUDO) apt-get -y install --no-install-recommends $(PACKAGES)
 	$(MAKE) tools
-
-.PHONY: kind-node
-kind-node:
-	git clone --depth 1 https://github.com/kubernetes/kubernetes.git -b $(KIND_NODE_VERSION) /tmp/kind-node
-	$(BINDIR)/kind build node-image --kube-root /tmp/kind-node --image ghcr.io/topolvm/kind-node:$(KIND_NODE_VERSION)
