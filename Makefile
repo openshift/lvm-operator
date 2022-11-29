@@ -236,7 +236,8 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS) \
+		--extra-service-accounts topolvm-node,vg-manager,topolvm-controller
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
