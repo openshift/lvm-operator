@@ -2,6 +2,8 @@
 approvers:
   - nbalacha
   - agarwal-mudit
+  - suleymanakbas91
+  - brandisher
 # review == this code is good /lgtm
 reviewers:
   - nbalacha
@@ -12,3 +14,6 @@ reviewers:
   - Yuggupta27
   - riya-singhal31
   - agarwal-mudit
+  - suleymanakbas91
+  - brandisher
+  - jerpeter1
