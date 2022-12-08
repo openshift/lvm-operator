@@ -9,6 +9,9 @@ on:
 jobs:
   publish-image:
     runs-on: ubuntu-latest
+    if: >
+      github.repository == 'red-hat-storage/lvm-operator' &&
+      github.ref == 'refs/heads/main'
     steps:
       - name: invoke-operator-build
         uses: benc-uk/workflow-dispatch@v1
