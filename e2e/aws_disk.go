@@ -41,7 +41,7 @@ type disk struct {
 }
 
 const (
-	awsPurposeTag       = "odf-lvmo"
+	awsPurposeTag       = "rh-lvmo"
 	labelNodeRoleWorker = "node-role.kubernetes.io/worker"
 )
 

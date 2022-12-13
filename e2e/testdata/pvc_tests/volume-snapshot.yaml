@@ -4,7 +4,7 @@ metadata:
   name: lvfilepvc-snapshot
   namespace: lvm-endtoendtest
 spec:
-  volumeSnapshotClassName: odf-lvm-vg1
+  volumeSnapshotClassName: lvms-vg1
   source:
     persistentVolumeClaimName: lvmfilepvc
 
