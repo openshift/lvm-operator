@@ -25,15 +25,15 @@ ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
-BUNDLE_PACKAGE ?= lvm-operator
+BUNDLE_PACKAGE ?= lvms-operator
 
 # Image URL to use all building/pushing image targets
 IMAGE_REGISTRY ?= quay.io
 REGISTRY_NAMESPACE ?= ocs-dev
 IMAGE_TAG ?= latest
-IMAGE_NAME ?= lvm-operator
+IMAGE_NAME ?= lvms-operator
 VGMANAGER_IMAGE_NAME ?= vgmanager
-MUST_GATHER_IMAGE_NAME ?= lvm-must-gather
+MUST_GATHER_IMAGE_NAME ?= lvms-must-gather
 MUST_GATHER_FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(MUST_GATHER_IMAGE_NAME):$(IMAGE_TAG)
 
 # IMG defines the image used for the operator.
@@ -68,7 +68,7 @@ SHELL = /usr/bin/env bash -o pipefail
 IMAGE_BUILD_CMD ?= $(shell command -v docker 2>&1 >/dev/null && echo docker || echo podman)
 
 
-MANAGER_NAME_PREFIX ?= lvm-operator-
+MANAGER_NAME_PREFIX ?= lvms-
 
 all: build
 
@@ -191,7 +191,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 deploy-with-olm: kustomize ## Deploy controller to the K8s cluster via OLM
 	cd olm-deploy/ && $(KUSTOMIZE) edit set image catalog-img=${CATALOG_IMG}
-	$(KUSTOMIZE) build olm-deploy/ | sed "s/lvm-operator.v.*/lvm-operator.v${VERSION}/g" | kubectl create -f -
+	$(KUSTOMIZE) build olm-deploy/ | sed "s/lvms-operator.v.*/lvms-operator.v${VERSION}/g" | kubectl create -f -
 
 undeploy-with-olm: ## Undeploy controller from the K8s cluster
 	$(KUSTOMIZE) build olm-deploy/ | kubectl delete -f -
@@ -299,8 +299,8 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-lvm-must-gather:
-	@echo "Building the lvm-must-gather image"
+lvms-must-gather:
+	@echo "Building the lvms-must-gather image"
 	$(IMAGE_BUILD_CMD) build -f must-gather/Dockerfile -t "${MUST_GATHER_FULL_IMAGE_NAME}" must-gather/
 
 # Variables required to run and build LVM end to end tests.
