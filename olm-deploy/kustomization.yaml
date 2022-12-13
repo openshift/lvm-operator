@@ -4,17 +4,17 @@ kind: Kustomization
 resources:
 - openshift-storage-namespace.yaml
 - openshift-storage-operatorgroup.yaml
-- lvm-operator-subscription.yaml
-- lvm-catalogsource.yaml
+- lvms-operator-subscription.yaml
+- lvms-catalogsource.yaml
 
 # image configurations
 configurations:
-- lvm-catalogsource-image.yaml
+- lvms-catalogsource-image.yaml
 
 # replace catalogsource image
 images:
 - name: catalog-img
-  newName: quay.io/ocs-dev/lvm-operator-catalog
+  newName: quay.io/ocs-dev/lvms-operator-catalog
   newTag: latest
 
 patches:
@@ -22,9 +22,6 @@ patches:
     - op: replace
       path: /spec/channel
       value: alpha
-    - op: replace
-      path: /spec/startingCSV
-      value: lvm-operator.v0.0.1
   target:
     kind: Subscription
-    name: lvm-operator
+    name: lvms-operator
