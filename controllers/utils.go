@@ -56,3 +56,11 @@ func setDaemonsetNodeSelector(nodeSelector *corev1.NodeSelector, ds *appsv1.Daem
 		ds.Spec.Template.Spec.Affinity = nil
 	}
 }
+
+func getStorageClassName(deviceName string) string {
+	return storageClassPrefix + deviceName
+}
+
+func getVolumeSnapshotClassName(deviceName string) string {
+	return volumeSnapshotClassPrefix + deviceName
+}
