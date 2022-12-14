@@ -8,5 +8,5 @@ roleRef:
   name: proxy-role
 subjects:
 - kind: ServiceAccount
-  name: lvm-controller-manager
+  name: lvms-operator
   namespace: system

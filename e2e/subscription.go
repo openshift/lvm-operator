@@ -77,7 +77,7 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 	// Catalog Source
 	lvmCatalog := v1alpha1.CatalogSource{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "lvm-catalogsource",
+			Name:      "lvms-catalogsource",
 			Namespace: installNamespace,
 		},
 		Spec: v1alpha1.CatalogSourceSpec{
@@ -94,16 +94,15 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 	// Subscriptions
 	lvmSubscription := v1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "lvm-operator",
+			Name:      "lvms-operator",
 			Namespace: installNamespace,
 		},
 		Spec: &v1alpha1.SubscriptionSpec{
 			Channel:                subscriptionChannel,
 			InstallPlanApproval:    "Automatic",
-			CatalogSource:          "lvm-catalogsource",
+			CatalogSource:          "lvms-catalogsource",
 			CatalogSourceNamespace: installNamespace,
-			// Upstream package name is lvm-operator (downstream will be odf-lvm-operator)
-			Package: "lvm-operator",
+			Package:                "lvms-operator",
 		},
 	}
 	lvmSubscription.SetGroupVersionKind(schema.GroupVersionKind{Group: v1alpha1.SchemeGroupVersion.Group, Kind: "Subscription", Version: v1alpha1.SchemeGroupVersion.Version})
@@ -118,7 +117,7 @@ func waitForLVMCatalogSource(ctx context.Context) error {
 	interval := 10 * time.Second
 	lastReason := ""
 
-	labelSelector, err := labels.Parse("olm.catalogSource in (lvm-catalogsource)")
+	labelSelector, err := labels.Parse("olm.catalogSource in (lvms-catalogsource)")
 	if err != nil {
 		return err
 	}
@@ -135,7 +134,7 @@ func waitForLVMCatalogSource(ctx context.Context) error {
 		}
 
 		if len(pods.Items) == 0 {
-			lastReason = "waiting on lvm catalog source pod to be created"
+			lastReason = "waiting on lvms catalog source pod to be created"
 			return false, nil
 		}
 		isReady := false
@@ -148,7 +147,7 @@ func waitForLVMCatalogSource(ctx context.Context) error {
 			}
 		}
 		if !isReady {
-			lastReason = "waiting on lvm catalog source pod to reach ready state"
+			lastReason = "waiting on lvms catalog source pod to reach ready state"
 			return false, nil
 		}
 
@@ -165,7 +164,7 @@ func waitForLVMCatalogSource(ctx context.Context) error {
 
 // waitForLVMOperator waits for the lvm-operator to come online.
 func waitForLVMOperator(ctx context.Context) error {
-	deployments := []string{"lvm-operator-controller-manager"}
+	deployments := []string{"lvms-operator"}
 
 	timeout := 1000 * time.Second
 	interval := 10 * time.Second

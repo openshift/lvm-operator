@@ -67,7 +67,7 @@ func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx c
 	// delete the corresponding volume snapshot class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		vsc := &snapapi.VolumeSnapshotClass{}
-		vscName := fmt.Sprintf("odf-lvm-%s", deviceClass.Name)
+		vscName := getVolumeSnapshotClassName(deviceClass.Name)
 		err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc)
 
 		if err != nil {
@@ -107,7 +107,7 @@ func getTopolvmSnapshotClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*snapapi.Vo
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		snapshotClass := &snapapi.VolumeSnapshotClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("odf-lvm-%s", deviceClass.Name),
+				Name: getVolumeSnapshotClassName(deviceClass.Name),
 			},
 
 			Driver:         TopolvmCSIDriverName,
