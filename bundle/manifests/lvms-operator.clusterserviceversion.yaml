@@ -565,7 +565,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
-                image: quay.io/nibalach/lvm-operator:dec13-1
+                image: quay.io/ocs-dev/lvms-operator:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -610,7 +610,7 @@ spec:
                 resources: {}
               - command:
                 - /metricsexporter
-                image: quay.io/nibalach/lvm-operator:dec13-1
+                image: quay.io/ocs-dev/lvms-operator:latest
                 name: metricsexporter
                 resources:
                   limits:
