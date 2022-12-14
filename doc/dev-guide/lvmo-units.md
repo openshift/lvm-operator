@@ -19,5 +19,5 @@
 
 - *topolvmStorageClass* resource units creates and manages all the storage
   classes corresponding to the deviceClasses in the LVMCluster
-- Storage Class name is generated with a prefix "topolvm-" added to name of the
+- Storage Class name is generated with a prefix "lvms-" added to name of the
   device class in the LVMCluster CR
