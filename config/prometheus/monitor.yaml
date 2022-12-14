@@ -4,9 +4,9 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app.kubernetes.io/name: lvm-operator
-    app.kubernetes.io/part-of: odf-lvm-provisioner
-  name: lvm-operator-controller-manager-metrics-monitor
+    app.kubernetes.io/name: lvms-operator
+    app.kubernetes.io/part-of: lvms-provisioner
+  name: lvms-operator-metrics-monitor
   namespace: system
 spec:
   endpoints:
@@ -17,7 +17,7 @@ spec:
       tlsConfig:
         insecureSkipVerify: true
     - path: /metrics
-      port: lvm-metrics
+      port: lvms-metrics
       scheme: http
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
