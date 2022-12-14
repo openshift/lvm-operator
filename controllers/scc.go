@@ -105,7 +105,7 @@ func newTopolvmNodeScc(namespace string) *secv1.SecurityContextConstraints {
 			Kind:       "SecurityContextConstraints",
 		},
 	}
-	scc.Name = "odf-lvm-topolvm-node"
+	scc.Name = sccPrefix + "topolvm-node"
 	scc.AllowPrivilegedContainer = true
 	scc.AllowHostNetwork = false
 	scc.AllowHostDirVolumePlugin = true
@@ -146,7 +146,7 @@ func newVGManagerScc(namespace string) *secv1.SecurityContextConstraints {
 			Kind:       "SecurityContextConstraints",
 		},
 	}
-	scc.Name = "odf-lvm-vgmanager"
+	scc.Name = sccPrefix + "vgmanager"
 	scc.AllowPrivilegedContainer = true
 	scc.AllowHostNetwork = false
 	scc.AllowHostDirVolumePlugin = true
