@@ -4,15 +4,15 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/compose: metrics
-    app.kubernetes.io/part-of: odf-lvm-provisioner
-  name: lvm-node-metrics
+    app.kubernetes.io/part-of: lvms-provisioner
+  name: lvms-node-metrics
 spec:
   ports:
-  - name: lvm-metrics
+  - name: lvms-metrics
     port: 23532
     protocol: TCP
     targetPort: 23532
   selector:
-    exporter: lvm-operator
+    exporter: lvms-operator
 status:
   loadBalancer: {}
