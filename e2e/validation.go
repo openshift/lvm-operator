@@ -34,8 +34,8 @@ const (
 	timeout                   = time.Minute * 15
 	interval                  = time.Second * 10
 	lvmVolumeGroupName        = "vg1"
-	storageClassName          = "odf-lvm-vg1"
-	volumeSnapshotClassName   = "odf-lvm-vg1"
+	storageClassName          = "lvms-vg1"
+	volumeSnapshotClassName   = "lvms-vg1"
 	csiDriverName             = "topolvm.io"
 	topolvmNodeDaemonSetName  = "topolvm-node"
 	topolvmCtrlDeploymentName = "topolvm-controller"

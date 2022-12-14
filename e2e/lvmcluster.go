@@ -30,7 +30,7 @@ import (
 func generateLVMCluster() *v1alpha1.LVMCluster {
 	lvmClusterRes := &v1alpha1.LVMCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "odf-lvmcluster",
+			Name:      "rh-lvmcluster",
 			Namespace: installNamespace,
 		},
 		Spec: v1alpha1.LVMClusterSpec{
