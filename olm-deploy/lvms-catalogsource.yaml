@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: lvm-catalogsource
+  name: lvms-catalogsource
   namespace: openshift-storage
 spec:
   sourceType: grpc
