@@ -1,7 +1,7 @@
 ## Deploying LVMCluster CR
 
-This guide assumes you followed steps in [Readme][repo-readme] and LVM operator
-(hereafter LVMO) is running in your cluster.
+This guide assumes you followed the steps in [Readme][repo-readme] and local volume manager 
+storage (hereafter lvms) is running in your cluster.
 
 Below are the available disks in our test kubernetes cluster node and there are
 no existing LVM Physical Volumes, Volume Groups and Logical Volumes
@@ -23,13 +23,13 @@ sh-4.4# vgs
 sh-4.4# lvs
 ```
 
-Here LVMO is installed in `lvm-operator-system` namespace via `make deploy`
-target and operations will not change if LVMO is installed in any other namespaces.
+Here lvms is installed in `lvm-operator-system` namespace via the `make deploy`
+target and operations will not change if lvms is installed in any other namespaces.
 
 ``` console
 kubectl get pods
 NAME                                 READY   STATUS    RESTARTS   AGE
-controller-manager-8bf864c85-8zjlp   3/3     Running   0          96s
+lvms-operator-8bf864c85-8zjlp        3/3     Running   0          96s
 ```
 
 After all containers in above listing is in `READY` state we can proceed with
@@ -65,7 +65,7 @@ EOF
 ``` console
 kubectl get pods
 NAME                                  READY   STATUS    RESTARTS   AGE
-controller-manager-8bf864c85-8zjlp    3/3     Running   0          31m
+lvms-operator-8bf864c85-8zjlp         3/3     Running   0          31m
 topolvm-controller-694bc98b87-x6dxn   4/4     Running   0          10m
 topolvm-node-pbcth                    4/4     Running   0          10m
 vg-manager-f979f                      1/1     Running   0          10m
@@ -88,8 +88,8 @@ Confirm that the following resources have been created on the cluster:
 
 - When LVMCluster CR is deployed which contains details of all volume groups that
   needs to be created across multiple nodes, two supporting Custom Resources
-  are created by LVMO
-- LVMVolumeGroup: CR created and managed by LVMO which tracks individual volume
+  are created by lvms
+- LVMVolumeGroup: CR created and managed by lvms which tracks individual volume
   groups across multiple nodes
 ``` yaml
 # kubectl get lvmvolumegroup vg1 -oyaml
@@ -130,13 +130,13 @@ spec:
 ``` console
 # kubectl get storageclass
 NAME          PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-odf-lvm-vg1   topolvm.io           Delete          WaitForFirstConsumer   true                   31m
+lvms-vg1      topolvm.io           Delete          WaitForFirstConsumer   true                   31m
 ```
 
 Note:
-- Reconciling multiple LVMCluster CRs by LVMO is not supported
+- Reconciling multiple LVMCluster CRs by lvms is not supported
 - Custom resources LVMVolumeGroup and LVMVolumeGroupNodeStatus are managed by
-  LVMO and users should not edit them.
+  lvms and users should not edit them.
 
 ## Deploying PVC and App Pod
 
@@ -176,13 +176,13 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: odf-lvm-vg1
+  storageClassName: lvms-vg1
 EOF
 ```
 ``` console
 kubectl get pvc
 NAME           STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvm-file-pvc   Pending                                      odf-lvm-vg1    12s
+lvm-file-pvc   Pending                                      lvms-vg1       12s
 ```
 - In a multi node setup the `WaitForFirstConsumer` volume binding is used to
   take scheduling decisions of pod placement which usually prefers the node
@@ -218,7 +218,7 @@ app-file                              1/1     Running   0          2m6s
 
 kubectl get pvc
 NAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvm-file-pvc   Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            odf-lvm-vg1    5m55s
+lvm-file-pvc   Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            lvms-vg1    5m55s
 ```
 - To create a PVC with `volumeMode: Block`, do the following:
 ``` yaml
@@ -235,7 +235,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: odf-lvm-vg1
+  storageClassName: lvms-vg1
 ---
 apiVersion: v1
 kind: Pod
@@ -265,16 +265,16 @@ app-file                              1/1     Running   0          9m34s
 
 kubectl get pvc
 NAME            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-lvm-block-pvc   Bound    pvc-56fe959a-1184-4fa6-9d66-b69c06d43cf4   5Gi        RWO            odf-lvm-vg1    104s
-lvm-file-pvc    Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            odf-lvm-vg1    13m
+lvm-block-pvc   Bound    pvc-56fe959a-1184-4fa6-9d66-b69c06d43cf4   5Gi        RWO            lvm-vg1        104s
+lvm-file-pvc    Bound    pvc-04a4f5f7-8665-4008-818a-490503c859f5   5Gi        RWO            lvm-vg1        13m
 ```
 
 ### Monitoring and Metrics
 
-- LVMO currently surfaces only Topolvm metrics and those can be viewed either
+- lvms currently surfaces only Topolvm metrics and those can be viewed either
   from UI or port-forwarding the service
 - On Openshift clusters, set the label "openshift.io/cluster-monitoring" on the
-  namespace the LVMO is running in.
+  namespace the lvms is running in.
 ``` console
 kubectl patch namespace/lvm-operator-system -p '{"metadata": {"labels": {"openshift.io/cluster-monitoring": "true"}}}'
 ```
@@ -370,11 +370,11 @@ sh-4.4# rm /etc/topolvm/lvmd.yaml
 ```
 Note:
 - Removal of volume groups, physical volumes and lvm config file is necessary
-  during cleanup or else LVMO fails to deploy Topolvm in next iteration.
+  during cleanup or else lvms fails to deploy Topolvm in next iteration.
 
-## Uninstalling LVMO
+## Uninstalling lvms
 
-- LVMO can be removed from the cluster via one of the following methods based
+- lvms can be removed from the cluster via one of the following methods based
   on your installation
 ``` console
 # if deployed via manifests

@@ -40,9 +40,9 @@ const (
 	// installNamespace is the namespace we installs the operator in.
 	installNamespace = "openshift-storage"
 	// storageClass is the name of the lvm storage class.
-	storageClass = "odf-lvm-vg1"
+	storageClass = "lvms-vg1"
 	// snapshotClass is the name of the lvm snapshot class.
-	snapshotClass = "odf-lvm-vg1"
+	snapshotClass = "lvms-vg1"
 )
 
 var (

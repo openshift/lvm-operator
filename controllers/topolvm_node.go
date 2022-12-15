@@ -176,10 +176,10 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 		topolvmNodeTolerations = tolerations
 	}
 	labels := map[string]string{
-		AppKubernetesNameLabel:      TopolvmNodeLabelVal,
+		AppKubernetesNameLabel:      CsiDriverNameVal,
 		AppKubernetesManagedByLabel: ManagedByLabelVal,
 		AppKubernetesPartOfLabel:    PartOfLabelVal,
-		AppKubernetesComponentLabel: CsiDriverComponentVal,
+		AppKubernetesComponentLabel: TopolvmNodeLabelVal,
 	}
 	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

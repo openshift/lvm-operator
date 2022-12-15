@@ -74,11 +74,11 @@ const (
 
 const (
 	UsageHelp = `Usage of operf:
-This script retrieves cpu and memory usage metrics for all the workloads created by the LVM operator.
+This script retrieves cpu and memory usage metrics for all the workloads created by the logical volume manager storage (lvms).
 
 	It creates <instances> of "busybox" pods using PVCs provisioned via the Storage class provided
 	Example:
-	# go run test/performance/operf.go -token sha256~cj81ClyUYu7g05y8K-uLWm2AbrKTbNEQ96hEJcWStQo -sc odf-lvm-vg1 -instances 16
+	# go run test/performance/operf.go -token sha256~cj81ClyUYu7g05y8K-uLWm2AbrKTbNEQ96hEJcWStQo -sc lvms-vg1 -instances 16
 
 Parameters:`
 )
@@ -139,7 +139,7 @@ func main() {
 
 	// Retrieve and print metrics
 	units := []LvmUnitMetrics{
-		{Namespace: *TestNamespace, Name: "lvm-operator-controller-manager", WorkloadType: "deployment"},
+		{Namespace: *TestNamespace, Name: "lvms-operator", WorkloadType: "deployment"},
 		{Namespace: *TestNamespace, Name: "topolvm-controller", WorkloadType: "deployment"},
 		{Namespace: *TestNamespace, Name: "topolvm-node", WorkloadType: "daemonset"},
 		{Namespace: *TestNamespace, Name: "vg-manager", WorkloadType: "daemonset"},

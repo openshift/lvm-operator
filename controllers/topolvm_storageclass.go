@@ -67,7 +67,7 @@ func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.
 	// delete the corresponding storage class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		sc := &storagev1.StorageClass{}
-		scName := fmt.Sprintf("odf-lvm-%s", deviceClass.Name)
+		scName := getStorageClassName(deviceClass.Name)
 		err := r.Client.Get(ctx, types.NamespacedName{Name: scName}, sc)
 
 		if err != nil {
@@ -127,7 +127,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 	}
 	sc := []*storagev1.StorageClass{}
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
-		scName := "odf-lvm-" + deviceClass.Name
+		scName := getStorageClassName(deviceClass.Name)
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: scName,

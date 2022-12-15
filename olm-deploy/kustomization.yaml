@@ -14,7 +14,7 @@ configurations:
 # replace catalogsource image
 images:
 - name: catalog-img
-  newName: quay.io/ocs-dev/lvm-operator-catalog
+  newName: quay.io/ocs-dev/lvms-operator-catalog
   newTag: latest
 
 patches:

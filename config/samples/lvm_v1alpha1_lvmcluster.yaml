@@ -1,7 +1,7 @@
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
-  name: odf-lvmcluster
+  name: my-lvmcluster
 spec:
   storage:
     deviceClasses:

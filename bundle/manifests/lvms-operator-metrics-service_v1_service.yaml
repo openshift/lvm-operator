@@ -3,8 +3,8 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app.kubernetes.io/name: lvm-operator
-  name: controller-manager-metrics-service
+    app.kubernetes.io/name: lvms-operator
+  name: lvms-operator-metrics-service
 spec:
   ports:
   - name: https
@@ -12,6 +12,6 @@ spec:
     protocol: TCP
     targetPort: https
   selector:
-    app.kubernetes.io/name: lvm-operator
+    app.kubernetes.io/name: lvms-operator
 status:
   loadBalancer: {}
