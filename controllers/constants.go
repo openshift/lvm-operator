@@ -37,53 +37,34 @@ const (
 	TopolvmControllerContainerLivenessPort  = int32(9808)
 	TopolvmControllerContainerReadinessPort = int32(8080)
 
-	// CSI Controller resource requests/limits
-	// TODO: Reduce these values and reach optimistic values without effecting performance
-	TopolvmControllerMemRequest = "100Mi"
-	TopolvmControllerMemLimit   = "150Mi"
-	TopolvmControllerCPURequest = "100m"
-	TopolvmControllerCPULimit   = "100m"
+	// CSI Controller resource requests
+	TopolvmControllerMemRequest = "45Mi"
+	TopolvmControllerCPURequest = "2m"
 
 	TopolvmCsiProvisionerMemRequest = "50Mi"
-	TopolvmCsiProvisionerMemLimit   = "100Mi"
-	TopolvmCsiProvisionerCPURequest = "50m"
-	TopolvmCsiProvisionerCPULimit   = "100m"
+	TopolvmCsiProvisionerCPURequest = "2m"
 
-	TopolvmCsiResizerMemRequest = "50Mi"
-	TopolvmCsiResizerMemLimit   = "100Mi"
-	TopolvmCsiResizerCPURequest = "20m"
-	TopolvmCsiResizerCPULimit   = "50m"
+	TopolvmCsiResizerMemRequest = "35Mi"
+	TopolvmCsiResizerCPURequest = "1m"
 
-	TopolvmCsiSnapshotterMemRequest = "50Mi"
-	TopolvmCsiSnapshotterMemLimit   = "100Mi"
-	TopolvmCsiSnapshotterCPURequest = "20m"
-	TopolvmCsiSnapshotterCPULimit   = "50m"
+	TopolvmCsiSnapshotterMemRequest = "35Mi"
+	TopolvmCsiSnapshotterCPURequest = "1m"
 
-	VgManagerMemRequest = "50Mi"
-	VgManagerMemLimit   = "100Mi"
-	VgManagerCPURequest = "30m"
-	VgManagerCPULimit   = "50m"
+	VgManagerMemRequest = "45Mi"
+	VgManagerCPURequest = "2m"
 
-	// topoLVM Node resource requests/limits
-	TopolvmNodeMemRequest = "150Mi"
-	TopolvmNodeMemLimit   = "200Mi"
-	TopolvmNodeCPURequest = "50m"
-	TopolvmNodeCPULimit   = "100m"
+	// topoLVM Node resource requests
+	TopolvmNodeMemRequest = "25Mi"
+	TopolvmNodeCPURequest = "1m"
 
-	TopolvmdMemRequest = "100Mi"
-	TopolvmdMemLimit   = "150Mi"
-	TopolvmdCPURequest = "150m"
-	TopolvmdCPULimit   = "200m"
+	TopolvmdMemRequest = "30Mi"
+	TopolvmdCPURequest = "2m"
 
-	CSIRegistrarMemRequest = "30Mi"
-	CSIRegistrarMemLimit   = "50Mi"
-	CSIRegistrarCPURequest = "20m"
-	CSIRegistrarCPULimit   = "30m"
+	CSIRegistrarMemRequest = "15Mi"
+	CSIRegistrarCPURequest = "1m"
 
-	LivenessProbeMemRequest = "30Mi"
-	LivenessProbeMemLimit   = "50Mi"
-	LivenessProbeCPURequest = "30m"
-	LivenessProbeCPULimit   = "50m"
+	LivenessProbeMemRequest = "15Mi"
+	LivenessProbeCPURequest = "1m"
 
 	// CSI Provisioner requires below environment values to make use of CSIStorageCapacity
 	PodNameEnv   = "POD_NAME"
