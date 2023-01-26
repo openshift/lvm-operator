@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: operator
   namespace: system
+  annotations:
+    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
 spec:
   template:
     spec:

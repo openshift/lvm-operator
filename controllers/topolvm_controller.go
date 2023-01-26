@@ -143,6 +143,10 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 		*getCsiSnapshotterContainer(),
 	}
 
+	annotations := map[string]string{
+		workloadPartitioningManagementAnnotation: managementAnnotationVal,
+	}
+
 	labels := map[string]string{
 		AppKubernetesNameLabel:      CsiDriverNameVal,
 		AppKubernetesManagedByLabel: ManagedByLabelVal,
@@ -152,9 +156,10 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 
 	controllerDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      TopolvmControllerDeploymentName,
-			Namespace: namespace,
-			Labels:    labels,
+			Name:        TopolvmControllerDeploymentName,
+			Namespace:   namespace,
+			Annotations: annotations,
+			Labels:      labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,

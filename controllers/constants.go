@@ -26,7 +26,6 @@ const (
 	// CSI Controller container and deployment names
 	TopolvmControllerDeploymentName = "topolvm-controller"
 	TopolvmControllerContainerName  = "topolvm-controller"
-	CsiRegistrarContainerName       = "csi-registrar"
 	CsiResizerContainerName         = "csi-resizer"
 	CsiProvisionerContainerName     = "csi-provisioner"
 	CsiSnapshotterContainerName     = "csi-snapshotter"
@@ -106,6 +105,13 @@ const (
 
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
+
+	// annotations
+
+	// WorkloadPartitioningManagement contains the management workload annotation
+	workloadPartitioningManagementAnnotation = "target.workload.openshift.io/management"
+
+	managementAnnotationVal = `{"effect": "PreferredDuringScheduling"}`
 
 	// labels and values
 

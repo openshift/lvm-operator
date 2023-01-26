@@ -1,6 +1,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    workload.openshift.io/allowed: "management"
   labels:
     app.kubernetes.io/name: lvms-operator
     security.openshift.io/scc.podSecurityLabelSync: "false"
@@ -15,6 +17,8 @@ kind: Deployment
 metadata:
   name: operator
   namespace: system
+  annotations:
+    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
   labels:
     app.kubernetes.io/name: lvms-operator
 spec:
