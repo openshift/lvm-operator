@@ -16,11 +16,17 @@ COPY pkg/ pkg/
 COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o vgmanager cmd/vgmanager/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM centos:stream8
+# vgmanager needs 'nsenter' and other basic linux utils to correctly function
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7
+
+# Update the image to get the latest CVE updates
+RUN microdnf update -y && \
+    microdnf install -y openssl && \
+    microdnf install -y util-linux && \
+    microdnf clean all
+
 WORKDIR /
 COPY --from=builder /workspace/vgmanager .
 USER 65532:65532
