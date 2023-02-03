@@ -36,6 +36,10 @@ spec:
           spec:
             description: LVMVolumeGroupSpec defines the desired state of LVMVolumeGroup
             properties:
+              default:
+                description: Default is a flag to indicate whether the device-class
+                  is the default
+                type: boolean
               deviceSelector:
                 description: DeviceSelector is a set of rules that should match for
                   a device to be included in this TopoLVMCluster

@@ -37,7 +37,8 @@ func generateLVMCluster() *v1alpha1.LVMCluster {
 			Storage: v1alpha1.Storage{
 				DeviceClasses: []v1alpha1.DeviceClass{
 					{
-						Name: "vg1",
+						Name:    "vg1",
+						Default: true,
 						ThinPoolConfig: &v1alpha1.ThinPoolConfig{
 							Name:               "mytp1",
 							SizePercent:        90,

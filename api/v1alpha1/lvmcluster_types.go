@@ -84,6 +84,10 @@ type DeviceClass struct {
 	// +kubebuilder:validation:Required
 	// +required
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+
+	// Default is a flag to indicate whether the device-class is the default
+	// +optional
+	Default bool `json:"default,omitempty"`
 }
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned

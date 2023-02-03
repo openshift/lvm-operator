@@ -46,6 +46,10 @@ spec:
                       PVs
                     items:
                       properties:
+                        default:
+                          description: Default is a flag to indicate whether the device-class
+                            is the default
+                          type: boolean
                         deviceSelector:
                           description: DeviceSelector is a set of rules that should
                             match for a device to be included in the LVMCluster

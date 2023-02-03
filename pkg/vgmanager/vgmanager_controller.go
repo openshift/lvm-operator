@@ -194,7 +194,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 		dc := &lvmd.DeviceClass{
 			Name:           volumeGroup.Name,
 			VolumeGroup:    volumeGroup.Name,
-			Default:        true,
+			Default:        volumeGroup.Spec.Default,
 			ThinPoolConfig: &lvmd.ThinPoolConfig{},
 		}
 
