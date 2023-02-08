@@ -60,7 +60,7 @@ metadata:
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    repository: https://github.com/red-hat-storage/lvm-operator
+    repository: https://github.com/openshift/lvm-operator
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
@@ -803,7 +803,7 @@ spec:
   - LVM
   links:
   - name: Source Repository
-    url: https://github.com/red-hat-storage/lvm-operator
+    url: https://github.com/openshift/lvm-operator
   maintainers:
   - email: ocs-support@redhat.com
     name: Red Hat Support

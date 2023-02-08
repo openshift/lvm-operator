@@ -3,7 +3,7 @@ package vgmanager
 import (
 	"testing"
 
-	"github.com/red-hat-storage/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal"
 	"github.com/stretchr/testify/assert"
 )
 

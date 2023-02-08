@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/red-hat-storage/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal"
 )
 
 type lvmError string

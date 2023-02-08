@@ -8,13 +8,13 @@ contribute to the project.
 
 Developers must follow these steps to make a change:
 
-1. Fork the `red-hat-storage/lvm-operator` repository on GitHub.
+1. Fork the `openshift/lvm-operator` repository on GitHub.
 2. Create a branch from the `main` branch, or from a versioned branch (such
    as `release-4.9`) if you are proposing a backport.
 3. Make changes.
 4. Create tests as needed and ensure that all tests pass.
 5. Push your changes to a branch in your fork of the repository.
-6. Submit a pull request to the `red-hat-storage/lvm-operator` repository.
+6. Submit a pull request to the `openshift/lvm-operator` repository.
 7. Work with the community to make any necessary changes through the code
    review process (effectively repeating steps 3-7 as needed).
 

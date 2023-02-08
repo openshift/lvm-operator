@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-logr/logr"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"

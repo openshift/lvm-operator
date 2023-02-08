@@ -19,7 +19,7 @@ package controllers
 import (
 	"context"
 
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"

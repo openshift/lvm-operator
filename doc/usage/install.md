@@ -60,7 +60,7 @@ oc get pods -w
 After the controller is running, create the sample lvmCluster CR:
 
 ```
-oc create -n lvm-operator-system -f https://github.com/red-hat-storage/lvm-operator/raw/main/config/samples/lvm_v1alpha1_lvmcluster.yaml
+oc create -n lvm-operator-system -f https://github.com/openshift/lvm-operator/raw/main/config/samples/lvm_v1alpha1_lvmcluster.yaml
 ```
 
 This will try to leverage all nodes and all available disks on these nodes.

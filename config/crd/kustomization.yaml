@@ -3,7 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/lvm.topolvm.io_lvmclusters.yaml
-# Topolvm CRD from https://github.com/red-hat-storage/topolvm/blob/main/config/crd/bases/topolvm.io_logicalvolumes.yaml
+# Topolvm CRD from https://github.com/openshift/topolvm/blob/main/config/crd/bases/topolvm.io_logicalvolumes.yaml
 - bases/topolvm.io_logicalvolumes.yaml
 - bases/lvm.topolvm.io_lvmvolumegroups.yaml
 - bases/lvm.topolvm.io_lvmvolumegroupnodestatuses.yaml

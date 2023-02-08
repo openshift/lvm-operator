@@ -1,4 +1,4 @@
-module github.com/red-hat-storage/lvm-operator
+module github.com/openshift/lvm-operator
 
 go 1.18
 

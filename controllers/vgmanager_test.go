@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

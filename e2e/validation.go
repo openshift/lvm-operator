@@ -24,7 +24,7 @@ import (
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	. "github.com/onsi/gomega"
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"

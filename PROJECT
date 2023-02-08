@@ -5,7 +5,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: lvm-operator
-repo: github.com/red-hat-storage/lvm-operator
+repo: github.com/openshift/lvm-operator
 resources:
 - api:
     crdVersion: v1
@@ -14,7 +14,7 @@ resources:
   domain: topolvm.io
   group: lvm
   kind: LVMCluster
-  path: github.com/red-hat-storage/lvm-operator/api/v1alpha1
+  path: github.com/openshift/lvm-operator/api/v1alpha1
   version: v1alpha1
   webhooks:
     validation: true
@@ -25,7 +25,7 @@ resources:
   domain: topolvm.io
   group: lvm
   kind: LVMVolumeGroup
-  path: github.com/red-hat-storage/lvm-operator/api/v1alpha1
+  path: github.com/openshift/lvm-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -33,6 +33,6 @@ resources:
   domain: topolvm.io
   group: lvm
   kind: LVMVolumeGroupNodeStatus
-  path: github.com/red-hat-storage/lvm-operator/api/v1alpha1
+  path: github.com/openshift/lvm-operator/api/v1alpha1
   version: v1alpha1
 version: "3"
