@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	v1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	v1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

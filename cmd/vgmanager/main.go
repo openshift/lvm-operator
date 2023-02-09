@@ -26,8 +26,8 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
-	"github.com/red-hat-storage/lvm-operator/pkg/vgmanager"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/vgmanager"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"

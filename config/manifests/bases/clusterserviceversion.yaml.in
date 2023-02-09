@@ -30,7 +30,7 @@ metadata:
             }
           }
         }
-    repository: https://github.com/red-hat-storage/lvm-operator
+    repository: https://github.com/openshift/lvm-operator
     operatorframework.io/suggested-namespace: openshift-storage
     operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
@@ -73,7 +73,7 @@ spec:
   - LVM
   links:
   - name: Source Repository
-    url: https://github.com/red-hat-storage/lvm-operator
+    url: https://github.com/openshift/lvm-operator
   maintainers:
   - email: ocs-support@redhat.com
     name: Red Hat Support

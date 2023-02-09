@@ -14,5 +14,5 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: manual-operator-build-push
-          repo: red-hat-storage/lvm-operator
+          repo: openshift/lvm-operator
           inputs: '{ "branch": "main" }'

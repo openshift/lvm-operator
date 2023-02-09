@@ -27,9 +27,9 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
-	"github.com/red-hat-storage/lvm-operator/controllers"
-	"github.com/red-hat-storage/lvm-operator/pkg/internal"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/controllers"
+	"github.com/openshift/lvm-operator/pkg/internal"
 	"github.com/topolvm/topolvm/lvmd"
 	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
 	corev1 "k8s.io/api/core/v1"

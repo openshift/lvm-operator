@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	secv1 "github.com/openshift/api/security/v1"
-	lvmv1alpha1 "github.com/red-hat-storage/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

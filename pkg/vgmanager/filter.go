@@ -19,7 +19,7 @@ package vgmanager
 import (
 	"strings"
 
-	"github.com/red-hat-storage/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal"
 )
 
 const (

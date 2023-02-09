@@ -56,4 +56,4 @@ Note:
 [topolvm-design]: https://github.com/topolvm/topolvm/blob/main/docs/design.md
 [controller]: ../../controllers/lvmcluster_controller.go
 [lvmcluster]: ../../api/v1alpha1/lvmcluster_types.go
-[issue]: https://github.com/red-hat-storage/lvm-operator/issues
+[issue]: https://github.com/openshift/lvm-operator/issues
