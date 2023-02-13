@@ -37,10 +37,15 @@ func createNamespace(ctx context.Context, namespace string) error {
 	label["pod-security.kubernetes.io/enforce"] = "privileged"
 	label["security.openshift.io/scc.podSecurityLabelSync"] = "false"
 
+	annotations := make(map[string]string)
+	// annotation required for workload partitioning
+	annotations["workload.openshift.io/allowed"] = "management"
+
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   namespace,
-			Labels: label,
+			Name:        namespace,
+			Annotations: annotations,
+			Labels:      label,
 		},
 	}
 	err := crClient.Create(ctx, ns)
@@ -58,10 +63,15 @@ func deleteNamespaceAndWait(ctx context.Context, namespace string) error {
 	label["pod-security.kubernetes.io/enforce"] = "baseline"
 	label["security.openshift.io/scc.podSecurityLabelSync"] = "false"
 
+	annotations := make(map[string]string)
+	// annotation required for workload partitioning
+	annotations["workload.openshift.io/allowed"] = "management"
+
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   namespace,
-			Labels: label,
+			Name:        namespace,
+			Annotations: annotations,
+			Labels:      label,
 		},
 	}
 	err := crClient.Delete(ctx, ns)

@@ -183,6 +183,9 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 			},
 		},
 	}
+	annotations := map[string]string{
+		workloadPartitioningManagementAnnotation: managementAnnotationVal,
+	}
 	labels := map[string]string{
 		AppKubernetesNameLabel:      VGManagerLabelVal,
 		AppKubernetesManagedByLabel: ManagedByLabelVal,
@@ -191,9 +194,10 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	}
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      VGManagerUnit,
-			Namespace: namespace,
-			Labels:    labels,
+			Name:        VGManagerUnit,
+			Namespace:   namespace,
+			Annotations: annotations,
+			Labels:      labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
