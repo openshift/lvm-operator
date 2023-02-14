@@ -584,12 +584,9 @@ spec:
                   initialDelaySeconds: 5
                   periodSeconds: 10
                 resources:
-                  limits:
-                    cpu: 100m
-                    memory: 100Mi
                   requests:
-                    cpu: 50m
-                    memory: 50Mi
+                    cpu: 3m
+                    memory: 30Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                 volumeMounts:
@@ -613,12 +610,9 @@ spec:
                 image: quay.io/ocs-dev/lvms-operator:latest
                 name: metricsexporter
                 resources:
-                  limits:
-                    cpu: 100m
-                    memory: 100Mi
                   requests:
-                    cpu: 30m
-                    memory: 30Mi
+                    cpu: 1m
+                    memory: 20Mi
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator

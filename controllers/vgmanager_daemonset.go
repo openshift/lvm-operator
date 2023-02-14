@@ -135,10 +135,6 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(VgManagerCPULimit),
-			corev1.ResourceMemory: resource.MustParse(VgManagerMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(VgManagerCPURequest),
 			corev1.ResourceMemory: resource.MustParse(VgManagerMemRequest),
