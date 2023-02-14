@@ -17,15 +17,18 @@ COPY cmd/ cmd/
 COPY pkg/ pkg/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o vgmanager cmd/vgmanager/main.go
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o metricsexporter cmd/metricsexporter/exporter.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM quay.io/centos/centos:stream8
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7
 
-# Install required utilities
-RUN dnf install -y openssl && dnf clean all
+# Update the image to get the latest CVE updates
+RUN microdnf update -y && \
+    microdnf install -y openssl && \
+    microdnf install -y util-linux && \
+    microdnf clean all
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
