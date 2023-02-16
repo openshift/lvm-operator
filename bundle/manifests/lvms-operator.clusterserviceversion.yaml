@@ -604,7 +604,10 @@ spec:
                 - containerPort: 8443
                   name: https
                   protocol: TCP
-                resources: {}
+                resources:
+                  requests:
+                    cpu: 1m
+                    memory: 20Mi
               - command:
                 - /metricsexporter
                 image: quay.io/ocs-dev/lvms-operator:latest
