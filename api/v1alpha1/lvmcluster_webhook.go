@@ -48,11 +48,12 @@ func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 func (l *LVMCluster) ValidateCreate() error {
 	lvmclusterlog.Info("validate create", "name", l.Name)
 
-	if len(l.Spec.Storage.DeviceClasses) != 1 {
-		return fmt.Errorf("Exactly one deviceClass is allowed")
+	err := l.verifySingleDefaultDeviceClass()
+	if err != nil {
+		return err
 	}
 
-	err := l.verifyPathsAreNotEmpty()
+	err = l.verifyPathsAreNotEmpty()
 	if err != nil {
 		return err
 	}
@@ -74,11 +75,12 @@ func (l *LVMCluster) ValidateCreate() error {
 func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 	lvmclusterlog.Info("validate update", "name", l.Name)
 
-	if len(l.Spec.Storage.DeviceClasses) != 1 {
-		return fmt.Errorf("Exactly one deviceClass is allowed")
+	err := l.verifySingleDefaultDeviceClass()
+	if err != nil {
+		return err
 	}
 
-	err := l.verifyPathsAreNotEmpty()
+	err = l.verifyPathsAreNotEmpty()
 	if err != nil {
 		return err
 	}
@@ -160,6 +162,28 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (l *LVMCluster) ValidateDelete() error {
 	lvmclusterlog.Info("validate delete", "name", l.Name)
+
+	return nil
+}
+
+func (l *LVMCluster) verifySingleDefaultDeviceClass() error {
+	deviceClasses := l.Spec.Storage.DeviceClasses
+	if len(deviceClasses) == 1 {
+		return nil
+	} else if len(deviceClasses) < 1 {
+		return fmt.Errorf("at least one deviceClass is required")
+	}
+	countDefault := 0
+	for _, deviceClass := range deviceClasses {
+		if deviceClass.Default {
+			countDefault++
+		}
+	}
+	if countDefault < 1 {
+		return fmt.Errorf("one default deviceClass is required. Please specify default=true for the default deviceClass")
+	} else if countDefault > 1 {
+		return fmt.Errorf("only one default deviceClass is allowed. Currently, there are %d default deviceClasses", countDefault)
+	}
 
 	return nil
 }

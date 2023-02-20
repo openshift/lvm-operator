@@ -138,6 +138,7 @@ func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1
 				NodeSelector:   deviceClass.NodeSelector,
 				DeviceSelector: deviceClass.DeviceSelector,
 				ThinPoolConfig: deviceClass.ThinPoolConfig,
+				Default:        len(deviceClasses) == 1 || deviceClass.Default, //True if there is only one device class or default is explicitly set.
 			},
 		}
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)

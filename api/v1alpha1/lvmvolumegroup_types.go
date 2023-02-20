@@ -42,6 +42,10 @@ type LVMVolumeGroupSpec struct {
 	// +kubebuilder:validation:Required
 	// +required
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+
+	// Default is a flag to indicate whether the device-class is the default
+	// +optional
+	Default bool `json:"default,omitempty"`
 }
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
