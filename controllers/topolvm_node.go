@@ -235,6 +235,12 @@ func getNodeInitContainer(initImage string) *corev1.Container {
 		Image:        initImage,
 		Command:      command,
 		VolumeMounts: volumeMounts,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(FileCheckerCPURequest),
+				corev1.ResourceMemory: resource.MustParse(FileCheckerMemRequest),
+			},
+		},
 	}
 
 	return fileChecker

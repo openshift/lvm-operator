@@ -202,6 +202,12 @@ func getInitContainer(initImage string) *corev1.Container {
 		Image:        initImage,
 		Command:      command,
 		VolumeMounts: volumeMounts,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(CertGeneratorCPURequest),
+				corev1.ResourceMemory: resource.MustParse(CertGeneratorMemRequest),
+			},
+		},
 	}
 
 	return ssCertGenerator
