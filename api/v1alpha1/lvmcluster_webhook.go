@@ -193,7 +193,11 @@ func (l *LVMCluster) verifyPathsAreNotEmpty() error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			if len(deviceClass.DeviceSelector.Paths) == 0 {
-				return fmt.Errorf("Path list should not be empty when DeviceSelector is specified.")
+				return fmt.Errorf("path list should not be empty when DeviceSelector is specified")
+			}
+		} else {
+			if len(l.Spec.Storage.DeviceClasses) > 1 {
+				return fmt.Errorf("path list should not be empty when there are multiple deviceClasses. Please specify device path(s) under deviceSelector.paths for %s deviceClass", deviceClass.Name)
 			}
 		}
 	}
