@@ -32,6 +32,7 @@ metadata:
     containerImage: quay.io/ocs-dev/lvm-operator:latest
     description: Logical volume manager storage provides dynamically provisioned local
       storage for container workloads
+    olm.skipRange: ""
     operatorframework.io/cluster-monitoring: "true"
     operatorframework.io/initialization-resource: |-
       {
