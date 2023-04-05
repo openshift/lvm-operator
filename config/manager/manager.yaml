@@ -28,6 +28,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app.kubernetes.io/name: lvms-operator
         app.kubernetes.io/part-of: lvms-provisioner
