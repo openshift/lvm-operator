@@ -9,6 +9,15 @@ resources:
 - bases/lvm.topolvm.io_lvmvolumegroupnodestatuses.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
+patches:
+  # The following patch adds an additionalPrinterColumn called Status into the LVMCluster CRD.
+  - target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: lvmclusters.lvm.topolvm.io
+    path: patches/additionalPrinterColumn_in_lvmcluster.yaml
+
 patchesStrategicMerge:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
