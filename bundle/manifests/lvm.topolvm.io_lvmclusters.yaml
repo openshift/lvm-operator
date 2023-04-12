@@ -14,7 +14,11 @@ spec:
     singular: lvmcluster
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: LVMCluster is the Schema for the lvmclusters API
