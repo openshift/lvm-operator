@@ -109,7 +109,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
 
-	// Mark the first lvmo storage class default if no other storageclasses exist on the cluster
+	// Mark the lvms storage class, associated with the default device class, as default if no other default storage class exists on the cluster
 	scList := &storagev1.StorageClassList{}
 	err := r.Client.List(ctx, scList)
 
@@ -145,8 +145,10 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
-			storageClass.Annotations[defaultSCAnnotation] = "true"
-			defaultStorageClassName = scName
+			if len(lvmCluster.Spec.Storage.DeviceClasses) == 1 || deviceClass.Default {
+				storageClass.Annotations[defaultSCAnnotation] = "true"
+				defaultStorageClassName = scName
+			}
 		}
 		sc = append(sc, storageClass)
 	}
