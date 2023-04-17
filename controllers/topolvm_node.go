@@ -66,10 +66,13 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 			return nil
 		}
 		// if update, update only mutable fields
-		// For topolvm Node, we have containers, node selector and toleration terms
+		// For topolvm Node, we have containers, initcontainers, node selector and toleration terms
 
 		// containers
 		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
+
+		// initcontainers
+		ds.Spec.Template.Spec.InitContainers = dsTemplate.Spec.Template.Spec.InitContainers
 
 		// tolerations
 		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
