@@ -21,6 +21,7 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +40,10 @@ func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &lvmv1alpha1.LVMVolumeGroupNodeStatus{}},
 			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
-			//			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&source.Kind{Type: &storagev1.StorageClass{}},
+			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
 		).
 		Complete(r)
 }
