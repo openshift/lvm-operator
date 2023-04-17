@@ -117,6 +117,7 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 	// for update, topolvm controller is interested in only updating container images
 	// labels, volumes, service account etc can remain unchanged
 	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
+	existing.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 
 	return nil
 }
