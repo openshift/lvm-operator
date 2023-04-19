@@ -70,7 +70,7 @@ type VGReconciler struct {
 }
 
 func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return ctrl.Result{}, fmt.Errorf("TESTING ERROR!!!")
+	return ctrl.Result{}, nil
 
 	r.Log = log.FromContext(ctx).WithName(ControllerName)
 	r.Log.Info("reconciling", "lvmvolumegroup", req)
