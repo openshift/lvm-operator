@@ -6,7 +6,7 @@ that expands its capabilities to gather LVM Operator information.
 
 ### Usage
 ```sh
-oc adm must-gather --image=quay.io/ocs-dev/lvm-must-gather:latest
+oc adm must-gather --image=quay.io/lvms_dev/lvm-must-gather:latest
 ```
 
 The command above will create a local directory with a dump of the lvm state.
@@ -33,7 +33,7 @@ Developers must follow these steps to make a change:
 
 To test the changes in must-gather follow these steps:
 1. Run `make lvm-must-gather`
-2. It will create an image named `quay.io/ocs-dev/lvm-must-gather:latest`
+2. It will create an image named `quay.io/lvms_dev/lvm-must-gather:latest`
 3. Tag it and push it to your image repository to use it with the `oc adm` command
 
 #### Commit and Pull Request Messages

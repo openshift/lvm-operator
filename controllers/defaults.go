@@ -23,7 +23,7 @@ import (
 var (
 	defaultValMap = map[string]string{
 		"OPERATOR_NAMESPACE":      "openshift-storage",
-		"TOPOLVM_CSI_IMAGE":       "quay.io/ocs-dev/topolvm:latest",
+		"TOPOLVM_CSI_IMAGE":       "quay.io/lvms_dev/topolvm:latest",
 		"CSI_REGISTRAR_IMAGE":     "k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.2",
 		"CSI_PROVISIONER_IMAGE":   "k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0",
 		"CSI_LIVENESSPROBE_IMAGE": "k8s.gcr.io/sig-storage/livenessprobe:v2.8.0",
@@ -31,7 +31,7 @@ var (
 		"CSI_SNAPSHOTTER_IMAGE":   "k8s.gcr.io/sig-storage/csi-snapshotter:v6.1.0",
 
 		// not being used, only for reference
-		"VGMANAGER_IMAGE": "quay.io/ocs-dev/vgmanager:latest",
+		"VGMANAGER_IMAGE": "quay.io/lvms_dev/vgmanager:latest",
 	}
 
 	OperatorNamespace = GetEnvOrDefault("OPERATOR_NAMESPACE")

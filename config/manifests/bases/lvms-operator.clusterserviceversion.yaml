@@ -5,7 +5,7 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     categories: Storage
-    containerImage: quay.io/ocs-dev/lvms-operator:latest
+    containerImage: quay.io/lvms_dev/lvms-operator:latest
     description: Logical volume manager storage provides dynamically provisioned local storage for container workloads
     operatorframework.io/cluster-monitoring: "true"
     operatorframework.io/initialization-resource: |-
