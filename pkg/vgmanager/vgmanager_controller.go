@@ -106,7 +106,7 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 }
 
 var reconcileInterval = time.Minute * 1
-var reconcileAgain ctrl.Result = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
+var reconcileAgain = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
 
 //TODO: Refactor this function to move the ctrl result to a single place
 
@@ -162,9 +162,9 @@ func (r *VGReconciler) reconcile(ctx context.Context, req ctrl.Request, volumeGr
 	}
 
 	if len(matchingDevices) == 0 {
-		r.Log.Info("no matching devices for volume group", "VGName", volumeGroup.Name)
+		r.Log.Info("no matching devices found for volume group", "VGName", volumeGroup.Name)
 		if len(delayedDevices) > 0 {
-			return reconcileAgain, nil
+			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil //30 seconds to make sure delayed devices become available
 		}
 
 		if found {
@@ -563,7 +563,7 @@ func deleteLVMDConfig() error {
 	return err
 }
 
-func (r *VGReconciler) getMatchingDevicesForVG(volumeGroup *lvmv1alpha1.LVMVolumeGroup) (matching []internal.BlockDevice, delayed []internal.BlockDevice, err error) {
+func (r *VGReconciler) getMatchingDevicesForVG(volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, []internal.BlockDevice, error) {
 	// The LVMVolumeGroup was created/modified
 	r.Log.Info("getting block devices for volumegroup", "VGName", volumeGroup.Name)
 
