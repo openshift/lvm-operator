@@ -29,7 +29,7 @@ BUNDLE_PACKAGE ?= lvms-operator
 
 # Image URL to use all building/pushing image targets
 IMAGE_REGISTRY ?= quay.io
-REGISTRY_NAMESPACE ?= ocs-dev
+REGISTRY_NAMESPACE ?= lvms_dev
 IMAGE_TAG ?= latest
 IMAGE_NAME ?= lvms-operator
 VGMANAGER_IMAGE_NAME ?= vgmanager
@@ -120,13 +120,13 @@ test: manifests generate fmt vet envtest godeps-update ## Run tests.
 
 
 OPERATOR_NAMESPACE ?= openshift-storage
-TOPOLVM_CSI_IMAGE ?= quay.io/ocs-dev/topolvm:latest
+TOPOLVM_CSI_IMAGE ?= quay.io/lvms_dev/topolvm:latest
 CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.2
 CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0
 CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.8.0
 CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.6.0
 CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.1.0
-VGMANAGER_IMAGE ?= quay.io/ocs-dev/vgmanager:latest
+VGMANAGER_IMAGE ?= quay.io/lvms_dev/vgmanager:latest
 
 
 define MANAGER_ENV_VARS
