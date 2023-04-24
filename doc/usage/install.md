@@ -17,7 +17,7 @@ export IMG=quay.io/USER/lvms-operator
 Then start the build process like this:
 
 ```
-make docker-build-combined docker-push
+make docker-build docker-push
 ```
 
 Ensure that the new repository in your registry is either set to public or that your target OpenShift cluster has read access to that repository.

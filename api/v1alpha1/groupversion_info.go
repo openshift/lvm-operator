@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the lvm v1alpha1 API group
-//+kubebuilder:object:generate=true
-//+groupName=lvm.topolvm.io
+// +kubebuilder:object:generate=true
+// +groupName=lvm.topolvm.io
 package v1alpha1
 
 import (

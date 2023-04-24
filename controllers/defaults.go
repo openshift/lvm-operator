@@ -29,9 +29,6 @@ var (
 		"CSI_LIVENESSPROBE_IMAGE": "k8s.gcr.io/sig-storage/livenessprobe:v2.8.0",
 		"CSI_RESIZER_IMAGE":       "k8s.gcr.io/sig-storage/csi-resizer:v1.6.0",
 		"CSI_SNAPSHOTTER_IMAGE":   "k8s.gcr.io/sig-storage/csi-snapshotter:v6.1.0",
-
-		// not being used, only for reference
-		"VGMANAGER_IMAGE": "quay.io/lvms_dev/vgmanager:latest",
 	}
 
 	OperatorNamespace = GetEnvOrDefault("OPERATOR_NAMESPACE")

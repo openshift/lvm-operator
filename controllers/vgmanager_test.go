@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -95,7 +94,6 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 			},
 			Spec: testCase.lvmclusterSpec,
 		}
-		os.Setenv("VGMANAGER_IMAGE", "test")
 		r := newFakeLVMClusterReconciler(t, lvmcluster)
 		var unit resourceManager = vgManager{}
 		err := unit.ensureCreated(r, context.Background(), lvmcluster)
