@@ -30,12 +30,12 @@ UNAME := $(shell uname)
 
 ## Versions
 
-# VERSION defines the project version for the bundle.
+# OPERATOR_VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
+# - use the OPERATOR_VERSION as arg of the bundle target (e.g make bundle OPERATOR_VERSION=0.0.2)
+# - use environment variables to overwrite this value (e.g export OPERATOR_VERSION=0.0.2)
+OPERATOR_VERSION ?= 0.0.1
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
@@ -146,7 +146,7 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-verify: ## Verify go formatting and generated files
+verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
 	hack/verify-deps.sh
 	hack/verify-bundle.sh
@@ -205,7 +205,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 deploy-with-olm: kustomize ## Deploy controller to the K8s cluster via OLM.
 	cd olm-deploy/ && $(KUSTOMIZE) edit set image catalog-img=${CATALOG_IMG}
-	$(KUSTOMIZE) build olm-deploy/ | sed "s/lvms-operator.v.*/lvms-operator.v${VERSION}/g" | kubectl create -f -
+	$(KUSTOMIZE) build olm-deploy/ | sed "s/lvms-operator.v.*/lvms-operator.v${OPERATOR_VERSION}/g" | kubectl create -f -
 
 undeploy-with-olm: ## Undeploy controller from the K8s cluster.
 	$(KUSTOMIZE) build olm-deploy/ | kubectl delete -f -
@@ -235,7 +235,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 		$(KUSTOMIZE) edit add annotation --force 'olm.skipRange':"$(SKIP_RANGE)" && \
 		$(KUSTOMIZE) edit add patch --name $(BUNDLE_PACKAGE).v0.0.0 --kind ClusterServiceVersion\
 		--patch '[{"op": "replace", "path": "/spec/replaces", "value": "$(REPLACES)"}]'
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS) \
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(OPERATOR_VERSION) $(BUNDLE_METADATA_OPTS) \
 		--extra-service-accounts topolvm-node,vg-manager,topolvm-controller
 	$(OPERATOR_SDK) bundle validate ./bundle
 
