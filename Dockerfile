@@ -13,15 +13,32 @@ RUN go mod download
 COPY main.go main.go
 COPY api/ api/
 COPY controllers/ controllers/
+COPY cmd/ cmd/
+COPY pkg/ pkg/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+# vgmanager needs 'nsenter' and other basic linux utils to correctly function
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7
+
+# Update the image to get the latest CVE updates
+RUN microdnf update -y && \
+    microdnf install -y openssl && \
+    microdnf install -y util-linux && \
+    microdnf clean all
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/vgmanager .
+COPY --from=builder /workspace/metricsexporter .
+EXPOSE 23532
 USER 65532:65532
 
+# '/manager' is lvm-operator entrypoint
 ENTRYPOINT ["/manager"]
+
+# '/vgmanager' is vgmanager entrypoint which is used in daemonset image
+# ENTRYPOINT ["/vgmanager"]

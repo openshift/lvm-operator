@@ -17,8 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"os"
-
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -123,13 +121,6 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	privileged := true
 	var zero int64 = 0
 
-	// try to get vgmanager image from env and on absence get from running pod
-	// TODO: investigate why storing this env in a variable is failing tests
-	image := os.Getenv("VGMANAGER_IMAGE")
-	if image == "" {
-		image = vgImage
-	}
-
 	command := []string{
 		"/vgmanager",
 	}
@@ -143,7 +134,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	containers := []corev1.Container{
 		{
 			Name:    VGManagerUnit,
-			Image:   image,
+			Image:   vgImage,
 			Command: command,
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: &privileged,
