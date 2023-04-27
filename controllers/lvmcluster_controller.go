@@ -335,7 +335,7 @@ func (r *LVMClusterReconciler) getExpectedVgCount(ctx context.Context, instance 
 	return vgCount, nil
 }
 
-// NOTE: when updating this, please also update doc/design/operator.md
+// NOTE: when updating this, please also update docs/design/operator.md
 type resourceManager interface {
 
 	// getName should return a camelCase name of this unit of reconciliation
