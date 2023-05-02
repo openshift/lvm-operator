@@ -1,36 +1,13 @@
-# Volume Group Manager
+# The Volume Group Manager
 
-## Creation
-
-- `vg-manager` daemonset pods are created by the LVMCluster controller on LVMCluster CR creation 
-- They run on all nodes which match the Node Selector specified in
-  the CR. They run on all schedulable nodes if no nodeSelector is specified.
-- A controller owner reference is set on the daemonset so it is cleaned up
-  when the LVMCluster CR is deleted.
-
-## Reconciliation
-
-- The vg-manager daemonset consists of individual controller pods, each of
-  which handles the on node operations for the node it is running on.
-- The vg-manager controller reconciles LVMVolumeGroup CRs which are created
-  by the LVMO.
-- The vg-manager will determine the disks that match the filters
-  specified (currently not implemented) on the node it is running on and create
-  an LVM VG with them. It then creates the lvmd.yaml config file for lvmd. 
-- vg-manager also updates LVMVolumeGroupStatus with observed status of volume
-  groups for the node on which it is running
+The Volume Group Manager manages a single controller/reconciler, which runs as `vg-manager` daemon set pods on a cluster. They are responsible for performing on-node operations for the node they are running on. They first identify disks that match the filters specified for the node. Next, they watch for the LVMVolumeGroup resource and create the necessary volume groups and thin pools on the node based on the specified deviceSelector and nodeSelector. Once the volume groups are created, vg-manager generates the `lvmd.yaml` configuration file for lvmd to use. Additionally, vg-manager updates the LVMVolumeGroupStatus with the observed status of the volume groups on the node where it is running.
 
 ## Deletion
 
-- `vg-manager` daemonset is garbage collected when LVMCluster CR is deleted
+A controller owner reference is set on the daemon set, so it is cleaned up when the LVMCluster CR is deleted.
 
 ## Considerations
 
-- Storing lvmd config file on host seemed to be better when compared against
-  below options:
-  1. Single configmap: Storing all the lvmd config file contents across nodes
-     into a single configmap involves extra processing to segment the config
-     according to the node and save that before being consumed by lvmd
-  2. Multiple configmaps: Although this is doable having multiple configmaps
-     limits topolvm nodeplugin not to be deployed as a daemonset since configmap
-     should be unique for a daemonset
+Storing the lvmd config file on the host provides a superior solution when compared to other options:
+- Single config map: The process of storing the configuration file contents of lvmd across multiple nodes in a single config map requires additional processing to segment the configuration based on each individual node and store it accordingly before it can be consumed by lvmd.
+- Multiple config maps: Although technically possible, using multiple config maps to store lvmd config file contents across nodes would limit the deployment of TopoLVM node plugin as a daemon set. This is because each daemon set requires a unique config map.
