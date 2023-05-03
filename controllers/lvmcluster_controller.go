@@ -48,6 +48,19 @@ const (
 	openshiftSCCPrivilegedName = "privileged"
 )
 
+// NOTE: when updating this, please also update docs/design/lvm-operator-manager.md
+type resourceManager interface {
+
+	// getName should return a camelCase name of this unit of reconciliation
+	getName() string
+
+	// ensureCreated should check the resources managed by this unit
+	ensureCreated(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
+
+	// ensureDeleted should wait for the resources to be cleaned up
+	ensureDeleted(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
+}
+
 type ClusterType string
 
 const (
@@ -199,23 +212,6 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		}
 	}
 
-	/* 	// check  and report deployment status
-	   	var failedStatusUpdates []string
-	   	var lastError error
-	   	for _, unit := range resourceList {
-	   		err := unit.updateStatus(r, ctx, instance)
-	   		if err != nil {
-	   			failedStatusUpdates = append(failedStatusUpdates, unit.getName())
-	   			unitError := fmt.Errorf("failed updating status for: %s %w", unit.getName(), err)
-	   			r.Log.Error(unitError, "")
-	   		}
-	   	} */
-	/* 	// return simple message that will fit in status reconcileSucceeded condition, don't put all the errors there
-	   	if len(failedStatusUpdates) > 0 {
-	   		return ctrl.Result{}, fmt.Errorf("status update failed for %s: %w", strings.Join(failedStatusUpdates, ","), lastError)
-	   	}
-	*/
-
 	r.Log.Info("successfully reconciled LvmCluster")
 
 	return ctrl.Result{}, nil
@@ -333,25 +329,6 @@ func (r *LVMClusterReconciler) getExpectedVgCount(ctx context.Context, instance 
 	}
 
 	return vgCount, nil
-}
-
-// NOTE: when updating this, please also update docs/design/lvm-operator-manager.md
-type resourceManager interface {
-
-	// getName should return a camelCase name of this unit of reconciliation
-	getName() string
-
-	// ensureCreated should check the resources managed by this unit
-	ensureCreated(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
-
-	// ensureDeleted should wait for the resources to be cleaned up
-	ensureDeleted(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
-
-	// updateStatus should optionally update the CR's status about the health of the managed resource
-	// each unit will have updateStatus called individually so
-	// avoid status fields like lastHeartbeatTime and have a
-	// status that changes only when the operands change.
-	updateStatus(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
 }
 
 // checkIfOpenshift checks to see if the operator is running on an OCP cluster.

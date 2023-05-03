@@ -115,11 +115,6 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 	return nil
 }
 
-func (c lvmVG) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	// intentionally empty
-	return nil
-}
-
 func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1.LVMCluster) []*lvmv1alpha1.LVMVolumeGroup {
 
 	lvmVolumeGroups := []*lvmv1alpha1.LVMVolumeGroup{}

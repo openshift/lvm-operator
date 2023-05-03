@@ -118,10 +118,6 @@ func (v vgManager) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 	return nil
 }
 
-func (v vgManager) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	return nil
-}
-
 func initMapIfNil(m *map[string]string) {
 	if len(*m) > 1 {
 		return

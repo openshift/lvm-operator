@@ -96,11 +96,6 @@ func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx c
 	return nil
 }
 
-func (s topolvmVolumeSnapshotClass) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	// intentionally empty as there'll be no status field on VolumeSnapshotClass resource
-	return nil
-}
-
 func getTopolvmSnapshotClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*snapapi.VolumeSnapshotClass {
 	vsc := []*snapapi.VolumeSnapshotClass{}
 

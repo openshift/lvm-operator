@@ -89,11 +89,6 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 	return err
 }
 
-func (c csiDriver) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	// intentionally empty as there'll be no status field on CSIDriver resource
-	return nil
-}
-
 func getCSIDriverResource() *storagev1.CSIDriver {
 	// topolvm doesn't use/need attacher and reduce a round trip of the rpc by setting this to false
 	attachRequired := false

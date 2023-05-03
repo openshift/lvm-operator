@@ -86,11 +86,6 @@ func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Contex
 	return nil
 }
 
-func (c openshiftSccs) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	// intentionally empty
-	return nil
-}
-
 func getAllSCCs(namespace string) []*secv1.SecurityContextConstraints {
 	return []*secv1.SecurityContextConstraints{
 		newTopolvmNodeScc(namespace),
