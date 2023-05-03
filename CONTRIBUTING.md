@@ -1,8 +1,6 @@
 # How to Contribute
 
-The lvm-operator project is under the [Apache 2.0 license](LICENSE). We accept
-contributions via GitHub pull requests. This document outlines how to
-contribute to the project.
+The lvm-operator project is under the [Apache 2.0 license](LICENSE). We accept contributions via GitHub pull requests. This document outlines how to contribute to the project.
 
 ## Contribution Flow
 
@@ -10,7 +8,7 @@ Developers must follow these steps to make a change:
 
 1. Fork the `openshift/lvm-operator` repository on GitHub.
 2. Create a branch from the `main` branch, or from a versioned branch (such
-   as `release-4.9`) if you are proposing a backport.
+   as `release-4.13`) if you are proposing a backport.
 3. Make changes.
 4. Create tests as needed and ensure that all tests pass.
 5. Push your changes to a branch in your fork of the repository.
@@ -18,42 +16,28 @@ Developers must follow these steps to make a change:
 7. Work with the community to make any necessary changes through the code
    review process (effectively repeating steps 3-7 as needed).
 
-
 ## Developer Environment Installation
-ToDo
-
+TODO
 
 ## Commits Per Pull Request
 
-Pull requests should always represent a complete logical change. Where
-possible, though, pull requests should be composed of multiple commits that
-each make small but meaningful changes. Striking a balance between minimal
-commits and logically complete changes is an art as much as a science, but
-when it is possible and reasonable, divide your pull request into more commits.
+Pull requests should always represent a complete logical change. Where possible, pull requests should be composed of multiple commits that each make small but meaningful changes. Striking a balance between minimal commits and logically complete changes is an art as much as a science, but when it is possible and reasonable, divide your pull request into more commits.
 
-Some times when it will almost always make sense to separate parts of a change
-into their own commits are:
-- Changes to unrelated formatting and typo-fixing.
+It makes sense to separate work into individual commits for changes such as:
+- Changes to unrelated formatting and typo fixes.
 - Refactoring changes that prepare the codebase for your logical change.
 
-Even when breaking down commits, each commit should leave the codebase in a
-working state. The code should add necessary unit tests and pass unit tests,
-formatting tests, and usually functional tests. There can be times when
-exceptions to these requirements are appropriate (for instance, it is sometimes
-useful for maintainability to split code changes and related changes to CRDs
-and CSVs). Unless you are very sure this is true for your change, though, make
-sure each commit passes CI checks as above.
+When breaking down commits, each commit should leave the codebase in a working state. The code should add necessary unit tests where required, and pass unit tests, formatting tests, and usually functional tests. There can be times when exceptions to these requirements are appropriate. For instance, it is sometimes useful for maintainability to split code changes and related changes to CRDs and CSVs. Unless you are very sure this is true for your change, make sure that each commit passes CI checks as above.
 
-Make sure to update the bundle manifests after making changes, in a separate
-commit using:
-```
+Make sure to update the bundle manifests after making changes:
+
+```bash
 make bundle
 ```
 
 ## Commit structure
 
-LVM Operator maintainers value clear and explanatory commit messages. So by default
-each of your commits must follow the rules below:
+LVM Operator maintainers value clear and explanatory commit messages. By default, each of your commits must follow the rules below:
 
 ### We follow the common commit conventions
 ```
@@ -87,14 +71,13 @@ and why do we need it.
 Signed-off-by: First_Name Last_Name <email address>
 ```
 
-
 ### More Guidelines:
 - Type/component should not be empty.
-- Your commit msg should not exceed more than 72 characters per line.
+- Your commit message should not exceed more than 72 characters per line.
 - Header should not have a full stop.
 - Body should always end with the full stop.
-- There should be one blank line in b/w header and body.
-- There should be one blank line in b/w body and footer.
-- Your commit message must be signed-off.
+- There should be one blank line between header and body.
+- There should be one blank line between body and footer.
+- Your commit must be signed-off.
 - *Recommendation*: A "Co-authored-by:" line should be added for each
   additional author.
