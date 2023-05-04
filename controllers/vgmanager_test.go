@@ -85,8 +85,7 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 		},
 	}
 
-	for i, testCase := range testTable {
-		t.Logf("TestCase #%d: %q", i, testCase.desc)
+	for _, testCase := range testTable {
 		lvmcluster := &lvmv1alpha1.LVMCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "testcluster",

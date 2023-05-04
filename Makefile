@@ -38,7 +38,7 @@ UNAME := $(shell uname)
 OPERATOR_VERSION ?= 0.0.1
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.22
+ENVTEST_K8S_VERSION = 1.26.0
 
 OPERATOR_SDK_VERSION ?= 1.23.0
 RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
@@ -146,20 +146,23 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+godeps-update: ## Run go mod tidy and go mod vendor.
+	go mod tidy && go mod vendor
+
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
 	hack/verify-deps.sh
 	hack/verify-bundle.sh
 	hack/verify-generated.sh
 
-godeps-update: ## Run go mod tidy and go mod vendor.
-	go mod tidy && go mod vendor
-
-run: manifests generate ## Run a controller from your host.
-	go run ./main.go
-
 test: manifests generate envtest godeps-update ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -cover `go list ./... | grep -v "e2e"`
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v "e2e"`
+ifeq ($(OPENSHIFT_CI), true)
+	hack/publish-codecov.sh
+endif
+
+run: manifests generate ## Run the Operator from your host.
+	go run ./main.go
 
 ##@ Build
 
@@ -287,8 +290,8 @@ DISK_INSTALL ?= false
 # Build and run e2e tests.
 e2e-test: ginkgo ## Build and run e2e tests.
 	@echo "build and run e2e tests"
-	cd e2e && $(GINKGO) build
-	cd e2e && ./e2e.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) --disk-install=$(DISK_INSTALL) -ginkgo.v
+	cd test/e2e && $(GINKGO) build
+	cd test/e2e && ./e2e.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) --disk-install=$(DISK_INSTALL) -ginkgo.v
 
 ##@ Tools
 

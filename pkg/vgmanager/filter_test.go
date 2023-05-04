@@ -24,7 +24,6 @@ func TestNotReadOnly(t *testing.T) {
 		{label: "tc invalid string", device: internal.BlockDevice{ReadOnly: "test"}, expected: true, expectErr: true},
 	}
 	for _, tc := range testcases {
-		t.Log("Test case : " + tc.label)
 		result, err := FilterMap[notReadOnly](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
@@ -42,7 +41,6 @@ func TestNotSuspended(t *testing.T) {
 		{label: "tc running", device: internal.BlockDevice{State: "running"}, expected: true, expectErr: false},
 	}
 	for _, tc := range testcases {
-		t.Log("Test case : " + tc.label)
 		result, err := FilterMap[notSuspended](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
@@ -60,7 +58,6 @@ func TestNoFilesystemSignature(t *testing.T) {
 		{label: "tc swap", device: internal.BlockDevice{FSType: "swap"}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
-		t.Log("Test case : " + tc.label)
 		result, err := FilterMap[noFilesystemSignature](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
@@ -77,7 +74,6 @@ func TestNoChildren(t *testing.T) {
 		{label: "tc no child", device: internal.BlockDevice{Name: "dev2", Children: []internal.BlockDevice{}}, expected: true, expectErr: false},
 	}
 	for _, tc := range testcases {
-		t.Log("Test case : " + tc.label)
 		result, err := FilterMap[noChildren](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
@@ -94,7 +90,6 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: internal.BlockDevice{Name: "dev2", Type: "disk"}, expected: true, expectErr: false},
 	}
 	for _, tc := range testcases {
-		t.Log("Test case : " + tc.label)
 		result, err := FilterMap[usableDeviceType](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
@@ -115,7 +110,6 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 		{label: "tc 6", device: internal.BlockDevice{Name: "dev6", PartLabel: "BOOT"}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
-		t.Log("Test case : " + tc.label)
 		result, err := FilterMap[noBiosBootInPartLabel](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {

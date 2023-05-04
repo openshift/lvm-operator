@@ -76,7 +76,7 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases"),
-			filepath.Join("..", "e2e", "testdata")},
+			filepath.Join("..", "test", "e2e", "testdata")},
 		ErrorIfCRDPathMissing: true,
 		CRDInstallOptions: envtest.CRDInstallOptions{
 			CleanUpAfterUse: true,
@@ -107,7 +107,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	// Create the primary namespace to be used by some of the tests
+	// Create the primary namespace to be used by some tests
 	testNamespace := &corev1.Namespace{}
 	testNamespace.Name = testLvmClusterNamespace
 	Expect(k8sClient.Create(ctx, testNamespace)).Should(Succeed())
