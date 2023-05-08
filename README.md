@@ -34,30 +34,36 @@ end
 ```
 
 - [Deploying the LVM Operator](#deploying-the-lvm-operator)
-   * [Building and pushing the Operator image to a registry](#building-and-pushing-the-operator-image-to-a-registry)
-   * [Using the pre-built image](#using-the-pre-built-image)
-   * [Deploying the operator](#deploying-the-operator)
-   * [Inspecting the storage objects on the node](#inspecting-the-storage-objects-on-the-node)
-   * [Testing the operator](#testing-the-operator)
+    * [Using the pre-built images](#using-the-pre-built-images)
+    * [Building the Operator yourself](#building-the-operator-yourself)
+    * [Deploying the operator](#deploying-the-operator)
+    * [Inspecting the storage objects on the node](#inspecting-the-storage-objects-on-the-node)
+    * [Testing the operator](#testing-the-operator)
 - [Cleanup](#cleanup)
 - [Metrics](#metrics)
 - [Known Limitations](#known-limitations)
-   * [Single LVMCluster support](#single-lvmcluster-support)
-   * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
+    * [Single LVMCluster support](#single-lvmcluster-support)
+    * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
 - [Contributing](#contributing)
 
 ## Deploying the LVM Operator
 
 Due to the absence of a CI pipeline that builds this repository, you will need to either build it yourself or use a pre-built image that has been made available. Please note that the pre-built image may not be in sync with the current state of the repository.
 
-### Building and pushing the Operator image to a registry
+### Using the pre-built images
+
+If you are comfortable using the pre-built images, simply proceed with the [deployment steps](#deploying-the-operator).
+
+### Building the Operator yourself
 
 To build the operator, install Docker or Podman and log into your registry.
 
-1. Set the environment variable `IMG` to the new repository path where you want to host your image:
+1. Set the following environment variables to the repository where you want to host your image:
 
     ```bash
-    $ export IMG=quay.io/<registry-name>/lvms-operator:latest
+    $ export IMAGE_REGISTRY=<quay/docker etc>
+    $ export REGISTRY_NAMESPACE=<registry-username>
+    $ export IMAGE_TAG=<some-tag>
     ```
 
 2. Build and push the container image:
@@ -66,15 +72,27 @@ To build the operator, install Docker or Podman and log into your registry.
     $ make docker-build docker-push
     ```
 
-Ensure that the OpenShift cluster has read access to that repository. Once this is complete, you are ready to proceed with the [deployment steps](#deploying-the-operator).
+<details><summary><strong>Building the Operator for OLM deployment</strong></summary>
+<p>
 
-### Using the pre-built image
+If you intend to deploy the Operator using the Operator Lifecycle Manager (OLM), there are some additional steps you should follow.
 
-If you are comfortable using the pre-built images, simply set your variable as follows:
+1. Build and push the bundle image:
 
-```bash
-$ export IMG=quay.io/lvms_dev/lvms-operator:latest
-```
+    ```bash
+    $ make bundle-build bundle-push
+    ```
+
+2. Build and push the catalog image:
+
+    ```bash
+    $ make catalog-build catalog-push
+    ```
+
+</p>
+</details>
+
+Ensure that the OpenShift cluster has read access to that repository. Once this is complete, you are ready to proceed with the next steps.
 
 ### Deploying the operator
 
@@ -83,6 +101,29 @@ You can begin the deployment by running the following command:
 ```bash
 $ make deploy
 ```
+
+<details><summary><strong>Deploying the Operator with OLM</strong></summary>
+<p>
+
+You can begin the deployment using the Operator Lifecycle Manager (OLM) by running the following command:
+
+```bash
+$ make deploy-with-olm
+```
+
+The process involves the creation of several resources to deploy the Operator using OLM. These include a custom `CatalogSource` to define the Operator source, the `openshift-storage` namespace to contain the Operator components, an `OperatorGroup` to manage the lifecycle of the Operator, a `Subscription` to subscribe to the Operator catalog in the `openshift-storage` namespace, and finally, the creation of a `ClusterServiceVersion` to describe the Operator's capabilities and requirements.
+
+Wait until the `ClusterServiceVersion` (CSV) reaches the `Succeeded` status:
+
+```bash
+$ kubectl get csv -n openshift-storage
+
+NAME                   DISPLAY       VERSION   REPLACES   PHASE
+lvms-operator.v0.0.1   LVM Storage   0.0.1                Succeeded
+```
+
+</p>
+</details>
 
 After the previous command has completed successfully, switch over to the `openshift-storage` namespace:
 
@@ -107,15 +148,16 @@ After the CR is deployed, the following actions are executed:
 - A Logical Volume Manager (LVM) volume group named `vg1` is created, utilizing all available disks on the cluster.
 - A thin pool named `thin-pool-1` is created within `vg1`, with a size equivalent to 90% of `vg1`.
 - The TopoLVM Container Storage Interface (CSI) plugin is deployed, resulting in the launch of the `topolvm-controller` and `topolvm-node` pods.
-- A Storage Class and a Volume Snapshot Class are created, both named `lvms-vg1`. This facilitates storage provisioning for OpenShift workloads. The Storage Class is configured with the `WaitForFirstConsumer` volume binding mode that is utilized in a multi-node configuration to optimize the scheduling of pod placement. This strategy prioritizes the allocation of pods to nodes with the greatest amount of available storage capacity.
+- A storage class and a volume snapshot class are created, both named `lvms-vg1`. This facilitates storage provisioning for OpenShift workloads. The storage class is configured with the `WaitForFirstConsumer` volume binding mode that is utilized in a multi-node configuration to optimize the scheduling of pod placement. This strategy prioritizes the allocation of pods to nodes with the greatest amount of available storage capacity.
 - The LVMS system also creates two additional internal CRs to support its functionality:
-  * `LVMVolumeGroup` is generated and managed by LVMS to monitor the individual Volume Groups across multiple nodes in the cluster.
-  * `LVMVolumeGroupNodeStatus` is created by the VG Manager. This CR is used to monitor the status of volume groups on individual nodes in the cluster.
+  * `LVMVolumeGroup` is generated and managed by LVMS to monitor the individual volume groups across multiple nodes in the cluster.
+  * `LVMVolumeGroupNodeStatus` is created by the [Volume Group Manager](docs/design/vg-manager.md). This CR is used to monitor the status of volume groups on individual nodes in the cluster.
 
-Wait until the LVMCluster reaches the `Ready` status:
+Wait until the `LVMCluster` reaches the `Ready` status:
 
 ```bash
 $ oc get lvmclusters.lvm.topolvm.io my-lvmcluster
+
 NAME            STATUS
 my-lvmcluster   Ready
 ```
@@ -128,11 +170,11 @@ $ oc get pods -w
 
 The `topolvm-node` pod remains in the initialization phase until the `vg-manager` completes all the necessary preparations.
 
-Once all the pods have been launched, the LVMS is ready to manage your Logical Volumes and make them available for use in your applications.
+Once all the pods have been launched, the LVMS is ready to manage your logical volumes and make them available for use in your applications.
 
 ### Inspecting the storage objects on the node
 
-Prior to the deployment of the Logical Volume Manager Storage (LVMS), there are no pre-existing LVM Physical Volumes (PVs), Volume Groups (VGs), or Logical Volumes (LVs) associated with the disks.
+Prior to the deployment of the Logical Volume Manager Storage (LVMS), there are no pre-existing LVM physical volumes, volume groups, or logical volumes associated with the disks.
 
 ```bash
 sh-4.4# lsblk
@@ -228,7 +270,7 @@ spec:
 EOF
 ```
 
-Once the pod has been created and associated with the corresponding PVC, the PVC will be bound, and the pod will transition to the Running state in due course.
+Once the pod has been created and associated with the corresponding PVC, the PVC is bound, and the pod transitions to the `Running` state.
 
 ```bash
 $ oc get pvc,pods
@@ -246,21 +288,21 @@ To perform a full cleanup, follow these steps:
 
 1. Remove all the application pods which are using PVCs created with LVMS, and then remove all these PVCs.
 
-2. Ensure that there are no remaining LogicalVolume custom resources that were created by LVMS.
+2. Ensure that there are no remaining `LogicalVolume` custom resources that were created by LVMS.
 
     ```bash
     $ oc get logicalvolumes.topolvm.io 
     No resources found
     ```
 
-3. Remove the LVMCluster CR.
+3. Remove the `LVMCluster` CR.
     
     ```bash
     $ oc delete lvmclusters.lvm.topolvm.io my-lvmcluster
     lvmcluster.lvm.topolvm.io "my-lvmcluster" deleted
     ```
 
-4. Verify that the only remaining resource in the `openshift-storage` namespace is the operator.
+4. Verify that the only remaining resource in the `openshift-storage` namespace is the Operator.
 
     ```bash
     oc get pods -n openshift-storage
