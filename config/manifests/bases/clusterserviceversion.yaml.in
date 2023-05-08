@@ -32,7 +32,7 @@ metadata:
         }
     repository: https://github.com/openshift/lvm-operator
     operatorframework.io/suggested-namespace: openshift-storage
-    operators.openshift.io/infrastructure-features: '["disconnected"]'
+    operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
   labels:
