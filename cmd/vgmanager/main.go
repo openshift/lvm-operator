@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Red Hat Openshift Data Foundation.
+Copyright © 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,28 +17,25 @@ limitations under the License.
 package main
 
 import (
-
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-
 	"flag"
 	"os"
 
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/vgmanager"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 )
 
 func init() {
@@ -46,20 +43,21 @@ func init() {
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
 }
 
-var metricsAddr string
-var probeAddr string
-var developmentMode bool
-
 func main() {
+	var metricsAddr string
+	var probeAddr string
+	var developmentMode bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&developmentMode, "development", false, "enable to enable development")
+	flag.BoolVar(&developmentMode, "development", false, "The switch to enable development mode.")
+	flag.Parse()
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
 	opts.Development = developmentMode
-
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	setupLog := ctrl.Log.WithName("setup")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -80,7 +78,7 @@ func main() {
 		NodeName:  os.Getenv("NODE_NAME"),
 		Namespace: os.Getenv("POD_NAMESPACE"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
+		setupLog.Error(err, "unable to create controller", "controller", "VGManager")
 		os.Exit(1)
 	}
 

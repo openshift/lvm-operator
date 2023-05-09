@@ -31,6 +31,8 @@ type LVMVolumeGroupNodeStatusSpec struct {
 type VGStatusType string
 
 const (
+	// VGStatusProgressing means that the VG creation is still in progress
+	VGStatusProgressing VGStatusType = "Progressing"
 	// VGStatusReady means that the vg has been created and is Ready
 	VGStatusReady VGStatusType = "Ready"
 	// VGStatusFailed means that the VG could not be created
