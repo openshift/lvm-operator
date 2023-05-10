@@ -15,6 +15,7 @@ metadata:
               "deviceClasses": [
                 {
                   "default": true,
+                  "fstype": "xfs",
                   "name": "vg1",
                   "thinPoolConfig": {
                     "name": "thin-pool-1",

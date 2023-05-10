@@ -1,0 +1,13 @@
+- build
+- push
+- deploy
+- `oc project openshift-storage`
+- create the cluster which specifies ext4 (config/samples/lvm_v1alpha1_lvmcluster.yaml)
+- `oc get pods -w` until all are ready
+- `oc get lvmclusters.lvm.topolvm.io my-lvmcluster -w` until ready
+- `oc describe storageclass/lvms-vg1` to validate the Parameter "csi.storage.k8s.io/fstype=ext4"
+- Create the pvc and pod (README)
+- `oc debug pod/{pod name}`
+- `chroot /host`
+- `lvdisplay` to get the lv path
+- `file -L -s {lv_path}` should have xfs or ext4 in the output
