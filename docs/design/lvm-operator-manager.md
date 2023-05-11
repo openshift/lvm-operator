@@ -58,3 +58,27 @@ The `lvmVG` reconcile unit is responsible for deploying and managing the LVMVolu
 ## Openshift Security Context Constraints (SCCs)
 
 The Operator requires elevated permissions to interact with the host's LVM commands, which are executed through `nsenter`. When deployed on an OpenShift cluster, all the necessary Security Context Constraints (SCCs) are created by the `openshiftSccs` reconcile unit. This ensures that the `vg-manager`, `topolvm-node`, and `lvmd` containers have the required permissions to function properly.
+
+## Implementation Notes
+
+Each unit of reconciliation should implement the `reconcileUnit` interface. This is run by the controller. Errors and success messages are propagated as Operator status and events. This interface is defined in [lvmcluster_controller.go](../../controllers/lvmcluster_controller.go)
+
+```go
+type resourceManager interface {
+
+	// getName should return a camelCase name of this unit of reconciliation
+	getName() string
+
+	// ensureCreated should check the resources managed by this unit
+	ensureCreated(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+
+	// ensureDeleted should wait for the resources to be cleaned up
+	ensureDeleted(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+
+	// updateStatus should optionally update the CR's status about the health of the managed resource
+	// each unit will have updateStatus called induvidually so
+	// avoid status fields like lastHeartbeatTime and have a
+	// status that changes only when the operands change.
+	updateStatus(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+}
+```

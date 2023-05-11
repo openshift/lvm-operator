@@ -1,6 +1,6 @@
 # The Volume Group Manager
 
-The Volume Group Manager manages a single controller/reconciler, which runs as `vg-manager` daemon set pods on a cluster. They are responsible for performing on-node operations for the node they are running on. They first identify disks that match the filters specified for the node. Next, they watch for the LVMVolumeGroup resource and create the necessary volume groups and thin pools on the node based on the specified deviceSelector and nodeSelector. Once the volume groups are created, vg-manager generates the `lvmd.yaml` configuration file for lvmd to use. Additionally, vg-manager updates the LVMVolumeGroupStatus with the observed status of the volume groups on the node where it is running.
+The Volume Group Manager manages a single controller/reconciler, which runs as `vg-manager` daemon set pods on a cluster. They are responsible for performing on-node operations for the node they are running on. They first identify disks that match the filters specified for the node. Next, they watch for the LVMVolumeGroup resource and create the necessary volume groups and thin pools on the node based on the specified deviceSelector and nodeSelector. Once the volume groups are created, vg-manager generates the `lvmd.yaml` configuration file for lvmd to use. Additionally, vg-manager updates the LVMVolumeGroupNodeStatus with the observed status of the volume groups on the node where it is running.
 
 ## Deletion
 
