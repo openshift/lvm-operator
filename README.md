@@ -7,7 +7,7 @@ This allows applications running on the cluster to consume storage from LVM logi
 
 The LVM Operator, in conjunction with the TopoLVM CSI Driver, Volume Group Manager, and other related components, collectively comprise the Logical Volume Manager Storage (LVMS) solution.
 
-Here is a brief overview of the operator:
+Here is a brief overview of how the Operator works. See [here](docs/design/architecture.md) for the architecture diagram.
 
 ```mermaid
 graph LR
@@ -36,9 +36,9 @@ end
 - [Deploying the LVM Operator](#deploying-the-lvm-operator)
     * [Using the pre-built images](#using-the-pre-built-images)
     * [Building the Operator yourself](#building-the-operator-yourself)
-    * [Deploying the operator](#deploying-the-operator)
+    * [Deploying the Operator](#deploying-the-operator)
     * [Inspecting the storage objects on the node](#inspecting-the-storage-objects-on-the-node)
-    * [Testing the operator](#testing-the-operator)
+    * [Testing the Operator](#testing-the-operator)
 - [Cleanup](#cleanup)
 - [Metrics](#metrics)
 - [Known Limitations](#known-limitations)
@@ -56,7 +56,7 @@ If you are comfortable using the pre-built images, simply proceed with the [depl
 
 ### Building the Operator yourself
 
-To build the operator, install Docker or Podman and log into your registry.
+To build the Operator, install Docker or Podman and log into your registry.
 
 1. Set the following environment variables to the repository where you want to host your image:
 
@@ -94,7 +94,7 @@ If you intend to deploy the Operator using the Operator Lifecycle Manager (OLM),
 
 Ensure that the OpenShift cluster has read access to that repository. Once this is complete, you are ready to proceed with the next steps.
 
-### Deploying the operator
+### Deploying the Operator
 
 You can begin the deployment by running the following command:
 
@@ -209,7 +209,7 @@ sh-4.4# lvs
   thin-pool-1 vg1 twi-a-tz-- <3.93t             0.00   1.19      
 ```
 
-### Testing the operator
+### Testing the Operator
 
 Once you have completed [the deployment steps](#deploying-the-operator), you can proceed to create a basic test application that will consume storage.
 
@@ -318,7 +318,7 @@ To perform a full cleanup, follow these steps:
 
 ## Metrics
 
-To enable monitoring on OpenShift clusters, you must assign the label `openshift.io/cluster-monitoring` to the namespace in which LVMS is running.
+The LVM Operator runs a metrics exporter sidecar to export Prometheus metrics. To enable monitoring on OpenShift clusters, assign the `openshift.io/cluster-monitoring` label to the same namespace that you deployed LVMS to.
 
 ```bash
 $ oc patch namespace/openshift-storage -p '{"metadata": {"labels": {"openshift.io/cluster-monitoring": "true"}}}'
