@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
+
+// debug immediately prints message in ginkgo test suite
+func debug(args ...interface{}) {
+	ginkgo.GinkgoWriter.Println(args)
+}
 
 // createNamespace creates a namespace in the cluster, ignoring if it already exists.
 func createNamespace(ctx context.Context, namespace string) error {

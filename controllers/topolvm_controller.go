@@ -101,11 +101,6 @@ func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Co
 	return err
 }
 
-func (c topolvmController) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	// TODO: Verify the status of controller plugin deployment and set the same on CR
-	return nil
-}
-
 func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *appsv1.Deployment) error {
 
 	// at creation, deep copy desired deployment into existing

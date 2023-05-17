@@ -74,11 +74,5 @@ type resourceManager interface {
 
 	// ensureDeleted should wait for the resources to be cleaned up
 	ensureDeleted(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
-
-	// updateStatus should optionally update the CR's status about the health of the managed resource
-	// each unit will have updateStatus called induvidually so
-	// avoid status fields like lastHeartbeatTime and have a
-	// status that changes only when the operands change.
-	updateStatus(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
 }
 ```

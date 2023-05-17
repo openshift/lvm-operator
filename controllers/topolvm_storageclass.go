@@ -96,11 +96,6 @@ func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.
 	return nil
 }
 
-func (s topolvmStorageClass) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	// intentionally empty as there'll be no status field on StorageClass resource
-	return nil
-}
-
 func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
 
 	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"

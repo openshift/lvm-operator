@@ -123,14 +123,6 @@ func (n topolvmNode) ensureDeleted(r *LVMClusterReconciler, ctx context.Context,
 	return nil
 }
 
-// updateStatus should optionally update the CR's status about the health of the managed resource
-// each unit will have updateStatus called individually so
-// avoid status fields like lastHeartbeatTime and have a
-// status that changes only when the operands change.
-func (n topolvmNode) updateStatus(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	return nil
-}
-
 func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string) *appsv1.DaemonSet {
 
 	hostPathDirectory := corev1.HostPathDirectory
