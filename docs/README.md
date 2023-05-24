@@ -1,6 +1,7 @@
 # Contents
 
-1. [Reconciler Design](design/architecture.md)
+1. [Architecture](design/architecture.md)
 2. [The LVM Operator Manager](design/lvm-operator-manager.md)
-2. [The Volume Group Manager](design/vg-manager.md)
-5. [Thin Provisioning](design/thin-provisioning.md)
+3. [The Volume Group Manager](design/vg-manager.md)
+4. [Thin Provisioning](design/thin-provisioning.md)
+5. [Troubleshooting Guide](troubleshooting.md)
