@@ -97,6 +97,8 @@ type DeviceClass struct {
 	Default bool `json:"default,omitempty"`
 
 	// FilesystemType sets the filesystem the device should use
+	// +kubebuilder:validation:Enum=xfs;ext4;""
+	// +kubebuilder:default=xfs
 	// +optional
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
 }

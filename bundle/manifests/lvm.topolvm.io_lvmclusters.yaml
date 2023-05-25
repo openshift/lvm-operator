@@ -66,8 +66,13 @@ spec:
                               type: array
                           type: object
                         fstype:
+                          default: xfs
                           description: FilesystemType sets the filesystem the device
                             should use
+                          enum:
+                          - xfs
+                          - ext4
+                          - ""
                           type: string
                         name:
                           description: 'Name of the class, the VG and possibly the
