@@ -123,6 +123,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 	sc := []*storagev1.StorageClass{}
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := getStorageClassName(deviceClass.Name)
+
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: scName,
@@ -135,7 +136,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 			AllowVolumeExpansion: &allowVolumeExpansion,
 			Parameters: map[string]string{
 				DeviceClassKey:              deviceClass.Name,
-				"csi.storage.k8s.io/fstype": TopolvmFilesystemType,
+				"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
 			},
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
