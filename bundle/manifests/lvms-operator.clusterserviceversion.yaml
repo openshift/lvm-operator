@@ -27,7 +27,7 @@ metadata:
           }
         }
       ]
-    capabilities: Basic Install
+    capabilities: Seamless Upgrades
     categories: Storage
     containerImage: quay.io/ocs-dev/lvm-operator:latest
     description: Logical volume manager storage provides dynamically provisioned local
