@@ -125,3 +125,18 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestNoReservedInPartLabel(t *testing.T) {
+	testcases := []filterTestCase{
+		{label: "tc 1", device: internal.BlockDevice{Name: "dev1", PartLabel: ""}, expected: true},
+		{label: "tc 2", device: internal.BlockDevice{Name: "dev2", PartLabel: "abc"}, expected: true},
+		{label: "tc 3", device: internal.BlockDevice{Name: "dev3", PartLabel: "reserved"}, expected: false},
+		{label: "tc 4", device: internal.BlockDevice{Name: "dev4", PartLabel: "RESERVED"}, expected: false},
+		{label: "tc 5", device: internal.BlockDevice{Name: "dev5", PartLabel: "Reserved"}, expected: false},
+	}
+	for _, tc := range testcases {
+		result, err := FilterMap[noReservedInPartLabel](tc.device, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.expected, result)
+	}
+}

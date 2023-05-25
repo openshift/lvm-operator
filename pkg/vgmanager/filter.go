@@ -27,6 +27,7 @@ const (
 	notReadOnly           = "notReadOnly"
 	notSuspended          = "notSuspended"
 	noBiosBootInPartLabel = "noBiosBootInPartLabel"
+	noReservedInPartLabel = "noReservedInPartLabel"
 	noFilesystemSignature = "noFilesystemSignature"
 	noBindMounts          = "noBindMounts"
 	noChildren            = "noChildren"
@@ -52,6 +53,11 @@ var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, 
 		biosBootInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("bios")) ||
 			strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("boot"))
 		return !biosBootInPartLabel, nil
+	},
+
+	noReservedInPartLabel: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
+		reservedInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), "reserved")
+		return !reservedInPartLabel, nil
 	},
 
 	noFilesystemSignature: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
