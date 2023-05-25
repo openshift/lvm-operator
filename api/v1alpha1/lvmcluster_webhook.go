@@ -68,6 +68,11 @@ func (l *LVMCluster) ValidateCreate() error {
 		return err
 	}
 
+	err = l.verifyFstype()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -91,6 +96,11 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 	}
 
 	err = l.verifyNoDeviceOverlap()
+	if err != nil {
+		return err
+	}
+
+	err = l.verifyFstype()
 	if err != nil {
 		return err
 	}
@@ -293,4 +303,14 @@ func (l *LVMCluster) getThinPoolsConfigOfDeviceClass(deviceClassName string) (*T
 	}
 
 	return nil, ErrDeviceClassNotFound
+}
+
+func (l *LVMCluster) verifyFstype() error {
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.FilesystemType != FilesystemTypeExt4 && deviceClass.FilesystemType != FilesystemTypeXFS {
+			return fmt.Errorf("fstype '%s' is not a supported filesystem type", deviceClass.FilesystemType)
+		}
+	}
+
+	return nil
 }
