@@ -65,10 +65,6 @@ spec:
                                 type: string
                               type: array
                           type: object
-                        fstype:
-                          description: FilesystemType sets the filesystem the device
-                            should use
-                          type: string
                         name:
                           description: 'Name of the class, the VG and possibly the
                             storageclass. Validations to confirm that this field can

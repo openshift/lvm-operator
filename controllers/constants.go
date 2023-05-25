@@ -87,6 +87,9 @@ const (
 	DefaultLVMdSocket = "/run/lvmd/lvmd.sock"
 	DeviceClassKey    = "topolvm.io/device-class"
 
+	// default fstype for topolvm storage classes
+	TopolvmFilesystemType = "xfs"
+
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
 

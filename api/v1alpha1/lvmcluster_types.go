@@ -58,13 +58,6 @@ type ThinPoolConfig struct {
 	OverprovisionRatio int `json:"overprovisionRatio"`
 }
 
-type DeviceFilesystemType string
-
-const (
-	FilesystemTypeExt4 DeviceFilesystemType = "ext4"
-	FilesystemTypeXFS  DeviceFilesystemType = "xfs"
-)
-
 type DeviceClass struct {
 	// Name of the class, the VG and possibly the storageclass.
 	// Validations to confirm that this field can be used as metadata.name field in storageclass
@@ -95,10 +88,6 @@ type DeviceClass struct {
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`
-
-	// FilesystemType sets the filesystem the device should use
-	// +optional
-	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
 }
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned
