@@ -32,7 +32,6 @@ jobs:
           # working-directory: somedir
 
           # Optional: golangci-lint command line arguments.
-          # TODO: remove --skip-files once logic is implemented
           # NO_FUTURE args from https://github.com/golangci/golangci-lint-action/issues/119
           args: >
             --out-${NO_FUTURE}format colored-line-number -E gosec --timeout=6m --skip-files
