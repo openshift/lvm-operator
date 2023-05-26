@@ -33,11 +33,6 @@ type LVMVolumeGroupSpec struct {
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
-	// TODO: add support for various LVM settings
-	// // Config for this deviceClass, lvm settings are a field here
-	// // +optional
-	// Config *DeviceClassConfig `json:"config,omitempty"`
-
 	// ThinPoolConfig contains configurations for the thin-pool
 	// +kubebuilder:validation:Required
 	// +required
