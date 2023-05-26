@@ -152,7 +152,6 @@ func (vg VolumeGroup) Delete(exec internal.Executor) error {
 func GetVolumeGroup(exec internal.Executor, name string) (*VolumeGroup, error) {
 	res := new(vgsOutput)
 
-	// TODO: Check if `vgs <vg_name> --reportformat json` can be used to filter out the exact volume group name.
 	args := []string{
 		"vgs", "--units", "g", "--reportformat", "json",
 	}
