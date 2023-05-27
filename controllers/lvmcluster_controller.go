@@ -234,15 +234,13 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 		return err
 	}
 
-	var statusVgCount int
+	var readyVGCount int
 	var isReady, isDegraded, isFailed bool
 
 	for _, nodeItem := range vgNodeStatusList.Items {
 		for _, item := range nodeItem.Spec.LVMVGStatus {
-
-			statusVgCount++
-
 			if item.Status == lvmv1alpha1.VGStatusReady {
+				readyVGCount++
 				isReady = true
 			} else if item.Status == lvmv1alpha1.VGStatusDegraded {
 				isDegraded = true
@@ -268,7 +266,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 		instance.Status.State = lvmv1alpha1.LVMStatusFailed
 	} else if isDegraded {
 		instance.Status.State = lvmv1alpha1.LVMStatusDegraded
-	} else if isReady && expectedVgCount == statusVgCount {
+	} else if isReady && expectedVgCount == readyVGCount {
 		instance.Status.State = lvmv1alpha1.LVMStatusReady
 		instance.Status.Ready = true
 	}
