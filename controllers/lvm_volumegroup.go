@@ -18,10 +18,10 @@ package controllers
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -40,7 +40,7 @@ func (c lvmVG) getName() string {
 
 func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
-	lvmVolumeGroups := c.getLvmVolumeGroups(r, lvmCluster)
+	lvmVolumeGroups := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 
 	for _, volumeGroup := range lvmVolumeGroups {
 		existingVolumeGroup := &lvmv1alpha1.LVMVolumeGroup{
@@ -58,49 +58,46 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 		if err != nil {
 			r.Log.Error(err, "failed to reconcile LVMVolumeGroup", "name", volumeGroup.Name)
 			return err
-		} else {
-			r.Log.Info("successfully reconciled LVMVolumeGroup", "operation", result, "name", volumeGroup.Name)
 		}
-
+		r.Log.Info("successfully reconciled LVMVolumeGroup", "operation", result, "name", volumeGroup.Name)
 	}
 	return nil
 }
 
 func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-
-	existingLvmVg := &lvmv1alpha1.LVMVolumeGroup{}
-	vgcrs := c.getLvmVolumeGroups(r, lvmCluster)
+	vgcrs := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 	allVGsDeleted := true
 
 	for _, vgcr := range vgcrs {
-		err := r.Client.Get(ctx, types.NamespacedName{Name: vgcr.Name, Namespace: vgcr.Namespace}, existingLvmVg)
+		currentLvmVg := &lvmv1alpha1.LVMVolumeGroup{}
+
+		err := r.Client.Get(ctx, types.NamespacedName{Name: vgcr.Name, Namespace: vgcr.Namespace}, currentLvmVg)
 		if err != nil {
 			// already deleted in previous reconcile
-			if errors.IsNotFound(err) {
+			if k8serror.IsNotFound(err) {
 				r.Log.Info("LVMVolumeGroup already deleted", "name", vgcr.Name)
 				continue
-			} else {
-				r.Log.Error(err, "failed to retrieve LVMVolumeGroup", "name", vgcr.Name)
-				return err
 			}
+			r.Log.Error(err, "failed to retrieve LVMVolumeGroup", "name", vgcr.Name)
+			return err
 		}
 
 		// if not deleted, initiate deletion
-		if existingLvmVg.GetDeletionTimestamp().IsZero() {
-			if err = r.Client.Delete(ctx, existingLvmVg); err != nil {
-				r.Log.Error(err, "failed to delete LVMVolumeGroup", "name", existingLvmVg.Name)
+		if currentLvmVg.GetDeletionTimestamp().IsZero() {
+			err = r.Client.Delete(ctx, currentLvmVg)
+			if err != nil {
+				r.Log.Error(err, "failed to delete LVMVolumeGroup", "name", currentLvmVg.Name)
 				return err
-			} else {
-				r.Log.Info("initiated LVMVolumeGroup deletion", "name", existingLvmVg.Name)
-				allVGsDeleted = false
 			}
+			r.Log.Info("initiated LVMVolumeGroup deletion", "name", currentLvmVg.Name)
+			allVGsDeleted = false
 		} else {
 			// Has the VG been cleaned up on all hosts?
-			exists := doesVGExistOnHosts(existingLvmVg.Name, lvmCluster)
+			exists := doesVGExistOnHosts(currentLvmVg.Name, lvmCluster)
 			if !exists {
 				// Remove finalizer
-				cutil.RemoveFinalizer(existingLvmVg, lvmvgFinalizer)
-				err = r.Client.Update(ctx, existingLvmVg)
+				cutil.RemoveFinalizer(currentLvmVg, lvmvgFinalizer)
+				err = r.Client.Update(ctx, currentLvmVg)
 				if err != nil {
 					return err
 				}
@@ -109,22 +106,23 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 			}
 		}
 	}
+
 	if !allVGsDeleted {
-		return fmt.Errorf("waiting for all VGs to be deleted")
+		return errors.New("waiting for all VGs to be deleted")
 	}
+
 	return nil
 }
 
-func (c lvmVG) getLvmVolumeGroups(r *LVMClusterReconciler, instance *lvmv1alpha1.LVMCluster) []*lvmv1alpha1.LVMVolumeGroup {
+func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) []*lvmv1alpha1.LVMVolumeGroup {
 
-	lvmVolumeGroups := []*lvmv1alpha1.LVMVolumeGroup{}
+	lvmVolumeGroups := make([]*lvmv1alpha1.LVMVolumeGroup, 0, len(deviceClasses))
 
-	deviceClasses := instance.Spec.Storage.DeviceClasses
 	for _, deviceClass := range deviceClasses {
 		lvmVolumeGroup := &lvmv1alpha1.LVMVolumeGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      deviceClass.Name,
-				Namespace: r.Namespace,
+				Namespace: namespace,
 				Finalizers: []string{
 					lvmvgFinalizer,
 				},

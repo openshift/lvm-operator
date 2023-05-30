@@ -18,11 +18,11 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/pkg/errors"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -52,11 +52,11 @@ func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 
 	if err != nil {
 		r.Log.Error(err, "csi driver reconcile failure", "name", csiDriverResource.Name)
-	} else {
-		r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
+		return err
 	}
 
-	return err
+	r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
+	return nil
 }
 
 func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
@@ -65,7 +65,7 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 
 	if err != nil {
 		// already deleted in previous reconcile
-		if errors.IsNotFound(err) {
+		if k8serror.IsNotFound(err) {
 			r.Log.Info("csi driver deleted", "TopolvmCSIDriverName", csiDriverResource.Name)
 			return nil
 		}
@@ -74,19 +74,19 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 	}
 
 	// if not deleted, initiate deletion
-	if csiDriverResource.GetDeletionTimestamp().IsZero() {
-		if err = r.Client.Delete(ctx, csiDriverResource); err != nil {
-			r.Log.Error(err, "failed to delete topolvm csi driver", "TopolvmCSIDriverName", csiDriverResource.Name)
-			return err
-		} else {
-			r.Log.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
-		}
-	} else {
+	if !csiDriverResource.GetDeletionTimestamp().IsZero() {
 		// set deletion in-progress for next reconcile to confirm deletion
-		return fmt.Errorf("topolvm csi driver %s is already marked for deletion", csiDriverResource.Name)
+		return errors.Errorf("topolvm csi driver %s is already marked for deletion", csiDriverResource.Name)
 	}
 
-	return err
+	err = r.Client.Delete(ctx, csiDriverResource)
+	if err != nil {
+		r.Log.Error(err, "failed to delete topolvm csi driver", "TopolvmCSIDriverName", csiDriverResource.Name)
+		return err
+	}
+	r.Log.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
+
+	return nil
 }
 
 func getCSIDriverResource() *storagev1.CSIDriver {
