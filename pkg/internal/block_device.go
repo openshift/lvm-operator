@@ -19,7 +19,7 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -43,12 +43,9 @@ const (
 
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
-
-	DiskByNamePrefix = "/dev"
-	DiskByPathPrefix = "/dev/disk/by-path"
 )
 
-// BlockDevice is the a block device as output by lsblk.
+// BlockDevice is the block device as output by lsblk.
 // All the fields are lsblk columns.
 type BlockDevice struct {
 	Name       string        `json:"name"`
@@ -69,7 +66,7 @@ type BlockDevice struct {
 	DevicePath string
 }
 
-// ListBlockDevices using the lsblk command
+// ListBlockDevices lists the block devices using the lsblk command
 func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
@@ -89,42 +86,17 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 	return blockDeviceMap["blockdevices"], nil
 }
 
-func ListDiskByPath(exec Executor) (map[string]string, error) {
-
-	devices := make(map[string]string)
-
-	diskByPathDir := filepath.Join(DiskByPathPrefix, "/*")
-
-	paths, err := filepath.Glob(diskByPathDir)
-	if err != nil {
-		return nil, fmt.Errorf("could not list devices in %q: %w", diskByPathDir, err)
-	}
-
-	for _, path := range paths {
-		diskName, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			return nil, fmt.Errorf("could not eval symLink %q:%w", path, err)
-		}
-		devices[diskName] = path
-	}
-
-	return devices, nil
-}
-
 // IsUsableLoopDev returns true if the loop device isn't in use by Kubernetes
 // by matching the back file path against a standard string used to mount devices
 // from host into pods
 func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
-
 	// holds back-file string of the loop device
 	var loopDeviceMap map[string][]struct {
 		BackFile string `json:"back-file"`
 	}
 
 	usable := true
-
 	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
-
 	output, err := exec.ExecuteCommandWithOutput(losetupPath, args...)
 	if err != nil {
 		return usable, err
@@ -159,7 +131,7 @@ func (b BlockDevice) HasChildren() bool {
 // HasBindMounts checks for bind mounts and returns mount point for a device by parsing `proc/1/mountinfo`.
 // HostPID should be set to true inside the POD spec to get details of host's mount points inside `proc/1/mountinfo`.
 func (b BlockDevice) HasBindMounts() (bool, string, error) {
-	data, err := ioutil.ReadFile(mountFile)
+	data, err := os.ReadFile(mountFile)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to read file %s: %v", mountFile, err)
 	}

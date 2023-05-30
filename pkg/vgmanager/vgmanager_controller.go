@@ -157,7 +157,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, err
 	}
 
-	r.Log.Info("listing matching and delayed devices", "availableDevices", availableDevices, "delayedDevices", delayedDevices)
+	r.Log.Info("listing available and delayed devices", "availableDevices", availableDevices, "delayedDevices", delayedDevices)
 
 	// If there are no available devices, that could mean either
 	// - There is no available devices to attach to the volume group

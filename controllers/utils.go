@@ -58,7 +58,7 @@ func setDaemonsetNodeSelector(nodeSelector *corev1.NodeSelector, ds *appsv1.Daem
 }
 
 func getStorageClassName(deviceName string) string {
-	return storageClassPrefix + deviceName
+	return StorageClassPrefix + deviceName
 }
 
 func getVolumeSnapshotClassName(deviceName string) string {

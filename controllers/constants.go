@@ -115,7 +115,7 @@ const (
 	PartOfLabelVal            = "lvms-provisioner"
 	CsiDriverNameVal          = "topolvm-csi-driver"
 
-	storageClassPrefix        = "lvms-"
+	StorageClassPrefix        = "lvms-"
 	volumeSnapshotClassPrefix = "lvms-"
 	sccPrefix                 = "lvms-"
 )
