@@ -2,7 +2,7 @@
 
 The LVM Operator Manager runs the LVM Cluster controller/reconciler that manages the following reconcile units: 
 
-- [LVMCluster Custom Resource (CR)](#lvmcluster-custom-resource--cr-)
+- [LVMCluster Custom Resource (CR)](#lvmcluster-custom-resource-cr)
 - [TopoLVM CSI](#topolvm-csi)
   * [CSI Driver](#csi-driver)
   * [TopoLVM Controller](#topolvm-controller)
@@ -11,9 +11,9 @@ The LVM Operator Manager runs the LVM Cluster controller/reconciler that manages
 - [Storage Classes](#storage-classes)
 - [Volume Group Manager](#volume-group-manager)
 - [LVM Volume Groups](#lvm-volume-groups)
-- [Openshift Security Context Constraints (SCCs)](#openshift-security-context-constraints--sccs-)
+- [Openshift Security Context Constraints (SCCs)](#openshift-security-context-constraints-sccs)
 
-Upon receiving a valid [LVMCluster custom resource](#lvmcluster-custom-resource--cr-), the LVM Cluster Controller initiates the reconciliation process to set up the TopoLVM Container Storage Interface (CSI) along with all the required resources for using locally available storage through Logical Volume Manager (LVM).
+Upon receiving a valid [LVMCluster custom resource](#lvmcluster-custom-resource-cr), the LVM Cluster Controller initiates the reconciliation process to set up the TopoLVM Container Storage Interface (CSI) along with all the required resources for using locally available storage through Logical Volume Manager (LVM).
 
 ## LVMCluster Custom Resource (CR)
 

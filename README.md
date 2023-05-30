@@ -44,6 +44,7 @@ end
 - [Known Limitations](#known-limitations)
     * [Single LVMCluster support](#single-lvmcluster-support)
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
+- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
 ## Deploying the LVM Operator
@@ -301,6 +302,8 @@ To perform a full cleanup, follow these steps:
     $ oc delete lvmclusters.lvm.topolvm.io my-lvmcluster
     lvmcluster.lvm.topolvm.io "my-lvmcluster" deleted
     ```
+   
+    If the previous command is stuck, it may be necessary to perform a [forced cleanup procedure](./docs/troubleshooting.md#forced-cleanup).
 
 4. Verify that the only remaining resource in the `openshift-storage` namespace is the Operator.
 
@@ -349,6 +352,10 @@ LVMS does not support the reconciliation of multiple LVMCluster custom resources
 ### Upgrades from v 4.10 and v4.11
 
 It is not possible to upgrade from release-4.10 and release-4.11 to a newer version due to a breaking change that has been implemented. For further information on this matter, consult [the relevant documentation](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md).
+
+## Troubleshooting
+
+See the [troubleshooting guide](docs/troubleshooting.md).
 
 ## Contributing
 
