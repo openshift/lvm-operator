@@ -126,7 +126,6 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 		{Name: "certs", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 	}
 
-	// TODO: Remove custom generation of TLS certs, current it's being used in topolvm controller manager
 	initContainers := []corev1.Container{
 		initContainer(initImage),
 	}
