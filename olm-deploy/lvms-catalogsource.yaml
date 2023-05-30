@@ -6,5 +6,5 @@ metadata:
 spec:
   sourceType: grpc
   image: catalog-img
-  displayName: OpenShift Data Foundation
+  displayName: Red Hat, Inc
   publisher: Red Hat
