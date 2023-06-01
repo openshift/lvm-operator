@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat Openshift Data Foundation.
+Copyright © 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 		Spec: v1alpha1.CatalogSourceSpec{
 			SourceType:  v1alpha1.SourceTypeGrpc,
 			Image:       lvmCatalogImage,
-			DisplayName: "OpenShift Data Foundation",
+			DisplayName: "Red Hat, Inc.",
 			Publisher:   "Red Hat",
 		},
 	}
