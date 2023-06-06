@@ -37,6 +37,8 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
+	persistent_volume "github.com/openshift/lvm-operator/controllers/persistent-volume"
+	persistent_volume_claim "github.com/openshift/lvm-operator/controllers/persistent-volume-claim"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
 )
@@ -84,7 +86,6 @@ func main() {
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
-		Namespace:              operatorNamespace,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "1136b8a6.topolvm.io",
@@ -94,6 +95,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// register controllers
 	if err = (&controllers.LVMClusterReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
@@ -107,7 +109,18 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "LVMCluster")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+
+	pvController := persistent_volume.NewPersistentVolumeReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-persistentvolume-controller"))
+	if err := pvController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
+		os.Exit(1)
+	}
+
+	pvcController := persistent_volume_claim.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-persistentvolumeclaim-controller"))
+	if err := pvcController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

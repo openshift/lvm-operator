@@ -41,11 +41,11 @@ The `topolvmNode` reconcile unit is responsible for deploying and managing the T
 
 ### TopoLVM Scheduler
 
-The TopoLVM Scheduler is **not** used in LVMS for scheduling Pods. Instead, the CSI StorageCapacity tracking feature is utilized by the Kubernetes scheduler to determine the Node on which to provision storage. This feature provides the necessary information to the scheduler regarding the available storage on each Node, allowing it to make an informed decision about where to place the Pod.
+The TopoLVM Scheduler is **not** used in LVMS for scheduling Pods. Instead, the CSI StorageCapacity tracking feature is utilized by the Kubernetes scheduler to determine the Node on which to provision storage. This feature provides the necessary information to the scheduler regarding the available storage on each node, allowing it to make an informed decision about where to place the Pod.
 
 ## Storage Classes
 
-The `topolvmStorageClass` reconcile unit is responsible for creating and managing all storage classes associated with the device classes specified in the LVMCluster CR. Each storage class is named with a prefix of 'lvms-' followed by the name of the corresponding device class in the LVMCluster CR.
+The `topolvmStorageClass` reconcile unit is responsible for creating and managing all storage classes associated with the device classes specified in the LVMCluster CR. Each storage class is named with a prefix of `lvms-` followed by the name of the corresponding device class in the LVMCluster CR.
 
 ## Volume Group Manager
 

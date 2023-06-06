@@ -208,7 +208,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		}
 	}
 
-	r.Log.Info("successfully reconciled LvmCluster")
+	r.Log.Info("successfully reconciled LVMCluster")
 
 	return ctrl.Result{}, nil
 }
