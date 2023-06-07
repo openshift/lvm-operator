@@ -6,7 +6,7 @@ that expands its capabilities to gather LVM Operator information.
 
 ### Usage
 ```sh
-oc adm must-gather --image=quay.io/lvms_dev/lvm-must-gather:latest
+oc adm must-gather --image=quay.io/lvms_dev/lvms-must-gather:latest
 ```
 
 The command above will create a local directory with a dump of the lvm state.
