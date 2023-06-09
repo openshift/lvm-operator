@@ -39,8 +39,6 @@ const (
 	testNamespace = "lvm-endtoendtest"
 	// installNamespace is the namespace we installs the operator in.
 	installNamespace = "openshift-storage"
-	// storageClass is the name of the lvm storage class.
-	storageClass = "lvms-vg1"
 	// snapshotClass is the name of the lvm snapshot class.
 	snapshotClass = "lvms-vg1"
 )

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/onsi/gomega"
+	v1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 )
 
 // beforeTestSuiteSetup is the function called to initialize the test environment.
@@ -36,41 +37,44 @@ func beforeTestSuiteSetup(ctx context.Context) {
 		err := deployLVMWithOLM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
+}
 
+func lvmClusterSetup(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) {
 	debug("BeforeTestSuite: starting LVM Cluster\n")
-	err := startLVMCluster(ctx)
+	err := startLVMCluster(clusterConfig, ctx)
 	gomega.Expect(err).To(gomega.BeNil())
+}
 
+func lvmNamespaceSetup(ctx context.Context) {
 	debug("BeforeTestSuite: creating Namespace %s\n", testNamespace)
-	err = createNamespace(ctx, testNamespace)
+	err := createNamespace(ctx, testNamespace)
 	gomega.Expect(err).To(gomega.BeNil())
+}
 
-	debug("------------------------------\n")
+func lvmNamespaceCleanup(ctx context.Context) {
+	debug("AfterTestSuite: deleting Namespace %s\n", testNamespace)
+	err := deleteNamespaceAndWait(ctx, testNamespace)
+	gomega.Expect(err).To(gomega.BeNil())
+}
 
+func lvmClusterCleanup(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) {
+	debug("AfterTestSuite: deleting default LVM Cluster\n")
+	err := deleteLVMCluster(clusterConfig, ctx)
+	gomega.Expect(err).To(gomega.BeNil())
 }
 
 // afterTestSuiteCleanup is the function called to tear down the test environment.
 func afterTestSuiteCleanup(ctx context.Context) {
 
-	debug("\n------------------------------\n")
-
-	debug("AfterTestSuite: deleting Namespace %s\n", testNamespace)
-	err := deleteNamespaceAndWait(ctx, testNamespace)
-	gomega.Expect(err).To(gomega.BeNil())
-
 	if lvmOperatorUninstall {
-		debug("AfterTestSuite: deleting default LVM Cluster\n")
-		err := deleteLVMCluster(ctx)
-		gomega.Expect(err).To(gomega.BeNil())
-
 		debug("AfterTestSuite: uninstalling LVM Operator\n")
-		err = uninstallLVM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
+		err := uninstallLVM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
 		gomega.Expect(err).To(gomega.BeNil(), "error uninstalling the LVM Operator: %v", err)
 	}
 
 	if diskInstall {
 		debug("Cleaning up disk\n")
-		err = diskRemoval(ctx)
+		err := diskRemoval(ctx)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
 }

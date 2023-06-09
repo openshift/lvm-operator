@@ -70,7 +70,7 @@ func ephemeralTest() {
 			It("Tests ephemeral volume operations for VolumeMode=Filesystem", func() {
 
 				By("Creating a pod with generic ephemeral volume")
-				podVolumeMountYaml := fmt.Sprintf(podEphemeralFSYAMLTemplate, "ephemeral-filepod", testNamespace, storageClass)
+				podVolumeMountYaml := fmt.Sprintf(podEphemeralFSYAMLTemplate, "ephemeral-filepod", testNamespace, storageClassName)
 				ephemeralPod, err = getPod(podVolumeMountYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, ephemeralPod)
@@ -105,7 +105,7 @@ func ephemeralTest() {
 				}, timeout, interval).Should(BeTrue())
 
 				By("Creating a clone of the pvc")
-				pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralfilepvc-clone", testNamespace, "Filesystem", storageClass, "ephemeral-filepod-generic-ephemeral-volume")
+				pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralfilepvc-clone", testNamespace, "Filesystem", storageClassName, "ephemeral-filepod-generic-ephemeral-volume")
 				clonePvc, err = getPVC(pvcCloneYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePvc)
@@ -125,7 +125,7 @@ func ephemeralTest() {
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for pvc")
-				pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralfilepvc-restore", testNamespace, "Filesystem", storageClass, "ephemeralfilepvc-snapshot")
+				pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralfilepvc-restore", testNamespace, "Filesystem", storageClassName, "ephemeralfilepvc-snapshot")
 				restorePvc, err = getPVC(pvcRestoreYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePvc)
@@ -180,7 +180,7 @@ func ephemeralTest() {
 
 			It("Tests PVC operations for VolumeMode=Block", func() {
 				By("Creating a pod with generic ephemeral volume")
-				podVolumeBlockYaml := fmt.Sprintf(podEphemeralBlockYAMLTemplate, "ephemeral-blockpod", testNamespace, storageClass)
+				podVolumeBlockYaml := fmt.Sprintf(podEphemeralBlockYAMLTemplate, "ephemeral-blockpod", testNamespace, storageClassName)
 				ephemeralPod, err = getPod(podVolumeBlockYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, ephemeralPod)
@@ -215,7 +215,7 @@ func ephemeralTest() {
 				}, timeout, interval).Should(BeTrue())
 
 				By("Creating a clone of the pvc")
-				pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralblockpvc-clone", testNamespace, "Block", storageClass, "ephemeral-blockpod-generic-ephemeral-volume")
+				pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralblockpvc-clone", testNamespace, "Block", storageClassName, "ephemeral-blockpod-generic-ephemeral-volume")
 				clonePvc, err = getPVC(pvcCloneYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePvc)
@@ -235,7 +235,7 @@ func ephemeralTest() {
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for pvc")
-				pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralblockpvc-restore", testNamespace, "Block", storageClass, "ephemeralblockpvc-snapshot")
+				pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralblockpvc-restore", testNamespace, "Block", storageClassName, "ephemeralblockpvc-snapshot")
 				restorePvc, err = getPVC(pvcRestoreYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePvc)

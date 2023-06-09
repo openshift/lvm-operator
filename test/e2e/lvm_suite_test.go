@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/lvm-operator/api/v1alpha1"
 )
 
 func TestLvm(t *testing.T) {
@@ -32,15 +33,36 @@ func TestLvm(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// Configure the disk and install the operator
 	beforeTestSuiteSetup(context.Background())
+	lvmNamespaceSetup(context.Background())
 })
 
 var _ = AfterSuite(func() {
+	lvmNamespaceCleanup(context.Background())
 	afterTestSuiteCleanup(context.Background())
 })
 
-var _ = Describe("LVMO e2e tests", func() {
-	Context("LVMCluster reconciliation", validateResources)
-	Context("PVC tests", pvcTest)
-	Context("Ephemeral volume tests", ephemeralTest)
+var _ = Describe("LVM Operator e2e tests", func() {
+	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
+
+	Describe("LVM Operator", Ordered, func() {
+		// Ordered to give the BeforeAll/AfterAll functionality to achieve common setup
+		var clusterConfig *v1alpha1.LVMCluster
+
+		BeforeAll(func() {
+			clusterConfig = generateLVMCluster()
+			lvmClusterSetup(clusterConfig, context.Background())
+		})
+
+		Describe("Functional Tests", func() {
+			Context("LVMCluster reconciliation", validateResources)
+			Context("PVC tests", pvcTest)
+			Context("Ephemeral volume tests", ephemeralTest)
+		})
+
+		AfterAll(func() {
+			lvmClusterCleanup(clusterConfig, context.Background())
+		})
+	})
 })

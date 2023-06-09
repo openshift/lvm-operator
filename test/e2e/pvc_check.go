@@ -62,7 +62,7 @@ func pvcTest() {
 		Context("create pvc, pod, snapshots, clones", func() {
 			It("Tests PVC operations for VolumeMode=Filesystem", func() {
 				By("Creating a pvc and pod")
-				filePvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmfilepvc", testNamespace, "Filesystem", storageClass)
+				filePvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmfilepvc", testNamespace, "Filesystem", storageClassName)
 				pvc, err = getPVC(filePvcYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, pvc)
@@ -105,7 +105,7 @@ func pvcTest() {
 				}, timeout, interval).Should(BeTrue())
 
 				By("Creating a clone of the filesystem pvc")
-				pvcCloneYaml := fmt.Sprintf(pvcCloneYAMLTemplate, "lvmfilepvc-clone", testNamespace, "Filesystem", storageClass, "lvmfilepvc")
+				pvcCloneYaml := fmt.Sprintf(pvcCloneYAMLTemplate, "lvmfilepvc-clone", testNamespace, "Filesystem", storageClassName, "lvmfilepvc")
 				clonePvc, err = getPVC(pvcCloneYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePvc)
@@ -125,7 +125,7 @@ func pvcTest() {
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for file-pvc")
-				pvcRestoreYaml := fmt.Sprintf(pvcSnapshotRestoreYAMLTemplate, "lvmfilepvc-restore", testNamespace, "Filesystem", storageClass, "lvmfilepvc-snapshot")
+				pvcRestoreYaml := fmt.Sprintf(pvcSnapshotRestoreYAMLTemplate, "lvmfilepvc-restore", testNamespace, "Filesystem", storageClassName, "lvmfilepvc-snapshot")
 				restorePvc, err = getPVC(pvcRestoreYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePvc)
@@ -175,7 +175,7 @@ func pvcTest() {
 
 			It("Tests PVC operations for VolumeMode=Block", func() {
 				By("Creating pvc and pod")
-				blockPvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmblockpvc", testNamespace, "Block", storageClass)
+				blockPvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmblockpvc", testNamespace, "Block", storageClassName)
 				pvc, err = getPVC(blockPvcYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, pvc)
@@ -218,7 +218,7 @@ func pvcTest() {
 				}, timeout, interval).Should(BeTrue())
 
 				By("Creating a clone of the block-pvc")
-				pvcCloneYaml := fmt.Sprintf(pvcCloneYAMLTemplate, "lvmblockpvc-clone", testNamespace, "Block", storageClass, "lvmblockpvc")
+				pvcCloneYaml := fmt.Sprintf(pvcCloneYAMLTemplate, "lvmblockpvc-clone", testNamespace, "Block", storageClassName, "lvmblockpvc")
 				clonePvc, err = getPVC(pvcCloneYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, clonePvc)
@@ -238,7 +238,7 @@ func pvcTest() {
 				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
 
 				By("Restore Snapshot for block-pvc")
-				pvcRestoreYaml := fmt.Sprintf(pvcSnapshotRestoreYAMLTemplate, "lvmblockpvc-restore", testNamespace, "Block", storageClass, "lvmblockpvc-snapshot")
+				pvcRestoreYaml := fmt.Sprintf(pvcSnapshotRestoreYAMLTemplate, "lvmblockpvc-restore", testNamespace, "Block", storageClassName, "lvmblockpvc-snapshot")
 				restorePvc, err = getPVC(pvcRestoreYaml)
 				Expect(err).To(BeNil())
 				err = crClient.Create(ctx, restorePvc)
