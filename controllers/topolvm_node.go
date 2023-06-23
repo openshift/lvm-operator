@@ -58,6 +58,13 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 			Namespace: dsTemplate.Namespace,
 		},
 	}
+
+	err := cutil.SetControllerReference(lvmCluster, ds, r.Scheme)
+	if err != nil {
+		r.Log.Error(err, "failed to set controller reference to topolvm node daemonset with name", ds.Name)
+		return err
+	}
+
 	unitLogger.Info("running CreateOrUpdate")
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, ds, func() error {
 		// at creation, deep copy the whole daemonSet

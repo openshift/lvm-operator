@@ -49,6 +49,13 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 				Namespace: volumeGroup.Namespace,
 			},
 		}
+
+		err := cutil.SetControllerReference(lvmCluster, existingVolumeGroup, r.Scheme)
+		if err != nil {
+			r.Log.Error(err, "failed to set controller reference to LVMVolumeGroup with name", volumeGroup.Name)
+			return err
+		}
+
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, existingVolumeGroup, func() error {
 			existingVolumeGroup.Finalizers = volumeGroup.Finalizers
 			existingVolumeGroup.Spec = volumeGroup.Spec
