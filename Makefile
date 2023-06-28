@@ -180,7 +180,7 @@ build-prometheus-alert-rules: jsonnet monitoring/mixin.libsonnet monitoring/aler
 	$(JSONNET) -S monitoring/alerts/alerts.jsonnet > config/prometheus/prometheus_rules.yaml
 
 docker-build: ## Build docker image with the manager.
-	$(IMAGE_BUILD_CMD) build -t ${IMG} .
+	$(IMAGE_BUILD_CMD) build --platform linux/amd64 -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
 	$(IMAGE_BUILD_CMD) push ${IMG}
@@ -244,7 +244,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	$(IMAGE_BUILD_CMD) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(IMAGE_BUILD_CMD) build --platform linux/amd64 -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
