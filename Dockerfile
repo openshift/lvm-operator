@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o vgman
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
 
 # Update the image to get the latest CVE updates
 RUN microdnf update -y && \

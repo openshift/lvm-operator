@@ -40,8 +40,7 @@ const (
 // they verify that the device itself is good to use
 var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, error){
 	notReadOnly: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		readOnly, err := dev.IsReadOnly()
-		return !readOnly, err
+		return !dev.ReadOnly, nil
 	},
 
 	notSuspended: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {

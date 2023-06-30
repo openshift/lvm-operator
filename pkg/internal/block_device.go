@@ -57,8 +57,8 @@ type BlockDevice struct {
 	FSType     string        `json:"fstype"`
 	Size       string        `json:"size"`
 	Children   []BlockDevice `json:"children,omitempty"`
-	Rotational string        `json:"rota"`
-	ReadOnly   string        `json:"ro,omitempty"`
+	Rotational bool          `json:"rota"`
+	ReadOnly   bool          `json:"ro,omitempty"`
 	Serial     string        `json:"serial,omitempty"`
 	PartLabel  string        `json:"partLabel,omitempty"`
 
@@ -118,11 +118,6 @@ func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
 	return usable, nil
 }
 
-// IsReadOnly checks is disk is read only
-func (b BlockDevice) IsReadOnly() (bool, error) {
-	return parseBitBool(b.ReadOnly)
-}
-
 // HasChildren checks if the disk has partitions
 func (b BlockDevice) HasChildren() bool {
 	return len(b.Children) > 0
@@ -150,14 +145,4 @@ func (b BlockDevice) HasBindMounts() (bool, string, error) {
 	}
 
 	return false, "", nil
-}
-
-func parseBitBool(s string) (bool, error) {
-	switch s {
-	case "0", "false", "":
-		return false, nil
-	case "1", "true":
-		return true, nil
-	}
-	return false, fmt.Errorf("invalid value: %q", s)
 }

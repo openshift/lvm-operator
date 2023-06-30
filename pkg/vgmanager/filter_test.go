@@ -16,12 +16,8 @@ type filterTestCase struct {
 
 func TestNotReadOnly(t *testing.T) {
 	testcases := []filterTestCase{
-		{label: "tc empty string", device: internal.BlockDevice{ReadOnly: ""}, expected: true, expectErr: false},
-		{label: "tc false", device: internal.BlockDevice{ReadOnly: "false"}, expected: true, expectErr: false},
-		{label: "tc true", device: internal.BlockDevice{ReadOnly: "true"}, expected: false, expectErr: false},
-		{label: "tc 0", device: internal.BlockDevice{ReadOnly: "0"}, expected: true, expectErr: false},
-		{label: "tc 1", device: internal.BlockDevice{ReadOnly: "1"}, expected: false, expectErr: false},
-		{label: "tc invalid string", device: internal.BlockDevice{ReadOnly: "test"}, expected: true, expectErr: true},
+		{label: "tc false", device: internal.BlockDevice{ReadOnly: false}, expected: true, expectErr: false},
+		{label: "tc true", device: internal.BlockDevice{ReadOnly: true}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
 		result, err := FilterMap[notReadOnly](tc.device, nil)
