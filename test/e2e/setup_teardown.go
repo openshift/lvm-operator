@@ -27,38 +27,38 @@ import (
 func beforeTestSuiteSetup(ctx context.Context) {
 
 	if diskInstall {
-		debug("Creating disk for e2e tests\n")
+		debug("Creating disk for e2e tests")
 		err := diskSetup(ctx)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
 
 	if lvmOperatorInstall {
-		debug("BeforeTestSuite: deploying LVM Operator\n")
+		debug("BeforeTestSuite: deploying LVM Operator")
 		err := deployLVMWithOLM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
 }
 
 func lvmClusterSetup(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) {
-	debug("BeforeTestSuite: starting LVM Cluster\n")
+	debug("BeforeTestSuite: starting LVM Cluster")
 	err := startLVMCluster(clusterConfig, ctx)
 	gomega.Expect(err).To(gomega.BeNil())
 }
 
 func lvmNamespaceSetup(ctx context.Context) {
-	debug("BeforeTestSuite: creating Namespace %s\n", testNamespace)
+	debug("BeforeTestSuite: creating Namespace", testNamespace)
 	err := createNamespace(ctx, testNamespace)
 	gomega.Expect(err).To(gomega.BeNil())
 }
 
 func lvmNamespaceCleanup(ctx context.Context) {
-	debug("AfterTestSuite: deleting Namespace %s\n", testNamespace)
+	debug("AfterTestSuite: deleting Namespace", testNamespace)
 	err := deleteNamespaceAndWait(ctx, testNamespace)
 	gomega.Expect(err).To(gomega.BeNil())
 }
 
 func lvmClusterCleanup(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) {
-	debug("AfterTestSuite: deleting default LVM Cluster\n")
+	debug("AfterTestSuite: deleting default LVM Cluster")
 	err := deleteLVMCluster(clusterConfig, ctx)
 	gomega.Expect(err).To(gomega.BeNil())
 }
@@ -67,13 +67,13 @@ func lvmClusterCleanup(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) 
 func afterTestSuiteCleanup(ctx context.Context) {
 
 	if lvmOperatorUninstall {
-		debug("AfterTestSuite: uninstalling LVM Operator\n")
+		debug("AfterTestSuite: uninstalling LVM Operator")
 		err := uninstallLVM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
 		gomega.Expect(err).To(gomega.BeNil(), "error uninstalling the LVM Operator: %v", err)
 	}
 
 	if diskInstall {
-		debug("Cleaning up disk\n")
+		debug("Cleaning up disk")
 		err := diskRemoval(ctx)
 		gomega.Expect(err).To(gomega.BeNil())
 	}
