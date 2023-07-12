@@ -319,6 +319,29 @@ To perform a full cleanup, follow these steps:
     make undeploy
     ```
 
+## E2E Tests
+
+There are a few steps require to run the end-to-end tests for LVMS. 
+
+You will need the following evironment variables set:
+```bash
+IMAGE_REGISTRY={{REGISTRY_URL}} # Ex: quay.io
+REGISTRY_NAMESPACE={{REGISTRY_NAMESPACE}} # Ex: lvms-dev
+```
+
+Once the environment variables are set, you can run
+```bash
+$ make local-e2e
+```
+
+That command will:
+- Do any repo sanitization needed (in case changes are made)
+- Build the Operator and tag it with the git hash
+- Build the Operator Bundle and tag it with the git hash
+- Build the Operator Catalog adn tag it with the git hash
+- Run the e2e tests against the built images
+- Undo any sanitization that was needed for the repo
+
 ## Metrics
 
 The LVM Operator runs a metrics exporter sidecar to export Prometheus metrics. To enable monitoring on OpenShift clusters, assign the `openshift.io/cluster-monitoring` label to the same namespace that you deployed LVMS to.
