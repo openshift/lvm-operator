@@ -377,5 +377,3 @@ release-local-catalog: opm
 .PHONY: local-e2e
 local-e2e:
 	hack/local-e2e.sh
-
-# IMAGE_TAG=6f2d1d78d29d34b6732e24ef464fddb78102a065 lvmt make e2e-test
