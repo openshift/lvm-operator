@@ -1,17 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-# Get the git hash for tagging the images
-TEMP_COMMIT="false"
-test -z "$(git status --porcelain)" || TEMP_COMMIT="true"
-
-if [[ "${TEMP_COMMIT}" == "true" ]]; then
-  git add .
-  git commit -m "chore: Temporary" || true
+# Do a temp commit if the working dir is dirty
+DIRTY_REPO="false"
+test -z "$(git status --porcelain)" || DIRTY_REPO="true"
+if [[ "${DIRTY_REPO}" == "true" ]]; then
+  echo "Dirty repository detected. Please run 'make git-sanitize' or commit your changes before running this command"
+  exit 1
 fi
 
 GITREV=$(git rev-parse HEAD)
 BUILDER=$(command -v docker 2>&1 >/dev/null && echo docker || echo podman)
+
+# Run the generate and bundle commands
+export IMAGE_TAG="${GITREV}"
+make generate bundle
 
 # If IMAGE_REPO is defined, build the operator image
 IMAGE_REPO="${IMAGE_REPO:-}"
@@ -37,12 +40,8 @@ if [ -n "$BUNDLE_REPO" ]; then
   fi
 fi
 
+echo
 echo "Built and Pushed:"
 if [ -n "$IMAGE_REPO" ]; then echo "${IMAGE_REPO}:${GITREV}"; fi
 if [ -n "$BUNDLE_REPO" ]; then echo "${BUNDLE_REPO}:${GITREV}"; fi
 if [ -n "$CATALOG_REPO" ]; then echo "${CATALOG_REPO}:${GITREV}"; fi
-
-# Clean up any temp commits made
-if [[ "${TEMP_COMMIT}" == "true" ]]; then
-  git reset --soft HEAD~1
-fi

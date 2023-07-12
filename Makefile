@@ -350,12 +350,32 @@ operator-sdk: ## Download operator-sdk locally.
 	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH};\
 	chmod +x $(OPERATOR_SDK) ;\
 
-.PHONY: prepare-local
-prepare-local: generate bundle
+.PHONY: git-sanitize
+git-sanitize:
+	hack/git-sanitize.sh
 
-.PHONY: release-local
-release-local: opm
+.PHONY: git-unsanitize
+git-unsanitize:
+	CLEANUP="true" hack/git-sanitize.sh
+
+.PHONY: release-local-operator
+release-local-operator:
+	IMAGE_REPO=$(IMAGE_REPO) hack/release-local.sh
+
+.PHONY: release-local-bundle
+release-local-bundle:
+	IMAGE_REPO=$(IMAGE_REPO) \
+	BUNDLE_REPO=$(BUNDLE_REPO) hack/release-local.sh
+
+.PHONY: release-local-catalog
+release-local-catalog: opm
 	IMAGE_REPO=$(IMAGE_REPO) \
 	BUNDLE_REPO=$(BUNDLE_REPO) \
 	CATALOG_REPO=$(CATALOG_REPO) \
 	OPM=$(OPM) hack/release-local.sh
+
+.PHONY: local-e2e
+local-e2e:
+	hack/local-e2e.sh
+
+# IMAGE_TAG=6f2d1d78d29d34b6732e24ef464fddb78102a065 lvmt make e2e-test
