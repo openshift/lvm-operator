@@ -362,18 +362,11 @@ git-unsanitize:
 release-local-operator:
 	IMAGE_REPO=$(IMAGE_REPO) hack/release-local.sh
 
-.PHONY: release-local-bundle
-release-local-bundle:
-	IMAGE_REPO=$(IMAGE_REPO) \
-	BUNDLE_REPO=$(BUNDLE_REPO) hack/release-local.sh
+.PHONY: deploy-local
+deploy-local:
+	hack/deploy-local.sh
 
-.PHONY: release-local-catalog
-release-local-catalog: opm
-	IMAGE_REPO=$(IMAGE_REPO) \
-	BUNDLE_REPO=$(BUNDLE_REPO) \
-	CATALOG_REPO=$(CATALOG_REPO) \
-	OPM=$(OPM) hack/release-local.sh
-
-.PHONY: local-e2e
-local-e2e:
-	hack/local-e2e.sh
+.PHONY: e2e
+e2e: ginkgo
+	cd test/e2e && $(GINKGO) build
+	cd test/e2e && ./e2e.test --lvm-operator-install=false --lvm-operator-uninstall=false -ginkgo.v
