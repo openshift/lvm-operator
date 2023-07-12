@@ -142,13 +142,16 @@ func lvmClusterTest() {
 			// Make sure the storage class was configured properly
 			sc := storagev1.StorageClass{}
 
+			var err error
 			Eventually(func() bool {
-				err := crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
-				if err != nil {
-					debug("Error getting StorageClass %s: %s\n", storageClassName, err.Error())
-				}
+				err = crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			if err != nil {
+				Fail(fmt.Sprintf("Error getting StorageClass %s: %s\n", storageClassName, err.Error()))
+			}
 
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeXFS)))
 		})
@@ -163,13 +166,16 @@ func lvmClusterTest() {
 			// Make sure the storage class was configured properly
 			sc := storagev1.StorageClass{}
 
+			var err error
 			Eventually(func() bool {
-				err := crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
-				if err != nil {
-					debug("Error getting StorageClass %s: %s\n", storageClassName, err.Error())
-				}
+				err = crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			if err != nil {
+				Fail(fmt.Sprintf("Error getting StorageClass %s: %s\n", storageClassName, err.Error()))
+			}
 
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeXFS)))
 		})
@@ -184,13 +190,16 @@ func lvmClusterTest() {
 			// Make sure the storage class was configured properly
 			sc := storagev1.StorageClass{}
 
+			var err error
 			Eventually(func() bool {
-				err := crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
-				if err != nil {
-					debug("Error getting StorageClass %s: %s\n", storageClassName, err.Error())
-				}
+				err = crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			if err != nil {
+				Fail(fmt.Sprintf("Error getting StorageClass %s: %s\n", storageClassName, err.Error()))
+			}
 
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeExt4)))
 		})

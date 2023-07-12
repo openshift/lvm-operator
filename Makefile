@@ -89,8 +89,9 @@ IMAGE_REGISTRY ?= quay.io
 REGISTRY_NAMESPACE ?= lvms_dev
 IMAGE_TAG ?= latest
 IMAGE_NAME ?= lvms-operator
+IMAGE_REPO ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(IMAGE_NAME)
 # IMG defines the image used for the operator.
-IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)
+IMG ?= $(IMAGE_REPO):$(IMAGE_TAG)
 
 # MUST_GATHER_IMG defines the image used for the must-gather.
 MUST_GATHER_IMAGE_NAME ?= lvms-must-gather
@@ -120,7 +121,8 @@ BUNDLE_PACKAGE ?= lvms-operator
 
 # BUNDLE_IMG defines the image used for the bundle.
 BUNDLE_IMAGE_NAME ?= $(IMAGE_NAME)-bundle
-BUNDLE_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(BUNDLE_IMAGE_NAME):$(IMAGE_TAG)
+BUNDLE_REPO ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(BUNDLE_IMAGE_NAME)
+BUNDLE_IMG ?= $(BUNDLE_REPO):$(IMAGE_TAG)
 
 # Each CSV has a replaces parameter that indicates which Operator it replaces.
 # This builds a graph of CSVs that can be queried by OLM, and updates can be
@@ -258,7 +260,8 @@ BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # CATALOG_IMG defines the image used for the catalog.
 CATALOG_IMAGE_NAME ?= $(IMAGE_NAME)-catalog
-CATALOG_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(CATALOG_IMAGE_NAME):$(IMAGE_TAG)
+CATALOG_REPO ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(CATALOG_IMAGE_NAME)
+CATALOG_IMG ?= $(CATALOG_REPO):$(IMAGE_TAG)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
@@ -346,3 +349,31 @@ operator-sdk: ## Download operator-sdk locally.
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
 	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH};\
 	chmod +x $(OPERATOR_SDK) ;\
+
+.PHONY: git-sanitize
+git-sanitize:
+	hack/git-sanitize.sh
+
+.PHONY: git-unsanitize
+git-unsanitize:
+	CLEANUP="true" hack/git-sanitize.sh
+
+.PHONY: release-local-operator
+release-local-operator:
+	IMAGE_REPO=$(IMAGE_REPO) hack/release-local.sh
+
+.PHONY: release-local-bundle
+release-local-bundle:
+	IMAGE_REPO=$(IMAGE_REPO) \
+	BUNDLE_REPO=$(BUNDLE_REPO) hack/release-local.sh
+
+.PHONY: release-local-catalog
+release-local-catalog: opm
+	IMAGE_REPO=$(IMAGE_REPO) \
+	BUNDLE_REPO=$(BUNDLE_REPO) \
+	CATALOG_REPO=$(CATALOG_REPO) \
+	OPM=$(OPM) hack/release-local.sh
+
+.PHONY: local-e2e
+local-e2e:
+	hack/local-e2e.sh
