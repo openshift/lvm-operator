@@ -25,13 +25,13 @@ fi
 
 # If BUNDLE_REPO is defined, build the bundle
 BUNDLE_REPO="${BUNDLE_REPO:-}"
+CATALOG_REPO="${CATALOG_REPO:-}"
 if [ -n "$BUNDLE_REPO" ]; then
   BUNDLE_IMG=${BUNDLE_REPO}:${GITREV}
   ${BUILDER} build -f bundle.Dockerfile -t ${BUNDLE_IMG} .
   ${BUILDER} push ${BUNDLE_REPO}:${GITREV}
 
   # If CATALOG_REPO is defined, build the catalog
-  CATALOG_REPO="${CATALOG_REPO:-}"
   if [ -n "$CATALOG_REPO" ]; then
     OPM="${OPM:-}"
     if [ -z "$OPM" ]; then echo "ERROR: OPM is a required variable"; exit 1; fi

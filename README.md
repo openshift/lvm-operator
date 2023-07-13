@@ -321,26 +321,30 @@ To perform a full cleanup, follow these steps:
 
 ## E2E Tests
 
-There are a few steps require to run the end-to-end tests for LVMS. 
+There are a few steps required to run the end-to-end tests for LVMS. 
 
 You will need the following evironment variables set:
 ```bash
 IMAGE_REGISTRY={{REGISTRY_URL}} # Ex: quay.io
-REGISTRY_NAMESPACE={{REGISTRY_NAMESPACE}} # Ex: lvms-dev
+REGISTRY_NAMESPACE={{REGISTRY_NAMESPACE}} # Ex: lvms-dev, this should be your own personal namespace
 ```
 
 Once the environment variables are set, you can run
 ```bash
-$ make local-e2e
-```
+# build and deploy your local code to the cluster
+$ make deploy-local
 
-That command will:
-- Do any repo sanitization needed (in case changes are made)
-- Build the Operator and tag it with the git hash
-- Build the Operator Bundle and tag it with the git hash
-- Build the Operator Catalog adn tag it with the git hash
-- Run the e2e tests against the built images
-- Undo any sanitization that was needed for the repo
+# Wait for the lvms-operator to have status=Running
+$ oc -n openshift-storage get pods
+# NAME                             READY   STATUS    RESTARTS   AGE
+# lvms-operator-579fbf46d5-vjwhp   3/3     Running   0          3m27s
+
+# run the e2e tests
+$ make e2e 
+
+# undeploy the operator from the cluster
+$ make undeploy
+```
 
 ## Metrics
 
