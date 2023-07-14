@@ -45,6 +45,7 @@ func (c csiDriver) getName() string {
 
 func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	csiDriverResource := getCSIDriverResource()
+
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, csiDriverResource, func() error {
 		// no need to mutate any field
 		return nil

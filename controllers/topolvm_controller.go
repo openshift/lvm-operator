@@ -59,6 +59,12 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 		},
 	}
 
+	err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme)
+	if err != nil {
+		r.Log.Error(err, "failed to set controller reference to topolvm controller deployment with name", existingDeployment.Name)
+		return err
+	}
+
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, existingDeployment, func() error {
 		return c.setTopolvmControllerDesiredState(existingDeployment, desiredDeployment)
 	})
