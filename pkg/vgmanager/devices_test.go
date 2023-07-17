@@ -401,6 +401,155 @@ func TestAvailableDevicesForVG(t *testing.T) {
 			numOfAvailableDevices: 1,
 			expectError:           false,
 		},
+		{
+			description: "vg has required and optional devices",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []string{
+							devicePaths["nvme1n1p1"],
+						},
+						OptionalPaths: []string{
+							devicePaths["nvme1n1p2"],
+						},
+					},
+				},
+			},
+			existingBlockDevices: []internal.BlockDevice{
+				{
+					Name:     "nvme1n1p1",
+					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+				},
+				{
+					Name:     "nvme1n1p2",
+					KName:    calculateDevicePath(t, "nvme1n1p2"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+				},
+			},
+			numOfAvailableDevices: 2,
+			expectError:           false,
+		},
+		{
+			description: "vg has an optional devices and no required devices",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						OptionalPaths: []string{
+							devicePaths["nvme1n1p1"],
+							devicePaths["nvme1n1p2"],
+						},
+					},
+				},
+			},
+			existingBlockDevices: []internal.BlockDevice{
+				{
+					Name:     "nvme1n1p1",
+					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+				},
+			},
+			numOfAvailableDevices: 1,
+			expectError:           false,
+		},
+		{
+			description: "vg has no required devices and no available optional devices",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						OptionalPaths: []string{
+							devicePaths["nvme1n1p2"],
+						},
+					},
+				},
+			},
+			existingBlockDevices: []internal.BlockDevice{
+				{
+					Name:     "nvme1n1p1",
+					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+				},
+			},
+			numOfAvailableDevices: 0,
+			expectError:           true,
+		},
+		{
+			description: "vg has duplicate required and optional device paths listed",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []string{
+							devicePaths["nvme1n1p1"],
+						},
+						OptionalPaths: []string{
+							devicePaths["nvme1n1p1"],
+						},
+					},
+				},
+			},
+			numOfAvailableDevices: 0,
+			expectError:           true,
+		},
+		{
+			description: "vg has duplicate required device paths listed",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []string{
+							devicePaths["nvme1n1p1"],
+							devicePaths["nvme1n1p1"],
+						},
+					},
+				},
+			},
+			numOfAvailableDevices: 0,
+			expectError:           true,
+		},
+		{
+			description: "vg has duplicate optional device paths listed",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						OptionalPaths: []string{
+							devicePaths["nvme1n1p1"],
+							devicePaths["nvme1n1p1"],
+						},
+					},
+				},
+			},
+			numOfAvailableDevices: 0,
+			expectError:           true,
+		},
 	}
 
 	for _, tc := range testCases {

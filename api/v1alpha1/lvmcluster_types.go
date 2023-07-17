@@ -109,6 +109,12 @@ type DeviceSelector struct {
 	// We discourage using the device names as they can change over node restarts.
 	// +optional
 	Paths []string `json:"paths,omitempty"`
+
+	// A list of device paths which could be chosen for creating Volume Group.
+	// For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
+	// We discourage using the device names as they can change over node restarts.
+	// +optional
+	OptionalPaths []string `json:"optionalPaths,omitempty"`
 }
 
 // type DeviceClassConfig struct {

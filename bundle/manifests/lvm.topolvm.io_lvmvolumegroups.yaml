@@ -42,6 +42,14 @@ spec:
                 description: DeviceSelector is a set of rules that should match for
                   a device to be included in this TopoLVMCluster
                 properties:
+                  optionalPaths:
+                    description: A list of device paths which could be chosen for
+                      creating Volume Group. For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
+                      We discourage using the device names as they can change over
+                      node restarts.
+                    items:
+                      type: string
+                    type: array
                   paths:
                     description: A list of device paths which would be chosen for
                       creating Volume Group. For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
