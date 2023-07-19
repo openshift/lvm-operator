@@ -370,3 +370,20 @@ deploy-local:
 e2e: ginkgo
 	cd test/e2e && $(GINKGO) build
 	cd test/e2e && ./e2e.test --lvm-operator-install=false --lvm-operator-uninstall=false -ginkgo.v
+
+GIT_URL ?= https://github.com/openshift/lvm-operator.git
+GIT_BRANCH ?= main
+
+.PHONY: create-buildconfig
+create-buildconfig:
+	GIT_URL=$(GIT_URL) GIT_BRANCH=$(GIT_BRANCH) hack/create-buildconfig.sh
+
+.PHONY: cluster-build
+cluster-build:
+	oc -n openshift-storage start-build lvms-operator --follow --wait
+
+.PHONY: cluster-deploy
+cluster-deploy:
+	IMAGE_REGISTRY=image-registry.openshift-image-registry.svc:5000 \
+	REGISTRY_NAMESPACE=openshift-storage \
+	$(MAKE) deploy
