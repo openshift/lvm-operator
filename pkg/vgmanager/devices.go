@@ -126,26 +126,50 @@ DeviceLoop:
 // filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.
 func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
 	var filteredBlockDevices []internal.BlockDevice
-	if volumeGroup.Spec.DeviceSelector != nil && len(volumeGroup.Spec.DeviceSelector.Paths) > 0 {
-		for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-			diskName, err := filepath.EvalSymlinks(path)
-			if err != nil {
-				err = fmt.Errorf("unable to find symlink for disk path %s: %v", path, err)
-				return []internal.BlockDevice{}, err
+	if volumeGroup.Spec.DeviceSelector != nil {
+
+		if err := checkDuplicateDeviceSelectorPaths(volumeGroup.Spec.DeviceSelector); err != nil {
+			return nil, fmt.Errorf("unable to validate device selector paths: %v", err)
+		}
+
+		// If Paths is specified, treat it as required paths
+		if len(volumeGroup.Spec.DeviceSelector.Paths) > 0 {
+			for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+				blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
+				if err != nil {
+					// An error for required devices is critical
+					return nil, fmt.Errorf("unable to validate device %s: %v", path, err)
+				}
+
+				// Check if we should skip this device
+				if blockDevice.DevicePath == "" {
+					continue
+				}
+
+				filteredBlockDevices = append(filteredBlockDevices, blockDevice)
+			}
+		}
+
+		// Check for any optional paths
+		if len(volumeGroup.Spec.DeviceSelector.OptionalPaths) > 0 {
+			for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+				blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
+
+				// Check if we should skip this device
+				if err != nil || blockDevice.DevicePath == "" {
+					continue
+				}
+
+				filteredBlockDevices = append(filteredBlockDevices, blockDevice)
 			}
 
-			isAlreadyExist := isDeviceAlreadyPartOfVG(vgs, diskName, volumeGroup)
-			if isAlreadyExist {
-				continue
+			// At least 1 of the optional paths are required if:
+			//   - OptionalPaths was specified AND
+			//   - There were no required paths
+			// This guarantees at least 1 device could be found
+			if len(filteredBlockDevices) == 0 {
+				return nil, fmt.Errorf("at least 1 valid optional device is required if DeviceSelector.OptionalPaths is specified")
 			}
-
-			blockDevice, ok := hasExactDisk(blockDevices, diskName)
-			if !ok {
-				return []internal.BlockDevice{}, fmt.Errorf("can not find device name %s in the available block devices", path)
-			}
-
-			blockDevice.DevicePath = path
-			filteredBlockDevices = append(filteredBlockDevices, blockDevice)
 		}
 
 		return filteredBlockDevices, nil
@@ -181,4 +205,67 @@ func hasExactDisk(blockDevices []internal.BlockDevice, deviceName string) (inter
 		}
 	}
 	return internal.BlockDevice{}, false
+}
+
+func checkDuplicateDeviceSelectorPaths(selector *lvmv1alpha1.DeviceSelector) error {
+	uniquePaths := make(map[string]bool)
+	duplicatePaths := make(map[string]bool)
+
+	// Check for duplicate required paths
+	for _, path := range selector.Paths {
+		if _, exists := uniquePaths[path]; exists {
+			duplicatePaths[path] = true
+			continue
+		}
+
+		uniquePaths[path] = true
+	}
+
+	// Check for duplicate optional paths
+	for _, path := range selector.OptionalPaths {
+		if _, exists := uniquePaths[path]; exists {
+			duplicatePaths[path] = true
+			continue
+		}
+
+		uniquePaths[path] = true
+	}
+
+	// Report any duplicate paths
+	if len(duplicatePaths) > 0 {
+		keys := make([]string, 0, len(duplicatePaths))
+		for k := range duplicatePaths {
+			keys = append(keys, k)
+		}
+
+		return fmt.Errorf("duplicate device paths found: %v", keys)
+	}
+
+	return nil
+}
+
+// getValidDevice will do various checks on a device path to make sure it is a valid device
+//
+//	An error will be returned if the device is invalid
+//	No error and an empty BlockDevice object will be returned if this device should be skipped (ex: duplicate device)
+func getValidDevice(devicePath string, blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (internal.BlockDevice, error) {
+	// Make sure the symlink exists
+	diskName, err := filepath.EvalSymlinks(devicePath)
+	if err != nil {
+		return internal.BlockDevice{}, fmt.Errorf("unable to find symlink for required disk path %s: %v", devicePath, err)
+	}
+
+	// Make sure this isn't a duplicate in the VG
+	if isDeviceAlreadyPartOfVG(vgs, diskName, volumeGroup) {
+		return internal.BlockDevice{}, nil // No error, we just don't want a duplicate
+	}
+
+	// Make sure the block device exists
+	blockDevice, ok := hasExactDisk(blockDevices, diskName)
+	if !ok {
+		return internal.BlockDevice{}, fmt.Errorf("can not find device name %s in the available block devices", devicePath)
+	}
+
+	blockDevice.DevicePath = devicePath
+	return blockDevice, nil
 }

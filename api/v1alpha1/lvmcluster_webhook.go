@@ -112,7 +112,7 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		var newThinPoolConfig, oldThinPoolConfig *ThinPoolConfig
-		var newDevices, oldDevices []string
+		var newDevices, newOptionalDevices, oldDevices, oldOptionalDevices []string
 
 		newThinPoolConfig = deviceClass.ThinPoolConfig
 		oldThinPoolConfig, err = oldLVMCluster.getThinPoolsConfigOfDeviceClass(deviceClass.Name)
@@ -134,36 +134,56 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 
 		if deviceClass.DeviceSelector != nil {
 			newDevices = deviceClass.DeviceSelector.Paths
+			newOptionalDevices = deviceClass.DeviceSelector.OptionalPaths
 		}
 
-		oldDevices, err = oldLVMCluster.getPathsOfDeviceClass(deviceClass.Name)
+		oldDevices, oldOptionalDevices, err = oldLVMCluster.getPathsOfDeviceClass(deviceClass.Name)
 
-		// if devices are removed now
-		if len(oldDevices) > len(newDevices) {
-			return fmt.Errorf("Invalid:devices can not be removed from the LVMCluster once added.")
+		// Is this a new device class?
+		if err == ErrDeviceClassNotFound {
+			continue
 		}
 
-		// if devices are added now
-		if len(oldDevices) == 0 && len(newDevices) > 0 && err != ErrDeviceClassNotFound {
-			return fmt.Errorf("Invalid:devices can not be added in the LVMCluster once created without devices.")
+		// Make sure a device path list was not added
+		if len(oldDevices) == 0 && len(newDevices) > 0 {
+			return fmt.Errorf("invalid: device paths can not be added after a device class has been initialized")
 		}
 
-		deviceMap := make(map[string]bool)
-
-		for _, device := range oldDevices {
-			deviceMap[device] = true
+		// Make sure an optionalPaths list was not added
+		if len(oldOptionalDevices) == 0 && len(newOptionalDevices) > 0 {
+			return fmt.Errorf("invalid: optional device paths can not be added after a device class has been initialized")
 		}
 
-		for _, device := range newDevices {
-			delete(deviceMap, device)
+		// Validate all the old paths still exist
+		err := validateDevicePathsStillExist(oldDevices, newDevices)
+		if err != nil {
+			return fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %v", err)
 		}
 
-		// if any old device is removed now
-		if len(deviceMap) != 0 {
-			return fmt.Errorf("Invalid:some of devices are deleted from the LVMCluster. "+
-				"Device can not be removed from the LVMCluster once added. "+
-				"oldDevices:%s, newDevices:%s", oldDevices, newDevices)
+		// Validate all the old optional paths still exist
+		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
+		if err != nil {
+			return fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %v", err)
 		}
+	}
+
+	return nil
+}
+
+func validateDevicePathsStillExist(old, new []string) error {
+	deviceMap := make(map[string]bool)
+
+	for _, device := range old {
+		deviceMap[device] = true
+	}
+
+	for _, device := range new {
+		delete(deviceMap, device)
+	}
+
+	// if any old device is removed now
+	if len(deviceMap) != 0 {
+		return fmt.Errorf("devices can not be removed from the LVMCluster once added oldDevices:%s, newDevices:%s", old, new)
 	}
 
 	return nil
@@ -203,8 +223,8 @@ func (l *LVMCluster) verifyPathsAreNotEmpty() error {
 	var deviceClassesWithoutPaths []string
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
-			if len(deviceClass.DeviceSelector.Paths) == 0 {
-				return fmt.Errorf("path list should not be empty when DeviceSelector is specified")
+			if len(deviceClass.DeviceSelector.Paths) == 0 && len(deviceClass.DeviceSelector.OptionalPaths) == 0 {
+				return fmt.Errorf("either paths or optionalPaths must be specified when DeviceSelector is specified")
 			}
 		} else {
 			deviceClassesWithoutPaths = append(deviceClassesWithoutPaths, deviceClass.Name)
@@ -223,8 +243,13 @@ func (l *LVMCluster) verifyAbsolutePath() error {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
 				if !strings.HasPrefix(path, "/dev/") {
-					return fmt.Errorf("Given path %s is not an absolute path. "+
-						"Please provide the absolute path to the device", path)
+					return fmt.Errorf("path %s must be an absolute path to the device", path)
+				}
+			}
+
+			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
+				if !strings.HasPrefix(path, "/dev/") {
+					return fmt.Errorf("optional path %s must be an absolute path to the device", path)
 				}
 			}
 		}
@@ -254,13 +279,34 @@ func (l *LVMCluster) verifyNoDeviceOverlap() error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			nodeSelector := deviceClass.NodeSelector.String()
+
+			// Required paths
 			for _, path := range deviceClass.DeviceSelector.Paths {
 				if val, ok := devices[nodeSelector][path]; ok {
 					var err error
 					if val != deviceClass.Name {
-						err = fmt.Errorf("Error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
+						err = fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
 					} else {
-						err = fmt.Errorf("Error: device path %s is specified at multiple places in deviceClass %s", path, val)
+						err = fmt.Errorf("error: device path %s is specified at multiple places in deviceClass %s", path, val)
+					}
+					return err
+				}
+
+				if devices[nodeSelector] == nil {
+					devices[nodeSelector] = make(map[string]string)
+				}
+
+				devices[nodeSelector][path] = deviceClass.Name
+			}
+
+			// Optional paths
+			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
+				if val, ok := devices[nodeSelector][path]; ok {
+					var err error
+					if val != deviceClass.Name {
+						err = fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
+					} else {
+						err = fmt.Errorf("error: optional device path %s is specified at multiple places in deviceClass %s", path, val)
 					}
 					return err
 				}
@@ -277,18 +323,21 @@ func (l *LVMCluster) verifyNoDeviceOverlap() error {
 	return nil
 }
 
-func (l *LVMCluster) getPathsOfDeviceClass(deviceClassName string) ([]string, error) {
-
+func (l *LVMCluster) getPathsOfDeviceClass(deviceClassName string) (required []string, optional []string, err error) {
+	required, optional, err = []string{}, []string{}, nil
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
 			if deviceClass.DeviceSelector != nil {
-				return deviceClass.DeviceSelector.Paths, nil
+				required = deviceClass.DeviceSelector.Paths
+				optional = deviceClass.DeviceSelector.OptionalPaths
 			}
-			return []string{}, nil
+
+			return
 		}
 	}
 
-	return []string{}, ErrDeviceClassNotFound
+	err = ErrDeviceClassNotFound
+	return
 }
 
 func (l *LVMCluster) getThinPoolsConfigOfDeviceClass(deviceClassName string) (*ThinPoolConfig, error) {
