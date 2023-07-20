@@ -9,9 +9,9 @@ In order to build on the cluster you need to first have your kubeconfig configur
 $ make create-buildconfig
 ```
     
-This will build from `https://github.com/openshift/lvm-operator` on branch `main` by default. This can be overridden by specifying the `GIT_REPO` and `GIT_BRANCH` environment variables.
+This will build from `https://github.com/openshift/lvm-operator` on branch `main` by default. This can be overridden by specifying the `GIT_URL` and `GIT_BRANCH` environment variables.
 ```bash
-$ GIT_REPO=https://github.com/my-user/lvm-operator.git \
+$ GIT_URL=https://github.com/my-user/lvm-operator.git \
 GIT_BRANCH=my-feature-branch \
 make create-buildconfig
 ```
