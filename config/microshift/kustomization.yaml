@@ -1,0 +1,20 @@
+## These resources are used for a microshift deployment.
+## They differ in that lvm operator is not used but topo lvm is deployed directly
+## they should be referenced within microshift as their go-to resource for a release
+resources:
+  - topolvm-controller_rbac.authorization.k8s.io_v1_clusterrole.yaml
+  - topolvm-controller_rbac.authorization.k8s.io_v1_clusterrolebinding.yaml
+  - topolvm-controller_v1_serviceaccount.yaml
+  - topolvm-csi-provisioner_rbac.authorization.k8s.io_v1_clusterrole.yaml
+  - topolvm-csi-provisioner_rbac.authorization.k8s.io_v1_clusterrolebinding.yaml
+  - topolvm-csi-provisioner_rbac.authorization.k8s.io_v1_role.yaml
+  - topolvm-csi-provisioner_rbac.authorization.k8s.io_v1_rolebinding.yaml
+  - topolvm-csi-resizer_rbac.authorization.k8s.io_v1_clusterrole.yaml
+  - topolvm-csi-resizer_rbac.authorization.k8s.io_v1_clusterrolebinding.yaml
+  - topolvm-csi-resizer_rbac.authorization.k8s.io_v1_role.yaml
+  - topolvm-csi-resizer_rbac.authorization.k8s.io_v1_rolebinding.yaml
+  - topolvm-csi-snapshotter_rbac.authorization.k8s.io_v1_clusterrole.yaml
+  - topolvm-csi-snapshotter_rbac.authorization.k8s.io_v1_clusterrolebinding.yaml
+  - topolvm-node_rbac.authorization.k8s.io_v1_clusterrole.yaml
+  - topolvm-node_rbac.authorization.k8s.io_v1_clusterrolebinding.yaml
+  - topolvm-node_v1_serviceaccount.yaml
