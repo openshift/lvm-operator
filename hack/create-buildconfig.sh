@@ -5,7 +5,10 @@ set -euo pipefail
 GIT_URL="${GIT_URL:-}"
 if [ -z "$GIT_URL" ]; then GIT_URL=$(git config --get remote.origin.url); fi
 
+GIT_BRANCH="${GIT_BRANCH:-}"
 if [ -z "$GIT_BRANCH" ]; then GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD); fi
+
+echo "Configuring build from branch ${GIT_BRANCH} in repo ${GIT_URL}"
 
 oc apply -f - <<EOF
 apiVersion: v1
