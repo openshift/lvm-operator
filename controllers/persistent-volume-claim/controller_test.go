@@ -40,7 +40,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 			objs: []client.Object{
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-deletionTimestamp",
-						DeletionTimestamp: &metav1.Time{Time: time.Now()}},
+						DeletionTimestamp: &metav1.Time{Time: time.Now()}, Finalizers: []string{"random-finalizer"}},
 				},
 			},
 		},
