@@ -110,13 +110,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	pvController := persistent_volume.NewPersistentVolumeReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-persistentvolume-controller"))
+	pvController := persistent_volume.NewPersistentVolumeReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-pv-controller"))
 	if err := pvController.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
 	}
 
-	pvcController := persistent_volume_claim.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-persistentvolumeclaim-controller"))
+	pvcController := persistent_volume_claim.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetEventRecorderFor("lvms-pvc-controller"))
 	if err := pvcController.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
 		os.Exit(1)
