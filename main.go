@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -25,15 +26,21 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
+
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
+	"github.com/openshift/library-go/pkg/config/leaderelection"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
@@ -72,7 +79,9 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logr := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logr)
+	klog.SetLogger(logr)
 
 	operatorNamespace, err := getOperatorNamespace()
 	if err != nil {
@@ -82,13 +91,22 @@ func main() {
 	}
 	setupLog.Info("Watching namespace", "Namespace", operatorNamespace)
 
+	leaderElectionConfig := resolveLeaderElectionConfig(enableLeaderElection, operatorNamespace)
+
+	le, err := leaderelection.ToLeaderElectionWithLease(
+		ctrl.GetConfigOrDie(), leaderElectionConfig, "lvms", "")
+	if err != nil {
+		setupLog.Error(err, "unable to setup leader election with lease configuration")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "1136b8a6.topolvm.io",
+		Scheme:                              scheme,
+		MetricsBindAddress:                  metricsAddr,
+		Port:                                9443,
+		HealthProbeBindAddress:              probeAddr,
+		LeaderElectionResourceLockInterface: le.Lock,
+		LeaderElection:                      !leaderElectionConfig.Disable,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -136,6 +154,41 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// resolveLeaderElectionConfig returns the correct LeaderElection Settings for Multi- or SNO-Clusters based
+// on the amount of nodes discovered in the cluster.
+func resolveLeaderElectionConfig(enableLeaderElection bool, operatorNamespace string) configv1.LeaderElection {
+	leaderElectionConfig := leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{
+		Disable: !enableLeaderElection,
+	}, operatorNamespace, "1136b8a6.topolvm.io")
+
+	snoChecker, err := client.New(ctrl.GetConfigOrDie(), client.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to setup SNO check with lease configuration")
+		os.Exit(1)
+	}
+	nodes := &corev1.NodeList{}
+	if err := snoChecker.List(context.Background(), nodes); err != nil {
+		setupLog.Error(err, "unable to retrieve nodes for SNO check with lease configuration")
+		os.Exit(1)
+	}
+	if len(nodes.Items) == 1 {
+		setupLog.Info("Overwriting defaults with SNO leader election config as only a single node was discovered",
+			"node", nodes.Items[0].GetName())
+		leaderElectionConfig = leaderelection.LeaderElectionSNOConfig(leaderElectionConfig)
+	}
+	setupLog.Info("leader election config setup succeeded",
+		"retryPeriod", leaderElectionConfig.RetryPeriod,
+		"leaseDuration", leaderElectionConfig.LeaseDuration,
+		"renewDeadline", leaderElectionConfig.RenewDeadline,
+		"election-namespace", leaderElectionConfig.Namespace,
+		"election-name", leaderElectionConfig.Name,
+		"disable", leaderElectionConfig.Disable,
+	)
+	return leaderElectionConfig
 }
 
 // getOperatorNamespace returns the Namespace the operator should be watching for changes
