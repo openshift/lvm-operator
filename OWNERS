@@ -5,6 +5,9 @@ approvers:
   - jeff-roche
 # review == this code is good /lgtm
 reviewers:
+  - suleymanakbas91
+  - brandisher
+  - jeff-roche
   - jerpeter1
   - qJkee
   - jakobmoellerdev
