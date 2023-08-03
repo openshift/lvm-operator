@@ -209,14 +209,26 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, err
 	}
 
-	// Create thin pool
-	err = r.addThinPoolToVG(volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig)
-	if err != nil {
-		r.Log.Error(err, "failed to create thin pool", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
-		if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name,
-			fmt.Sprintf("failed to create thin pool %s for volume group %s: %v", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err.Error())); statuserr != nil {
-			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-			return reconcileAgain, statuserr
+	if volumeGroup.Spec.RAIDConfig == nil {
+		// Create thin pool
+		err = r.setupThinPool(volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig)
+		if err != nil {
+			r.Log.Error(err, "failed to create thin pool", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
+			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name,
+				fmt.Sprintf("failed to create thin pool %s for volume group %s: %v", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err.Error())); statuserr != nil {
+				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+				return reconcileAgain, statuserr
+			}
+		}
+	} else {
+		err = r.setupRAIDThinPool(volumeGroup)
+		if err != nil {
+			r.Log.Error(err, "failed to create thin pool (with RAID)", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
+			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name,
+				fmt.Sprintf("failed to create thin pool %s for volume group %s: %v", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err.Error())); statuserr != nil {
+				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+				return reconcileAgain, statuserr
+			}
 		}
 	}
 
@@ -370,7 +382,64 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 	return nil
 }
 
-func (r *VGReconciler) addThinPoolToVG(vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
+func (r *VGReconciler) setupRAIDThinPool(vg *lvmv1alpha1.LVMVolumeGroup) error {
+	resp, err := GetLVSOutput(r.executor, vg.Name)
+	if err != nil {
+		return fmt.Errorf("failed to list logical volumes in the volume vg %q. %v", vg.Name, err)
+	}
+
+	for _, report := range resp.Report {
+		for _, lv := range report.Lv {
+			if lv.Name == vg.Name {
+				return fmt.Errorf("failed to create raid-enabled thinpool thin pool %q. Logical volume with same name already exists, and extension is not possible with RAID configurations", lv.Name)
+			}
+		}
+	}
+
+	args := []string{
+		"--type", string(vg.Spec.RAIDConfig.Type),
+		"--mirrors", fmt.Sprintf("%d", vg.Spec.RAIDConfig.Mirrors),
+		"-l", fmt.Sprintf("%d%%FREE", vg.Spec.ThinPoolConfig.SizePercent),
+		"-n", vg.Spec.ThinPoolConfig.Name,
+		vg.Name,
+	}
+
+	if vg.Spec.RAIDConfig.Stripes > 0 {
+		args = append(args, "--stripes", fmt.Sprintf("%d", vg.Spec.RAIDConfig.Stripes))
+	}
+
+	if !vg.Spec.RAIDConfig.Sync {
+		args = append(args, "--nosync")
+		r.Log.Info("raid config without initial sync, potentially dangerous!")
+	}
+
+	r.Log.Info("creating RAID array")
+	res, err := r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to create raid array %q in the volume group %q using command '%s': %v",
+			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
+	}
+	r.Log.Info("RAID array was created", "result", res)
+
+	args = []string{
+		"--type", "thin-pool",
+		"--chunksize", DefaultChunkSize,
+		"-Z", "y",
+		"-y",
+		fmt.Sprintf("%s/%s", vg.Name, vg.Spec.ThinPoolConfig.Name),
+	}
+	r.Log.Info("Converting RAID array into Thin Pool")
+	res, err = r.executor.ExecuteCommandWithOutputAsHost(lvConvertCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to convert raid pool to thin-pool %q in the volume group %q using command '%s': %v",
+			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvConvertCmd, strings.Join(args, " ")), err)
+	}
+	r.Log.Info("Thin pool conversion completed", "result", res)
+
+	return nil
+}
+
+func (r *VGReconciler) setupThinPool(vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
 	resp, err := GetLVSOutput(r.executor, vgName)
 	if err != nil {
 		return fmt.Errorf("failed to list logical volumes in the volume group %q. %v", vgName, err)

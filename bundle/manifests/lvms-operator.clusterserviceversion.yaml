@@ -14,7 +14,18 @@ metadata:
             "storage": {
               "deviceClasses": [
                 {
+                  "RAIDConfig": {
+                    "mirrors": 1,
+                    "sync": true,
+                    "type": "raid1"
+                  },
                   "default": true,
+                  "deviceSelector": {
+                    "paths": [
+                      "/dev/vdb",
+                      "/dev/vdc"
+                    ]
+                  },
                   "fstype": "xfs",
                   "name": "vg1",
                   "thinPoolConfig": {
@@ -606,7 +617,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
-                image: quay.io/lvms_dev/lvms-operator:latest
+                image: quay.io/jmoller/lvms-operator:OCPVE-590-raid
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -651,7 +662,7 @@ spec:
                     memory: 20Mi
               - command:
                 - /metricsexporter
-                image: quay.io/lvms_dev/lvms-operator:latest
+                image: quay.io/jmoller/lvms-operator:OCPVE-590-raid
                 name: metricsexporter
                 resources:
                   requests:

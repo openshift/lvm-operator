@@ -38,6 +38,10 @@ type LVMVolumeGroupSpec struct {
 	// +required
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
 
+	// RAIDConfig contains configurations for RAID
+	// +optional
+	RAIDConfig *RAIDConfig `json:"RAIDConfig,omitempty"`
+
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`

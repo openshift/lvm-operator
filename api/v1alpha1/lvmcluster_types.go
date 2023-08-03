@@ -58,6 +58,41 @@ type ThinPoolConfig struct {
 	OverprovisionRatio int `json:"overprovisionRatio"`
 }
 
+type RAIDType string
+
+const (
+	RAIDType0  = "raid0"
+	RAIDType1  = "raid1"
+	RAIDType5  = "raid5"
+	RAIDType10 = "raid10"
+)
+
+// RAIDConfig contains configuration options for RAID configurations through software RAID via LVM
+type RAIDConfig struct {
+	// Type of the RAID configuration
+	// +kubebuilder:default=raid1
+	// +kubebuilder:validation:Required
+	// +required
+	Type RAIDType `json:"type"`
+
+	// Mirrors represents how many copies of the data should be held in a separate physical volume.
+	// Note that 1 Mirror will equal a total of 1+1=2 volumes holding data.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +required
+	Mirrors int `json:"mirrors"`
+
+	// Stripes Specifies  the number of stripes in a striped LV. This is the number of PVs (devices) that a striped LV is spread across. Data that appears sequential in the LV is spread across multiple devices in units of the stripe size (see --stripesize). This does not change existing allocated space, but only applies to space being allocated by the
+	// command. When creating a RAID 4/5/6 LV, this number does not include the extra devices that are required for parity. The largest number depends on the RAID type (raid0: 64, raid10: 32, raid4/5: 63, raid6: 62), and when unspecified, the default depends on the RAID type (raid0: 2, raid10: 2, raid4/5: 3, raid6: 5.)  To stripe a  new  raid
+	// LV across all PVs by default, see lvm.conf(5) allocation/raid_stripe_all_devices
+	Stripes int `json:"stripes,omitempty"`
+
+	// If set to false, causes  the  creation  of mirror, raid1, raid4, raid5 and raid10 to skip the initial synchronization. In case of mirror, raid1 and raid10, any data written afterwards will be mirrored, but the original contents will not be copied. In case of raid4 and raid5, no parity blocks will be written, though any data written afterwards will cause
+	// parity blocks to be stored.  This is useful for skipping a potentially long and resource intensive initial sync of an empty mirror/raid1/raid4/raid5 and raid10 LV.  This option is not valid for raid6, because raid6 relies on proper parity (P and Q Syndromes) being created during initial synchronization in order to reconstruct proper user date in case of device failures.  raid0 and raid0_meta do not provide any data copies or parity support and thus do not support initial synchronization.
+	// +kubebuilder:default=true
+	Sync bool `json:"sync"`
+}
+
 type DeviceFilesystemType string
 
 const (
@@ -86,6 +121,9 @@ type DeviceClass struct {
 	// +kubebuilder:validation:Required
 	// +required
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+
+	// +optional
+	RAIDConfig *RAIDConfig `json:"RAIDConfig,omitempty"`
 
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
