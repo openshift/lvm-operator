@@ -74,6 +74,11 @@ func (l *LVMCluster) ValidateCreate() (admission.Warnings, error) {
 		return admission.Warnings{}, err
 	}
 
+	err = l.verifyRAIDConfig()
+	if err != nil {
+		return admission.Warnings{}, err
+	}
+
 	return admission.Warnings{}, nil
 }
 
@@ -359,6 +364,22 @@ func (l *LVMCluster) verifyFstype() error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.FilesystemType != FilesystemTypeExt4 && deviceClass.FilesystemType != FilesystemTypeXFS {
 			return fmt.Errorf("fstype '%s' is not a supported filesystem type", deviceClass.FilesystemType)
+		}
+	}
+
+	return nil
+}
+
+func (l *LVMCluster) verifyRAIDConfig() error {
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		switch deviceClass.RAIDConfig.Type {
+		case RAIDType1:
+			totalDevices := len(deviceClass.DeviceSelector.Paths) + len(deviceClass.DeviceSelector.Paths)
+			requiredDevices := deviceClass.RAIDConfig.Mirrors + 1 // data plus amount of mirrors
+			if totalDevices < requiredDevices {
+				return fmt.Errorf("%s with %d mirror(s) requires at least %d devices in the deviceClass",
+					deviceClass.RAIDConfig.Type, deviceClass.RAIDConfig.Mirrors, requiredDevices)
+			}
 		}
 	}
 
