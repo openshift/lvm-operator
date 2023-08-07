@@ -77,10 +77,7 @@ type RAIDConfig struct {
 
 	// Mirrors represents how many copies of the data should be held in a separate physical volume.
 	// Note that 1 Mirror will equal a total of 1+1=2 volumes holding data.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=0
-	// +required
-	Mirrors int `json:"mirrors"`
+	Mirrors int `json:"mirrors,omitempty"`
 
 	// Stripes Specifies  the number of stripes in a striped LV. This is the number of PVs (devices) that a striped LV is spread across. Data that appears sequential in the LV is spread across multiple devices in units of the stripe size (see --stripesize). This does not change existing allocated space, but only applies to space being allocated by the
 	// command. When creating a RAID 4/5/6 LV, this number does not include the extra devices that are required for parity. The largest number depends on the RAID type (raid0: 64, raid10: 32, raid4/5: 63, raid6: 62), and when unspecified, the default depends on the RAID type (raid0: 2, raid10: 2, raid4/5: 3, raid6: 5.)  To stripe a  new  raid

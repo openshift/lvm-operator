@@ -38,11 +38,9 @@ spec:
                 description: RAIDConfig contains configurations for RAID
                 properties:
                   mirrors:
-                    default: 1
                     description: Mirrors represents how many copies of the data should
                       be held in a separate physical volume. Note that 1 Mirror will
                       equal a total of 1+1=2 volumes holding data.
-                    minimum: 0
                     type: integer
                   stripes:
                     description: 'Stripes Specifies  the number of stripes in a striped
@@ -80,7 +78,6 @@ spec:
                     description: Type of the RAID configuration
                     type: string
                 required:
-                - mirrors
                 - sync
                 - type
                 type: object

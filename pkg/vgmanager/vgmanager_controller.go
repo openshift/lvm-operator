@@ -398,10 +398,13 @@ func (r *VGReconciler) setupRAIDThinPool(vg *lvmv1alpha1.LVMVolumeGroup) error {
 
 	args := []string{
 		"--type", string(vg.Spec.RAIDConfig.Type),
-		"--mirrors", fmt.Sprintf("%d", vg.Spec.RAIDConfig.Mirrors),
 		"-l", fmt.Sprintf("%d%%FREE", vg.Spec.ThinPoolConfig.SizePercent),
 		"-n", vg.Spec.ThinPoolConfig.Name,
 		vg.Name,
+	}
+
+	if vg.Spec.RAIDConfig.Mirrors > 0 {
+		args = append(args, "--mirrors", fmt.Sprintf("%d", vg.Spec.RAIDConfig.Mirrors))
 	}
 
 	if vg.Spec.RAIDConfig.Stripes > 0 {
