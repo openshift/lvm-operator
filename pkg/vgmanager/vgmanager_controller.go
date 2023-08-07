@@ -169,7 +169,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 				return reconcileAgain, statuserr
 			}
-			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil //30 seconds to make sure delayed devices become available
+			return ctrl.Result{Requeue: true, RequeueAfter: deviceMinAge}, nil
 		}
 
 		devicesExist := false
@@ -397,11 +397,10 @@ func (r *VGReconciler) setupRAIDThinPool(vg *lvmv1alpha1.LVMVolumeGroup) error {
 	}
 
 	// Step 1: Create Data RAID Array
-	dataRAIDName := fmt.Sprintf("%s-data", vg.Spec.ThinPoolConfig.Name)
 	args := []string{
 		"--type", string(vg.Spec.RAIDConfig.Type),
 		"-l", fmt.Sprintf("%d%%FREE", vg.Spec.ThinPoolConfig.SizePercent),
-		"-n", dataRAIDName,
+		"-n", vg.Spec.ThinPoolConfig.Name,
 		vg.Name,
 	}
 	// this is in preparation of other raid types that do only striping or require no mirror input (e.g. raid0)
@@ -436,28 +435,27 @@ func (r *VGReconciler) setupRAIDThinPool(vg *lvmv1alpha1.LVMVolumeGroup) error {
 		args = append(args, "--nosync")
 		r.Log.Info("raid config without initial sync, potentially dangerous!")
 	}
-	r.Log.Info("creating RAID array for meta")
+	r.Log.Info("creating RAID array for meta", "size", vg.Spec.RAIDConfig.MetadataSize)
 	res, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
 	if err != nil {
-		return fmt.Errorf("failed to create raid array %q in the volume group %q using command '%s': %v",
-			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
+		return fmt.Errorf("failed to create raid array %q in the volume group %q using command '%s': %v (%s)",
+			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err, res)
 	}
 	r.Log.Info("Meta RAID array was created", "result", res)
 
 	// Step 3: Convert RAID Arrays into Thin-Pool
 	args = []string{
-		"--thinpool", fmt.Sprintf("%s/%s", vg.Name, dataRAIDName),
+		"--thinpool", fmt.Sprintf("%s/%s", vg.Name, vg.Spec.ThinPoolConfig.Name),
 		"--poolmetadata", fmt.Sprintf("%s/%s", vg.Name, metaRAIDName),
 		"--chunksize", DefaultChunkSize,
 		"-Z", "y",
 		"-y",
-		fmt.Sprintf("%s/%s", vg.Name, vg.Spec.ThinPoolConfig.Name),
 	}
 	r.Log.Info("Converting RAID arrays into Thin Pool")
 	res, err = r.executor.ExecuteCommandWithOutputAsHost(lvConvertCmd, args...)
 	if err != nil {
-		return fmt.Errorf("failed to convert raid pool to thin-pool %q in the volume group %q using command '%s': %v",
-			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvConvertCmd, strings.Join(args, " ")), err)
+		return fmt.Errorf("failed to convert raid pool to thin-pool %q in the volume group %q using command '%s': %v (%s)",
+			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvConvertCmd, strings.Join(args, " ")), err, res)
 	}
 	r.Log.Info("Thin pool conversion completed", "result", res)
 

@@ -68,26 +68,27 @@ const (
 type RAIDConfig struct {
 	// Type of the RAID configuration
 	// +kubebuilder:default=raid1
-	// +kubebuilder:validation:Required
 	// +required
 	Type RAIDType `json:"type"`
 
 	// Mirrors represents how many copies of the data should be held in a separate physical volume.
 	// Note that 1 Mirror will equal a total of 1+1=2 volumes holding data.
 	// +kubebuilder:default=1
-	// +kubebuilder:validation:Required
+	// +required
 	Mirrors int `json:"mirrors"`
 
 	// If set to false, causes  the  creation  of mirror, raid1, raid4, raid5 and raid10 to skip the initial synchronization. In case of mirror, raid1 and raid10, any data written afterwards will be mirrored, but the original contents will not be copied. In case of raid4 and raid5, no parity blocks will be written, though any data written afterwards will cause
 	// parity blocks to be stored.  This is useful for skipping a potentially long and resource intensive initial sync of an empty mirror/raid1/raid4/raid5 and raid10 LV.  This option is not valid for raid6, because raid6 relies on proper parity (P and Q Syndromes) being created during initial synchronization in order to reconstruct proper user date in case of device failures.  raid0 and raid0_meta do not provide any data copies or parity support and thus do not support initial synchronization.
 	// +kubebuilder:default=false
+	// +required
 	Sync bool `json:"sync"`
 
 	// MetadataSize represents the amount of storage in MiB that should be reserved for the Metadata RAID volume. In comparison to non-RAID configurations, a default (and minimal) Size of 512MiB will be reserved for the volume.
 	// Assuming ThinPoolConfig.SizePercent=90, then the actual ThinPool will use 90% of the free space on top of 512MiB for the LVM metadata.
 	// +kubebuilder:default=512
 	// +kubebuilder:validation:Minimum=512
-	MetadataSize int
+	// +required
+	MetadataSize int `json:"metadataSize"`
 }
 
 type DeviceFilesystemType string

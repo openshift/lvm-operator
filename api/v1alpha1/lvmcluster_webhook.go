@@ -47,6 +47,7 @@ func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (l *LVMCluster) ValidateCreate() (admission.Warnings, error) {
+	warnings := admission.Warnings{}
 	lvmclusterlog.Info("validate create", "name", l.Name)
 
 	err := l.verifySingleDefaultDeviceClass()
@@ -74,16 +75,18 @@ func (l *LVMCluster) ValidateCreate() (admission.Warnings, error) {
 		return admission.Warnings{}, err
 	}
 
-	err = l.verifyRAIDConfig()
+	warningsFromRAID, err := l.verifyRAIDConfig()
+	warnings = append(warnings, warningsFromRAID...)
 	if err != nil {
-		return admission.Warnings{}, err
+		return warnings, err
 	}
 
-	return admission.Warnings{}, nil
+	return warnings, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+	warnings := admission.Warnings{}
 	lvmclusterlog.Info("validate update", "name", l.Name)
 
 	err := l.verifySingleDefaultDeviceClass()
@@ -111,9 +114,15 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, err
 		return admission.Warnings{}, err
 	}
 
+	warningsFromRAID, err := l.verifyRAIDConfig()
+	warnings = append(warnings, warningsFromRAID...)
+	if err != nil {
+		return warnings, err
+	}
+
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
-		return admission.Warnings{}, fmt.Errorf("Failed to parse LVMCluster.")
+		return warnings, fmt.Errorf("Failed to parse LVMCluster.")
 	}
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -125,16 +134,22 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, err
 
 		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && err != ErrDeviceClassNotFound) ||
 			(newThinPoolConfig == nil && oldThinPoolConfig != nil) {
-			return admission.Warnings{}, fmt.Errorf("ThinPoolConfig can not be changed")
+			return warnings, fmt.Errorf("ThinPoolConfig can not be changed")
+		}
+
+		newRAIDConfig := deviceClass.RAIDConfig
+		oldRAIDConfig, _ := oldLVMCluster.getRAIDConfigOfDeviceClass(deviceClass.Name)
+		if newRAIDConfig == nil && oldRAIDConfig != nil {
+			return warnings, fmt.Errorf("changing a RAID-configured deviceClass to no longer use RAID is not supported, first remove the LVMCluster and then reapply your deviceClass without RAID configured")
 		}
 
 		if newThinPoolConfig != nil && oldThinPoolConfig != nil {
 			if newThinPoolConfig.Name != oldThinPoolConfig.Name {
-				return admission.Warnings{}, fmt.Errorf("ThinPoolConfig.Name can not be changed")
+				return warnings, fmt.Errorf("ThinPoolConfig.Name can not be changed")
 			} else if newThinPoolConfig.SizePercent != oldThinPoolConfig.SizePercent {
-				return admission.Warnings{}, fmt.Errorf("ThinPoolConfig.SizePercent can not be changed")
+				return warnings, fmt.Errorf("ThinPoolConfig.SizePercent can not be changed")
 			} else if newThinPoolConfig.OverprovisionRatio != oldThinPoolConfig.OverprovisionRatio {
-				return admission.Warnings{}, fmt.Errorf("ThinPoolConfig.OverprovisionRatio can not be changed")
+				return warnings, fmt.Errorf("ThinPoolConfig.OverprovisionRatio can not be changed")
 			}
 		}
 
@@ -152,28 +167,28 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, err
 
 		// Make sure a device path list was not added
 		if len(oldDevices) == 0 && len(newDevices) > 0 {
-			return admission.Warnings{}, fmt.Errorf("invalid: device paths can not be added after a device class has been initialized")
+			return warnings, fmt.Errorf("invalid: device paths can not be added after a device class has been initialized")
 		}
 
 		// Make sure an optionalPaths list was not added
 		if len(oldOptionalDevices) == 0 && len(newOptionalDevices) > 0 {
-			return admission.Warnings{}, fmt.Errorf("invalid: optional device paths can not be added after a device class has been initialized")
+			return warnings, fmt.Errorf("invalid: optional device paths can not be added after a device class has been initialized")
 		}
 
 		// Validate all the old paths still exist
 		err := validateDevicePathsStillExist(oldDevices, newDevices)
 		if err != nil {
-			return admission.Warnings{}, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %v", err)
+			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %v", err)
 		}
 
 		// Validate all the old optional paths still exist
 		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
 		if err != nil {
-			return admission.Warnings{}, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %v", err)
+			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %v", err)
 		}
 	}
 
-	return admission.Warnings{}, nil
+	return warnings, nil
 }
 
 func validateDevicePathsStillExist(old, new []string) error {
@@ -360,6 +375,19 @@ func (l *LVMCluster) getThinPoolsConfigOfDeviceClass(deviceClassName string) (*T
 	return nil, ErrDeviceClassNotFound
 }
 
+func (l *LVMCluster) getRAIDConfigOfDeviceClass(deviceClassName string) (*RAIDConfig, error) {
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.Name == deviceClassName {
+			if deviceClass.ThinPoolConfig != nil {
+				return deviceClass.RAIDConfig, nil
+			}
+			return nil, nil
+		}
+	}
+
+	return nil, ErrDeviceClassNotFound
+}
+
 func (l *LVMCluster) verifyFstype() error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.FilesystemType != FilesystemTypeExt4 && deviceClass.FilesystemType != FilesystemTypeXFS {
@@ -370,18 +398,30 @@ func (l *LVMCluster) verifyFstype() error {
 	return nil
 }
 
-func (l *LVMCluster) verifyRAIDConfig() error {
+func (l *LVMCluster) verifyRAIDConfig() (admission.Warnings, error) {
+	warnings := admission.Warnings{}
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.RAIDConfig == nil {
+			continue
+		}
 		switch deviceClass.RAIDConfig.Type {
 		case RAIDType1:
 			totalDevices := len(deviceClass.DeviceSelector.Paths) + len(deviceClass.DeviceSelector.Paths)
+
+			// Implicit Creation of deviceClass with all available Devices
+			if totalDevices == 0 {
+				warnings = append(warnings, "configuring RAID without configuring a set amount of devices is "+
+					"potentially dangerous and can lead to undefined behavior, it is recommended to specify devices explicitly.")
+				continue
+			}
+
 			requiredDevices := deviceClass.RAIDConfig.Mirrors + 1 // data plus amount of mirrors
 			if totalDevices < requiredDevices {
-				return fmt.Errorf("%s with %d mirror(s) requires at least %d devices in the deviceClass",
+				return warnings, fmt.Errorf("%s with %d mirror(s) requires at least %d devices in the deviceClass",
 					deviceClass.RAIDConfig.Type, deviceClass.RAIDConfig.Mirrors, requiredDevices)
 			}
 		}
 	}
 
-	return nil
+	return warnings, nil
 }

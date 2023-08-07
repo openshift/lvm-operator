@@ -52,30 +52,26 @@ spec:
                           description: RAIDConfig contains configuration options for
                             RAID configurations through software RAID via LVM
                           properties:
+                            metadataSize:
+                              default: 512
+                              description: MetadataSize represents the amount of storage
+                                in MiB that should be reserved for the Metadata RAID
+                                volume. In comparison to non-RAID configurations,
+                                a default (and minimal) Size of 512MiB will be reserved
+                                for the volume. Assuming ThinPoolConfig.SizePercent=90,
+                                then the actual ThinPool will use 90% of the free
+                                space on top of 512MiB for the LVM metadata.
+                              minimum: 512
+                              type: integer
                             mirrors:
+                              default: 1
                               description: Mirrors represents how many copies of the
                                 data should be held in a separate physical volume.
                                 Note that 1 Mirror will equal a total of 1+1=2 volumes
                                 holding data.
                               type: integer
-                            stripes:
-                              description: 'Stripes Specifies  the number of stripes
-                                in a striped LV. This is the number of PVs (devices)
-                                that a striped LV is spread across. Data that appears
-                                sequential in the LV is spread across multiple devices
-                                in units of the stripe size (see --stripesize). This
-                                does not change existing allocated space, but only
-                                applies to space being allocated by the command. When
-                                creating a RAID 4/5/6 LV, this number does not include
-                                the extra devices that are required for parity. The
-                                largest number depends on the RAID type (raid0: 64,
-                                raid10: 32, raid4/5: 63, raid6: 62), and when unspecified,
-                                the default depends on the RAID type (raid0: 2, raid10:
-                                2, raid4/5: 3, raid6: 5.)  To stripe a  new  raid
-                                LV across all PVs by default, see lvm.conf(5) allocation/raid_stripe_all_devices'
-                              type: integer
                             sync:
-                              default: true
+                              default: false
                               description: If set to false, causes  the  creation  of
                                 mirror, raid1, raid4, raid5 and raid10 to skip the
                                 initial synchronization. In case of mirror, raid1
@@ -98,6 +94,8 @@ spec:
                               description: Type of the RAID configuration
                               type: string
                           required:
+                          - metadataSize
+                          - mirrors
                           - sync
                           - type
                           type: object

@@ -7,17 +7,12 @@ spec:
     deviceClasses:
     - name: vg1
       default: true
-      deviceSelector:
-        paths:
-          - /dev/vdb
-          - /dev/vdc
-          - /dev/vdd
-          - /dev/vde
-      RAIDConfig:
-        type: raid10
-        mirrors: 1
-        stripes: 2
-        sync: true
+#      deviceSelector:
+#        paths:
+#          - /dev/vdb
+#          - /dev/vdc
+#      RAIDConfig:
+#        type: raid1
       thinPoolConfig:
         name: thin-pool-1
         sizePercent: 90
