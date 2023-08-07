@@ -121,10 +121,11 @@ func main() {
 
 	// register controllers
 	if err = (&controllers.LVMClusterReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		SecurityClient: secv1client.NewForConfigOrDie(mgr.GetConfig()),
-		Namespace:      operatorNamespace,
+		Client:                           mgr.GetClient(),
+		Scheme:                           mgr.GetScheme(),
+		SecurityClient:                   secv1client.NewForConfigOrDie(mgr.GetConfig()),
+		Namespace:                        operatorNamespace,
+		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
 		os.Exit(1)

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/api/config/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
@@ -77,6 +78,10 @@ type LVMClusterReconciler struct {
 	SecurityClient secv1client.SecurityV1Interface
 	Namespace      string
 	ImageName      string
+
+	// TopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
+	// leader election configuration
+	TopoLVMLeaderElectionPassthrough configv1.LeaderElection
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -190,7 +195,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	resourceCreationList := []resourceManager{
 		&csiDriver{},
-		&topolvmController{},
+		&topolvmController{r.TopoLVMLeaderElectionPassthrough},
 		&openshiftSccs{},
 		&topolvmNode{},
 		&vgManager{},
