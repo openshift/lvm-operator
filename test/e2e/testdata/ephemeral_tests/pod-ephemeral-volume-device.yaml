@@ -6,6 +6,13 @@ metadata:
 spec:
   containers:
     - name: ubuntu
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        capabilities:
+          drop:
+            - "ALL"
       image: quay.io/cybozu/ubuntu:20.04
       command: ["/usr/local/bin/pause"]
       volumeDevices:

@@ -19,7 +19,13 @@ package e2e
 import (
 	"context"
 	"flag"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	ctrlZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,6 +39,15 @@ func TestLvm(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	core := zapcore.NewCore(
+		&ctrlZap.KubeAwareEncoder{Encoder: zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())},
+		zapcore.AddSync(GinkgoWriter),
+		zap.NewAtomicLevelAt(zapcore.Level(-9)),
+	)
+	zapLog := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	logr := zapr.NewLogger(zapLog.With(zap.Namespace("context")))
+	log.SetLogger(logr)
+
 	// Configure the disk and install the operator
 	beforeTestSuiteSetup(context.Background())
 	lvmNamespaceSetup(context.Background())
@@ -50,9 +65,11 @@ var _ = Describe("LVM Operator e2e tests", func() {
 		// Ordered to give the BeforeAll/AfterAll functionality to achieve common setup
 		var clusterConfig *v1alpha1.LVMCluster
 
-		BeforeAll(func() {
+		BeforeAll(func(ctx SpecContext) {
 			clusterConfig = generateLVMCluster()
-			lvmClusterSetup(clusterConfig, context.Background())
+			lvmClusterSetup(clusterConfig, ctx)
+			By("Verifying the cluster is ready")
+			Eventually(clusterReadyCheck(clusterConfig), timeout, 300*time.Millisecond).WithContext(ctx).Should(Succeed())
 		})
 
 		Describe("Functional Tests", func() {
@@ -61,8 +78,8 @@ var _ = Describe("LVM Operator e2e tests", func() {
 			Context("Ephemeral volume tests", ephemeralTest)
 		})
 
-		AfterAll(func() {
-			lvmClusterCleanup(clusterConfig, context.Background())
+		AfterAll(func(ctx SpecContext) {
+			lvmClusterCleanup(clusterConfig, ctx)
 		})
 	})
 })

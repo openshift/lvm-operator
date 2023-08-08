@@ -19,14 +19,17 @@ package e2e
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
+	"k8s.io/client-go/discovery"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	k8sv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -55,236 +58,256 @@ var (
 func ephemeralTest() {
 	Describe("Ephemeral Volume Tests", func() {
 		var (
-			pvc          *k8sv1.PersistentVolumeClaim = &k8sv1.PersistentVolumeClaim{}
-			ephemeralPod *k8sv1.Pod
-			snapshot     *snapapi.VolumeSnapshot
-			clonePvc     *k8sv1.PersistentVolumeClaim
-			clonePod     *k8sv1.Pod
-			restorePvc   *k8sv1.PersistentVolumeClaim
-			restorePod   *k8sv1.Pod
-			err          error
-			ctx          = context.Background()
+			pvc             = &k8sv1.PersistentVolumeClaim{}
+			ephemeralPod    *k8sv1.Pod
+			snapshot        *snapapi.VolumeSnapshot
+			clonePvc        *k8sv1.PersistentVolumeClaim
+			clonePod        *k8sv1.Pod
+			restorePvc      *k8sv1.PersistentVolumeClaim
+			restorePod      *k8sv1.Pod
+			err             error
+			skipSnapshotOps = false
 		)
 
 		Context("Create ephemeral pod and volume", func() {
-			It("Tests ephemeral volume operations for VolumeMode=Filesystem", func() {
+			Context("Tests ephemeral volume operations for VolumeMode=Filesystem", Ordered, func() {
+				It("Creation of ephemeral Pod binding a PVC from LVMS", func(ctx SpecContext) {
+					By("Creating an ephemeral pod")
+					podVolumeMountYaml := fmt.Sprintf(podEphemeralFSYAMLTemplate, "ephemeral-filepod", testNamespace, storageClassName)
+					ephemeralPod, err = getPod(podVolumeMountYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, ephemeralPod)).To(Succeed())
 
-				By("Creating a pod with generic ephemeral volume")
-				podVolumeMountYaml := fmt.Sprintf(podEphemeralFSYAMLTemplate, "ephemeral-filepod", testNamespace, storageClassName)
-				ephemeralPod, err = getPod(podVolumeMountYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, ephemeralPod)
-				Expect(err).To(BeNil())
+					By("PVC should be bound")
+					Eventually(func(ctx context.Context) error {
+						if err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-filepod-generic-ephemeral-volume", Namespace: testNamespace}, pvc); err != nil {
+							return err
+						}
+						if pvc.Status.Phase != k8sv1.ClaimBound {
+							return fmt.Errorf("pvc is not bound yet: %s", pvc.Status.Phase)
+						}
+						return nil
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				By("PVC should be bound")
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-filepod-generic-ephemeral-volume", Namespace: testNamespace}, pvc)
-					return err == nil && pvc.Status.Phase == k8sv1.ClaimBound
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("PVC %s is bound\n", pvc.Name)
+					By("Pod should be running")
+					Eventually(func(ctx context.Context) bool {
+						err = crClient.Get(ctx, types.NamespacedName{Name: ephemeralPod.Name, Namespace: testNamespace}, ephemeralPod)
+						return err == nil && ephemeralPod.Status.Phase == k8sv1.PodRunning
+					}, timeout, interval).WithContext(ctx).Should(BeTrue())
+				})
 
-				By("Pod should be running")
-				Eventually(func() bool {
-					err = crClient.Get(ctx, types.NamespacedName{Name: ephemeralPod.Name, Namespace: testNamespace}, ephemeralPod)
-					return err == nil && ephemeralPod.Status.Phase == k8sv1.PodRunning
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Pod %s is running\n", ephemeralPod.Name)
+				It("Testing Snapshot Operations", func(ctx SpecContext) {
+					By("Creating a Snapshot of the pvc")
+					snapshotYaml := fmt.Sprintf(ephemeralVolumeSnapshotYAMLTemplate, "ephemeralfilepvc-snapshot", testNamespace, snapshotClass, "ephemeral-filepod-generic-ephemeral-volume")
+					snapshot, err = getVolumeSnapshot(snapshotYaml)
+					Expect(err).To(BeNil())
+					err = crClient.Create(ctx, snapshot)
+					if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+						skipSnapshotOps = true
+						Skip("Skipping Testing of Snapshot Operations due to lack of volume snapshot support")
+					}
+					Expect(err).To(BeNil())
 
-				By("Creating a Snapshot of the pvc")
-				snapshotYaml := fmt.Sprintf(ephemeralVolumeSnapshotYAMLTemplate, "ephemeralfilepvc-snapshot", testNamespace, snapshotClass, "ephemeral-filepod-generic-ephemeral-volume")
-				snapshot, err = getVolumeSnapshot(snapshotYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, snapshot)
-				Expect(err).To(BeNil())
-				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
+					By("Verifying that the Snapshot is ready")
+					Eventually(func() bool {
+						err := crClient.Get(ctx, types.NamespacedName{Name: snapshot.Name, Namespace: snapshot.Namespace}, snapshot)
+						return err == nil && snapshot.Status != nil && *snapshot.Status.ReadyToUse
+					}, timeout, interval).Should(BeTrue())
 
-				By("Verifying that the Snapshot is ready")
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: snapshot.Name, Namespace: snapshot.Namespace}, snapshot)
-					return err == nil && snapshot.Status != nil && *snapshot.Status.ReadyToUse
-				}, timeout, interval).Should(BeTrue())
+					By("Creating a clone of the pvc")
+					pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralfilepvc-clone", testNamespace, "Filesystem", storageClassName, "ephemeral-filepod-generic-ephemeral-volume")
+					clonePvc, err = getPVC(pvcCloneYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, clonePvc)).To(Succeed())
 
-				By("Creating a clone of the pvc")
-				pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralfilepvc-clone", testNamespace, "Filesystem", storageClassName, "ephemeral-filepod-generic-ephemeral-volume")
-				clonePvc, err = getPVC(pvcCloneYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, clonePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
+					By("Creating a pod consuming the clone of the pvc")
+					podVolumeMountYaml := fmt.Sprintf(podFSYAMLTemplate, "clone-ephemeralfilepod", testNamespace, "ephemeralfilepvc-clone")
+					clonePod, err = getPod(podVolumeMountYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, clonePod)).To(Succeed())
 
-				podVolumeMountYaml = fmt.Sprintf(podFSYAMLTemplate, "clone-ephemeralfilepod", testNamespace, "ephemeralfilepvc-clone")
-				clonePod, err = getPod(podVolumeMountYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, clonePod)
-				Expect(err).To(BeNil())
+					By("Having a bound claim in the pvc")
+					Eventually(func(ctx context.Context) error {
+						if err := crClient.Get(ctx, client.ObjectKeyFromObject(clonePvc), clonePvc); err != nil {
+							return err
+						}
+						if clonePvc.Status.Phase != k8sv1.ClaimBound {
+							return fmt.Errorf("pvc is not bound yet: %s", clonePvc.Status.Phase)
+						}
+						return nil
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: clonePvc.Name, Namespace: clonePvc.Namespace}, clonePvc)
-					return err == nil && clonePvc.Status.Phase == k8sv1.ClaimBound
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
+					By("Restore Snapshot for pvc")
+					pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralfilepvc-restore", testNamespace, "Filesystem", storageClassName, "ephemeralfilepvc-snapshot")
+					restorePvc, err = getPVC(pvcRestoreYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, restorePvc)).To(Succeed())
 
-				By("Restore Snapshot for pvc")
-				pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralfilepvc-restore", testNamespace, "Filesystem", storageClassName, "ephemeralfilepvc-snapshot")
-				restorePvc, err = getPVC(pvcRestoreYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, restorePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
+					By("Creating a pod consuming the restored snapshot data")
+					podVolumeMountYaml = fmt.Sprintf(podFSYAMLTemplate, "restore-ephemeralfilepod", testNamespace, "ephemeralfilepvc-restore")
+					restorePod, err = getPod(podVolumeMountYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, restorePod)).To(Succeed())
 
-				podVolumeMountYaml = fmt.Sprintf(podFSYAMLTemplate, "restore-ephemeralfilepod", testNamespace, "ephemeralfilepvc-restore")
-				restorePod, err = getPod(podVolumeMountYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, restorePod)
-				Expect(err).To(BeNil())
+					By("Having the restored data pvc be bound")
+					Eventually(func(ctx context.Context) error {
+						if err := crClient.Get(ctx, client.ObjectKeyFromObject(restorePvc), restorePvc); err != nil {
+							return err
+						}
+						if restorePvc.Status.Phase != k8sv1.ClaimBound {
+							return fmt.Errorf("pvc is not bound yet: %s", restorePvc.Status.Phase)
+						}
+						return nil
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
+				})
 
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: restorePvc.Name, Namespace: restorePvc.Namespace}, restorePvc)
-					return err == nil && restorePvc.Status.Phase == k8sv1.ClaimBound
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Restored PVC %s is bound\n", restorePvc.Name)
+				It("Cleaning up ephemeral volume operations for VolumeMode=Filesystem", func(ctx SpecContext) {
+					if !skipSnapshotOps {
+						By(fmt.Sprintf("Deleting %s", clonePod.Name))
+						Expect(crClient.Delete(ctx, clonePod)).To(Succeed())
 
-				err = crClient.Delete(ctx, clonePod)
-				Expect(err).To(BeNil())
-				fmt.Printf("Pod %s is deleted\n", clonePod.Name)
+						By(fmt.Sprintf("Deleting Clone PVC %s", clonePvc.Name))
+						Expect(crClient.Delete(ctx, clonePvc)).To(Succeed())
 
-				err = crClient.Delete(ctx, clonePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Clone PVC %s is deleted\n", clonePvc.Name)
+						By(fmt.Sprintf("Deleting Pod %s", restorePod.Name))
+						Expect(crClient.Delete(ctx, restorePod)).To(Succeed())
 
-				err = crClient.Delete(ctx, restorePod)
-				Expect(err).To(BeNil())
-				fmt.Printf("Pod %s is deleted\n", restorePod.Name)
+						By(fmt.Sprintf("Deleting Snapshot PVC %s", restorePvc.Name))
+						Expect(crClient.Delete(ctx, restorePvc)).To(Succeed())
 
-				err = crClient.Delete(ctx, restorePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Restored Snapshot %s is deleted\n", restorePvc.Name)
+						By(fmt.Sprintf("Deleting VolumeSnapshot %s", snapshot.Name))
+						Expect(crClient.Delete(ctx, snapshot)).To(Succeed())
+					}
 
-				err = crClient.Delete(ctx, snapshot)
-				Expect(err).To(BeNil())
-				fmt.Printf("Snapshot %s is deleted\n", snapshot.Name)
+					By("Deleting Pod")
+					Expect(crClient.Delete(ctx, ephemeralPod)).To(Succeed())
 
-				By("Deleting the pod")
-				err = crClient.Delete(ctx, ephemeralPod)
-				Expect(err).To(BeNil())
-				fmt.Printf("Pod %s is deleted\n", ephemeralPod.Name)
-
-				By("Confirming that ephemeral volume is automatically deleted")
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-filepod-generic-ephemeral-volume", Namespace: testNamespace}, pvc)
-					return err != nil && errors.IsNotFound(err)
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Deleting the pod, deleted the ephemeral volume %s\n", pvc.Name)
-
+					By("Confirming that ephemeral volume is automatically deleted")
+					Eventually(func(ctx context.Context) bool {
+						err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-filepod-generic-ephemeral-volume", Namespace: testNamespace}, pvc)
+						return err != nil && k8serrors.IsNotFound(err)
+					}, timeout, interval).WithContext(ctx).Should(BeTrue())
+				})
 			})
 
-			It("Tests PVC operations for VolumeMode=Block", func() {
-				By("Creating a pod with generic ephemeral volume")
-				podVolumeBlockYaml := fmt.Sprintf(podEphemeralBlockYAMLTemplate, "ephemeral-blockpod", testNamespace, storageClassName)
-				ephemeralPod, err = getPod(podVolumeBlockYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, ephemeralPod)
-				Expect(err).To(BeNil())
+			Context("Tests PVC operations for VolumeMode=Block", Ordered, func() {
+				It("Creation of ephemeral Pod binding a PVC from LVMS", func(ctx SpecContext) {
+					By("Creating an ephemeral pod")
+					podVolumeBlockYaml := fmt.Sprintf(podEphemeralBlockYAMLTemplate, "ephemeral-blockpod", testNamespace, storageClassName)
+					ephemeralPod, err = getPod(podVolumeBlockYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, ephemeralPod)).To(Succeed())
 
-				By("PVC should be bound")
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-blockpod-generic-ephemeral-volume", Namespace: testNamespace}, pvc)
-					return err == nil && pvc.Status.Phase == k8sv1.ClaimBound
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("PVC %s is bound\n", pvc.Name)
+					By("PVC should be bound")
+					Eventually(func(ctx context.Context) error {
+						if err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-blockpod-generic-ephemeral-volume", Namespace: testNamespace}, pvc); err != nil {
+							return err
+						}
+						if pvc.Status.Phase != k8sv1.ClaimBound {
+							return fmt.Errorf("pvc is not bound yet: %s", pvc.Status.Phase)
+						}
+						return nil
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				By("Pod should be running")
-				Eventually(func() bool {
-					err = crClient.Get(ctx, types.NamespacedName{Name: ephemeralPod.Name, Namespace: testNamespace}, ephemeralPod)
-					return err == nil && ephemeralPod.Status.Phase == k8sv1.PodRunning
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Pod %s is running\n", ephemeralPod.Name)
+					By("Pod should be running")
+					Eventually(func(ctx context.Context) bool {
+						err = crClient.Get(ctx, types.NamespacedName{Name: ephemeralPod.Name, Namespace: testNamespace}, ephemeralPod)
+						return err == nil && ephemeralPod.Status.Phase == k8sv1.PodRunning
+					}, timeout, interval).WithContext(ctx).Should(BeTrue())
+				})
 
-				By("Creating a Snapshot of the pvc")
-				snapshotYaml := fmt.Sprintf(ephemeralVolumeSnapshotYAMLTemplate, "ephemeralblockpvc-snapshot", testNamespace, snapshotClass, "ephemeral-blockpod-generic-ephemeral-volume")
-				snapshot, err = getVolumeSnapshot(snapshotYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, snapshot)
-				Expect(err).To(BeNil())
-				fmt.Printf("Snapshot %s is created\n", snapshot.Name)
+				It("Testing Snapshot Operations", func(ctx SpecContext) {
+					By("Creating a Snapshot of the pvc")
+					snapshotYaml := fmt.Sprintf(ephemeralVolumeSnapshotYAMLTemplate, "ephemeralblockpvc-snapshot", testNamespace, snapshotClass, "ephemeral-blockpod-generic-ephemeral-volume")
+					snapshot, err = getVolumeSnapshot(snapshotYaml)
+					Expect(err).To(BeNil())
+					err = crClient.Create(ctx, snapshot)
+					if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+						skipSnapshotOps = true
+						Skip("Skipping Testing of Snapshot Operations due to lack of volume snapshot support")
+					}
+					Expect(err).To(BeNil())
 
-				By("Verifying that the Snapshot is ready")
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: snapshot.Name, Namespace: snapshot.Namespace}, snapshot)
-					return err == nil && snapshot.Status != nil && *snapshot.Status.ReadyToUse
-				}, timeout, interval).Should(BeTrue())
+					By("Verifying that the Snapshot is ready")
+					Eventually(func(ctx context.Context) bool {
+						err := crClient.Get(ctx, types.NamespacedName{Name: snapshot.Name, Namespace: snapshot.Namespace}, snapshot)
+						return err == nil && snapshot.Status != nil && *snapshot.Status.ReadyToUse
+					}, timeout, interval).WithContext(ctx).Should(BeTrue())
 
-				By("Creating a clone of the pvc")
-				pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralblockpvc-clone", testNamespace, "Block", storageClassName, "ephemeral-blockpod-generic-ephemeral-volume")
-				clonePvc, err = getPVC(pvcCloneYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, clonePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Cloned PVC %s is created\n", clonePvc.Name)
+					By("Creating a clone of the pvc")
+					pvcCloneYaml := fmt.Sprintf(ephemeralPvcCloneYAMLTemplate, "ephemeralblockpvc-clone", testNamespace, "Block", storageClassName, "ephemeral-blockpod-generic-ephemeral-volume")
+					clonePvc, err = getPVC(pvcCloneYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, clonePvc)).To(BeNil())
 
-				podVolumeBlockYaml = fmt.Sprintf(podBlockYAMLTemplate, "clone-ephemeralblockpod", testNamespace, "ephemeralblockpvc-clone")
-				clonePod, err = getPod(podVolumeBlockYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, clonePod)
-				Expect(err).To(BeNil())
+					By("Creating a pod consuming the clone of the pvc")
+					podVolumeBlockYaml := fmt.Sprintf(podBlockYAMLTemplate, "clone-ephemeralblockpod", testNamespace, "ephemeralblockpvc-clone")
+					clonePod, err = getPod(podVolumeBlockYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, clonePod)).To(BeNil())
 
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: clonePvc.Name, Namespace: clonePvc.Namespace}, clonePvc)
-					return err == nil && clonePvc.Status.Phase == k8sv1.ClaimBound
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Cloned PVC %s is bound\n", clonePvc.Name)
+					By("Having a bound claim in the pvc")
+					Eventually(func(ctx context.Context) error {
+						if err := crClient.Get(ctx, client.ObjectKeyFromObject(clonePvc), clonePvc); err != nil {
+							return err
+						}
+						if clonePvc.Status.Phase != k8sv1.ClaimBound {
+							return fmt.Errorf("pvc is not bound yet: %s", clonePvc.Status.Phase)
+						}
+						return nil
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				By("Restore Snapshot for pvc")
-				pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralblockpvc-restore", testNamespace, "Block", storageClassName, "ephemeralblockpvc-snapshot")
-				restorePvc, err = getPVC(pvcRestoreYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, restorePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Snapshot %s is restored\n", restorePvc.Name)
+					By("Restore Snapshot for pvc")
+					pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralblockpvc-restore", testNamespace, "Block", storageClassName, "ephemeralblockpvc-snapshot")
+					restorePvc, err = getPVC(pvcRestoreYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, restorePvc)).To(Succeed())
 
-				podVolumeBlockYaml = fmt.Sprintf(podBlockYAMLTemplate, "restore-ephemeralblockpod", testNamespace, "ephemeralblockpvc-restore")
-				restorePod, err = getPod(podVolumeBlockYaml)
-				Expect(err).To(BeNil())
-				err = crClient.Create(ctx, restorePod)
-				Expect(err).To(BeNil())
+					By("Creating a pod consuming the restored snapshot data")
+					podVolumeBlockYaml = fmt.Sprintf(podBlockYAMLTemplate, "restore-ephemeralblockpod", testNamespace, "ephemeralblockpvc-restore")
+					restorePod, err = getPod(podVolumeBlockYaml)
+					Expect(err).To(BeNil())
+					Expect(crClient.Create(ctx, restorePod)).To(Succeed())
 
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: restorePvc.Name, Namespace: restorePvc.Namespace}, restorePvc)
-					return err == nil && restorePvc.Status.Phase == k8sv1.ClaimBound
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Restored PVC %s is bound\n", restorePvc.Name)
+					By("Having the restored data pvc be bound")
+					Eventually(func(ctx context.Context) error {
+						if err := crClient.Get(ctx, client.ObjectKeyFromObject(restorePvc), restorePvc); err != nil {
+							return err
+						}
+						if restorePvc.Status.Phase != k8sv1.ClaimBound {
+							return fmt.Errorf("pvc is not bound yet: %s", restorePvc.Status.Phase)
+						}
+						return nil
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
+				})
 
-				err = crClient.Delete(ctx, clonePod)
-				Expect(err).To(BeNil())
-				fmt.Printf("Pod %s is deleted\n", clonePod.Name)
+				It("Cleaning up ephemeral volume operations for VolumeMode=Filesystem", func(ctx SpecContext) {
+					if !skipSnapshotOps {
+						By(fmt.Sprintf("Deleting %s", clonePod.Name))
+						Expect(crClient.Delete(ctx, clonePod)).To(Succeed())
 
-				err = crClient.Delete(ctx, clonePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Clone PVC %s is deleted\n", clonePvc.Name)
+						By(fmt.Sprintf("Deleting Clone PVC %s", clonePvc.Name))
+						Expect(crClient.Delete(ctx, clonePvc)).To(Succeed())
 
-				err = crClient.Delete(ctx, restorePod)
-				Expect(err).To(BeNil())
-				fmt.Printf("Pod %s is deleted\n", restorePod.Name)
+						By(fmt.Sprintf("Deleting Pod %s", restorePod.Name))
+						Expect(crClient.Delete(ctx, restorePod)).To(Succeed())
 
-				err = crClient.Delete(ctx, restorePvc)
-				Expect(err).To(BeNil())
-				fmt.Printf("Restored Snapshot %s is deleted\n", restorePvc.Name)
+						By(fmt.Sprintf("Deleting Snapshot PVC %s", restorePvc.Name))
+						Expect(crClient.Delete(ctx, restorePvc)).To(Succeed())
 
-				err = crClient.Delete(ctx, snapshot)
-				Expect(err).To(BeNil())
-				fmt.Printf("Snapshot %s is deleted\n", snapshot.Name)
+						By(fmt.Sprintf("Deleting VolumeSnapshot %s", snapshot.Name))
+						Expect(crClient.Delete(ctx, snapshot)).To(Succeed())
+					}
 
-				By("Deleting the pod")
-				err = crClient.Delete(ctx, ephemeralPod)
-				Expect(err).To(BeNil())
-				fmt.Printf("Pod %s is deleted\n", ephemeralPod.Name)
+					By("Deleting Pod")
+					Expect(crClient.Delete(ctx, ephemeralPod)).To(Succeed())
 
-				By("Confirming that ephemeral volume is automatically deleted")
-				Eventually(func() bool {
-					err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-blockpod-generic-ephemeral-volume", Namespace: testNamespace}, pvc)
-					return err != nil && errors.IsNotFound(err)
-				}, timeout, interval).Should(BeTrue())
-				fmt.Printf("Deleting the pod, deleted the ephemeral volume\n")
+					By("Confirming that ephemeral volume is automatically deleted")
+					Eventually(func(ctx context.Context) bool {
+						err := crClient.Get(ctx, types.NamespacedName{Name: "ephemeral-blockpod-generic-ephemeral-volume", Namespace: testNamespace}, pvc)
+						return err != nil && k8serrors.IsNotFound(err)
+					}, timeout, interval).WithContext(ctx).Should(BeTrue())
+				})
 			})
 
 		})

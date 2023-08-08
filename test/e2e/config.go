@@ -93,7 +93,7 @@ func getKubeconfig(kubeconfig string) (*rest.Config, error) {
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		return config, nil
+		return nil, err
 	}
 	return config, err
 }

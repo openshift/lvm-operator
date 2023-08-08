@@ -172,7 +172,8 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 			}
 		}
 		if err != nil {
-			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, err
+			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, err
 		} else {
 			return reconcile.Result{}, nil
 		}
