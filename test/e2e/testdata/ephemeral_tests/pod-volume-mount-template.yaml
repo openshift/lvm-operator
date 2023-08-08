@@ -6,6 +6,13 @@ metadata:
 spec:
   containers:
     - name: nginx
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        capabilities:
+          drop:
+            - "ALL"
       image: public.ecr.aws/docker/library/nginx:latest
       volumeMounts:
         - mountPath: /test1

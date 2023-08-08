@@ -18,19 +18,18 @@ package e2e
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
-
-	v1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/lvm-operator/api/v1alpha1"
+	storagev1 "k8s.io/api/storage/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -69,9 +68,7 @@ func startLVMCluster(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) er
 
 // deleteLVMCluster deletes a sample CR.
 func deleteLVMCluster(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) error {
-	lvmClusterRes := generateLVMCluster()
-	cluster := &v1alpha1.LVMCluster{}
-	err := crClient.Delete(ctx, lvmClusterRes)
+	err := crClient.Delete(ctx, clusterConfig)
 	if err != nil {
 		return err
 	}
@@ -80,9 +77,9 @@ func deleteLVMCluster(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) e
 	interval := 10 * time.Second
 
 	// wait for LVMCluster to be deleted
-	err = utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
-		err = crClient.Get(ctx, types.NamespacedName{Name: lvmClusterRes.Name, Namespace: installNamespace}, cluster)
-		if err != nil && errors.IsNotFound(err) {
+	err = utilwait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
+		err = crClient.Get(ctx, types.NamespacedName{Name: clusterConfig.Name, Namespace: installNamespace}, clusterConfig)
+		if err != nil && k8serrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -94,114 +91,95 @@ func deleteLVMCluster(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) e
 	return err
 }
 
-func setupPodAndPVC() (*corev1.PersistentVolumeClaim, *corev1.Pod) {
-	filePvcYaml := fmt.Sprintf(pvcYAMLTemplate, "lvmfilepvc", testNamespace, "Filesystem", storageClassName)
-	pvc, err := getPVC(filePvcYaml)
-	Expect(err).To(BeNil())
-
-	err = crClient.Create(context.Background(), pvc)
-	Expect(err).To(BeNil())
-
-	podVolumeMountYaml := fmt.Sprintf(podVolumeFSYAMLTemplate, "lvmfilepod", testNamespace, "lvmfilepvc")
-	pod, err := getPod(podVolumeMountYaml)
-	Expect(err).To(BeNil())
-
-	err = crClient.Create(context.Background(), pod)
-	Expect(err).To(BeNil())
-
-	return pvc, pod
-}
-
-func cleanupPVCAndPod(pvc *corev1.PersistentVolumeClaim, pod *corev1.Pod) {
-	err := crClient.Delete(context.Background(), pod)
-	Expect(err).To(BeNil())
-	fmt.Printf("Pod %s is deleted\n", pod.Name)
-
-	err = crClient.Delete(context.Background(), pvc)
-	Expect(err).To(BeNil())
-	fmt.Printf("PVC %s is deleted\n", pvc.Name)
-}
-
 func lvmClusterTest() {
 	Describe("Filesystem Type", Serial, func() {
 
 		var clusterConfig *v1alpha1.LVMCluster
-		ctx := context.Background()
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// Delete the cluster
 			lvmClusterCleanup(clusterConfig, ctx)
 		})
 
-		It("should default to xfs", func() {
+		It("should default to xfs", func(ctx SpecContext) {
 			clusterConfig = generateLVMCluster() // Do not specify a fstype
 
 			By("Setting up the cluster with the default fstype")
 			lvmClusterSetup(clusterConfig, ctx)
 
+			By("Verifying the cluster is ready")
+			Eventually(clusterReadyCheck(clusterConfig), timeout, 300*time.Millisecond).WithContext(ctx).Should(Succeed())
+
+			By("Checking that the Storage Class is created normally")
 			// Make sure the storage class was configured properly
 			sc := storagev1.StorageClass{}
 
-			var err error
-			Eventually(func() bool {
-				err = crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+			By("Verifying the StorageClass exists")
+			Eventually(func(ctx SpecContext) error {
+				return crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
-
-			if err != nil {
-				Fail(fmt.Sprintf("Error getting StorageClass %s: %s\n", storageClassName, err.Error()))
-			}
+			By("Verifying that the default FS type is set to XFS on the StorageClass")
 
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeXFS)))
 		})
 
-		It("should be xfs if specified", func() {
+		It("should be xfs if specified", func(ctx SpecContext) {
 			clusterConfig = generateLVMCluster()
 			clusterConfig.Spec.Storage.DeviceClasses[0].FilesystemType = v1alpha1.FilesystemTypeXFS
 
-			By("Setting up the cluster with the default fstype")
+			By("Setting up the cluster with xfs fstype")
 			lvmClusterSetup(clusterConfig, ctx)
+
+			By("Verifying the cluster is ready")
+			Eventually(clusterReadyCheck(clusterConfig), timeout, 300*time.Millisecond).WithContext(ctx).Should(Succeed())
 
 			// Make sure the storage class was configured properly
 			sc := storagev1.StorageClass{}
 
-			var err error
-			Eventually(func() bool {
-				err = crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+			By("Verifying the StorageClass exists")
+			Eventually(func(ctx SpecContext) error {
+				return crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
-
-			if err != nil {
-				Fail(fmt.Sprintf("Error getting StorageClass %s: %s\n", storageClassName, err.Error()))
-			}
-
+			By("Verifying the correct fstype Parameter")
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeXFS)))
 		})
 
-		It("should be ext4 if specified", func() {
+		It("should be ext4 if specified", func(ctx SpecContext) {
 			clusterConfig = generateLVMCluster()
 			clusterConfig.Spec.Storage.DeviceClasses[0].FilesystemType = v1alpha1.FilesystemTypeExt4
 
 			By("Setting up the cluster with the ext4 fstype")
 			lvmClusterSetup(clusterConfig, ctx)
 
+			By("Verifying the cluster is ready")
+			Eventually(clusterReadyCheck(clusterConfig), timeout, 300*time.Millisecond).WithContext(ctx).Should(Succeed())
+
 			// Make sure the storage class was configured properly
 			sc := storagev1.StorageClass{}
 
-			var err error
-			Eventually(func() bool {
-				err = crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+			By("Verifying the StorageClass exists")
+			Eventually(func(ctx SpecContext) error {
+				return crClient.Get(ctx, types.NamespacedName{Name: storageClassName, Namespace: installNamespace}, &sc)
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
 
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
-
-			if err != nil {
-				Fail(fmt.Sprintf("Error getting StorageClass %s: %s\n", storageClassName, err.Error()))
-			}
-
+			By("Verifying the correct fstype Parameter")
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeExt4)))
 		})
 	})
+}
+
+func clusterReadyCheck(clusterConfig *v1alpha1.LVMCluster) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		currentCluster := clusterConfig
+		err := crClient.Get(ctx, client.ObjectKeyFromObject(clusterConfig), currentCluster)
+		if err != nil {
+			return err
+		}
+		if currentCluster.Status.State == v1alpha1.LVMStatusReady {
+			return nil
+		}
+		return errors.New("cluster is not ready yet")
+	}
 }
