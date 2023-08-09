@@ -84,7 +84,7 @@ func Test_nodeLookupSNOLeaderElection_Resolve(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			clnt := fake.NewClientBuilder().WithObjects(tt.nodes...).Build()
 			le := &nodeLookupSNOLeaderElection{
-				clnt: clnt,
+				snoCheck: NewMasterSNOCheck(clnt),
 				defaultElectionConfig: leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{},
 					"test", "test-leader-id"),
 			}

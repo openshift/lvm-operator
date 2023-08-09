@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/openshift/lvm-operator/controllers/node"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -32,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -89,7 +91,13 @@ func main() {
 	}
 	setupLog.Info("Watching namespace", "Namespace", operatorNamespace)
 
-	leaderElectionResolver, err := cluster.NewLeaderElectionResolver(ctrl.GetConfigOrDie(), scheme, enableLeaderElection, operatorNamespace)
+	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to initialize setup client for pre-manager startup checks")
+		os.Exit(1)
+	}
+	snoCheck := cluster.NewMasterSNOCheck(setupClient)
+	leaderElectionResolver, err := cluster.NewLeaderElectionResolver(snoCheck, enableLeaderElection, operatorNamespace)
 	if err != nil {
 		setupLog.Error(err, "unable to setup leader election")
 		os.Exit(1)
@@ -130,6 +138,24 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
 		os.Exit(1)
 	}
+
+	if !snoCheck.IsSNO(context.Background()) {
+		setupLog.Info("starting node-removal controller to observe node removal in MultiNode")
+		if err = (&node.RemovalController{
+			Client: mgr.GetClient(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "NodeRemovalControlelr")
+			os.Exit(1)
+		}
+	}
+
+	if err = mgr.GetFieldIndexer().IndexField(context.Background(), &lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
+		return []string{object.GetName()}
+	}); err != nil {
+		setupLog.Error(err, "unable to create name index on LVMVolumeGroupNodeStatus")
+		os.Exit(1)
+	}
+
 	if err = (&lvmv1alpha1.LVMCluster{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "LVMCluster")
 		os.Exit(1)
