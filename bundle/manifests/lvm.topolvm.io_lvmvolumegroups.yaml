@@ -53,6 +53,11 @@ spec:
                       be held in a separate physical volume. Note that 1 Mirror will
                       equal a total of 1+1=2 volumes holding data.
                     type: integer
+                  name:
+                    default: /dev/md/lvms
+                    description: Name of the RAID device, cannot be conflicting with
+                      other RAID device-names on any node.
+                    type: string
                   sync:
                     default: false
                     description: If set to false, causes  the  creation  of mirror,
@@ -77,6 +82,7 @@ spec:
                 required:
                 - metadataSize
                 - mirrors
+                - name
                 - sync
                 - type
                 type: object

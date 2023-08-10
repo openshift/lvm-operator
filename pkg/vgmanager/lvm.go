@@ -32,16 +32,17 @@ var (
 )
 
 const (
-	lvmCmd       = "/usr/sbin/lvm"
-	vgCreateCmd  = "/usr/sbin/vgcreate"
-	vgExtendCmd  = "/usr/sbin/vgextend"
-	vgRemoveCmd  = "/usr/sbin/vgremove"
-	pvRemoveCmd  = "/usr/sbin/pvremove"
-	lvCreateCmd  = "/usr/sbin/lvcreate"
-	lvConvertCmd = "/usr/sbin/lvconvert"
-	lvExtendCmd  = "/usr/sbin/lvextend"
-	lvRemoveCmd  = "/usr/sbin/lvremove"
-	lvChangeCmd  = "/usr/sbin/lvchange"
+	lvmCmd        = "/usr/sbin/lvm"
+	lvmDevicesCmd = "/usr/sbin/lvmdevices"
+	vgCreateCmd   = "/usr/sbin/vgcreate"
+	vgExtendCmd   = "/usr/sbin/vgextend"
+	vgRemoveCmd   = "/usr/sbin/vgremove"
+	pvRemoveCmd   = "/usr/sbin/pvremove"
+	lvCreateCmd   = "/usr/sbin/lvcreate"
+	lvConvertCmd  = "/usr/sbin/lvconvert"
+	lvExtendCmd   = "/usr/sbin/lvextend"
+	lvRemoveCmd   = "/usr/sbin/lvremove"
+	lvChangeCmd   = "/usr/sbin/lvchange"
 )
 
 // vgsOutput represents the output of the `vgs --reportformat json` command

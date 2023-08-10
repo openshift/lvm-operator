@@ -66,12 +66,15 @@ type BlockDevice struct {
 	DevicePath string
 }
 
-// ListBlockDevices lists the block devices using the lsblk command
-func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
+// ListBlockDevices lists the block devices using the lsblk command, optionally by specifiyng a specific device to look for
+func ListBlockDevices(exec Executor, device string) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "--paths", "-o", columns}
+	if device != "" {
+		args = append(args, device)
+	}
 
 	output, err := exec.ExecuteCommandWithOutput("lsblk", args...)
 	if err != nil {

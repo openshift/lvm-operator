@@ -137,7 +137,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 
-	blockDevices, err := internal.ListBlockDevices(r.executor)
+	blockDevices, err := internal.ListBlockDevices(r.executor, "")
 	if err != nil {
 		return reconcileAgain, fmt.Errorf("failed to list block devices: %v", err)
 	}
@@ -209,6 +209,21 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, nil
 	}
 
+	// replace devices with RAID device if necessary
+	if volumeGroup.Spec.RAIDConfig != nil {
+		raidDevice, err := r.createRAIDArray(volumeGroup, availableDevices)
+		if err != nil {
+			err := fmt.Errorf("error while creating MDM RAID array: %w", err)
+			r.Log.Error(err, err.Error(), "VGName", volumeGroup.Name)
+			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err.Error()); statuserr != nil {
+				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+				return reconcileAgain, statuserr
+			}
+			return reconcileAgain, err
+		}
+		availableDevices = []internal.BlockDevice{raidDevice}
+	}
+
 	// Create/extend VG
 	err = r.addDevicesToVG(vgs, volumeGroup.Name, availableDevices)
 	if err != nil {
@@ -219,29 +234,16 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, err
 	}
 
-	if volumeGroup.Spec.RAIDConfig == nil {
-		// Create thin pool
-		err = r.setupThinPool(volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig)
-		if err != nil {
-			r.Log.Error(err, "failed to create thin pool", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
-			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name,
-				fmt.Sprintf("failed to create thin pool %s for volume group %s: %v", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err.Error())); statuserr != nil {
-				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-				return reconcileAgain, statuserr
-			}
-			return reconcileAgain, err
+	// Create thin pool
+	err = r.setupThinPool(volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig)
+	if err != nil {
+		r.Log.Error(err, "failed to create thin pool", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
+		if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name,
+			fmt.Sprintf("failed to create thin pool %s for volume group %s: %v", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err.Error())); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+			return reconcileAgain, statuserr
 		}
-	} else {
-		err = r.setupRAIDThinPool(volumeGroup)
-		if err != nil {
-			r.Log.Error(err, "failed to create thin pool (with RAID)", "VGName", "ThinPool", volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig.Name)
-			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name,
-				fmt.Sprintf("failed to create thin pool %s for volume group %s: %v", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err.Error())); statuserr != nil {
-				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-				return reconcileAgain, statuserr
-			}
-			return reconcileAgain, err
-		}
+		return reconcileAgain, err
 	}
 
 	// Add the volume group to device classes inside lvmd config if not exists
@@ -406,6 +408,14 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		return fmt.Errorf("failed to delete volume group. %q, %v", volumeGroup.Name, err)
 	}
 
+	if volumeGroup.Spec.RAIDConfig != nil {
+		err = NewMDADMRunner(r.executor, volumeGroup.Spec.RAIDConfig).DeleteRAID()
+		if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, fmt.Sprintf("failed to delete volume group %s: %v", volumeGroup.Name, err.Error())); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+		}
+		return fmt.Errorf("failed to delete RAID Array. %q, %v", volumeGroup.Name, err)
+	}
+
 	// Remove this vg from the lvmdconf file
 	lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses[:index], lvmdConfig.DeviceClasses[index+1:]...)
 
@@ -428,86 +438,6 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 		return statuserr
 	}
-
-	return nil
-}
-
-func (r *VGReconciler) setupRAIDThinPool(vg *lvmv1alpha1.LVMVolumeGroup) error {
-	resp, err := GetLVSOutput(r.executor, vg.Name)
-	if err != nil {
-		return fmt.Errorf("failed to list logical volumes in the volume vg %q. %v", vg.Name, err)
-	}
-
-	for _, report := range resp.Report {
-		for _, lv := range report.Lv {
-			if lv.Name == vg.Name {
-				return fmt.Errorf("failed to create raid-enabled thinpool thin pool %q. Logical volume with same name already exists, and extension is not possible with RAID configurations", lv.Name)
-			}
-		}
-	}
-
-	// Step 1: Create Data RAID Array
-	args := []string{
-		"--type", string(vg.Spec.RAIDConfig.Type),
-		"-l", fmt.Sprintf("%d%%FREE", vg.Spec.ThinPoolConfig.SizePercent),
-		"-n", vg.Spec.ThinPoolConfig.Name,
-		vg.Name,
-	}
-	// this is in preparation of other raid types that do only striping or require no mirror input (e.g. raid0)
-	if vg.Spec.RAIDConfig.Mirrors > 0 {
-		args = append(args, "--mirrors", fmt.Sprintf("%d", vg.Spec.RAIDConfig.Mirrors))
-	}
-	if !vg.Spec.RAIDConfig.Sync {
-		args = append(args, "--nosync")
-		r.Log.Info("raid config without initial sync, potentially dangerous!")
-	}
-	r.Log.Info("creating RAID array for data")
-	res, err := r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
-	if err != nil {
-		return fmt.Errorf("failed to create raid array %q in the volume group %q using command '%s': %v",
-			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
-	}
-	r.Log.Info("Data RAID array was created", "result", res)
-
-	// Step 2: Create Meta RAID Array
-	metaRAIDName := fmt.Sprintf("%s-meta", vg.Spec.ThinPoolConfig.Name)
-	args = []string{
-		"--type", string(vg.Spec.RAIDConfig.Type),
-		"-L", fmt.Sprintf("%dMiB", vg.Spec.RAIDConfig.MetadataSize),
-		"-n", metaRAIDName,
-		vg.Name,
-	}
-	// this is in preparation of other raid types that do only striping or require no mirror input (e.g. raid0)
-	if vg.Spec.RAIDConfig.Mirrors > 0 {
-		args = append(args, "--mirrors", fmt.Sprintf("%d", vg.Spec.RAIDConfig.Mirrors))
-	}
-	if !vg.Spec.RAIDConfig.Sync {
-		args = append(args, "--nosync")
-		r.Log.Info("raid config without initial sync detected, potentially dangerous!")
-	}
-	r.Log.Info("creating RAID array for meta", "size", vg.Spec.RAIDConfig.MetadataSize)
-	res, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
-	if err != nil {
-		return fmt.Errorf("failed to create raid array %q in the volume group %q using command '%s': %v (%s)",
-			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err, res)
-	}
-	r.Log.Info("Meta RAID array was created", "result", res)
-
-	// Step 3: Convert RAID Arrays into Thin-Pool
-	args = []string{
-		"--thinpool", fmt.Sprintf("%s/%s", vg.Name, vg.Spec.ThinPoolConfig.Name),
-		"--poolmetadata", fmt.Sprintf("%s/%s", vg.Name, metaRAIDName),
-		"--chunksize", DefaultChunkSize,
-		"-Z", "y",
-		"-y",
-	}
-	r.Log.Info("Converting RAID arrays into Thin Pool")
-	res, err = r.executor.ExecuteCommandWithOutputAsHost(lvConvertCmd, args...)
-	if err != nil {
-		return fmt.Errorf("failed to convert raid pool to thin-pool %q in the volume group %q using command '%s': %v (%s)",
-			vg.Spec.ThinPoolConfig.Name, vg.Name, fmt.Sprintf("%s %s", lvConvertCmd, strings.Join(args, " ")), err, res)
-	}
-	r.Log.Info("Thin pool conversion completed", "result", res)
 
 	return nil
 }
@@ -603,6 +533,26 @@ func (r *VGReconciler) matchesThisNode(ctx context.Context, selector *corev1.Nod
 		return false, err
 	}
 	return NodeSelectorMatchesNodeLabels(node, selector)
+}
+
+func (r *VGReconciler) createRAIDArray(group *lvmv1alpha1.LVMVolumeGroup, devices []internal.BlockDevice) (internal.BlockDevice, error) {
+
+	err := NewMDADMRunner(r.executor, group.Spec.RAIDConfig).CreateRAID(devices)
+	if err != nil {
+		return internal.BlockDevice{}, fmt.Errorf("could not create RAID device: %w", err)
+	}
+
+	blockDevices, err := internal.ListBlockDevices(r.executor, group.Spec.RAIDConfig.Name)
+	if err != nil {
+		return internal.BlockDevice{}, fmt.Errorf("failed to list updated block devices after raid creation: %w", err)
+	}
+
+	if len(blockDevices) == 0 {
+		return internal.BlockDevice{}, fmt.Errorf("could not get RAID device after successful creation (missing %s)",
+			group.Spec.RAIDConfig.Name)
+	}
+
+	return blockDevices[0], nil
 }
 
 func loadLVMDConfig() (*lvmdCMD.Config, error) {

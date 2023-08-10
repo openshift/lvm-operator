@@ -66,6 +66,11 @@ const (
 
 // RAIDConfig contains configuration options for RAID configurations through software RAID via LVM
 type RAIDConfig struct {
+	// Name of the RAID device, cannot be conflicting with other RAID device-names on any node.
+	// +kubebuilder:default=/dev/md/lvms
+	// +required
+	Name string `json:"name"`
+
 	// Type of the RAID configuration
 	// +kubebuilder:default=raid1
 	// +required
