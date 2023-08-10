@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	v1 "github.com/openshift/api/config/v1"
 	"path/filepath"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
@@ -37,7 +38,9 @@ const (
 	controllerName = "topolvm-controller"
 )
 
-type topolvmController struct{}
+type topolvmController struct {
+	topoLVMLeaderElectionPassthrough v1.LeaderElection
+}
 
 // topolvmController unit satisfies resourceManager interface
 var _ resourceManager = topolvmController{}
@@ -51,7 +54,7 @@ func (c topolvmController) getName() string {
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName)
+	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName, c.topoLVMLeaderElectionPassthrough)
 	existingDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      desiredDeployment.Name,
@@ -124,7 +127,7 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 	return nil
 }
 
-func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string) *appsv1.Deployment {
+func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string, topoLVMLeaderElectionPassthrough v1.LeaderElection) *appsv1.Deployment {
 	// Topolvm CSI Controller Deployment
 	var replicas int32 = 1
 	volumes := []corev1.Volume{
@@ -138,11 +141,11 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 
 	// get all containers that are part of csi controller deployment
 	containers := []corev1.Container{
-		controllerContainer(),
-		csiProvisionerContainer(),
-		csiResizerContainer(),
+		controllerContainer(topoLVMLeaderElectionPassthrough),
+		csiProvisionerContainer(topoLVMLeaderElectionPassthrough),
+		csiResizerContainer(topoLVMLeaderElectionPassthrough),
 		livenessProbeContainer(),
-		csiSnapshotterContainer(),
+		csiSnapshotterContainer(topoLVMLeaderElectionPassthrough),
 	}
 
 	annotations := map[string]string{
@@ -212,12 +215,16 @@ func initContainer(initImage string) corev1.Container {
 	}
 }
 
-func controllerContainer() corev1.Container {
+func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
 
 	// topolvm controller plugin container
 	command := []string{
 		"/topolvm-controller",
 		"--cert-dir=/certs",
+		fmt.Sprintf("--leader-election-namespace=%s", topoLVMLeaderElectionPassthrough.Namespace),
+		fmt.Sprintf("--leader-election-lease-duration=%s", topoLVMLeaderElectionPassthrough.LeaseDuration.Duration),
+		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
+		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
@@ -271,7 +278,7 @@ func controllerContainer() corev1.Container {
 	}
 }
 
-func csiProvisionerContainer() corev1.Container {
+func csiProvisionerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
 
 	// csi provisioner container
 	args := []string{
@@ -280,6 +287,10 @@ func csiProvisionerContainer() corev1.Container {
 		"--capacity-ownerref-level=2",
 		"--capacity-poll-interval=30s",
 		"--feature-gates=Topology=true",
+		fmt.Sprintf("--leader-election-namespace=%s", topoLVMLeaderElectionPassthrough.Namespace),
+		fmt.Sprintf("--leader-election-lease-duration=%s", topoLVMLeaderElectionPassthrough.LeaseDuration.Duration),
+		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
+		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
@@ -322,11 +333,15 @@ func csiProvisionerContainer() corev1.Container {
 	}
 }
 
-func csiResizerContainer() corev1.Container {
+func csiResizerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
 
 	// csi resizer container
 	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
+		fmt.Sprintf("--leader-election-namespace=%s", topoLVMLeaderElectionPassthrough.Namespace),
+		fmt.Sprintf("--leader-election-lease-duration=%s", topoLVMLeaderElectionPassthrough.LeaseDuration.Duration),
+		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
+		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
@@ -349,10 +364,14 @@ func csiResizerContainer() corev1.Container {
 	}
 }
 
-func csiSnapshotterContainer() corev1.Container {
+func csiSnapshotterContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
 
 	args := []string{
 		fmt.Sprintf("--csi-address=%s", DefaultCSISocket),
+		fmt.Sprintf("--leader-election-namespace=%s", topoLVMLeaderElectionPassthrough.Namespace),
+		fmt.Sprintf("--leader-election-lease-duration=%s", topoLVMLeaderElectionPassthrough.LeaseDuration.Duration),
+		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
+		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
