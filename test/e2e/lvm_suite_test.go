@@ -59,27 +59,26 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("LVM Operator e2e tests", func() {
-	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
+	Describe("LVM FileSystemTest", Serial, lvmFileSystemTest)
 
-	Describe("LVM Operator", Ordered, func() {
-		// Ordered to give the BeforeAll/AfterAll functionality to achieve common setup
+	Describe("LVMCluster File/Block Tests", Ordered, func() {
 		var clusterConfig *v1alpha1.LVMCluster
 
 		BeforeAll(func(ctx SpecContext) {
 			clusterConfig = generateLVMCluster()
 			lvmClusterSetup(clusterConfig, ctx)
-			By("Verifying the cluster is ready")
+			By("Verifying that LVMCluster is ready")
 			Eventually(clusterReadyCheck(clusterConfig), timeout, 300*time.Millisecond).WithContext(ctx).Should(Succeed())
 		})
 
-		Describe("Functional Tests", func() {
-			Context("LVMCluster reconciliation", validateResources)
-			Context("PVC tests", pvcTest)
-			Context("Ephemeral volume tests", ephemeralTest)
-		})
+		Context("Validation of created resources", validateResources)
+		Context("PersistentVolumeClaims, Snapshots & Cloning for Static Pods", pvcTest)
+		Context("PersistentVolumeClaims, Snapshots & Cloning for Ephemeral Pods", ephemeralTest)
 
 		AfterAll(func(ctx SpecContext) {
 			lvmClusterCleanup(clusterConfig, ctx)
 		})
 	})
+
+	Describe("LVMCluster RAID Tests", Ordered, raidTest)
 })

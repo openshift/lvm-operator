@@ -252,7 +252,7 @@ func ListLogicalVolumes(exec internal.Executor, vgName string) ([]string, error)
 	return lvs, nil
 }
 
-// GetLVSOutput returns the output for `lvs` command in json format
+// GetLVSOutput returns the output for `lvs` command for all LVs in the VG in json format
 func GetLVSOutput(exec internal.Executor, vgName string) (*lvsOutput, error) {
 	res := new(lvsOutput)
 	args := []string{

@@ -406,7 +406,12 @@ func (l *LVMCluster) verifyRAIDConfig() (admission.Warnings, error) {
 		}
 		switch deviceClass.RAIDConfig.Type {
 		case RAIDType1:
-			totalDevices := len(deviceClass.DeviceSelector.Paths) + len(deviceClass.DeviceSelector.Paths)
+			totalDevices := 0
+
+			if deviceClass.DeviceSelector != nil {
+				totalDevices += len(deviceClass.DeviceSelector.Paths)
+				totalDevices += len(deviceClass.DeviceSelector.OptionalPaths)
+			}
 
 			// Implicit Creation of deviceClass with all available Devices
 			if totalDevices == 0 {

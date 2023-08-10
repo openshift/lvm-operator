@@ -58,7 +58,7 @@ func lvmNamespaceCleanup(ctx context.Context) {
 }
 
 func lvmClusterCleanup(clusterConfig *v1alpha1.LVMCluster, ctx context.Context) {
-	By("Deleting default LVM Cluster")
+	By("Deleting LVM Cluster")
 	err := deleteLVMCluster(clusterConfig, ctx)
 	Expect(err).To(BeNil())
 }

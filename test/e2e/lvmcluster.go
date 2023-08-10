@@ -123,7 +123,7 @@ func cleanupPVCAndPod(pvc *corev1.PersistentVolumeClaim, pod *corev1.Pod) {
 	fmt.Printf("PVC %s is deleted\n", pvc.Name)
 }
 
-func lvmClusterTest() {
+func lvmFileSystemTest() {
 	Describe("Filesystem Type", Serial, func() {
 
 		var clusterConfig *v1alpha1.LVMCluster

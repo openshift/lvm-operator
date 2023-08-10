@@ -181,19 +181,29 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 			}
 		}
 
-		if devicesExist {
-			r.Log.Info("all the available devices are attached to the volume group", "VGName", volumeGroup.Name)
-			if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
-				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-				return reconcileAgain, statuserr
-			}
-		} else {
+		if !devicesExist {
 			errMsg := "no available devices found for volume group"
 			r.Log.Error(fmt.Errorf(errMsg), errMsg, "VGName", volumeGroup.Name)
 			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, errMsg); statuserr != nil {
 				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
 				return reconcileAgain, statuserr
 			}
+		}
+
+		if err := r.validateLVs(volumeGroup); err != nil {
+			err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
+			r.Log.Error(err, err.Error(), "VGName", volumeGroup.Name)
+			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err.Error()); statuserr != nil {
+				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+				return reconcileAgain, statuserr
+			}
+			return reconcileAgain, err
+		}
+
+		r.Log.Info("all the available devices are attached to the volume group", "VGName", volumeGroup.Name)
+		if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+			return reconcileAgain, statuserr
 		}
 
 		return reconcileAgain, nil
@@ -219,6 +229,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 				return reconcileAgain, statuserr
 			}
+			return reconcileAgain, err
 		}
 	} else {
 		err = r.setupRAIDThinPool(volumeGroup)
@@ -229,6 +240,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 				return reconcileAgain, statuserr
 			}
+			return reconcileAgain, err
 		}
 	}
 
@@ -280,6 +292,44 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		requeueAfter = time.Second * 30
 	}
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+func (r *VGReconciler) validateLVs(volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
+	// If we don't have a ThinPool, VG Manager has no authority about the top Level LVs inside the VG, but TopoLVM
+	if volumeGroup.Spec.ThinPoolConfig == nil {
+		return nil
+	}
+
+	resp, err := GetLVSOutput(r.executor, volumeGroup.Name)
+	if err != nil {
+		return fmt.Errorf("could not get logical volumes found inside volume group, volume group content is degraded or corrupt: %w", err)
+	}
+
+	for _, report := range resp.Report {
+		for _, lv := range report.Lv {
+			if lv.Name != volumeGroup.Spec.ThinPoolConfig.Name {
+				continue
+			}
+			lvAttr, err := ParsedLvAttr(lv.LvAttr)
+			if err != nil {
+				return fmt.Errorf("could not parse lv_attr from logical volume %s: %w", lv.Name, err)
+			}
+			if lvAttr.VolumeType != VolumeTypeThinPool {
+				return fmt.Errorf("found logical volume in volume group that is not of type Thin-Pool, "+
+					"even though there is a Thin-Pool configured: %s, lv_attr: %s,"+
+					"this is most likely a corruption of the thin pool or a setup gone wrong",
+					string(lvAttr.VolumeType), lvAttr)
+			}
+
+			if lvAttr.State != StateActive {
+				return fmt.Errorf("found inactive logical volume, maybe external repairs are formed or there is another"+
+					"entity conflicting with vg-manager, cannot proceed until volume is activated again: lv_attr: %s", lvAttr)
+			}
+
+			r.Log.Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
+		}
+	}
+	return nil
 }
 
 func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
@@ -433,7 +483,7 @@ func (r *VGReconciler) setupRAIDThinPool(vg *lvmv1alpha1.LVMVolumeGroup) error {
 	}
 	if !vg.Spec.RAIDConfig.Sync {
 		args = append(args, "--nosync")
-		r.Log.Info("raid config without initial sync, potentially dangerous!")
+		r.Log.Info("raid config without initial sync detected, potentially dangerous!")
 	}
 	r.Log.Info("creating RAID array for meta", "size", vg.Spec.RAIDConfig.MetadataSize)
 	res, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
