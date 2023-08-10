@@ -17,6 +17,7 @@ limitations under the License.
 package vgmanager
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -126,6 +127,7 @@ DeviceLoop:
 // filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.
 func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
 	var filteredBlockDevices []internal.BlockDevice
+
 	if volumeGroup.Spec.DeviceSelector != nil {
 
 		if err := checkDuplicateDeviceSelectorPaths(volumeGroup.Spec.DeviceSelector); err != nil {
@@ -143,6 +145,7 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 
 				// Check if we should skip this device
 				if blockDevice.DevicePath == "" {
+					r.Log.Info(fmt.Sprintf("skipping required device that is already part of volume group %s: %s", volumeGroup.Name, path))
 					continue
 				}
 
@@ -156,7 +159,14 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 				blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
 
 				// Check if we should skip this device
-				if err != nil || blockDevice.DevicePath == "" {
+				if err != nil {
+					r.Log.Info(fmt.Sprintf("skipping optional device path due to error: %v", err))
+					continue
+				}
+
+				// Check if we should skip this device
+				if blockDevice.DevicePath == "" {
+					r.Log.Info(fmt.Sprintf("skipping optional device path that is already part of volume group %s: %s", volumeGroup.Name, path))
 					continue
 				}
 
@@ -166,9 +176,9 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 			// At least 1 of the optional paths are required if:
 			//   - OptionalPaths was specified AND
 			//   - There were no required paths
-			// This guarantees at least 1 device could be found
+			// This guarantees at least 1 device could be found between optionalPaths and paths
 			if len(filteredBlockDevices) == 0 {
-				return nil, fmt.Errorf("at least 1 valid optional device is required if DeviceSelector.OptionalPaths is specified")
+				return nil, errors.New("at least 1 valid device is required if DeviceSelector paths or optionalPaths are specified")
 			}
 		}
 
@@ -252,7 +262,7 @@ func getValidDevice(devicePath string, blockDevices []internal.BlockDevice, vgs 
 	// Make sure the symlink exists
 	diskName, err := filepath.EvalSymlinks(devicePath)
 	if err != nil {
-		return internal.BlockDevice{}, fmt.Errorf("unable to find symlink for required disk path %s: %v", devicePath, err)
+		return internal.BlockDevice{}, fmt.Errorf("unable to find symlink for disk path %s: %v", devicePath, err)
 	}
 
 	// Make sure this isn't a duplicate in the VG
