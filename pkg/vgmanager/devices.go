@@ -68,37 +68,28 @@ func (r *VGReconciler) addDevicesToVG(vgs []VolumeGroup, vgName string, devices 
 }
 
 // getAvailableDevicesForVG determines the available devices that can be used to create a volume group.
-func (r *VGReconciler) getAvailableDevicesForVG(blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, []internal.BlockDevice, error) {
+func (r *VGReconciler) getAvailableDevicesForVG(blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
 	// filter devices based on DeviceSelector.Paths if specified
 	availableDevices, err := r.filterMatchingDevices(blockDevices, vgs, volumeGroup)
 	if err != nil {
 		r.Log.Error(err, "failed to filter matching devices", "VGName", volumeGroup.Name)
-		return nil, nil, err
+		return nil, err
 	}
 
-	// determine only available devices based on device age and filters in FilterMap
-	availableDevices, delayedDevices := r.filterAvailableDevices(availableDevices)
-
-	return availableDevices, delayedDevices, nil
+	return r.filterAvailableDevices(availableDevices), nil
 }
 
 // filterAvailableDevices returns:
 // availableDevices: the list of blockdevices considered available
-// delayedDevices: the list of blockdevices considered available, but first observed less than 'minDeviceAge' time ago
-func (r *VGReconciler) filterAvailableDevices(blockDevices []internal.BlockDevice) ([]internal.BlockDevice, []internal.BlockDevice) {
-	var availableDevices, delayedDevices []internal.BlockDevice
+func (r *VGReconciler) filterAvailableDevices(blockDevices []internal.BlockDevice) []internal.BlockDevice {
+	var availableDevices []internal.BlockDevice
 	// using a label so `continue DeviceLoop` can be used to skip devices
 DeviceLoop:
 	for _, blockDevice := range blockDevices {
-
-		// store device in deviceAgeMap
-		r.deviceAgeMap.storeDeviceAge(blockDevice.KName)
-
 		// check for partitions recursively
 		if blockDevice.HasChildren() {
-			childAvailableDevices, childDelayedDevices := r.filterAvailableDevices(blockDevice.Children)
+			childAvailableDevices := r.filterAvailableDevices(blockDevice.Children)
 			availableDevices = append(availableDevices, childAvailableDevices...)
-			delayedDevices = append(delayedDevices, childDelayedDevices...)
 		}
 
 		devLogger := r.Log.WithValues("Device.Name", blockDevice.Name)
@@ -113,15 +104,9 @@ DeviceLoop:
 				continue DeviceLoop
 			}
 		}
-		// check if the device is older than deviceMinAge
-		isOldEnough := r.deviceAgeMap.isOlderThan(blockDevice.KName)
-		if isOldEnough {
-			availableDevices = append(availableDevices, blockDevice)
-		} else {
-			delayedDevices = append(delayedDevices, blockDevice)
-		}
+		availableDevices = append(availableDevices, blockDevice)
 	}
-	return availableDevices, delayedDevices
+	return availableDevices
 }
 
 // filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.

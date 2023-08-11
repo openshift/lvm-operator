@@ -28,9 +28,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 		}
 	}
 
-	r := &VGReconciler{
-		deviceAgeMap: newAgeMap(&wallTime{}),
-	}
+	r := &VGReconciler{}
 
 	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
 	delete(FilterMap, "noBindMounts")
@@ -554,14 +552,13 @@ func TestAvailableDevicesForVG(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			//use delayed devices as available devices in the test, as they are matching all the conditions but device age logic only considers them 30 seconds later
-			_, delayedDevices, err := r.getAvailableDevicesForVG(tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
+			availableDevices, err := r.getAvailableDevicesForVG(tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
 			if !tc.expectError {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
 			}
-			assert.Equal(t, tc.numOfAvailableDevices, len(delayedDevices), "expected numOfAvailableDevices is not equal to actual number")
+			assert.Equal(t, tc.numOfAvailableDevices, len(availableDevices), "expected numOfAvailableDevices is not equal to actual number")
 		})
 	}
 }
