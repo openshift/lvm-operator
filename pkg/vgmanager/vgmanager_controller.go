@@ -46,7 +46,7 @@ import (
 const (
 	ControllerName    = "vg-manager"
 	DefaultChunkSize  = "128"
-	reconcileInterval = 1 * time.Minute
+	reconcileInterval = 15 * time.Second
 )
 
 var (
@@ -55,7 +55,6 @@ var (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VGReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.deviceAgeMap = newAgeMap(&wallTime{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Complete(r)
@@ -63,13 +62,11 @@ func (r *VGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 type VGReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Log    logr.Logger
-	// map from KNAME of device to time when the device was first observed since the process started
-	deviceAgeMap *ageMap
-	executor     internal.Executor
-	NodeName     string
-	Namespace    string
+	Scheme    *runtime.Scheme
+	Log       logr.Logger
+	executor  internal.Executor
+	NodeName  string
+	Namespace string
 }
 
 func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -143,35 +140,19 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	}
 
 	//Get the available block devices that can be used for this volume group
-	availableDevices, delayedDevices, err := r.getAvailableDevicesForVG(blockDevices, vgs, volumeGroup)
+	availableDevices, err := r.getAvailableDevicesForVG(blockDevices, vgs, volumeGroup)
 	if err != nil {
 		r.Log.Error(err, "failed to get block devices for volumegroup, will retry", "name", volumeGroup.Name)
-		// Set a failure status only if there is an error and there is no delayed devices. If there are delayed devices, there is a chance that this will pass in the next reconciliation.
-		if len(delayedDevices) == 0 {
-			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, fmt.Sprintf("failed to get block devices for volumegroup %s: %v", volumeGroup.Name, err.Error())); statuserr != nil {
-				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
-			}
-		}
-
 		// Failed to get devices for this volume group. Reconcile again.
 		return reconcileAgain, err
 	}
 
-	r.Log.Info("listing available and delayed devices", "availableDevices", availableDevices, "delayedDevices", delayedDevices)
+	r.Log.Info("listing available and delayed devices", "availableDevices", availableDevices)
 
 	// If there are no available devices, that could mean either
 	// - There is no available devices to attach to the volume group
 	// - All the available devices are already attached
 	if len(availableDevices) == 0 {
-		if len(delayedDevices) > 0 {
-			r.Log.Info("there are delayed devices, will retry them in the next reconciliation", "VGName", volumeGroup.Name, "delayedDevices", delayedDevices)
-			if statuserr := r.setVolumeGroupProgressingStatus(ctx, volumeGroup.Name); statuserr != nil {
-				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-				return reconcileAgain, statuserr
-			}
-			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil //30 seconds to make sure delayed devices become available
-		}
-
 		devicesExist := false
 		for _, vg := range vgs {
 			if volumeGroup.Name == vg.Name {
@@ -262,12 +243,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, nil
 	}
 
-	// requeue faster if some devices are too recently observed to consume
-	requeueAfter := time.Minute * 1
-	if len(delayedDevices) > 0 {
-		requeueAfter = time.Second * 30
-	}
-	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	return reconcileAgain, nil
 }
 
 func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
