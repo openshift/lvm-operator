@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("LVMCluster controller", func() {
@@ -189,7 +190,15 @@ var _ = Describe("LVMCluster controller", func() {
 
 			// delete lvmVolumeGroupNodeStatus as it should be deleted by vgmanager
 			// and if it is present lvmcluster reconciler takes it as vg is present on node
-			Expect(k8sClient.Delete(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
+
+			// we will now remove the node which will cause the LVM cluster status to also lose that vg
+			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
+			// deletion of LVMCluster CR and thus also the NodeStatus through the removal controller
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn),
+					&lvmv1alpha1.LVMVolumeGroupNodeStatus{})
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
 
 			// deletion of LVMCluster CR
 			Eventually(func() bool {
