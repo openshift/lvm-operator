@@ -18,13 +18,15 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -52,6 +54,11 @@ func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx c
 		// we anticipate no edits to volume snapshot class
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, vsc, func() error { return nil })
 		if err != nil {
+			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
+			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+				r.Log.Info("topolvm volume snapshot classes do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
+				return nil
+			}
 			r.Log.Error(err, "topolvm volume snapshot class reconcile failure", "name", vsc.Name)
 			return err
 		} else {
@@ -72,8 +79,13 @@ func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx c
 
 		if err != nil {
 			// already deleted in previous reconcile
-			if errors.IsNotFound(err) {
+			if k8serrors.IsNotFound(err) {
 				r.Log.Info("topolvm volume snapshot class is deleted", "VolumeSnapshotClass", vscName)
+				return nil
+			}
+			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
+			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+				r.Log.Info("topolvm volume snapshot classes do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
 				return nil
 			}
 			r.Log.Error(err, "failed to retrieve topolvm volume snapshot class", "VolumeSnapshotClass", vscName)
