@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	capacityAnnotation = "capacity.topolvm.io/00default"
+	CapacityAnnotation = "capacity.topolvm.io/"
 )
 
 // PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
@@ -67,7 +67,9 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
-	if !strings.HasPrefix(*pvc.Spec.StorageClassName, controllers.StorageClassPrefix) {
+	// Skip if StorageClassName does not contain the lvms prefix
+	lvmsPrefix, deviceClass, exists := strings.Cut(*pvc.Spec.StorageClassName, "-")
+	if !exists || fmt.Sprintf("%s-", lvmsPrefix) != controllers.StorageClassPrefix {
 		logger.Info("skipping pvc as the storageClassName does not contain desired prefix",
 			"desired-prefix", controllers.StorageClassPrefix)
 		return ctrl.Result{}, nil
@@ -90,11 +92,9 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	requestedStorage := pvc.Spec.Resources.Requests.Storage()
 	var nodeMessage []string
 	for _, node := range nodeList.Items {
-		capacity, ok := node.Annotations[capacityAnnotation]
+		capacity, ok := node.Annotations[CapacityAnnotation+deviceClass]
 		if !ok {
-			errMessage := fmt.Sprintf("could not find capacity annotation on the node %s", node.Name)
-			logger.Error(fmt.Errorf(errMessage), errMessage)
-			return ctrl.Result{}, nil
+			continue
 		}
 
 		capacityQuantity, err := resource.ParseQuantity(capacity)
