@@ -105,22 +105,26 @@ var _ = Describe("LVMCluster controller", func() {
 	lvmVolumeGroupOut := &lvmv1alpha1.LVMVolumeGroup{}
 
 	// Topolvm Storage Classes
-	scNames := []types.NamespacedName{}
+	var scNames []types.NamespacedName
 	for _, deviceClass := range lvmClusterIn.Spec.Storage.DeviceClasses {
 		scNames = append(scNames, types.NamespacedName{
 			Name: getStorageClassName(deviceClass.Name),
-		},
-		)
+		})
 	}
 	scOut := &storagev1.StorageClass{}
 
 	Context("Reconciliation on creating an LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR creation, ", func() {
 			By("verifying CR status on reconciliation")
-			Expect(k8sClient.Create(ctx, lvmClusterIn)).Should(Succeed())
-
 			// create node as it should be present
 			Expect(k8sClient.Create(ctx, nodeIn)).Should(Succeed())
+			// This update is necessary as all nodes get NoSchedule Taint on Creation,
+			// and we cannot create it explicitly without taints
+			nodeIn.Spec.Taints = make([]corev1.Taint, 0)
+			Expect(k8sClient.Update(ctx, nodeIn)).Should(Succeed())
+
+			Expect(k8sClient.Create(ctx, lvmClusterIn)).Should(Succeed())
+
 			// create lvmVolumeGroupNodeStatus as it should be created by vgmanager and
 			// lvmcluster controller expecting this to be present to set the status properly
 			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())

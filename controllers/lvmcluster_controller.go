@@ -22,18 +22,21 @@ import (
 	"os"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -230,7 +233,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 		return err
 	}
 
-	expectedVgCount, err := r.getExpectedVgCount(ctx, instance)
+	expectedVGCount, err := r.getExpectedVGCount(ctx, instance)
 	if err != nil {
 		r.Log.Error(err, "failed to calculate expected VG count")
 		return err
@@ -264,11 +267,13 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	instance.Status.State = lvmv1alpha1.LVMStatusProgressing
 	instance.Status.Ready = false
 
+	r.Log.Info("Verifying readiness", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
+
 	if isFailed {
 		instance.Status.State = lvmv1alpha1.LVMStatusFailed
 	} else if isDegraded {
 		instance.Status.State = lvmv1alpha1.LVMStatusDegraded
-	} else if isReady && expectedVgCount == readyVGCount {
+	} else if isReady && expectedVGCount == readyVGCount {
 		instance.Status.State = lvmv1alpha1.LVMStatusReady
 		instance.Status.Ready = true
 	}
@@ -298,7 +303,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	return nil
 }
 
-func (r *LVMClusterReconciler) getExpectedVgCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
+func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
 
 	var vgCount int
 
@@ -310,12 +315,25 @@ func (r *LVMClusterReconciler) getExpectedVgCount(ctx context.Context, instance 
 	}
 
 	for _, deviceClass := range instance.Spec.Storage.DeviceClasses {
-		if deviceClass.NodeSelector == nil {
-			vgCount += len(nodeList.Items)
-			continue
-		}
-
 		for i := range nodeList.Items {
+			ignoreDueToNoSchedule := false
+			for _, taint := range nodeList.Items[i].Spec.Taints {
+				if taint.Effect == corev1.TaintEffectNoSchedule {
+					r.Log.V(1).Info("even though node selector matches, NoSchedule forces ignore of the Node",
+						"node", nodeList.Items[i].GetName())
+					ignoreDueToNoSchedule = true
+					break
+				}
+			}
+			if ignoreDueToNoSchedule {
+				continue
+			}
+
+			if deviceClass.NodeSelector == nil {
+				vgCount++
+				continue
+			}
+
 			matches, err := corev1helper.MatchNodeSelectorTerms(&nodeList.Items[i], deviceClass.NodeSelector)
 			if err != nil {
 				r.Log.Error(err, "failed to match node selector")
