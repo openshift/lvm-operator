@@ -67,11 +67,12 @@ type pvsOutput struct {
 type lvsOutput struct {
 	Report []struct {
 		Lv []struct {
-			Name     string `json:"lv_name"`
-			VgName   string `json:"vg_name"`
-			PoolName string `json:"pool_lv"`
-			LvAttr   string `json:"lv_attr"`
-			LvSize   string `json:"lv_size"`
+			Name            string `json:"lv_name"`
+			VgName          string `json:"vg_name"`
+			PoolName        string `json:"pool_lv"`
+			LvAttr          string `json:"lv_attr"`
+			LvSize          string `json:"lv_size"`
+			MetadataPercent string `json:"metadata_percent"`
 		} `json:"lv"`
 	} `json:"report"`
 }

@@ -44,9 +44,10 @@ import (
 )
 
 const (
-	ControllerName    = "vg-manager"
-	DefaultChunkSize  = "128"
-	reconcileInterval = 15 * time.Second
+	ControllerName            = "vg-manager"
+	DefaultChunkSize          = "128"
+	reconcileInterval         = 15 * time.Second
+	metadataWarningPercentage = 95
 )
 
 var (
@@ -162,19 +163,31 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 			}
 		}
 
-		if devicesExist {
-			r.Log.Info("all the available devices are attached to the volume group", "VGName", volumeGroup.Name)
-			if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
-				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-				return reconcileAgain, statuserr
-			}
-		} else {
-			errMsg := "no available devices found for volume group"
-			r.Log.Error(fmt.Errorf(errMsg), errMsg, "VGName", volumeGroup.Name)
-			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, errMsg); statuserr != nil {
+		if !devicesExist {
+			err := fmt.Errorf("no available devices found for volume group")
+			r.Log.Error(err, err.Error(), "VGName", volumeGroup.Name)
+			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err.Error()); statuserr != nil {
 				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
 				return reconcileAgain, statuserr
 			}
+			return reconcileAgain, err
+		}
+
+		// since the last reconciliation there could have been corruption on the LVs so we need to verify them again
+		if err := r.validateLVs(volumeGroup); err != nil {
+			err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
+			r.Log.Error(err, err.Error(), "VGName", volumeGroup.Name)
+			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err.Error()); statuserr != nil {
+				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+				return reconcileAgain, statuserr
+			}
+			return reconcileAgain, err
+		}
+
+		r.Log.Info("all the available devices are attached to the volume group", "VGName", volumeGroup.Name)
+		if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+			return reconcileAgain, statuserr
 		}
 
 		return reconcileAgain, nil
@@ -199,6 +212,17 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 			r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 			return reconcileAgain, statuserr
 		}
+	}
+
+	// Validate the LVs created from the Thin-Pool to make sure the adding went as planned.
+	if err := r.validateLVs(volumeGroup); err != nil {
+		err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
+		r.Log.Error(err, err.Error(), "VGName", volumeGroup.Name)
+		if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err.Error()); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+			return reconcileAgain, statuserr
+		}
+		return reconcileAgain, err
 	}
 
 	// Add the volume group to device classes inside lvmd config if not exists
@@ -343,6 +367,54 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		return statuserr
 	}
 
+	return nil
+}
+
+// validateLVs verifies that all lvs that should have been created in the volume group are present and
+// in their correct state
+func (r *VGReconciler) validateLVs(volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
+	// If we don't have a ThinPool, VG Manager has no authority about the top Level LVs inside the VG, but TopoLVM
+	if volumeGroup.Spec.ThinPoolConfig == nil {
+		return nil
+	}
+
+	resp, err := GetLVSOutput(r.executor, volumeGroup.Name)
+	if err != nil {
+		return fmt.Errorf("could not get logical volumes found inside volume group, volume group content is degraded or corrupt: %w", err)
+	}
+
+	for _, report := range resp.Report {
+		for _, lv := range report.Lv {
+			if lv.Name != volumeGroup.Spec.ThinPoolConfig.Name {
+				continue
+			}
+			lvAttr, err := ParsedLvAttr(lv.LvAttr)
+			if err != nil {
+				return fmt.Errorf("could not parse lv_attr from logical volume %s: %w", lv.Name, err)
+			}
+			if lvAttr.VolumeType != VolumeTypeThinPool {
+				return fmt.Errorf("found logical volume in volume group that is not of type Thin-Pool, "+
+					"even though there is a Thin-Pool configured: %s, lv_attr: %s,"+
+					"this is most likely a corruption of the thin pool or a setup gone wrong",
+					string(lvAttr.VolumeType), lvAttr)
+			}
+
+			if lvAttr.State != StateActive {
+				return fmt.Errorf("found inactive logical volume, maybe external repairs are necessary/already happening or there is another"+
+					"entity conflicting with vg-manager, cannot proceed until volume is activated again: lv_attr: %s", lvAttr)
+			}
+			metadataPercentage, err := strconv.ParseFloat(lv.MetadataPercent, 32)
+			if err != nil {
+				return fmt.Errorf("could not ensure metadata percentage of LV due to a parsing error: %w", err)
+			}
+			if metadataPercentage > metadataWarningPercentage {
+				return fmt.Errorf("metadata partition is over %v percent filled and LVM Metadata Overflows cannot be recovered"+
+					"you should manually extend the metadata_partition or you will risk data loss: metadata_percent: %v", metadataPercentage, lv.MetadataPercent)
+			}
+
+			r.Log.Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
+		}
+	}
 	return nil
 }
 
