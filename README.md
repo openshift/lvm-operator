@@ -44,6 +44,7 @@ end
 - [Known Limitations](#known-limitations)
     * [Single LVMCluster support](#single-lvmcluster-support)
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
+    * [Snapshotting and Cloning in Multi-Node Topologies](#snapshotting-and-cloning-in-multi-node-topologies)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -379,6 +380,22 @@ LVMS does not support the reconciliation of multiple LVMCluster custom resources
 ### Upgrades from v 4.10 and v4.11
 
 It is not possible to upgrade from release-4.10 and release-4.11 to a newer version due to a breaking change that has been implemented. For further information on this matter, consult [the relevant documentation](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md).
+
+### Snapshotting and Cloning in Multi-Node Topologies
+
+In general, since LVMCluster does not ensure data replication, `VolumeSnapshots` and consumption of them is always limited to the original dataSource.
+Thus, snapshots must be created on the same node as the original data. Also, all pods relying on a PVC that is using the snapshot data will have to be scheduled
+on the node that contained the original `LogicalVolume` in TopoLVM.
+
+It should be noted that snapshotting is based on Thin-Pool Snapshots from upstream TopoLVM and are still considered [experimental in upstream](https://github.com/topolvm/topolvm/discussions/737).
+This is because multi-node Kubernetes clusters have the scheduler figure out pod placement logically onto different nodes (with the node topology from the native Kubernetes Scheduler responsible for deciding the node where Pods should be deployed),
+and it cannot always be guaranteed that Snapshots are provisioned on the same node as the original data (which is based on the CSI topology, known by TopoLVM) if the `PersistentVolumeClaim` is not created upfront.
+
+If you are unsure what to make of this, always make sure that the original `PerstistentVolumeClaim` that you want to have Snapshots on is already created and `Bound`.
+With these prerequisites it can be guaranteed that all follow-up `VolumeSnapshot` Objects as well as `PersistentVolumeClaim` objects depending on the original one are scheduled correctly.
+The easiest way to achieve this is to use precreated `PersistentVolumeClaims` and non-ephemeral `StatefulSet` for your workload.
+
+_NOTE: All of the above also applies for cloning the `PersistentVolumeClaims` directly by using the original `PersistentVolumeClaims` as data source instead of using a Snapshot._
 
 ## Troubleshooting
 
