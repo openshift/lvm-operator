@@ -127,6 +127,7 @@ DeviceLoop:
 // filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.
 func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
 	var filteredBlockDevices []internal.BlockDevice
+	devicesAlreadyInVG := false
 
 	if volumeGroup.Spec.DeviceSelector != nil {
 
@@ -146,6 +147,7 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 				// Check if we should skip this device
 				if blockDevice.DevicePath == "" {
 					r.Log.Info(fmt.Sprintf("skipping required device that is already part of volume group %s: %s", volumeGroup.Name, path))
+					devicesAlreadyInVG = true
 					continue
 				}
 
@@ -160,13 +162,14 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 
 				// Check if we should skip this device
 				if err != nil {
-					r.Log.Info(fmt.Sprintf("skipping optional device path due to error: %v", err))
+					r.Log.Info(fmt.Sprintf("skipping optional device path: %v", err))
 					continue
 				}
 
 				// Check if we should skip this device
 				if blockDevice.DevicePath == "" {
 					r.Log.Info(fmt.Sprintf("skipping optional device path that is already part of volume group %s: %s", volumeGroup.Name, path))
+					devicesAlreadyInVG = true
 					continue
 				}
 
@@ -176,8 +179,10 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 			// At least 1 of the optional paths are required if:
 			//   - OptionalPaths was specified AND
 			//   - There were no required paths
+			//   - Devices were not already part of the volume group (meaning this was run after vg creation)
 			// This guarantees at least 1 device could be found between optionalPaths and paths
-			if len(filteredBlockDevices) == 0 {
+			//if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
+			if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
 				return nil, errors.New("at least 1 valid device is required if DeviceSelector paths or optionalPaths are specified")
 			}
 		}
