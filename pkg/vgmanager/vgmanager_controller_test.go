@@ -13,6 +13,34 @@ import (
 	"k8s.io/utils/strings/slices"
 )
 
+var mockLvsOutputNoReportContent = `
+{
+      "report": []
+}
+`
+
+var mockLvsOutputNoLVsInReport = `
+{
+      "report": [
+          {
+              "lv": []
+          }
+      ]
+  }
+`
+
+var mockLvsOutputWrongLVsInReport = `
+{
+      "report": [
+          {
+              "lv": [
+                  {"lv_name":"thin-pool-BLUB", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":""}
+              ]
+          }
+      ]
+  }
+`
+
 var mockLvsOutputThinPoolValid = `
 {
       "report": [
@@ -138,6 +166,45 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 			name: "Invalid LV due to suspended instead of active state",
 			fields: fields{
 				executor: mockExecutorForLVSOutput(mockLvsOutputThinPoolSuspended),
+			},
+			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+					Name: "thin-pool-1",
+				}},
+			}},
+			wantErr: assert.Error,
+		},
+		{
+			name: "Invalid LV due to empty report",
+			fields: fields{
+				executor: mockExecutorForLVSOutput(mockLvsOutputNoReportContent),
+			},
+			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+					Name: "thin-pool-1",
+				}},
+			}},
+			wantErr: assert.Error,
+		},
+		{
+			name: "Invalid LV due to no LVs in report",
+			fields: fields{
+				executor: mockExecutorForLVSOutput(mockLvsOutputNoLVsInReport),
+			},
+			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+					Name: "thin-pool-1",
+				}},
+			}},
+			wantErr: assert.Error,
+		},
+		{
+			name: "Invalid LV due to wrong LVs in report",
+			fields: fields{
+				executor: mockExecutorForLVSOutput(mockLvsOutputWrongLVsInReport),
 			},
 			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
