@@ -291,7 +291,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 			numOfAvailableDevices: 0,
 		},
 		{
-			description: "vg has device path that is already a part of the existing vg",
+			description: "vg has device paths that are already a part of the existing vg",
 			volumeGroup: v1alpha1.LVMVolumeGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "vg1",
@@ -301,6 +301,9 @@ func TestAvailableDevicesForVG(t *testing.T) {
 						Paths: []string{
 							devicePaths["nvme1n1p1"],
 						},
+						OptionalPaths: []string{
+							devicePaths["nvme1n1p2"],
+						},
 					},
 				},
 			},
@@ -309,6 +312,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 					PVs: []string{
 						calculateDevicePath(t, "nvme1n1p1"),
+						calculateDevicePath(t, "nvme1n1p2"),
 					},
 				},
 			},
@@ -316,6 +320,14 @@ func TestAvailableDevicesForVG(t *testing.T) {
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+				},
+				{
+					Name:     "nvme1n1p2",
+					KName:    calculateDevicePath(t, "nvme1n1p2"),
 					Type:     "disk",
 					Size:     "279.4G",
 					ReadOnly: false,
