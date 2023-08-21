@@ -37,7 +37,7 @@ func NewPersistentVolumeReconciler(client client.Client, apiReader client.Reader
 
 // Reconcile PV
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.Log.WithName("persistentvolume-controller").WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
+	logger := log.Log.WithName("pv-controller").WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
 
 	pv := &corev1.PersistentVolume{}
 	err := r.client.Get(ctx, req.NamespacedName, pv)

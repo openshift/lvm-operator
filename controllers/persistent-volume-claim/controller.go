@@ -21,22 +21,20 @@ import (
 )
 
 const (
-	capacityAnnotation = "capacity.topolvm.io/00default"
+	CapacityAnnotation = "capacity.topolvm.io/"
 )
 
 // PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
 type PersistentVolumeClaimReconciler struct {
-	client    client.Client
-	apiReader client.Reader
-	recorder  record.EventRecorder
+	Client   client.Client
+	Recorder record.EventRecorder
 }
 
 // NewPersistentVolumeClaimReconciler returns PersistentVolumeClaimReconciler.
-func NewPersistentVolumeClaimReconciler(client client.Client, apiReader client.Reader, eventRecorder record.EventRecorder) *PersistentVolumeClaimReconciler {
+func NewPersistentVolumeClaimReconciler(client client.Client, eventRecorder record.EventRecorder) *PersistentVolumeClaimReconciler {
 	return &PersistentVolumeClaimReconciler{
-		client:    client,
-		apiReader: apiReader,
-		recorder:  eventRecorder,
+		Client:   client,
+		Recorder: eventRecorder,
 	}
 }
 
@@ -46,10 +44,10 @@ func NewPersistentVolumeClaimReconciler(client client.Client, apiReader client.R
 
 // Reconcile PVC
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.Log.WithName("persistentvolume-controller").WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
+	logger := log.Log.WithName("pvc-controller").WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
 
 	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.client.Get(ctx, req.NamespacedName, pvc)
+	err := r.Client.Get(ctx, req.NamespacedName, pvc)
 	switch {
 	case err == nil:
 	case apierrors.IsNotFound(err):
@@ -59,7 +57,21 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	// Skip if the PVC is deleted or does not use the lvms storage class.
-	if pvc.DeletionTimestamp != nil || !strings.HasPrefix(*pvc.Spec.StorageClassName, controllers.StorageClassPrefix) {
+	if pvc.DeletionTimestamp != nil {
+		logger.Info("skipping pvc as it is about to be deleted (deletionTimestamp is set)")
+		return ctrl.Result{}, nil
+	}
+
+	if pvc.Spec.StorageClassName == nil {
+		logger.Info("skipping pvc as the storageClassName is not set")
+		return ctrl.Result{}, nil
+	}
+
+	// Skip if StorageClassName does not contain the lvms prefix
+	lvmsPrefix, deviceClass, exists := strings.Cut(*pvc.Spec.StorageClassName, "-")
+	if !exists || fmt.Sprintf("%s-", lvmsPrefix) != controllers.StorageClassPrefix {
+		logger.Info("skipping pvc as the storageClassName does not contain desired prefix",
+			"desired-prefix", controllers.StorageClassPrefix)
 		return ctrl.Result{}, nil
 	}
 
@@ -70,7 +82,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 
 	// List the nodes
 	nodeList := &corev1.NodeList{}
-	err = r.client.List(ctx, nodeList)
+	err = r.Client.List(ctx, nodeList)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -80,11 +92,9 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	requestedStorage := pvc.Spec.Resources.Requests.Storage()
 	var nodeMessage []string
 	for _, node := range nodeList.Items {
-		capacity, ok := node.Annotations[capacityAnnotation]
+		capacity, ok := node.Annotations[CapacityAnnotation+deviceClass]
 		if !ok {
-			errMessage := fmt.Sprintf("could not find capacity annotation on the node %s", node.Name)
-			logger.Error(fmt.Errorf(errMessage), errMessage)
-			return ctrl.Result{}, nil
+			continue
 		}
 
 		capacityQuantity, err := resource.ParseQuantity(capacity)
@@ -101,7 +111,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 
 	// Publish an event if the requested storage is greater than the available capacity
 	if !found {
-		r.recorder.Event(pvc, "Warning", "NotEnoughCapacity",
+		r.Recorder.Event(pvc, "Warning", "NotEnoughCapacity",
 			fmt.Sprintf("Requested storage (%s) is greater than available capacity on any node (%s).", requestedStorage.String(), strings.Join(nodeMessage, ",")))
 		logger.Info("Event published for the PVC", "PVC", req.NamespacedName)
 	}
