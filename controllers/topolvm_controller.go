@@ -19,9 +19,9 @@ package controllers
 import (
 	"context"
 	"fmt"
-	v1 "github.com/openshift/api/config/v1"
 	"path/filepath"
 
+	v1 "github.com/openshift/api/config/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -74,6 +74,11 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 
 	if err != nil {
 		r.Log.Error(err, "csi controller reconcile failure", "name", desiredDeployment.Name)
+		return err
+	}
+
+	if err := verifyDeploymentReadiness(existingDeployment); err != nil {
+		r.Log.Error(err, "csi controller is not considered ready", "deployment", existingDeployment.Name)
 		return err
 	}
 

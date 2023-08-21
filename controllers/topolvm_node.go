@@ -97,6 +97,12 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 	} else {
 		r.Log.Info(topolvmNodeName, "operation", result, "name", ds.Name)
 	}
+
+	if err := verifyDaemonSetReadiness(ds); err != nil {
+		r.Log.Error(err, "DaemonSet is not considered ready", "DaemonSet", topolvmNodeName)
+		return err
+	}
+
 	return err
 }
 

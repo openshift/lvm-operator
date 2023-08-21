@@ -110,6 +110,12 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 	} else {
 		unitLogger.Info("daemonset unchanged")
 	}
+
+	if err := verifyDaemonSetReadiness(ds); err != nil {
+		r.Log.Error(err, "DaemonSet is not considered ready", "DaemonSet", topolvmNodeName)
+		return err
+	}
+
 	return err
 }
 
