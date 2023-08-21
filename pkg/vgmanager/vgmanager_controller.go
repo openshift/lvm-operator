@@ -382,12 +382,22 @@ func (r *VGReconciler) validateLVs(volumeGroup *lvmv1alpha1.LVMVolumeGroup) erro
 	if err != nil {
 		return fmt.Errorf("could not get logical volumes found inside volume group, volume group content is degraded or corrupt: %w", err)
 	}
+	if len(resp.Report) < 1 {
+		return fmt.Errorf("LV report was empty, meaning that the thin-pool LV is no longer found, " +
+			"but the volume group might still exist")
+	}
 
 	for _, report := range resp.Report {
+		if len(report.Lv) < 1 {
+			return fmt.Errorf("no LV was found in the report, meaning that the thin-pool LV is no longer found, " +
+				"but the volume group might still exist")
+		}
+		thinPoolExists := false
 		for _, lv := range report.Lv {
 			if lv.Name != volumeGroup.Spec.ThinPoolConfig.Name {
 				continue
 			}
+			thinPoolExists = true
 			lvAttr, err := ParsedLvAttr(lv.LvAttr)
 			if err != nil {
 				return fmt.Errorf("could not parse lv_attr from logical volume %s: %w", lv.Name, err)
@@ -413,6 +423,9 @@ func (r *VGReconciler) validateLVs(volumeGroup *lvmv1alpha1.LVMVolumeGroup) erro
 			}
 
 			r.Log.Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
+		}
+		if !thinPoolExists {
+			return fmt.Errorf("the thin-pool LV is no longer present, but the volume group might still exist")
 		}
 	}
 	return nil
