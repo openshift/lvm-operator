@@ -169,20 +169,22 @@ run: manifests generate ## Run the Operator from your host.
 ##@ Build
 
 IMAGE_BUILD_CMD ?= $(shell command -v docker 2>&1 >/dev/null && echo docker || echo podman)
+OS ?= linux
+ARCH ?= amd64
 
 all: build
 
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/manager main.go
 
 build-vgmanager: generate fmt vet ## Build vg manager binary.
-	go build -o bin/vgmanager cmd/vgmanager/main.go
+	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/vgmanager cmd/vgmanager/main.go
 
 build-prometheus-alert-rules: jsonnet monitoring/mixin.libsonnet monitoring/alerts/alerts.jsonnet monitoring/alerts/*.libsonnet
 	$(JSONNET) -S monitoring/alerts/alerts.jsonnet > config/prometheus/prometheus_rules.yaml
 
 docker-build: ## Build docker image with the manager.
-	$(IMAGE_BUILD_CMD) build -t ${IMG} .
+	$(IMAGE_BUILD_CMD) build --platform=${OS}/${ARCH} -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
 	$(IMAGE_BUILD_CMD) push ${IMG}
