@@ -283,16 +283,15 @@ catalog-push: ## Push a catalog image.
 ##@ E2E tests
 
 # Variables required to run and build LVM end to end tests.
-LVM_OPERATOR_INSTALL ?= true
-LVM_OPERATOR_UNINSTALL ?= true
+LVM_OPERATOR_INSTALL ?= false
+LVM_OPERATOR_UNINSTALL ?= false
 SUBSCRIPTION_CHANNEL ?= alpha
 
 # Handles only AWS as of now.
 DISK_INSTALL ?= false
 
-# Build and run e2e tests.
-e2e-test: ginkgo ## Build and run e2e tests.
-	@echo "build and run e2e tests"
+.PHONY: e2e
+e2e: ginkgo ## Build and run e2e tests.
 	cd test/e2e && $(GINKGO) build
 	cd test/e2e && ./e2e.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) --disk-install=$(DISK_INSTALL) -ginkgo.v
 
@@ -365,11 +364,6 @@ release-local-operator:
 .PHONY: deploy-local
 deploy-local:
 	hack/deploy-local.sh
-
-.PHONY: e2e
-e2e: ginkgo
-	cd test/e2e && $(GINKGO) build
-	cd test/e2e && ./e2e.test --lvm-operator-install=false --lvm-operator-uninstall=false -ginkgo.v
 
 .PHONY: create-buildconfig
 create-buildconfig:
