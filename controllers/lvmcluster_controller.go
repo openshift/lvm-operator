@@ -25,8 +25,8 @@ import (
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
-
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/controllers/internal"
 
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 
@@ -165,7 +165,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
 func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
 
-	//The resource was deleted
+	// The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
 		// Check for existing LogicalVolumes
 		lvsExist, err := r.logicalVolumesExist(ctx, instance)
@@ -197,7 +197,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		r.Log.Info("successfully added finalizer")
 	}
 
-	resourceCreationList := []resourceManager{
+	resources := []resourceManager{
 		&csiDriver{},
 		&topolvmController{r.TopoLVMLeaderElectionPassthrough},
 		&openshiftSccs{},
@@ -208,16 +208,30 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		&topolvmVolumeSnapshotClass{},
 	}
 
-	// handle create/update
-	for _, unit := range resourceCreationList {
-		err := unit.ensureCreated(r, ctx, instance)
-		if err != nil {
-			r.Log.Error(err, "failed to reconcile", "resource", unit.getName())
-			return ctrl.Result{}, err
+	resourceSyncStart := time.Now()
+	results := make(chan error, len(resources))
+	create := func(i int) {
+		results <- resources[i].ensureCreated(r, ctx, instance)
+	}
+
+	for i := range resources {
+		go create(i)
+	}
+
+	var errs []error
+	for i := 0; i < len(resources); i++ {
+		if err := <-results; err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	r.Log.Info("successfully reconciled LVMCluster")
+	resourceSyncElapsedTime := time.Since(resourceSyncStart)
+	if len(errs) > 0 {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile resources managed by LVMCluster within %v: %w",
+			resourceSyncElapsedTime, internal.NewMultiError(errs))
+	}
+
+	r.Log.Info("successfully reconciled LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)
 
 	return ctrl.Result{}, nil
 }

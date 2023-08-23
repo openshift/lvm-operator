@@ -61,8 +61,7 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 
 	err := cutil.SetControllerReference(lvmCluster, ds, r.Scheme)
 	if err != nil {
-		r.Log.Error(err, "failed to set controller reference to topolvm node daemonset with name", ds.Name)
-		return err
+		return fmt.Errorf("failed to set controller reference to topolvm node daemonset: %w", err)
 	}
 
 	unitLogger.Info("running CreateOrUpdate")
@@ -93,11 +92,17 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 	})
 
 	if err != nil {
-		r.Log.Error(err, fmt.Sprintf("%s reconcile failure", topolvmNodeName), "name", ds.Name)
-	} else {
-		r.Log.Info(topolvmNodeName, "operation", result, "name", ds.Name)
+		return fmt.Errorf("%s failed to reconcile: %w", n.getName(), err)
 	}
-	return err
+
+	unitLogger.Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
+
+	if err := verifyDaemonSetReadiness(ds); err != nil {
+		return fmt.Errorf("DaemonSet is not considered ready: %w", err)
+	}
+	unitLogger.Info("DaemonSet is ready", "name", ds.Name)
+
+	return nil
 }
 
 // ensureDeleted should wait for the resources to be cleaned up

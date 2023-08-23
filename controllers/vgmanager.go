@@ -24,7 +24,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type vgManager struct{}
@@ -103,14 +102,17 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 	})
 
 	if err != nil {
-		r.Log.Error(err, "failed to create or update vgManager daemonset", "name", ds.Name)
-		return err
-	} else if result != controllerutil.OperationResultNone {
-		unitLogger.Info("daemonset modified", "operation", result, "name", ds.Name)
-	} else {
-		unitLogger.Info("daemonset unchanged")
+		return fmt.Errorf("%s failed to reconcile: %w", v.getName(), err)
 	}
-	return err
+
+	unitLogger.Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
+
+	if err := verifyDaemonSetReadiness(ds); err != nil {
+		return fmt.Errorf("DaemonSet is not considered ready: %w", err)
+	}
+	unitLogger.Info("DaemonSet is ready", "name", ds.Name)
+
+	return nil
 }
 
 // ensureDeleted is a noop. Deletion will be handled by ownerref

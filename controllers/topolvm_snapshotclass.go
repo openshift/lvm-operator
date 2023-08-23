@@ -46,24 +46,21 @@ func (s topolvmVolumeSnapshotClass) getName() string {
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;create;delete;watch;list
 
 func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-
+	unitLogger := r.Log.WithValues("resourceManager", s.getName())
 	// one volume snapshot class for every deviceClass based on CR is created
 	topolvmSnapshotClasses := getTopolvmSnapshotClasses(lvmCluster)
 	for _, vsc := range topolvmSnapshotClasses {
-
 		// we anticipate no edits to volume snapshot class
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, vsc, func() error { return nil })
 		if err != nil {
 			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
-				r.Log.Info("topolvm volume snapshot classes do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
+				r.Log.Info("volume snapshot class CRDs do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
 				return nil
 			}
-			r.Log.Error(err, "topolvm volume snapshot class reconcile failure", "name", vsc.Name)
-			return err
-		} else {
-			r.Log.Info("topolvm volume snapshot class", "operation", result, "name", vsc.Name)
+			return fmt.Errorf("%s failed to reconcile: %w", s.getName(), err)
 		}
+		unitLogger.Info("VolumeSnapshotClass applied to cluster", "operation", result, "name", vsc.Name)
 	}
 	return nil
 }

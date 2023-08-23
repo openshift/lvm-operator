@@ -17,9 +17,12 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // extractNodeSelectorAndTolerations combines and extracts scheduling parameters from the multiple deviceClass entries in an lvmCluster
@@ -63,4 +66,48 @@ func getStorageClassName(deviceName string) string {
 
 func getVolumeSnapshotClassName(deviceName string) string {
 	return volumeSnapshotClassPrefix + deviceName
+}
+
+func verifyDaemonSetReadiness(ds *appsv1.DaemonSet) error {
+	// If the update strategy is not a rolling update, there will be nothing to wait for
+	if ds.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
+		return nil
+	}
+
+	// Make sure all the updated pods have been scheduled
+	if ds.Status.UpdatedNumberScheduled != ds.Status.DesiredNumberScheduled {
+		return fmt.Errorf("the DaemonSet is not ready: %s/%s. %d out of %d expected pods have been scheduled", ds.Namespace, ds.Name, ds.Status.UpdatedNumberScheduled, ds.Status.DesiredNumberScheduled)
+	}
+	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, int(ds.Status.DesiredNumberScheduled), true)
+	if err != nil {
+		// If for some reason the value is invalid, set max unavailable to the
+		// number of desired replicas. This is the same behavior as the
+		// `MaxUnavailable` function in deploymentutil
+		maxUnavailable = int(ds.Status.DesiredNumberScheduled)
+	}
+
+	expectedReady := int(ds.Status.DesiredNumberScheduled) - maxUnavailable
+	if !(int(ds.Status.NumberReady) >= expectedReady) {
+		return fmt.Errorf("the DaemonSet is not ready: %s/%s. %d out of %d expected pods are ready", ds.Namespace, ds.Name, ds.Status.NumberReady, expectedReady)
+	}
+	return nil
+}
+
+func verifyDeploymentReadiness(dep *appsv1.Deployment) error {
+	if len(dep.Status.Conditions) == 0 {
+		return fmt.Errorf("the Deployment is not ready: %s/%s. deployment cannot be ready as no condition was found", dep.Namespace, dep.Name)
+	}
+	for _, condition := range dep.Status.Conditions {
+		if condition.Type == appsv1.DeploymentAvailable && condition.Status == corev1.ConditionFalse {
+			return fmt.Errorf("the Deployment is not ready: %s/%s. deployment has not reached minimum availability and thus not ready: %v",
+				dep.Namespace, dep.Name, condition)
+		} else if condition.Type == appsv1.DeploymentProgressing && condition.Status == corev1.ConditionFalse {
+			return fmt.Errorf("the Deployment is not ready: %s/%s. deployment has not progressed and is thus not ready: %v",
+				dep.Namespace, dep.Name, condition)
+		} else if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
+			return fmt.Errorf("the Deployment is not ready: %s/%s. deployment has a replica failure and is thus not ready: %v",
+				dep.Namespace, dep.Name, condition)
+		}
+	}
+	return nil
 }
