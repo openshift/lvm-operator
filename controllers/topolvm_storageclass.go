@@ -24,15 +24,17 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	scName = "topolvm-storageclass"
 )
 
-type topolvmStorageClass struct{}
+type topolvmStorageClass struct{ *runtime.Scheme }
 
 // topolvmStorageClass unit satisfies resourceManager interface
 var _ resourceManager = topolvmStorageClass{}
@@ -48,14 +50,18 @@ func (s topolvmStorageClass) ensureCreated(r *LVMClusterReconciler, ctx context.
 	// one storage class for every deviceClass based on CR is created
 	topolvmStorageClasses := getTopolvmStorageClasses(r, ctx, lvmCluster)
 	for _, sc := range topolvmStorageClasses {
+		if versioned, err := s.Scheme.ConvertToVersion(sc,
+			runtime.GroupVersioner(schema.GroupVersions(s.Scheme.PrioritizedVersionsAllGroups()))); err == nil {
+			sc = versioned.(*storagev1.StorageClass)
+		}
 
 		// we anticipate no edits to storage class
-		result, err := cutil.CreateOrUpdate(ctx, r.Client, sc, func() error { return nil })
+		err := r.Client.Patch(ctx, sc, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName))
 		if err != nil {
 			r.Log.Error(err, "topolvm storage class reconcile failure", "name", sc.Name)
 			return err
 		} else {
-			r.Log.Info("topolvm storage class", "operation", result, "name", sc.Name)
+			r.Log.Info("topolvm storage class", "name", sc.Name)
 		}
 	}
 	return nil

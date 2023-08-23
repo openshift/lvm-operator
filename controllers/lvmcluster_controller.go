@@ -165,7 +165,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
 func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
 
-	//The resource was deleted
+	// The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
 		// Check for existing LogicalVolumes
 		lvsExist, err := r.logicalVolumesExist(ctx, instance)
@@ -198,14 +198,14 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	}
 
 	resourceCreationList := []resourceManager{
-		&csiDriver{},
-		&topolvmController{r.TopoLVMLeaderElectionPassthrough},
-		&openshiftSccs{},
-		&topolvmNode{},
-		&vgManager{},
-		&lvmVG{},
-		&topolvmStorageClass{},
-		&topolvmVolumeSnapshotClass{},
+		&csiDriver{r.Scheme},
+		&topolvmController{r.Scheme, r.TopoLVMLeaderElectionPassthrough},
+		&openshiftSccs{r.Scheme},
+		&topolvmNode{r.Scheme},
+		&vgManager{r.Scheme},
+		&lvmVG{r.Scheme},
+		&topolvmStorageClass{r.Scheme},
+		&topolvmVolumeSnapshotClass{r.Scheme},
 	}
 
 	// handle create/update
@@ -290,7 +290,8 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 
 	instance.Status.DeviceClassStatuses = allVgStatuses
 	// Apply status changes
-	err = r.Client.Status().Update(ctx, instance)
+	instance.SetManagedFields(nil)
+	err = r.Client.Status().Patch(ctx, instance, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName))
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.Error(err, "failed to update status")

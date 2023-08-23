@@ -24,15 +24,19 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	driverName = "topolvm-csi-driver"
 )
 
-type csiDriver struct{}
+type csiDriver struct {
+	*runtime.Scheme
+}
 
 // csiDriver unit satisfies resourceManager interface
 var _ resourceManager = csiDriver{}
@@ -43,20 +47,22 @@ func (c csiDriver) getName() string {
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list
 
-func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	csiDriverResource := getCSIDriverResource()
+func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	driver := getCSIDriverResource()
 
-	result, err := cutil.CreateOrUpdate(ctx, r.Client, csiDriverResource, func() error {
-		// no need to mutate any field
-		return nil
-	})
+	if versioned, err := c.Scheme.ConvertToVersion(driver,
+		runtime.GroupVersioner(schema.GroupVersions(c.Scheme.PrioritizedVersionsAllGroups()))); err == nil {
+		driver = versioned.(*storagev1.CSIDriver)
+	}
+
+	err := r.Client.Patch(ctx, driver, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName))
 
 	if err != nil {
-		r.Log.Error(err, "csi driver reconcile failure", "name", csiDriverResource.Name)
+		r.Log.Error(err, "csi driver reconcile failure", "name", driver.Name)
 		return err
 	}
 
-	r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
+	r.Log.Info("csi driver", "name", driver.Name)
 	return nil
 }
 

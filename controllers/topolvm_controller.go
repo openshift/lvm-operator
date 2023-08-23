@@ -19,8 +19,12 @@ package controllers
 import (
 	"context"
 	"fmt"
-	v1 "github.com/openshift/api/config/v1"
 	"path/filepath"
+
+	v1 "github.com/openshift/api/config/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/pkg/errors"
@@ -39,6 +43,7 @@ const (
 )
 
 type topolvmController struct {
+	*runtime.Scheme
 	topoLVMLeaderElectionPassthrough v1.LeaderElection
 }
 
@@ -54,30 +59,25 @@ func (c topolvmController) getName() string {
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName, c.topoLVMLeaderElectionPassthrough)
-	existingDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      desiredDeployment.Name,
-			Namespace: desiredDeployment.Namespace,
-		},
+	deploy := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName, c.topoLVMLeaderElectionPassthrough)
+
+	if versioned, err := c.Scheme.ConvertToVersion(deploy,
+		runtime.GroupVersioner(schema.GroupVersions(c.Scheme.PrioritizedVersionsAllGroups()))); err == nil {
+		deploy = versioned.(*appsv1.Deployment)
 	}
 
-	err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme)
+	err := cutil.SetControllerReference(lvmCluster, deploy, r.Scheme)
 	if err != nil {
-		r.Log.Error(err, "failed to set controller reference to topolvm controller deployment with name", existingDeployment.Name)
+		r.Log.Error(err, "failed to set controller reference to topolvm controller deployment with name", deploy.Name)
 		return err
 	}
 
-	result, err := cutil.CreateOrUpdate(ctx, r.Client, existingDeployment, func() error {
-		return c.setTopolvmControllerDesiredState(existingDeployment, desiredDeployment)
-	})
-
-	if err != nil {
-		r.Log.Error(err, "csi controller reconcile failure", "name", desiredDeployment.Name)
+	if err := r.Client.Patch(ctx, deploy, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName)); err != nil {
+		r.Log.Error(err, "csi controller reconcile failure", "name", deploy.Name)
 		return err
 	}
 
-	r.Log.Info("csi controller", "operation", result, "name", desiredDeployment.Name)
+	r.Log.Info("csi controller", "name", deploy.Name)
 	return nil
 }
 
@@ -159,7 +159,7 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 		AppKubernetesComponentLabel: TopolvmControllerLabelVal,
 	}
 
-	return &appsv1.Deployment{
+	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        TopolvmControllerDeploymentName,
 			Namespace:   namespace,
@@ -186,6 +186,8 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 			},
 		},
 	}
+
+	return deploy
 }
 
 func initContainer(initImage string) corev1.Container {

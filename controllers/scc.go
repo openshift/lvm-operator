@@ -25,13 +25,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
 	sccName = "topolvm-scc"
 )
 
-type openshiftSccs struct{}
+type openshiftSccs struct{ *runtime.Scheme }
 
 // openshiftSccs unit satisfies resourceManager interface
 var _ resourceManager = openshiftSccs{}

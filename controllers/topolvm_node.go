@@ -28,8 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -37,7 +40,7 @@ const (
 	topolvmNodeName = "topolvm-node"
 )
 
-type topolvmNode struct{}
+type topolvmNode struct{ *runtime.Scheme }
 
 func (n topolvmNode) getName() string {
 	return topolvmNodeName
@@ -49,14 +52,10 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 	unitLogger := r.Log.WithValues("topolvmNode", n.getName())
 
 	// get desired daemonSet spec
-	dsTemplate := getNodeDaemonSet(lvmCluster, r.Namespace, r.ImageName)
-
-	// create desired daemonSet or update mutable fields on existing one
-	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dsTemplate.Name,
-			Namespace: dsTemplate.Namespace,
-		},
+	ds := getNodeDaemonSet(lvmCluster, r.Namespace, r.ImageName)
+	if versioned, err := n.Scheme.ConvertToVersion(ds,
+		runtime.GroupVersioner(schema.GroupVersions(n.Scheme.PrioritizedVersionsAllGroups()))); err == nil {
+		ds = versioned.(*appsv1.DaemonSet)
 	}
 
 	err := cutil.SetControllerReference(lvmCluster, ds, r.Scheme)
@@ -65,37 +64,13 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 		return err
 	}
 
-	unitLogger.Info("running CreateOrUpdate")
-	result, err := cutil.CreateOrUpdate(ctx, r.Client, ds, func() error {
-		// at creation, deep copy the whole daemonSet
-		if ds.CreationTimestamp.IsZero() {
-			dsTemplate.DeepCopyInto(ds)
-			return nil
-		}
-		// if update, update only mutable fields
-		// For topolvm Node, we have containers, initcontainers, node selector and toleration terms
-
-		// containers
-		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
-
-		// initcontainers
-		ds.Spec.Template.Spec.InitContainers = dsTemplate.Spec.Template.Spec.InitContainers
-
-		// tolerations
-		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
-
-		// nodeSelector if non-nil
-		if dsTemplate.Spec.Template.Spec.Affinity != nil {
-			setDaemonsetNodeSelector(dsTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, ds)
-		}
-
-		return nil
-	})
+	unitLogger.Info("Apply")
+	err = r.Client.Patch(ctx, ds, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName))
 
 	if err != nil {
 		r.Log.Error(err, fmt.Sprintf("%s reconcile failure", topolvmNodeName), "name", ds.Name)
 	} else {
-		r.Log.Info(topolvmNodeName, "operation", result, "name", ds.Name)
+		r.Log.Info(topolvmNodeName, "name", ds.Name)
 	}
 	return err
 }

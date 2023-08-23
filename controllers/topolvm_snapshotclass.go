@@ -25,16 +25,18 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	vscName = "topolvm-volumeSnapshotClass"
 )
 
-type topolvmVolumeSnapshotClass struct{}
+type topolvmVolumeSnapshotClass struct{ *runtime.Scheme }
 
 // topolvmVolumeSnapshotClass unit satisfies resourceManager interface
 var _ resourceManager = topolvmVolumeSnapshotClass{}
@@ -50,9 +52,13 @@ func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx c
 	// one volume snapshot class for every deviceClass based on CR is created
 	topolvmSnapshotClasses := getTopolvmSnapshotClasses(lvmCluster)
 	for _, vsc := range topolvmSnapshotClasses {
+		if versioned, err := s.Scheme.ConvertToVersion(vsc,
+			runtime.GroupVersioner(schema.GroupVersions(s.Scheme.PrioritizedVersionsAllGroups()))); err == nil {
+			vsc = versioned.(*snapapi.VolumeSnapshotClass)
+		}
 
 		// we anticipate no edits to volume snapshot class
-		result, err := cutil.CreateOrUpdate(ctx, r.Client, vsc, func() error { return nil })
+		err := r.Client.Patch(ctx, vsc, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName))
 		if err != nil {
 			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
@@ -62,7 +68,7 @@ func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx c
 			r.Log.Error(err, "topolvm volume snapshot class reconcile failure", "name", vsc.Name)
 			return err
 		} else {
-			r.Log.Info("topolvm volume snapshot class", "operation", result, "name", vsc.Name)
+			r.Log.Info("topolvm volume snapshot class", "name", vsc.Name)
 		}
 	}
 	return nil

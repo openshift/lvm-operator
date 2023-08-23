@@ -23,7 +23,10 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -32,7 +35,7 @@ const (
 	lvmvgFinalizer = "lvm.openshift.io/lvmvolumegroup"
 )
 
-type lvmVG struct{}
+type lvmVG struct{ *runtime.Scheme }
 
 func (c lvmVG) getName() string {
 	return lvmVGName
@@ -43,30 +46,23 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 	lvmVolumeGroups := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 
 	for _, volumeGroup := range lvmVolumeGroups {
-		existingVolumeGroup := &lvmv1alpha1.LVMVolumeGroup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      volumeGroup.Name,
-				Namespace: volumeGroup.Namespace,
-			},
+		if versioned, err := c.Scheme.ConvertToVersion(volumeGroup,
+			runtime.GroupVersioner(schema.GroupVersions(c.Scheme.PrioritizedVersionsAllGroups()))); err == nil {
+			volumeGroup = versioned.(*lvmv1alpha1.LVMVolumeGroup)
 		}
 
-		err := cutil.SetControllerReference(lvmCluster, existingVolumeGroup, r.Scheme)
+		err := cutil.SetControllerReference(lvmCluster, volumeGroup, r.Scheme)
 		if err != nil {
 			r.Log.Error(err, "failed to set controller reference to LVMVolumeGroup with name", volumeGroup.Name)
 			return err
 		}
 
-		result, err := cutil.CreateOrUpdate(ctx, r.Client, existingVolumeGroup, func() error {
-			existingVolumeGroup.Finalizers = volumeGroup.Finalizers
-			existingVolumeGroup.Spec = volumeGroup.Spec
-			return nil
-		})
-
+		err = r.Client.Patch(ctx, volumeGroup, client.Apply, client.ForceOwnership, client.FieldOwner(ControllerName))
 		if err != nil {
 			r.Log.Error(err, "failed to reconcile LVMVolumeGroup", "name", volumeGroup.Name)
 			return err
 		}
-		r.Log.Info("successfully reconciled LVMVolumeGroup", "operation", result, "name", volumeGroup.Name)
+		r.Log.Info("successfully reconciled LVMVolumeGroup", "name", volumeGroup.Name)
 	}
 	return nil
 }
@@ -138,7 +134,7 @@ func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) 
 				NodeSelector:   deviceClass.NodeSelector,
 				DeviceSelector: deviceClass.DeviceSelector,
 				ThinPoolConfig: deviceClass.ThinPoolConfig,
-				Default:        len(deviceClasses) == 1 || deviceClass.Default, //True if there is only one device class or default is explicitly set.
+				Default:        len(deviceClasses) == 1 || deviceClass.Default, // True if there is only one device class or default is explicitly set.
 			},
 		}
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)
