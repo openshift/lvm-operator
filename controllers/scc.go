@@ -41,28 +41,29 @@ func (c openshiftSccs) getName() string {
 }
 
 func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	unitLogger := r.Log.WithValues("resourceManager", c.getName())
 	if !IsOpenshift(r) {
-		r.Log.Info("not creating SCCs as this is not an Openshift cluster")
+		unitLogger.Info("not creating SCCs as this is not an Openshift cluster")
 		return nil
 	}
 	sccs := getAllSCCs(r.Namespace)
 	for _, scc := range sccs {
 		_, err := r.SecurityClient.SecurityContextConstraints().Get(ctx, scc.Name, metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			r.Log.Info("creating SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
-			_, err := r.SecurityClient.SecurityContextConstraints().Create(ctx, scc, metav1.CreateOptions{})
-			if err != nil {
-				r.Log.Error(err, "failed to create SCC", "SecurityContextConstraint", scc.Name)
-				return err
-			}
-			r.Log.Info("successfully created SCC", "SecurityContextConstraint", scc.Name)
-		} else if err == nil {
+		if err == nil {
 			// Don't update the SCC
-			r.Log.Info("already exists", "SecurityContextConstraint", scc.Name)
-		} else {
-			r.Log.Error(err, "something went wrong when checking for SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
-			return err
+			unitLogger.Info("SecurityContextConstraint exists, skipping creation", "name", scc.Name)
+			continue
 		}
+
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("something went wrong when checking for SecurityContextConstraint: %w", err)
+		}
+
+		if _, err := r.SecurityClient.SecurityContextConstraints().Create(ctx, scc, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
+		}
+
+		unitLogger.Info("SecurityContextConstraint created", "name", scc.Name)
 	}
 
 	return nil

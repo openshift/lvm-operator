@@ -4,9 +4,11 @@ import (
 	"strings"
 )
 
-// NewMultiErrorWithNewLineSeparator creates a MultiError that uses "\n" as separator for each error.
-func NewMultiErrorWithNewLineSeparator(errs []error) error {
-	return &MultiError{Errors: errs, Separator: "\n"}
+const DefaultMultiErrorSeparator = ";"
+
+// NewMultiError creates a MultiError that uses the default separator for each error.
+func NewMultiError(errs []error) error {
+	return &MultiError{Errors: errs, Separator: DefaultMultiErrorSeparator}
 }
 
 // MultiError is an error that aggregates multiple errors together and uses

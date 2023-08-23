@@ -227,9 +227,8 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	resourceSyncElapsedTime := time.Since(resourceSyncStart)
 	if len(errs) > 0 {
-		err := internal.NewMultiErrorWithNewLineSeparator(errs)
-		r.Log.Error(err, "failed to reconcile resources managed by LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile resources managed by LVMCluster within %v: %w",
+			resourceSyncElapsedTime, internal.NewMultiError(errs))
 	}
 
 	r.Log.Info("successfully reconciled LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)

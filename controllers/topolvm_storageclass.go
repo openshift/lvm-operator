@@ -44,19 +44,17 @@ func (s topolvmStorageClass) getName() string {
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;create;delete;watch;list
 
 func (s topolvmStorageClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	unitLogger := r.Log.WithValues("resourceManager", s.getName())
 
 	// one storage class for every deviceClass based on CR is created
 	topolvmStorageClasses := getTopolvmStorageClasses(r, ctx, lvmCluster)
 	for _, sc := range topolvmStorageClasses {
-
 		// we anticipate no edits to storage class
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, sc, func() error { return nil })
 		if err != nil {
-			r.Log.Error(err, "topolvm storage class reconcile failure", "name", sc.Name)
-			return err
-		} else {
-			r.Log.Info("topolvm storage class", "operation", result, "name", sc.Name)
+			return fmt.Errorf("%s failed to reconcile: %w", s.getName(), err)
 		}
+		unitLogger.Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
 	}
 	return nil
 }

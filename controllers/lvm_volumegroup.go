@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +40,7 @@ func (c lvmVG) getName() string {
 }
 
 func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	unitLogger := r.Log.WithValues("topolvmNode", c.getName())
 
 	lvmVolumeGroups := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 
@@ -50,10 +52,8 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 			},
 		}
 
-		err := cutil.SetControllerReference(lvmCluster, existingVolumeGroup, r.Scheme)
-		if err != nil {
-			r.Log.Error(err, "failed to set controller reference to LVMVolumeGroup with name", volumeGroup.Name)
-			return err
+		if err := cutil.SetControllerReference(lvmCluster, existingVolumeGroup, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set controller reference to LVMVolumeGroup: %w", err)
 		}
 
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, existingVolumeGroup, func() error {
@@ -63,10 +63,10 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 		})
 
 		if err != nil {
-			r.Log.Error(err, "failed to reconcile LVMVolumeGroup", "name", volumeGroup.Name)
-			return err
+			return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
 		}
-		r.Log.Info("successfully reconciled LVMVolumeGroup", "operation", result, "name", volumeGroup.Name)
+
+		unitLogger.Info("LVMVolumeGroup applied to cluster", "operation", result, "name", volumeGroup.Name)
 	}
 	return nil
 }
@@ -138,7 +138,7 @@ func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) 
 				NodeSelector:   deviceClass.NodeSelector,
 				DeviceSelector: deviceClass.DeviceSelector,
 				ThinPoolConfig: deviceClass.ThinPoolConfig,
-				Default:        len(deviceClasses) == 1 || deviceClass.Default, //True if there is only one device class or default is explicitly set.
+				Default:        len(deviceClasses) == 1 || deviceClass.Default, // True if there is only one device class or default is explicitly set.
 			},
 		}
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)

@@ -52,6 +52,7 @@ func (c topolvmController) getName() string {
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;update;delete;get;list;watch
 
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	unitLogger := r.Log.WithValues("resourceManager", c.getName())
 
 	// get the desired state of topolvm controller deployment
 	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName, c.topoLVMLeaderElectionPassthrough)
@@ -64,8 +65,7 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 
 	err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme)
 	if err != nil {
-		r.Log.Error(err, "failed to set controller reference to topolvm controller deployment with name", existingDeployment.Name)
-		return err
+		return fmt.Errorf("failed to set controller reference for csi controller: %w", err)
 	}
 
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, existingDeployment, func() error {
@@ -73,16 +73,15 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 	})
 
 	if err != nil {
-		r.Log.Error(err, "csi controller reconcile failure", "name", desiredDeployment.Name)
-		return err
+		return fmt.Errorf("could not create/update csi controller: %w", err)
 	}
+	unitLogger.Info("Deployment applied to cluster", "operation", result, "name", desiredDeployment.Name)
 
 	if err := verifyDeploymentReadiness(existingDeployment); err != nil {
-		r.Log.Error(err, "csi controller is not considered ready", "deployment", existingDeployment.Name)
-		return err
+		return fmt.Errorf("csi controller is not ready: %w", err)
 	}
+	unitLogger.Info("Deployment is ready", "name", desiredDeployment.Name)
 
-	r.Log.Info("csi controller", "operation", result, "name", desiredDeployment.Name)
 	return nil
 }
 

@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/pkg/errors"
@@ -44,6 +45,7 @@ func (c csiDriver) getName() string {
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list
 
 func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	unitLogger := r.Log.WithValues("resourceManager", c.getName())
 	csiDriverResource := getCSIDriverResource()
 
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, csiDriverResource, func() error {
@@ -52,11 +54,9 @@ func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 	})
 
 	if err != nil {
-		r.Log.Error(err, "csi driver reconcile failure", "name", csiDriverResource.Name)
-		return err
+		return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
 	}
-
-	r.Log.Info("csi driver", "operation", result, "name", csiDriverResource.Name)
+	unitLogger.Info("CSIDriver applied to cluster", "operation", result, "name", csiDriverResource.Name)
 	return nil
 }
 
