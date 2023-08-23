@@ -20,73 +20,82 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func diskSetup(ctx context.Context) error {
-
 	// get nodes
+	By(fmt.Sprintf("getting all worker nodes by label %s", labelNodeRoleWorker))
 	nodeList := &corev1.NodeList{}
-	err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})
-	if err != nil {
-		fmt.Printf("failed to list nodes\n")
-		return err
+	if err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker}); err != nil {
+		return fmt.Errorf("could not list worker nodes nodes for Disk setup: %w", err)
 	}
 
-	fmt.Printf("getting AWS region info from node spec\n")
-	_, region, _, err := getAWSNodeInfo(nodeList.Items[0])
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "getAWSNodeInfo")
+	By("getting AWS region info from the first Node spec")
+	nodeInfo, err := getAWSNodeInfo(nodeList.Items[0])
+	Expect(err).NotTo(HaveOccurred(), "getAWSNodeInfo")
 
 	// initialize client
-	fmt.Printf("initialize ec2 creds\n")
-	ec2Client, err := getEC2Client(ctx, region)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "getEC2Client")
+	By("initializing ec2 client with the previously attained region")
+	ec2, err := getEC2Client(ctx, nodeInfo.Region)
+	Expect(err).NotTo(HaveOccurred(), "getEC2Client")
 
-	// represents the disk layout to setup on the nodes.
-	var nodeEnv []nodeDisks
-	for _, node := range nodeList.Items {
-		nodeEnv = append(nodeEnv, nodeDisks{
-
-			disks: []disk{
-				{size: 10},
-				{size: 20},
-			},
-			node: node,
-		})
-	}
+	// represents the Disk layout to setup on the nodes.
+	nodeEnv, err := getNodeEnvironmentFromNodeList(nodeList)
+	Expect(err).NotTo(HaveOccurred(), "getNodeEnvironmentFromNodeList")
 
 	// create and attach volumes
-	fmt.Printf("creating and attaching disks\n")
-	err = createAndAttachAWSVolumes(ec2Client, nodeEnv)
-	gomega.Expect(err).To(gomega.BeNil())
+	By("creating and attaching Disks")
+	Expect(NewAWSDiskManager(ec2, GinkgoLogr).CreateAndAttachAWSVolumes(ctx, nodeEnv)).To(Succeed())
 
 	return nil
 }
 
+func getNodeEnvironmentFromNodeList(nodeList *corev1.NodeList) ([]NodeDisks, error) {
+	var nodeEnv []NodeDisks
+	for _, node := range nodeList.Items {
+		nodeInfo, err := getAWSNodeInfo(node)
+		if err != nil {
+			return nil, fmt.Errorf("could not get node environment: %w", err)
+		}
+		disks := NodeDisks{
+			Node: node.GetName(),
+			Disks: []Disk{
+				{Size: 10},
+				{Size: 20},
+			},
+			AWSNodeInfo: nodeInfo,
+		}
+		GinkgoLogr.Info("preparing Node", "Node", node.GetName(), "Disks", disks)
+		nodeEnv = append(nodeEnv, disks)
+	}
+	return nodeEnv, nil
+}
+
 func diskRemoval(ctx context.Context) error {
 	// get nodes
+	By(fmt.Sprintf("getting all worker nodes by label %s", labelNodeRoleWorker))
 	nodeList := &corev1.NodeList{}
-	err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})
-	if err != nil {
-		fmt.Printf("failed to list nodes\n")
-		return err
+	if err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker}); err != nil {
+		return fmt.Errorf("could not list worker nodes nodes for Disk setup: %w", err)
 	}
-	fmt.Printf("getting AWS region info from node spec\n")
-	_, region, _, err := getAWSNodeInfo(nodeList.Items[0])
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "getAWSNodeInfo")
+
+	By("getting AWS region info from the first Node spec")
+	nodeInfo, err := getAWSNodeInfo(nodeList.Items[0])
+	Expect(err).NotTo(HaveOccurred(), "getAWSNodeInfo")
 
 	// initialize client
-	fmt.Printf("initialize ec2 creds\n")
-	ec2Client, err := getEC2Client(ctx, region)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "getEC2Client")
+	By("initializing ec2 client with the previously attained region")
+	ec2, err := getEC2Client(ctx, nodeInfo.Region)
+	Expect(err).NotTo(HaveOccurred(), "getEC2Client")
 
-	// cleaning disk
-	fmt.Printf("cleaning up disks\n")
-	err = cleanupAWSDisks(ec2Client)
-	gomega.Expect(err).To(gomega.BeNil())
+	// cleaning Disk
+	By("cleaning up Disks")
+	Expect(NewAWSDiskManager(ec2, GinkgoLogr).cleanupAWSDisks(ctx)).To(Succeed())
 
 	return err
 }

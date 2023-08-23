@@ -20,8 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/client-go/discovery"
 	"time"
+
+	"k8s.io/client-go/discovery"
 
 	. "github.com/onsi/ginkgo/v2"
 

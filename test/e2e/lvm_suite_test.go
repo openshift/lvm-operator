@@ -19,13 +19,15 @@ package e2e
 import (
 	"context"
 	"flag"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	ctrlZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/go-logr/zapr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	ctrlZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,7 +40,7 @@ func TestLvm(t *testing.T) {
 	RunSpecs(t, "Lvm Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx context.Context) {
 	core := zapcore.NewCore(
 		&ctrlZap.KubeAwareEncoder{Encoder: zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())},
 		zapcore.AddSync(GinkgoWriter),
@@ -49,13 +51,13 @@ var _ = BeforeSuite(func() {
 	log.SetLogger(logr)
 
 	// Configure the disk and install the operator
-	beforeTestSuiteSetup(context.Background())
-	lvmNamespaceSetup(context.Background())
+	beforeTestSuiteSetup(ctx)
+	lvmNamespaceSetup(ctx)
 })
 
-var _ = AfterSuite(func() {
-	lvmNamespaceCleanup(context.Background())
-	afterTestSuiteCleanup(context.Background())
+var _ = AfterSuite(func(ctx context.Context) {
+	lvmNamespaceCleanup(ctx)
+	afterTestSuiteCleanup(ctx)
 })
 
 var _ = Describe("LVM Operator e2e tests", func() {
