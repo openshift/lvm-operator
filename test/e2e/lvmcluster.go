@@ -168,6 +168,31 @@ func lvmClusterTest() {
 			Expect(sc.Parameters["csi.storage.k8s.io/fstype"]).To(Equal(string(v1alpha1.FilesystemTypeExt4)))
 		})
 	})
+
+	Describe("Storage Class", Serial, func() {
+
+		var clusterConfig *v1alpha1.LVMCluster
+
+		AfterEach(func(ctx SpecContext) {
+			// Delete the cluster
+			lvmClusterCleanup(clusterConfig, ctx)
+		})
+
+		It("should become ready without a default storageclass", func(ctx SpecContext) {
+			clusterConfig = generateLVMCluster() // Do not specify a fstype
+
+			// set default to false
+			for _, dc := range clusterConfig.Spec.Storage.DeviceClasses {
+				dc.Default = false
+			}
+
+			By("Setting up the cluster with the default fstype")
+			lvmClusterSetup(clusterConfig, ctx)
+
+			By("Verifying the cluster is ready")
+			Eventually(clusterReadyCheck(clusterConfig), timeout, 300*time.Millisecond).WithContext(ctx).Should(Succeed())
+		})
+	})
 }
 
 func clusterReadyCheck(clusterConfig *v1alpha1.LVMCluster) func(ctx context.Context) error {

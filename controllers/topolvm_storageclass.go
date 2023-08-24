@@ -138,11 +138,9 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 			},
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
-		if setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
-			if len(lvmCluster.Spec.Storage.DeviceClasses) == 1 || deviceClass.Default {
-				storageClass.Annotations[defaultSCAnnotation] = "true"
-				defaultStorageClassName = scName
-			}
+		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
+			storageClass.Annotations[defaultSCAnnotation] = "true"
+			defaultStorageClassName = scName
 		}
 		sc = append(sc, storageClass)
 	}
