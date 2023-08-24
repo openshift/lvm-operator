@@ -18,24 +18,23 @@ package e2e
 
 import (
 	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/api/v1alpha1"
 )
 
 // beforeTestSuiteSetup is the function called to initialize the test environment.
 func beforeTestSuiteSetup(ctx context.Context) {
 
 	if diskInstall {
-		By("Creating disk for e2e tests")
-		err := diskSetup(ctx)
-		Expect(err).To(BeNil())
+		By("Creating Disk for e2e tests")
+		Expect(diskSetup(ctx)).To(Succeed())
 	}
 
 	if lvmOperatorInstall {
 		By("BeforeTestSuite: deploying LVM Operator")
-		err := deployLVMWithOLM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)
-		Expect(err).To(BeNil())
+		Expect(deployLVMWithOLM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)).To(Succeed())
 	}
 }
 
