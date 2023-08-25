@@ -70,8 +70,7 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 			r.Log.Info("csi driver deleted", "TopolvmCSIDriverName", csiDriverResource.Name)
 			return nil
 		}
-		r.Log.Error(err, "failed to retrieve topolvm csi driver resource", "TopolvmCSIDriverName", csiDriverResource.Name)
-		return err
+		return fmt.Errorf("failed to retrieve topolvm csi driver %s: %w", csiDriverResource.GetName(), err)
 	}
 
 	// if not deleted, initiate deletion
@@ -82,8 +81,7 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 
 	err = r.Client.Delete(ctx, csiDriverResource)
 	if err != nil {
-		r.Log.Error(err, "failed to delete topolvm csi driver", "TopolvmCSIDriverName", csiDriverResource.Name)
-		return err
+		return fmt.Errorf("failed to delete topolvm csi driver %s: %w", csiDriverResource.GetName(), err)
 	}
 	r.Log.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
 
