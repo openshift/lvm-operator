@@ -44,6 +44,7 @@ end
 - [Known Limitations](#known-limitations)
     * [Single LVMCluster support](#single-lvmcluster-support)
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
+    * [Missing native LVM RAID Configuration support](#missing-native-lvm-raid-configuration-support)
     * [Snapshotting and Cloning in Multi-Node Topologies](#snapshotting-and-cloning-in-multi-node-topologies)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -380,6 +381,24 @@ LVMS does not support the reconciliation of multiple LVMCluster custom resources
 ### Upgrades from v 4.10 and v4.11
 
 It is not possible to upgrade from release-4.10 and release-4.11 to a newer version due to a breaking change that has been implemented. For further information on this matter, consult [the relevant documentation](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md).
+
+### Missing native LVM RAID Configuration support
+
+Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs. 
+This is backed by an LVM Logical Volume of type `thin`, which is reflected in the LVM flags as an attribute.
+When trying to use LVM's inbuilt RAID capabilities, it conflicts with this `thin` attribute as the same flag is also indicative wether a volume is part of LVM RAID configurations (`r` or `R` flag).
+This means that the only way to support RAID configuration from within `LVM` would be to do a conversion from two RAID Arrays into a thinpool with `lvconvert`, after which the RAID is no longer recognized by LVM (due to said conflict in the volume attributes).
+While this would enable initial synchronization and redundancy, all repair and extend operations would not longer respect the RAID topology in the Volume Group, and operations like `lvconvert --repair` are not even supported anymore. 
+This means that it would be quite a complex situation to recover from.
+
+Instead of doing LVM based RAIDs, we recommend using the [`mdraid`](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#linux-raid-subsystems_managing-raid) subsystem in linux instead of the LVM RAID capabilities.
+Simply create a RAID array with `mdadm` and then use this in your `deviceSelector` within `LVMCluster`:
+
+1. For a simple RAID1, you could use `mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/sda1 /dev/sdc1`
+2. Then you can reference `/dev/md0` in the `deviceSelector` as normal
+3. Any recovery and syncing will then happen with `mdraid`: [Replacing Disks](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#replacing-a-failed-disk-in-raid_managing-raid) and [Repairing](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#repairing-raid-disks_managing-raid) will work transparently of LVMS and can be covered by a sysadmin of the Node.
+
+_NOTE: Currently, RAID Arrays created with `mdraid` are not automatically recognized when not using any `deviceSelector`, thus they MUST be specified explicitly._
 
 ### Snapshotting and Cloning in Multi-Node Topologies
 
