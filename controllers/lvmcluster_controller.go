@@ -155,7 +155,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	// The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
 		// Check for existing LogicalVolumes
-		lvsExist, err := r.logicalVolumesExist(ctx, instance)
+		lvsExist, err := r.logicalVolumesExist(ctx)
 		if err != nil {
 			// check every 10 seconds if there are still PVCs present
 			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
@@ -293,14 +293,11 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 }
 
 func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
-
 	var vgCount int
 
 	nodeList := &corev1.NodeList{}
-	err := r.Client.List(ctx, nodeList)
-	if err != nil {
-		r.Log.Error(err, "failed to list Nodes")
-		return 0, err
+	if err := r.Client.List(ctx, nodeList); err != nil {
+		return 0, fmt.Errorf("failed to list Nodes: %w", err)
 	}
 
 	for _, deviceClass := range instance.Spec.Storage.DeviceClasses {
@@ -325,8 +322,7 @@ func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance 
 
 			matches, err := corev1helper.MatchNodeSelectorTerms(&nodeList.Items[i], deviceClass.NodeSelector)
 			if err != nil {
-				r.Log.Error(err, "failed to match node selector")
-				return 0, err
+				return 0, fmt.Errorf("failed to match node selector: %w", err)
 			}
 
 			if matches {
@@ -351,9 +347,7 @@ func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
 				r.ClusterType = ClusterTypeOther
 				r.Log.Info("openshiftSCC not found, setting cluster type to other")
 			} else {
-				// Something went wrong
-				r.Log.Error(err, "failed to get SCC", "Name", openshiftSCCPrivilegedName)
-				return err
+				return fmt.Errorf("failed to get SCC %s", openshiftSCCPrivilegedName)
 			}
 		} else {
 			r.Log.Info("openshiftSCC found, setting cluster type to openshift")
@@ -395,13 +389,10 @@ func (r *LVMClusterReconciler) setRunningPodImage(ctx context.Context) error {
 	return nil
 }
 
-func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (bool, error) {
-
+func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context) (bool, error) {
 	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
-
 	if err := r.Client.List(ctx, logicalVolumeList); err != nil {
-		r.Log.Error(err, "failed to get Topolvm LogicalVolume list")
-		return false, err
+		return false, fmt.Errorf("failed to get TopoLVM LogicalVolume list: %w", err)
 	}
 	if len(logicalVolumeList.Items) > 0 {
 
@@ -425,15 +416,15 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 		}
 
 		for _, unit := range resourceDeletionList {
-			err := unit.ensureDeleted(r, ctx, instance)
-			if err != nil {
+			if err := unit.ensureDeleted(r, ctx, instance); err != nil {
 				return fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
 			}
 		}
-		controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer)
-		if err := r.Client.Update(context.TODO(), instance); err != nil {
-			r.Log.Info("failed to remove finalizer from LVMCluster", "LvmCluster", instance.Name)
-			return err
+
+		if update := controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer); update {
+			if err := r.Client.Update(ctx, instance); err != nil {
+				return fmt.Errorf("failed to remove finalizer from LVMCluster %s: %w", instance.GetName(), err)
+			}
 		}
 	}
 
