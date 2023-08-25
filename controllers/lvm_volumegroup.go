@@ -22,10 +22,10 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -40,7 +40,7 @@ func (c lvmVG) getName() string {
 }
 
 func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("topolvmNode", c.getName())
+	logger := log.FromContext(ctx).WithValues("topolvmNode", c.getName())
 
 	lvmVolumeGroups := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 
@@ -66,47 +66,37 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 			return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
 		}
 
-		unitLogger.Info("LVMVolumeGroup applied to cluster", "operation", result, "name", volumeGroup.Name)
+		logger.Info("LVMVolumeGroup applied to cluster", "operation", result, "name", volumeGroup.Name)
 	}
 	return nil
 }
 
 func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("topolvmNode", c.getName())
 	vgcrs := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 	allVGsDeleted := true
 
-	for _, vgcr := range vgcrs {
-		currentLvmVg := &lvmv1alpha1.LVMVolumeGroup{}
-
-		err := r.Client.Get(ctx, types.NamespacedName{Name: vgcr.Name, Namespace: vgcr.Namespace}, currentLvmVg)
-		if err != nil {
-			// already deleted in previous reconcile
-			if k8serror.IsNotFound(err) {
-				r.Log.Info("LVMVolumeGroup already deleted", "name", vgcr.Name)
-				continue
-			}
-			r.Log.Error(err, "failed to retrieve LVMVolumeGroup", "name", vgcr.Name)
-			return err
+	for _, volumeGroup := range vgcrs {
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(volumeGroup), volumeGroup); err != nil {
+			return client.IgnoreNotFound(err)
 		}
 
 		// if not deleted, initiate deletion
-		if currentLvmVg.GetDeletionTimestamp().IsZero() {
-			err = r.Client.Delete(ctx, currentLvmVg)
-			if err != nil {
-				r.Log.Error(err, "failed to delete LVMVolumeGroup", "name", currentLvmVg.Name)
-				return err
+		if volumeGroup.GetDeletionTimestamp().IsZero() {
+			if err := r.Client.Delete(ctx, volumeGroup); err != nil {
+				return fmt.Errorf("failed to delete LVMVolumeGroup %s: %w", volumeGroup.GetName(), err)
 			}
-			r.Log.Info("initiated LVMVolumeGroup deletion", "name", currentLvmVg.Name)
+			logger.Info("initiated LVMVolumeGroup deletion", "name", volumeGroup.Name)
 			allVGsDeleted = false
 		} else {
 			// Has the VG been cleaned up on all hosts?
-			exists := doesVGExistOnHosts(currentLvmVg.Name, lvmCluster)
+			exists := doesVGExistOnHosts(volumeGroup.Name, lvmCluster)
 			if !exists {
 				// Remove finalizer
-				cutil.RemoveFinalizer(currentLvmVg, lvmvgFinalizer)
-				err = r.Client.Update(ctx, currentLvmVg)
-				if err != nil {
-					return err
+				if update := cutil.RemoveFinalizer(volumeGroup, lvmvgFinalizer); update {
+					if err := r.Client.Update(ctx, volumeGroup); err != nil {
+						return fmt.Errorf("failed to remove finalizer from LVMVolumeGroup")
+					}
 				}
 			} else {
 				allVGsDeleted = false

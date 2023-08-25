@@ -66,9 +66,10 @@ const (
 )
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(logger)
 
-	ctx, cancel = context.WithCancel(context.TODO())
+	ctx, cancel = context.WithCancel(context.Background())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -114,7 +115,6 @@ var _ = BeforeSuite(func() {
 		Scheme:         k8sManager.GetScheme(),
 		SecurityClient: secv1client.NewForConfigOrDie(k8sManager.GetConfig()),
 		Namespace:      testLvmClusterNamespace,
-		Log:            ctrl.Log.WithName("controllers").WithName("LvmCluster"),
 		ImageName:      testImageName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -124,7 +124,7 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = k8sManager.GetFieldIndexer().IndexField(context.Background(), &lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
+	err = k8sManager.GetFieldIndexer().IndexField(ctx, &lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
 		return []string{object.GetName()}
 	})
 	Expect(err).ToNot(HaveOccurred(), "unable to create name index on LVMVolumeGroupNodeStatus")
@@ -140,6 +140,5 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	cancel()
 	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(testEnv.Stop()).To(Succeed())
 })

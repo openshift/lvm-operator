@@ -23,11 +23,12 @@ import (
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -46,7 +47,7 @@ func (s topolvmVolumeSnapshotClass) getName() string {
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;create;delete;watch;list
 
 func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("resourceManager", s.getName())
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 	// one volume snapshot class for every deviceClass based on CR is created
 	topolvmSnapshotClasses := getTopolvmSnapshotClasses(lvmCluster)
 	for _, vsc := range topolvmSnapshotClasses {
@@ -55,17 +56,18 @@ func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx c
 		if err != nil {
 			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
-				r.Log.Info("volume snapshot class CRDs do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
+				logger.Info("volume snapshot class CRDs do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
 				return nil
 			}
 			return fmt.Errorf("%s failed to reconcile: %w", s.getName(), err)
 		}
-		unitLogger.Info("VolumeSnapshotClass applied to cluster", "operation", result, "name", vsc.Name)
+		logger.Info("VolumeSnapshotClass applied to cluster", "operation", result, "name", vsc.Name)
 	}
 	return nil
 }
 
 func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 
 	// construct name of volume snapshot class based on CR spec deviceClass field and
 	// delete the corresponding volume snapshot class
@@ -74,39 +76,31 @@ func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx c
 		vscName := getVolumeSnapshotClassName(deviceClass.Name)
 		err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc)
 
-		if err != nil {
-			// already deleted in previous reconcile
-			if k8serrors.IsNotFound(err) {
-				r.Log.Info("topolvm volume snapshot class is deleted", "VolumeSnapshotClass", vscName)
-				return nil
-			}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc); err != nil {
 			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
-				r.Log.Info("topolvm volume snapshot classes do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
+				logger.Info("topolvm volume snapshot classes do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
 				return nil
 			}
-			r.Log.Error(err, "failed to retrieve topolvm volume snapshot class", "VolumeSnapshotClass", vscName)
-			return err
+			return client.IgnoreNotFound(err)
 		}
 
 		// VolumeSnapshotClass exists, initiate deletion
-		if vsc.GetDeletionTimestamp().IsZero() {
-			if err = r.Client.Delete(ctx, vsc); err != nil {
-				r.Log.Error(err, "failed to delete topolvm volume snapshot class", "VolumeSnapshotClass", vscName)
-				return err
-			} else {
-				r.Log.Info("initiated topolvm volume snapshot class deletion", "VolumeSnapshotClass", vscName)
-			}
-		} else {
+		if !vsc.GetDeletionTimestamp().IsZero() {
 			// return error for next reconcile to confirm deletion
 			return fmt.Errorf("topolvm volume snapshot class %s is already marked for deletion", vscName)
 		}
+
+		if err = r.Client.Delete(ctx, vsc); err != nil {
+			return fmt.Errorf("failed to delete topolvm VolumeSnapshotClass %s: %w", vscName, err)
+		}
+		logger.Info("initiated topolvm volume snapshot class deletion", "VolumeSnapshotClass", vscName)
 	}
 	return nil
 }
 
 func getTopolvmSnapshotClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*snapapi.VolumeSnapshotClass {
-	vsc := []*snapapi.VolumeSnapshotClass{}
+	var vsc []*snapapi.VolumeSnapshotClass
 
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		snapshotClass := &snapapi.VolumeSnapshotClass{

@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type vgManager struct{}
@@ -39,7 +40,7 @@ func (v vgManager) getName() string {
 }
 
 func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("resourceManager", v.getName())
+	logger := log.FromContext(ctx).WithValues("resourceManager", v.getName())
 
 	// get desired daemonset spec
 	dsTemplate := newVGManagerDaemonset(lvmCluster, r.Namespace, r.ImageName)
@@ -57,7 +58,7 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 			Namespace: dsTemplate.Namespace,
 		},
 	}
-	unitLogger.Info("running CreateOrUpdate")
+	logger.Info("running CreateOrUpdate")
 	// the anonymous mutate function modifies the daemonset object after fetching it.
 	// if the daemonset does not already exist, it creates it, otherwise, it updates it
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, ds, func() error {
@@ -105,12 +106,12 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 		return fmt.Errorf("%s failed to reconcile: %w", v.getName(), err)
 	}
 
-	unitLogger.Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
+	logger.Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
 
 	if err := verifyDaemonSetReadiness(ds); err != nil {
 		return fmt.Errorf("DaemonSet is not considered ready: %w", err)
 	}
-	unitLogger.Info("DaemonSet is ready", "name", ds.Name)
+	logger.Info("DaemonSet is ready", "name", ds.Name)
 
 	return nil
 }

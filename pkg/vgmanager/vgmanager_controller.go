@@ -68,7 +68,7 @@ type VGReconciler struct {
 }
 
 func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger := log.FromContext(ctx)
 	logger.Info("reconciling", "LVMVolumeGroup", req)
 
 	// Check if this LVMVolumeGroup needs to be processed on this node
@@ -93,7 +93,7 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 }
 
 func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger := log.FromContext(ctx)
 	// Check if the LVMVolumeGroup resource is deleted
 	if !volumeGroup.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.processDelete(ctx, volumeGroup)
@@ -128,7 +128,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	}
 
 	// Get the available block devices that can be used for this volume group
-	availableDevices, err := r.getAvailableDevicesForVG(blockDevices, vgs, volumeGroup)
+	availableDevices, err := r.getAvailableDevicesForVG(ctx, blockDevices, vgs, volumeGroup)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
 	}
@@ -174,8 +174,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	}
 
 	// Create/extend VG
-	err = r.addDevicesToVG(vgs, volumeGroup.Name, availableDevices)
-	if err != nil {
+	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, availableDevices); err != nil {
 		err = fmt.Errorf("failed to create/extend volume group %s: %w", volumeGroup.Name, err)
 		if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err); err != nil {
 			logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
@@ -184,8 +183,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	}
 
 	// Create thin pool
-	err = r.addThinPoolToVG(ctx, volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig)
-	if err != nil {
+	if err = r.addThinPoolToVG(ctx, volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig); err != nil {
 		err := fmt.Errorf("failed to create thin pool %s for volume group %s: %w", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err)
 		if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, err); err != nil {
 			logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
@@ -246,7 +244,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 }
 
 func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
-	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger := log.FromContext(ctx)
 
 	// Read the lvmd config file
 	lvmdConfig, err := loadLVMDConfig()
@@ -341,7 +339,7 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 // validateLVs verifies that all lvs that should have been created in the volume group are present and
 // in their correct state
 func (r *VGReconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
-	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger := log.FromContext(ctx)
 
 	// If we don't have a ThinPool, VG Manager has no authority about the top Level LVs inside the VG, but TopoLVM
 	if volumeGroup.Spec.ThinPoolConfig == nil {
@@ -402,7 +400,7 @@ func (r *VGReconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1
 }
 
 func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
-	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger := log.FromContext(ctx)
 
 	resp, err := GetLVSOutput(r.executor, vgName)
 	if err != nil {
@@ -435,7 +433,7 @@ func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, confi
 }
 
 func (r *VGReconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
-	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger := log.FromContext(ctx)
 
 	vg, err := GetVolumeGroup(r.executor, vgName)
 	if err != nil {

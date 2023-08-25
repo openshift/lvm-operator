@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -51,7 +52,7 @@ func (c topolvmController) getName() string {
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;update;delete;get;list;watch
 
 func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("resourceManager", c.getName())
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 
 	// get the desired state of topolvm controller deployment
 	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName, c.topoLVMLeaderElectionPassthrough)
@@ -73,23 +74,24 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 	if err != nil {
 		return fmt.Errorf("could not create/update csi controller: %w", err)
 	}
-	unitLogger.Info("Deployment applied to cluster", "operation", result, "name", desiredDeployment.Name)
+	logger.Info("Deployment applied to cluster", "operation", result, "name", desiredDeployment.Name)
 
 	if err := verifyDeploymentReadiness(existingDeployment); err != nil {
 		return fmt.Errorf("csi controller is not ready: %w", err)
 	}
-	unitLogger.Info("Deployment is ready", "name", desiredDeployment.Name)
+	logger.Info("Deployment is ready", "name", desiredDeployment.Name)
 
 	return nil
 }
 
-func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	existingDeployment := &appsv1.Deployment{}
 
 	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: r.Namespace}, existingDeployment)
 	// already deleted in previous reconcile
 	if k8serror.IsNotFound(err) {
-		r.Log.Info("csi controller deleted", "TopolvmController", existingDeployment.Name)
+		logger.Info("csi controller deleted", "TopolvmController", existingDeployment.Name)
 		return nil
 	}
 
@@ -107,7 +109,7 @@ func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Co
 		return fmt.Errorf("failed to delete topolvm controller deployment %s: %w", existingDeployment.GetName(), err)
 	}
 
-	r.Log.Info("initiated topolvm controller deployment deletion", "TopolvmController", existingDeployment.Name)
+	logger.Info("initiated topolvm controller deployment deletion", "TopolvmController", existingDeployment.Name)
 	return nil
 }
 

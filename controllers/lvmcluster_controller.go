@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
@@ -76,7 +75,6 @@ const (
 type LVMClusterReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
-	Log            logr.Logger
 	ClusterType    ClusterType
 	SecurityClient secv1client.SecurityV1Interface
 	Namespace      string
@@ -108,8 +106,8 @@ type LVMClusterReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log = log.Log.WithName(ControllerName).WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
-	r.Log.Info("reconciling")
+	logger := log.FromContext(ctx)
+	logger.Info("reconciling")
 
 	// Checks that only a single LVMCluster instance exists
 	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
@@ -151,6 +149,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
 func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 
 	// The resource was deleted
 	if !instance.DeletionTimestamp.IsZero() {
@@ -166,7 +165,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 				fmt.Errorf("found PVCs provisioned by topolvm, waiting for their deletion: %w", err)
 		}
 
-		r.Log.Info("processing LVMCluster deletion")
+		logger.Info("processing LVMCluster deletion")
 		if err := r.processDelete(ctx, instance); err != nil {
 			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
 			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion")
@@ -178,7 +177,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		if err := r.Client.Update(ctx, instance); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to update LvmCluster with finalizer: %w", err)
 		}
-		r.Log.Info("successfully added finalizer")
+		logger.Info("successfully added finalizer")
 	}
 
 	resources := []resourceManager{
@@ -215,12 +214,13 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 			resourceSyncElapsedTime, internal.NewMultiError(errs))
 	}
 
-	r.Log.Info("successfully reconciled LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)
+	logger.Info("successfully reconciled LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)
 
 	return ctrl.Result{}, nil
 }
 
 func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx)
 
 	vgNodeMap := make(map[string][]lvmv1alpha1.NodeStatus)
 
@@ -262,7 +262,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	instance.Status.State = lvmv1alpha1.LVMStatusProgressing
 	instance.Status.Ready = false
 
-	r.Log.Info("calculating readiness of LVMCluster", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
+	logger.Info("calculating readiness of LVMCluster", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
 
 	if isFailed {
 		instance.Status.State = lvmv1alpha1.LVMStatusFailed
@@ -288,11 +288,12 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	if err = r.Client.Status().Update(ctx, instance); err != nil {
 		return fmt.Errorf("failed to update LVMCluster status: %w", err)
 	}
-	r.Log.Info("successfully updated the LVMCluster status")
+	logger.Info("successfully updated the LVMCluster status")
 	return nil
 }
 
 func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
+	logger := log.FromContext(ctx)
 	var vgCount int
 
 	nodeList := &corev1.NodeList{}
@@ -305,7 +306,7 @@ func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance 
 			ignoreDueToNoSchedule := false
 			for _, taint := range nodeList.Items[i].Spec.Taints {
 				if taint.Effect == corev1.TaintEffectNoSchedule {
-					r.Log.V(1).Info("even though node selector matches, NoSchedule forces ignore of the Node",
+					logger.V(1).Info("even though node selector matches, NoSchedule forces ignore of the Node",
 						"node", nodeList.Items[i].GetName())
 					ignoreDueToNoSchedule = true
 					break
@@ -337,6 +338,7 @@ func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance 
 // checkIfOpenshift checks to see if the operator is running on an OCP cluster.
 // It does this by querying for the "privileged" SCC which exists on all OCP clusters.
 func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
+	logger := log.FromContext(ctx)
 	if r.ClusterType == "" {
 		// cluster type has not been determined yet
 		// Check if the privileged SCC exists on the cluster (this is one of the default SCCs)
@@ -345,12 +347,12 @@ func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
 			if errors.IsNotFound(err) {
 				// Not an Openshift cluster
 				r.ClusterType = ClusterTypeOther
-				r.Log.Info("openshiftSCC not found, setting cluster type to other")
+				logger.Info("openshiftSCC not found, setting cluster type to other")
 			} else {
 				return fmt.Errorf("failed to get SCC %s", openshiftSCCPrivilegedName)
 			}
 		} else {
-			r.Log.Info("openshiftSCC found, setting cluster type to openshift")
+			logger.Info("openshiftSCC found, setting cluster type to openshift")
 			r.ClusterType = ClusterTypeOCP
 		}
 	}

@@ -25,12 +25,13 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -46,7 +47,7 @@ func (n topolvmNode) getName() string {
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;update;delete;get;list;watch
 
 func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("topolvmNode", n.getName())
+	logger := log.FromContext(ctx).WithValues("topolvmNode", n.getName())
 
 	// get desired daemonSet spec
 	dsTemplate := getNodeDaemonSet(lvmCluster, r.Namespace, r.ImageName)
@@ -64,7 +65,7 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 		return fmt.Errorf("failed to set controller reference to topolvm node daemonset: %w", err)
 	}
 
-	unitLogger.Info("running CreateOrUpdate")
+	logger.Info("running CreateOrUpdate")
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, ds, func() error {
 		// at creation, deep copy the whole daemonSet
 		if ds.CreationTimestamp.IsZero() {
@@ -95,42 +96,37 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 		return fmt.Errorf("%s failed to reconcile: %w", n.getName(), err)
 	}
 
-	unitLogger.Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
+	logger.Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
 
 	if err := verifyDaemonSetReadiness(ds); err != nil {
 		return fmt.Errorf("DaemonSet is not considered ready: %w", err)
 	}
-	unitLogger.Info("DaemonSet is ready", "name", ds.Name)
+	logger.Info("DaemonSet is ready", "name", ds.Name)
 
 	return nil
 }
 
 // ensureDeleted should wait for the resources to be cleaned up
-func (n topolvmNode) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (n topolvmNode) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("topolvmNode", n.getName())
 	NodeDaemonSet := &appsv1.DaemonSet{}
-	err := r.Client.Get(ctx,
-		types.NamespacedName{Name: TopolvmNodeDaemonsetName, Namespace: r.Namespace},
-		NodeDaemonSet)
 
-	if err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("topolvm node deleted", "TopolvmNode", NodeDaemonSet.Name)
-			return nil
-		}
-		r.Log.Error(err, "failed to retrieve topolvm node daemonset", "TopolvmNode", NodeDaemonSet.Name)
-		return err
-	} else {
-		// if not deleted, initiate deletion
-		if NodeDaemonSet.GetDeletionTimestamp().IsZero() {
-			if err = r.Client.Delete(ctx, NodeDaemonSet); err != nil {
-				r.Log.Error(err, "failed to delete topolvm node daemonset", "TopolvmNodeName", TopolvmNodeDaemonsetName)
-				return err
-			} else {
-				// set deletion in-progress for next reconcile to confirm deletion
-				return fmt.Errorf("topolvm csi node daemonset %s is already marked for deletion", TopolvmNodeDaemonsetName)
-			}
-		}
+	if err := r.Client.Get(ctx,
+		types.NamespacedName{Name: TopolvmNodeDaemonsetName, Namespace: r.Namespace},
+		NodeDaemonSet); err != nil {
+		return client.IgnoreNotFound(err)
 	}
+
+	// if not deleted, initiate deletion
+	if !NodeDaemonSet.GetDeletionTimestamp().IsZero() {
+		return fmt.Errorf("topolvm csi node daemonset %s is already marked for deletion", TopolvmNodeDaemonsetName)
+	}
+
+	if err := r.Client.Delete(ctx, NodeDaemonSet); err != nil {
+		return fmt.Errorf("failed to delete topolvm node daemonset %s: %w", TopolvmNodeDaemonsetName, err)
+	}
+
+	logger.Info("initiated topolvm node DaemonSet deletion", "name", TopolvmNodeDaemonsetName)
 
 	return nil
 }
