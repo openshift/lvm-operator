@@ -74,22 +74,18 @@ func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.
 				r.Log.Info("topolvm storage class is deleted", "StorageClass", scName)
 				return nil
 			}
-			r.Log.Error(err, "failed to retrieve topolvm storage class", "StorageClass", scName)
-			return err
+			return fmt.Errorf("failed to retrieve topolvm storage class %s: %w", scName, err)
 		}
 
-		// storageClass exists, initiate deletion
-		if sc.GetDeletionTimestamp().IsZero() {
-			if err = r.Client.Delete(ctx, sc); err != nil {
-				r.Log.Error(err, "failed to delete topolvm storage class", "StorageClass", scName)
-				return err
-			} else {
-				r.Log.Info("initiated topolvm storage class deletion", "StorageClass", scName)
-			}
-		} else {
+		if !sc.GetDeletionTimestamp().IsZero() {
 			// return error for next reconcile to confirm deletion
 			return fmt.Errorf("topolvm storage class %s is already marked for deletion", scName)
 		}
+
+		if err = r.Client.Delete(ctx, sc); err != nil {
+			return fmt.Errorf("failed to delete topolvm storage class %s: %w", scName, err)
+		}
+		r.Log.Info("initiated topolvm storage class deletion", "StorageClass", scName)
 	}
 	return nil
 }
@@ -118,7 +114,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 			}
 		}
 	}
-	sc := []*storagev1.StorageClass{}
+	var sc []*storagev1.StorageClass
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := getStorageClassName(deviceClass.Name)
 
