@@ -23,7 +23,6 @@ import (
 
 	v1 "github.com/openshift/api/config/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -63,8 +62,7 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 		},
 	}
 
-	err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme)
-	if err != nil {
+	if err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme); err != nil {
 		return fmt.Errorf("failed to set controller reference for csi controller: %w", err)
 	}
 
@@ -89,26 +87,24 @@ func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Co
 	existingDeployment := &appsv1.Deployment{}
 
 	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: r.Namespace}, existingDeployment)
+	// already deleted in previous reconcile
+	if k8serror.IsNotFound(err) {
+		r.Log.Info("csi controller deleted", "TopolvmController", existingDeployment.Name)
+		return nil
+	}
+
 	if err != nil {
-		// already deleted in previous reconcile
-		if k8serror.IsNotFound(err) {
-			r.Log.Info("csi controller deleted", "TopolvmController", existingDeployment.Name)
-			return nil
-		}
-		r.Log.Error(err, "failed to retrieve csi controller deployment", "TopolvmController", existingDeployment.Name)
-		return err
+		return fmt.Errorf("failed to retrieve csi controller deployment %s: %w", existingDeployment.GetName(), err)
 	}
 
 	// if not deleted, initiate deletion
 	if !existingDeployment.GetDeletionTimestamp().IsZero() {
 		// set deletion in-progress for next reconcile to confirm deletion
-		return errors.Errorf("topolvm controller deployment %s is already marked for deletion", existingDeployment.Name)
+		return fmt.Errorf("topolvm controller deployment %s is already marked for deletion", existingDeployment.Name)
 	}
 
-	err = r.Client.Delete(ctx, existingDeployment)
-	if err != nil {
-		r.Log.Error(err, "failed to delete topolvm controller deployment", "TopolvmController", existingDeployment.Name)
-		return err
+	if err = r.Client.Delete(ctx, existingDeployment); err != nil {
+		return fmt.Errorf("failed to delete topolvm controller deployment %s: %w", existingDeployment.GetName(), err)
 	}
 
 	r.Log.Info("initiated topolvm controller deployment deletion", "TopolvmController", existingDeployment.Name)
