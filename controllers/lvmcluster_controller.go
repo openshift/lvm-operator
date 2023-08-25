@@ -114,37 +114,25 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Checks that only a single LVMCluster instance exists
 	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
 	if err := r.Client.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
-		r.Log.Error(err, "failed to list LVMCluster instances")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to list LVMCluster instances: %w", err)
 	}
 	if size := len(lvmClusterList.Items); size > 1 {
-		err := fmt.Errorf("there should be a single LVMCluster, %d items found", size)
-		r.Log.Error(err, "multiple LVMCluster instances found")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("there should be a single LVMCluster but multiple were found, %d clusters found", size)
 	}
 
 	// get lvmcluster
 	lvmCluster := &lvmv1alpha1.LVMCluster{}
-	err := r.Client.Get(ctx, req.NamespacedName, lvmCluster)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Info("LVMCluster instance not found")
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		return ctrl.Result{}, err
+	if err := r.Client.Get(ctx, req.NamespacedName, lvmCluster); err != nil {
+		// Error reading the object - requeue the request unless not found.
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	err = r.checkIfOpenshift(ctx)
-	if err != nil {
-		r.Log.Error(err, "failed to check cluster type")
-		return ctrl.Result{}, err
+	if err := r.checkIfOpenshift(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("could not determine if cluster is an openshift cluster: %w", err)
 	}
 
-	err = r.getRunningPodImage(ctx)
-	if err != nil {
-		r.Log.Error(err, "failed to get operator image")
-		return ctrl.Result{}, err
+	if err := r.setRunningPodImage(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to introspect running pod image: %w", err)
 	}
 
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
@@ -155,8 +143,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if reconcileError != nil {
 		return result, reconcileError
 	} else if statusError != nil && !errors.IsNotFound(statusError) {
-		r.Log.Error(statusError, "failed to update LVMCluster status")
-		return result, statusError
+		return result, fmt.Errorf("failed to update LVMCluster status: %w", statusError)
 	} else {
 		return result, nil
 	}
@@ -170,29 +157,26 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		// Check for existing LogicalVolumes
 		lvsExist, err := r.logicalVolumesExist(ctx, instance)
 		if err != nil {
-			r.Log.Error(err, "failed to check if LogicalVolumes exist")
-		} else {
-			if lvsExist {
-				err = fmt.Errorf("found PVCs provisioned by topolvm")
-			} else {
-				r.Log.Info("processing LVMCluster deletion")
-				err = r.processDelete(ctx, instance)
-			}
+			// check every 10 seconds if there are still PVCs present
+			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
 		}
-		if err != nil {
+		if lvsExist {
+			// check every 10 seconds if there are still PVCs present
+			return ctrl.Result{RequeueAfter: time.Second * 10},
+				fmt.Errorf("found PVCs provisioned by topolvm, waiting for their deletion: %w", err)
+		}
+
+		r.Log.Info("processing LVMCluster deletion")
+		if err := r.processDelete(ctx, instance); err != nil {
 			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
-			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, err
-		} else {
-			return reconcile.Result{}, nil
+			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion")
 		}
+		return reconcile.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
-		r.Log.Info("finalizer not found for LvmCluster. Adding finalizer")
-		controllerutil.AddFinalizer(instance, lvmClusterFinalizer)
-		if err := r.Client.Update(context.TODO(), instance); err != nil {
-			r.Log.Error(err, "failed to update LvmCluster with finalizer")
-			return reconcile.Result{}, err
+	if updated := controllerutil.AddFinalizer(instance, lvmClusterFinalizer); updated {
+		if err := r.Client.Update(ctx, instance); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to update LvmCluster with finalizer: %w", err)
 		}
 		r.Log.Info("successfully added finalizer")
 	}
@@ -241,16 +225,13 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	vgNodeMap := make(map[string][]lvmv1alpha1.NodeStatus)
 
 	vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
-	err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace))
-	if err != nil {
-		r.Log.Error(err, "failed to list LVMVolumeGroupNodeStatus")
-		return err
+	if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
+		return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
 	}
 
 	expectedVGCount, err := r.getExpectedVGCount(ctx, instance)
 	if err != nil {
-		r.Log.Error(err, "failed to calculate expected VG count")
-		return err
+		return fmt.Errorf("failed to calculate expected VG count: %w", err)
 	}
 
 	var readyVGCount int
@@ -281,7 +262,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	instance.Status.State = lvmv1alpha1.LVMStatusProgressing
 	instance.Status.Ready = false
 
-	r.Log.Info("Verifying readiness", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
+	r.Log.Info("calculating readiness of LVMCluster", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
 
 	if isFailed {
 		instance.Status.State = lvmv1alpha1.LVMStatusFailed
@@ -292,7 +273,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 		instance.Status.Ready = true
 	}
 
-	allVgStatuses := []lvmv1alpha1.DeviceClassStatus{}
+	var allVgStatuses []lvmv1alpha1.DeviceClassStatus
 	for key, val := range vgNodeMap {
 		allVgStatuses = append(allVgStatuses,
 			lvmv1alpha1.DeviceClassStatus{
@@ -304,16 +285,10 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 
 	instance.Status.DeviceClassStatuses = allVgStatuses
 	// Apply status changes
-	err = r.Client.Status().Update(ctx, instance)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			r.Log.Error(err, "failed to update status")
-		}
-		return err
+	if err = r.Client.Status().Update(ctx, instance); err != nil {
+		return fmt.Errorf("failed to update LVMCluster status: %w", err)
 	}
-
-	r.Log.Info("successfully updated the LvmCluster status")
-
+	r.Log.Info("successfully updated the LVMCluster status")
 	return nil
 }
 
@@ -392,22 +367,19 @@ func IsOpenshift(r *LVMClusterReconciler) bool {
 	return r.ClusterType == ClusterTypeOCP
 }
 
-// getRunningPodImage gets the operator image and set it in reconciler struct
-func (r *LVMClusterReconciler) getRunningPodImage(ctx context.Context) error {
+// setRunningPodImage gets the operator image and set it in reconciler struct
+func (r *LVMClusterReconciler) setRunningPodImage(ctx context.Context) error {
 
 	if r.ImageName == "" {
 		// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
-		podName := os.Getenv("POD_NAME")
+		podName := os.Getenv(PodNameEnv)
 		if podName == "" {
-			err := fmt.Errorf("failed to get pod name env variable")
-			r.Log.Error(err, "POD_NAME env variable is not set")
-			return err
+			return fmt.Errorf("failed to get pod name env variable, %s env variable is not set", PodNameEnv)
 		}
 
 		pod := &corev1.Pod{}
 		if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: r.Namespace}, pod); err != nil {
-			r.Log.Error(err, "failed to get pod", "pod", podName)
-			return err
+			return fmt.Errorf("failed to get pod %s: %w", podName, err)
 		}
 
 		for _, c := range pod.Spec.Containers {
@@ -417,10 +389,7 @@ func (r *LVMClusterReconciler) getRunningPodImage(ctx context.Context) error {
 			}
 		}
 
-		err := fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
-		r.Log.Error(err, "container image not found")
-		return err
-
+		return fmt.Errorf("failed to get container image for %s in pod %s", LVMOperatorContainerName, podName)
 	}
 
 	return nil
