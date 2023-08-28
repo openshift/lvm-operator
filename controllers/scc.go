@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -40,10 +41,10 @@ func (c openshiftSccs) getName() string {
 	return sccName
 }
 
-func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("resourceManager", c.getName())
+func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	if !IsOpenshift(r) {
-		unitLogger.Info("not creating SCCs as this is not an Openshift cluster")
+		logger.Info("not creating SCCs as this is not an Openshift cluster")
 		return nil
 	}
 	sccs := getAllSCCs(r.Namespace)
@@ -51,7 +52,7 @@ func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Contex
 		_, err := r.SecurityClient.SecurityContextConstraints().Get(ctx, scc.Name, metav1.GetOptions{})
 		if err == nil {
 			// Don't update the SCC
-			unitLogger.Info("SecurityContextConstraint exists, skipping creation", "name", scc.Name)
+			logger.Info("SecurityContextConstraint exists, skipping creation", "name", scc.Name)
 			continue
 		}
 
@@ -63,24 +64,23 @@ func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Contex
 			return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
 		}
 
-		unitLogger.Info("SecurityContextConstraint created", "name", scc.Name)
+		logger.Info("SecurityContextConstraint created", "name", scc.Name)
 	}
 
 	return nil
 }
 
-func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	if IsOpenshift(r) {
 		var err error
 		sccs := getAllSCCs(r.Namespace)
 		for _, scc := range sccs {
-			err = r.SecurityClient.SecurityContextConstraints().Delete(ctx, scc.Name, metav1.DeleteOptions{})
-			if err != nil {
+			if err = r.SecurityClient.SecurityContextConstraints().Delete(ctx, scc.Name, metav1.DeleteOptions{}); err != nil {
 				if !errors.IsNotFound(err) {
-					r.Log.Error(err, "failed to delete SecurityContextConstraint", "SecurityContextConstraint", scc.Name)
-					return err
+					return fmt.Errorf("failed to delete SecurityContextConstraint %s: %w", scc.GetName(), err)
 				}
-				r.Log.Info("SecurityContextConstraint is already deleted", "SecurityContextConstraint", scc.Name)
+				logger.Info("SecurityContextConstraint is already deleted", "SecurityContextConstraint", scc.Name)
 			}
 		}
 	}

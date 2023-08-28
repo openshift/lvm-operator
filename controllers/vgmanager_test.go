@@ -20,9 +20,11 @@ import (
 	"context"
 	"testing"
 
+	"gotest.tools/v3/assert"
+
+	"github.com/go-logr/logr/testr"
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -30,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -58,7 +60,6 @@ func newFakeLVMClusterReconciler(t *testing.T, objs ...client.Object) *LVMCluste
 	return &LVMClusterReconciler{
 		Client:    client,
 		Scheme:    scheme,
-		Log:       logf.Log.WithName("LVMCLusterTest"),
 		Namespace: "default",
 	}
 }
@@ -95,7 +96,7 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 		}
 		r := newFakeLVMClusterReconciler(t, lvmcluster)
 		var unit resourceManager = vgManager{}
-		err := unit.ensureCreated(r, context.Background(), lvmcluster)
+		err := unit.ensureCreated(r, log.IntoContext(context.Background(), testr.New(t)), lvmcluster)
 		assert.NilError(t, err, "running ensureCreated")
 		ds := &appsv1.DaemonSet{}
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: VGManagerUnit, Namespace: testNamespace}, ds)

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "k8s.io/api/apps/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -49,14 +50,14 @@ func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *LVMClusterReconciler) getLVMClusterObjsForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {
+
 	foundLVMClusterList := &lvmv1alpha1.LVMClusterList{}
 	listOps := &client.ListOptions{
 		Namespace: obj.GetNamespace(),
 	}
 
-	err := r.Client.List(ctx, foundLVMClusterList, listOps)
-	if err != nil {
-		r.Log.Error(err, "getLVMClusterObjsForReconcile: Failed to get LVMCluster objs")
+	if err := r.Client.List(ctx, foundLVMClusterList, listOps); err != nil {
+		log.FromContext(ctx).Error(err, "getLVMClusterObjsForReconcile: Failed to get LVMCluster objs")
 		return []reconcile.Request{}
 	}
 

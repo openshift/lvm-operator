@@ -22,10 +22,11 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -44,57 +45,49 @@ func (s topolvmStorageClass) getName() string {
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;create;delete;watch;list
 
 func (s topolvmStorageClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("resourceManager", s.getName())
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 
 	// one storage class for every deviceClass based on CR is created
-	topolvmStorageClasses := getTopolvmStorageClasses(r, ctx, lvmCluster)
+	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, lvmCluster)
 	for _, sc := range topolvmStorageClasses {
 		// we anticipate no edits to storage class
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, sc, func() error { return nil })
 		if err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", s.getName(), err)
 		}
-		unitLogger.Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
+		logger.Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
 	}
 	return nil
 }
 
 func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 
 	// construct name of storage class based on CR spec deviceClass field and
 	// delete the corresponding storage class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		sc := &storagev1.StorageClass{}
 		scName := getStorageClassName(deviceClass.Name)
-		err := r.Client.Get(ctx, types.NamespacedName{Name: scName}, sc)
 
-		if err != nil {
-			// already deleted in previous reconcile
-			if errors.IsNotFound(err) {
-				r.Log.Info("topolvm storage class is deleted", "StorageClass", scName)
-				return nil
-			}
-			r.Log.Error(err, "failed to retrieve topolvm storage class", "StorageClass", scName)
-			return err
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
+			return client.IgnoreNotFound(err)
 		}
 
-		// storageClass exists, initiate deletion
-		if sc.GetDeletionTimestamp().IsZero() {
-			if err = r.Client.Delete(ctx, sc); err != nil {
-				r.Log.Error(err, "failed to delete topolvm storage class", "StorageClass", scName)
-				return err
-			} else {
-				r.Log.Info("initiated topolvm storage class deletion", "StorageClass", scName)
-			}
-		} else {
+		if !sc.GetDeletionTimestamp().IsZero() {
 			// return error for next reconcile to confirm deletion
 			return fmt.Errorf("topolvm storage class %s is already marked for deletion", scName)
 		}
+
+		if err := r.Client.Delete(ctx, sc); err != nil {
+			return fmt.Errorf("failed to delete topolvm storage class %s: %w", scName, err)
+		}
+		logger.Info("initiated topolvm storage class deletion", "StorageClass", scName)
 	}
 	return nil
 }
 
-func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
+func (s topolvmStorageClass) getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 
 	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
 	allowVolumeExpansion := true
@@ -107,7 +100,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 	err := r.Client.List(ctx, scList)
 
 	if err != nil {
-		r.Log.Error(err, "failed to list storage classes. Not setting any storageclass as the default")
+		logger.Error(err, "failed to list storage classes. Not setting any storageclass as the default")
 		setDefaultStorageClass = false
 	} else {
 		for _, sc := range scList.Items {
@@ -118,7 +111,7 @@ func getTopolvmStorageClasses(r *LVMClusterReconciler, ctx context.Context, lvmC
 			}
 		}
 	}
-	sc := []*storagev1.StorageClass{}
+	var sc []*storagev1.StorageClass
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := getStorageClassName(deviceClass.Name)
 

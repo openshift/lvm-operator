@@ -23,10 +23,11 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/pkg/errors"
 	storagev1 "k8s.io/api/storage/v1"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -44,8 +45,8 @@ func (c csiDriver) getName() string {
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list
 
-func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
-	unitLogger := r.Log.WithValues("resourceManager", c.getName())
+func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	csiDriverResource := getCSIDriverResource()
 
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, csiDriverResource, func() error {
@@ -56,22 +57,15 @@ func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 	if err != nil {
 		return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
 	}
-	unitLogger.Info("CSIDriver applied to cluster", "operation", result, "name", csiDriverResource.Name)
+	logger.Info("CSIDriver applied to cluster", "operation", result, "name", csiDriverResource.Name)
 	return nil
 }
 
-func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	csiDriverResource := &storagev1.CSIDriver{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmCSIDriverName}, csiDriverResource)
-
-	if err != nil {
-		// already deleted in previous reconcile
-		if k8serror.IsNotFound(err) {
-			r.Log.Info("csi driver deleted", "TopolvmCSIDriverName", csiDriverResource.Name)
-			return nil
-		}
-		r.Log.Error(err, "failed to retrieve topolvm csi driver resource", "TopolvmCSIDriverName", csiDriverResource.Name)
-		return err
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmCSIDriverName}, csiDriverResource); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
 	// if not deleted, initiate deletion
@@ -80,12 +74,10 @@ func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, l
 		return errors.Errorf("topolvm csi driver %s is already marked for deletion", csiDriverResource.Name)
 	}
 
-	err = r.Client.Delete(ctx, csiDriverResource)
-	if err != nil {
-		r.Log.Error(err, "failed to delete topolvm csi driver", "TopolvmCSIDriverName", csiDriverResource.Name)
-		return err
+	if err := r.Client.Delete(ctx, csiDriverResource); err != nil {
+		return fmt.Errorf("failed to delete topolvm csi driver %s: %w", csiDriverResource.GetName(), err)
 	}
-	r.Log.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
+	logger.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
 
 	return nil
 }

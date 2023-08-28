@@ -1,14 +1,17 @@
 package vgmanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/internal"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -564,7 +567,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			availableDevices, err := r.getAvailableDevicesForVG(tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
+			availableDevices, err := r.getAvailableDevicesForVG(log.IntoContext(context.Background(), testr.New(t)), tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
 			if !tc.expectError {
 				assert.NoError(t, err)
 			} else {

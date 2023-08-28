@@ -1,6 +1,7 @@
 package vgmanager
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var mockLvsOutputNoReportContent = `
@@ -218,10 +220,9 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VGReconciler{
-				Log:      testr.New(t),
 				executor: tt.fields.executor,
 			}
-			tt.wantErr(t, r.validateLVs(tt.args.volumeGroup), fmt.Sprintf("validateLVs(%v)", tt.args.volumeGroup))
+			tt.wantErr(t, r.validateLVs(log.IntoContext(context.Background(), testr.New(t)), tt.args.volumeGroup), fmt.Sprintf("validateLVs(%v)", tt.args.volumeGroup))
 		})
 	}
 }

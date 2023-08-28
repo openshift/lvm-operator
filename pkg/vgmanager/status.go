@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -55,20 +56,18 @@ func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vgName str
 	return r.setVolumeGroupStatus(ctx, status)
 }
 
-func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vgName string, reason string) error {
+func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vgName string, err error) error {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vgName,
 		Status: lvmv1alpha1.VGStatusFailed,
-		Reason: reason,
+		Reason: err.Error(),
 	}
 
 	// Set devices for the VGStatus.
 	// If there is backing volume group, then set as degraded
-	devicesExist, err := r.setDevices(status)
-	if err != nil {
-		return err
-	}
-	if devicesExist {
+	if devicesExist, err := r.setDevices(status); err != nil {
+		return fmt.Errorf("could not set devices in VGStatus: %w", err)
+	} else if devicesExist {
 		status.Status = lvmv1alpha1.VGStatusDegraded
 	}
 
@@ -76,6 +75,8 @@ func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vgName st
 }
 
 func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, status *lvmv1alpha1.VGStatus) error {
+	logger := log.FromContext(ctx)
+
 	// Get LVMVolumeGroupNodeStatus and set the relevant VGStatus
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
 		ObjectMeta: metav1.ObjectMeta{
@@ -98,19 +99,23 @@ func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, status *lvmv1al
 
 		return nil
 	})
+
 	if err != nil {
-		r.Log.Error(err, "failed to create or update LVMVolumeGroupNodeStatus", "name", nodeStatus.Name)
-		return err
-	} else if result != controllerutil.OperationResultNone {
-		r.Log.Info("LVMVolumeGroupNodeStatus modified", "operation", result, "name", nodeStatus.Name)
+		return fmt.Errorf("LVMVolumeGroupNodeStatus could not be updated: %w", err)
+	}
+
+	if result != controllerutil.OperationResultNone {
+		logger.Info("LVMVolumeGroupNodeStatus modified", "operation", result, "name", nodeStatus.Name)
 	} else {
-		r.Log.Info("LVMVolumeGroupNodeStatus unchanged")
+		logger.Info("LVMVolumeGroupNodeStatus unchanged")
 	}
 
 	return nil
 }
 
 func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vgName string) error {
+	logger := log.FromContext(ctx)
+
 	// Get LVMVolumeGroupNodeStatus and remove the relevant VGStatus
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
 		ObjectMeta: metav1.ObjectMeta{
@@ -136,12 +141,13 @@ func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vgName strin
 		return nil
 	})
 	if err != nil {
-		r.Log.Error(err, "failed to create or update LVMVolumeGroupNodeStatus", "name", nodeStatus.Name)
-		return err
-	} else if result != controllerutil.OperationResultNone {
-		r.Log.Info("LVMVolumeGroupNodeStatus modified", "operation", result, "name", nodeStatus.Name)
+		return fmt.Errorf("failed to create or update LVMVolumeGroupNodeStatus %s", nodeStatus.GetName())
+	}
+
+	if result != controllerutil.OperationResultNone {
+		logger.Info("LVMVolumeGroupNodeStatus modified", "operation", result, "name", nodeStatus.Name)
 	} else {
-		r.Log.Info("LVMVolumeGroupNodeStatus unchanged")
+		logger.Info("LVMVolumeGroupNodeStatus unchanged")
 	}
 
 	return nil
