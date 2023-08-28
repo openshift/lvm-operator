@@ -23,15 +23,14 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
-	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers/internal"
+	"github.com/openshift/lvm-operator/pkg/cluster"
 
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -47,8 +46,6 @@ var lvmClusterFinalizer = "lvmcluster.topolvm.io"
 
 const (
 	ControllerName = "lvmcluster-controller"
-
-	openshiftSCCPrivilegedName = "privileged"
 )
 
 // NOTE: when updating this, please also update docs/design/lvm-operator-manager.md
@@ -64,21 +61,13 @@ type resourceManager interface {
 	ensureDeleted(*LVMClusterReconciler, context.Context, *lvmv1alpha1.LVMCluster) error
 }
 
-type ClusterType string
-
-const (
-	ClusterTypeOCP   ClusterType = "openshift"
-	ClusterTypeOther ClusterType = "other"
-)
-
 // LVMClusterReconciler reconciles a LVMCluster object
 type LVMClusterReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	ClusterType    ClusterType
-	SecurityClient secv1client.SecurityV1Interface
-	Namespace      string
-	ImageName      string
+	Scheme              *runtime.Scheme
+	ClusterTypeResolver cluster.TypeResolver
+	Namespace           string
+	ImageName           string
 
 	// TopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration
@@ -95,7 +84,7 @@ type LVMClusterReconciler struct {
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
-//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;create;update;delete
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
@@ -123,10 +112,6 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.Client.Get(ctx, req.NamespacedName, lvmCluster); err != nil {
 		// Error reading the object - requeue the request unless not found.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	if err := r.checkIfOpenshift(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("could not determine if cluster is an openshift cluster: %w", err)
 	}
 
 	if err := r.setRunningPodImage(ctx); err != nil {
@@ -183,12 +168,17 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	resources := []resourceManager{
 		&csiDriver{},
 		&topolvmController{r.TopoLVMLeaderElectionPassthrough},
-		&openshiftSccs{},
 		&topolvmNode{},
 		&vgManager{},
 		&lvmVG{},
 		&topolvmStorageClass{},
 		&topolvmVolumeSnapshotClass{},
+	}
+
+	if clusterType, err := r.ClusterTypeResolver.GetType(ctx); clusterType == cluster.TypeOCP {
+		resources = append(resources, openshiftSccs{})
+	} else if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to determine cluster type: %w", err)
 	}
 
 	resourceSyncStart := time.Now()
@@ -335,35 +325,7 @@ func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance 
 	return vgCount, nil
 }
 
-// checkIfOpenshift checks to see if the operator is running on an OCP cluster.
-// It does this by querying for the "privileged" SCC which exists on all OCP clusters.
-func (r *LVMClusterReconciler) checkIfOpenshift(ctx context.Context) error {
-	logger := log.FromContext(ctx)
-	if r.ClusterType == "" {
-		// cluster type has not been determined yet
-		// Check if the privileged SCC exists on the cluster (this is one of the default SCCs)
-		_, err := r.SecurityClient.SecurityContextConstraints().Get(ctx, openshiftSCCPrivilegedName, metav1.GetOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Not an Openshift cluster
-				r.ClusterType = ClusterTypeOther
-				logger.Info("openshiftSCC not found, setting cluster type to other")
-			} else {
-				return fmt.Errorf("failed to get SCC %s", openshiftSCCPrivilegedName)
-			}
-		} else {
-			logger.Info("openshiftSCC found, setting cluster type to openshift")
-			r.ClusterType = ClusterTypeOCP
-		}
-	}
-	return nil
-}
-
-func IsOpenshift(r *LVMClusterReconciler) bool {
-	return r.ClusterType == ClusterTypeOCP
-}
-
-// setRunningPodImage gets the operator image and set it in reconciler struct
+// getRunningPodImage gets the operator image and set it in reconciler struct
 func (r *LVMClusterReconciler) setRunningPodImage(ctx context.Context) error {
 
 	if r.ImageName == "" {
@@ -412,9 +374,14 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 			&lvmVG{},
 			&topolvmController{},
 			&csiDriver{},
-			&openshiftSccs{},
 			&topolvmNode{},
 			&vgManager{},
+		}
+
+		if clusterType, err := r.ClusterTypeResolver.GetType(ctx); clusterType == cluster.TypeOCP {
+			resourceDeletionList = append(resourceDeletionList, openshiftSccs{})
+		} else if err != nil {
+			return fmt.Errorf("failed to determine cluster type: %w", err)
 		}
 
 		for _, unit := range resourceDeletionList {

@@ -167,7 +167,9 @@ rules:
   - create
   - delete
   - get
+  - list
   - update
+  - watch
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:
