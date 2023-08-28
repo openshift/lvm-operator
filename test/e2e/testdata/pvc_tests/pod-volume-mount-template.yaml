@@ -5,7 +5,7 @@ metadata:
   namespace: %s
 spec:
   containers:
-    - name: nginx
+    - name: ubuntu
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -13,7 +13,8 @@ spec:
         capabilities:
           drop:
             - "ALL"
-      image: public.ecr.aws/docker/library/nginx:latest
+      image: quay.io/cybozu/ubuntu:20.04
+      command: ["/usr/local/bin/pause"]
       volumeMounts:
         - mountPath: /test1
           name: my-volume

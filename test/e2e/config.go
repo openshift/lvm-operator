@@ -57,6 +57,7 @@ var (
 	scheme               = runtime.NewScheme()
 	crClient             crclient.Client
 	deserializer         runtime.Decoder
+	contentTester        *PodRunner
 )
 
 func init() {
@@ -83,6 +84,10 @@ func init() {
 	crClient, err = crclient.New(config, crclient.Options{Scheme: scheme})
 	if err != nil {
 		panic(fmt.Sprintf("Failed to set client: %v", err))
+	}
+
+	if contentTester, err = NewPodRunner(config, crClient.Scheme()); err != nil {
+		panic(fmt.Sprintf("Failed to initialize pod runner: %v", err))
 	}
 
 	deserializer = serializer.NewCodecFactory(scheme).UniversalDeserializer()

@@ -21,6 +21,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+
 	"k8s.io/client-go/discovery"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -94,6 +95,9 @@ func ephemeralTest() {
 						err = crClient.Get(ctx, types.NamespacedName{Name: ephemeralPod.Name, Namespace: testNamespace}, ephemeralPod)
 						return err == nil && ephemeralPod.Status.Phase == k8sv1.PodRunning
 					}, timeout, interval).WithContext(ctx).Should(BeTrue())
+
+					By("Writing data to the Pod")
+					Expect(contentTester.WriteDataInPod(ctx, ephemeralPod, "TESTDATA", ContentModeFile)).To(Succeed())
 				})
 
 				It("Testing Snapshot Operations", func(ctx SpecContext) {
@@ -137,6 +141,14 @@ func ephemeralTest() {
 						return nil
 					}, timeout, interval).WithContext(ctx).Should(Succeed())
 
+					By("Reading data from the cloned data in the Pod")
+					clonedData := ""
+					Eventually(func(ctx context.Context) error {
+						clonedData, err = contentTester.GetDataInPod(ctx, clonePod, ContentModeFile)
+						return err
+					}).WithContext(ctx).Should(Succeed())
+					Expect(clonedData).To(Equal("TESTDATA"))
+
 					By("Restore Snapshot for pvc")
 					pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralfilepvc-restore", testNamespace, "Filesystem", storageClassName, "ephemeralfilepvc-snapshot")
 					restorePvc, err = getPVC(pvcRestoreYaml)
@@ -159,6 +171,14 @@ func ephemeralTest() {
 						}
 						return nil
 					}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+					By("Reading data from the restored data in the Pod")
+					restoredData := ""
+					Eventually(func(ctx context.Context) error {
+						restoredData, err = contentTester.GetDataInPod(ctx, restorePod, ContentModeFile)
+						return err
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
+					Expect(restoredData).To(Equal("TESTDATA"))
 				})
 
 				It("Cleaning up ephemeral volume operations for VolumeMode=Filesystem", func(ctx SpecContext) {
@@ -214,6 +234,9 @@ func ephemeralTest() {
 						err = crClient.Get(ctx, types.NamespacedName{Name: ephemeralPod.Name, Namespace: testNamespace}, ephemeralPod)
 						return err == nil && ephemeralPod.Status.Phase == k8sv1.PodRunning
 					}, timeout, interval).WithContext(ctx).Should(BeTrue())
+
+					By("Writing data to the Pod")
+					Expect(contentTester.WriteDataInPod(ctx, ephemeralPod, "TESTDATA", ContentModeBlock)).To(Succeed())
 				})
 
 				It("Testing Snapshot Operations", func(ctx SpecContext) {
@@ -257,6 +280,14 @@ func ephemeralTest() {
 						return nil
 					}, timeout, interval).WithContext(ctx).Should(Succeed())
 
+					By("Reading data from the cloned data in the Pod")
+					clonedData := ""
+					Eventually(func(ctx context.Context) error {
+						clonedData, err = contentTester.GetDataInPod(ctx, clonePod, ContentModeBlock)
+						return err
+					}).WithContext(ctx).Should(Succeed())
+					Expect(clonedData).To(Equal("TESTDATA"))
+
 					By("Restore Snapshot for pvc")
 					pvcRestoreYaml := fmt.Sprintf(ephemeralPvcSnapshotRestoreYAMLTemplate, "ephemeralblockpvc-restore", testNamespace, "Block", storageClassName, "ephemeralblockpvc-snapshot")
 					restorePvc, err = getPVC(pvcRestoreYaml)
@@ -279,6 +310,14 @@ func ephemeralTest() {
 						}
 						return nil
 					}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+					By("Reading data from the restored data in the Pod")
+					restoredData := ""
+					Eventually(func(ctx context.Context) error {
+						restoredData, err = contentTester.GetDataInPod(ctx, restorePod, ContentModeBlock)
+						return err
+					}, timeout, interval).WithContext(ctx).Should(Succeed())
+					Expect(restoredData).To(Equal("TESTDATA"))
 				})
 
 				It("Cleaning up ephemeral volume operations for VolumeMode=Filesystem", func(ctx SpecContext) {
