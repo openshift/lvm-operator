@@ -46,26 +46,17 @@ Start by filling out the header with the metadata for this enhancement.
 
 # Logical Volume Manager CSI Driver
 
-This is the title of the enhancement. Keep it simple and descriptive. A good
-title can help communicate what the enhancement is and should be considered as
-part of any review.
-
-The YAML `title` should be lowercased and spaces/punctuation should be
-replaced with `-`.
-
-The `Metadata` section above is intended to support the creation of tooling
-around the enhancement process.
-
 ## Summary
 
-The `Summary` section is incredibly important for producing high quality
-user-focused documentation such as release notes or a development roadmap. It
-should be possible to collect this information before implementation begins in
-order to avoid requiring implementors to split their attention between writing
-release notes and implementing the feature itself.
-
-A good summary is no more than one paragraph in length. More detail
-should go into the following sections.
+The LVM Storage Operator currently adds node-local storage by utilizing the 
+upstream TopoLVM Container Storage Interface (CSI) driver. The TopoLVM CSI 
+driver was implemented to cover the most basic Logical Volume Management (LVM)
+use cases and as such has multiple draw backs and deficiencies that lead to 
+complex bugs and a non-standard relationship with the CSI Driver and the
+Operator. This enhancement proposal covers the details of developing a new CSI
+driver with similar functionality to TopoLVM while reducing the limitations of
+TopoLVM, moving all LVM modification commands to the CSI driver, and general
+architectural improvements.
 
 ## Motivation
 
