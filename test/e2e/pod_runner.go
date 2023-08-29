@@ -148,14 +148,18 @@ func (t *PodRunner) WriteDataInPod(ctx context.Context, pod *k8sv1.Pod, content 
 	return err
 }
 
-// GetDataInPod gets the data in a pod.
+// GetDataInPod uses either cat or head to retrieve data from a file or a block-device.
+// While cat for files is canonical to read, using head for block devices is a hack that we use to avoid
+// having to partition the block device. Instead we read directly from the device. This only works
+// as long as the read data is exactly one line, if it is more this code will break.
+// For testing purposes this will be fine to verify block integrity though.
 func (t *PodRunner) GetDataInPod(ctx context.Context, pod *k8sv1.Pod, mode ContentMode) (string, error) {
 	var command string
 	if mode == ContentModeFile {
 		// if we use a file we can simply get the file content
 		command = fmt.Sprintf("cat %s/test", pod.Spec.Containers[0].VolumeMounts[0].MountPath)
 	} else {
-		// for a block device, since we don't format, we have to limit the lines, otherwise we will read
+		// HACK: for a block device, since we don't format, we have to limit the lines, otherwise we will read
 		// the entire disk content as bytes, which will be bad. Instead, limit to one line.
 		command = fmt.Sprintf("head -n1 %s", pod.Spec.Containers[0].VolumeDevices[0].DevicePath)
 	}
