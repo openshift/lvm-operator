@@ -5,7 +5,7 @@ metadata:
   namespace: %s
 spec:
   containers:
-    - name: ubuntu
+    - name: pause
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -13,8 +13,8 @@ spec:
         capabilities:
           drop:
             - "ALL"
-      image: quay.io/cybozu/ubuntu:20.04
-      command: ["/usr/local/bin/pause"]
+      image: public.ecr.aws/docker/library/busybox:1.36
+      command: ["sh", "-c", "tail -f /dev/null"]
       volumeDevices:
         - devicePath: /dev/xda
           name: my-volume
