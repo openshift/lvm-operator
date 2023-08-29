@@ -51,12 +51,9 @@ func (r *CachedTypeResolver) GetType(ctx context.Context) (Type, error) {
 type DefaultTypeResolver struct{ client.Client }
 
 // GetType checks to see if the operator is running on an OCP cluster.
-// It does this by querying for the "privileged" SCC which exists on all OCP clusters.
 func (r DefaultTypeResolver) GetType(ctx context.Context) (Type, error) {
 	logger := log.FromContext(ctx)
 
-	// cluster type has not been determined yet
-	// Check if the privileged SCC exists on the cluster (this is one of the default SCCs)
 	err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, &configv1.Infrastructure{})
 
 	if err == nil {
@@ -65,7 +62,6 @@ func (r DefaultTypeResolver) GetType(ctx context.Context) (Type, error) {
 	}
 
 	if k8serrors.IsNotFound(err) {
-		// Not an Openshift cluster
 		logger.Info("Openshift Infrastructure not found, setting cluster type to other")
 		return TypeOther, nil
 	}
