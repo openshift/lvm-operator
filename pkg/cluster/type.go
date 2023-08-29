@@ -6,15 +6,13 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	v1 "github.com/openshift/api/security/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-const openshiftSCCPrivilegedName = "privileged"
 
 type Type string
 
@@ -56,18 +54,19 @@ type DefaultTypeResolver struct{ client.Client }
 // It does this by querying for the "privileged" SCC which exists on all OCP clusters.
 func (r DefaultTypeResolver) GetType(ctx context.Context) (Type, error) {
 	logger := log.FromContext(ctx)
+
 	// cluster type has not been determined yet
 	// Check if the privileged SCC exists on the cluster (this is one of the default SCCs)
-	err := r.Get(ctx, types.NamespacedName{Name: openshiftSCCPrivilegedName}, &v1.SecurityContextConstraints{})
+	err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, &configv1.Infrastructure{})
 
 	if err == nil {
-		logger.Info("openshiftSCC found, setting cluster type to openshift")
+		logger.Info("Openshift Infrastructure found, setting cluster type to openshift")
 		return TypeOCP, nil
 	}
 
 	if k8serrors.IsNotFound(err) {
 		// Not an Openshift cluster
-		logger.Info("openshiftSCC not found, setting cluster type to other")
+		logger.Info("Openshift Infrastructure not found, setting cluster type to other")
 		return TypeOther, nil
 	}
 
@@ -78,11 +77,11 @@ func (r DefaultTypeResolver) GetType(ctx context.Context) (Type, error) {
 	if errors.As(err, &groupErr) {
 		for _, err := range groupErr.Groups {
 			if k8serrors.IsNotFound(err) {
-				logger.Info("SCCs are not available in the cluster, setting cluster type to other")
+				logger.Info("Openshift Infrastructure not available in the cluster, setting cluster type to other")
 				return TypeOther, nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("failed to get SCC %s: %w", openshiftSCCPrivilegedName, err)
+	return "", fmt.Errorf("failed to get Openshift Infrastructure 'cluster': %w", err)
 }

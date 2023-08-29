@@ -22,6 +22,8 @@ import (
 	"os"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	secv1 "github.com/openshift/api/security/v1"
 	lvmv1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	operatorv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -69,6 +71,8 @@ func init() {
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapapi.AddToScheme(scheme))
+	utilruntime.Must(secv1.Install(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 
 	kubeconfig := os.Getenv("KUBECONFIG")
 	config, err := getKubeconfig(kubeconfig)

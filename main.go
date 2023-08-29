@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 
+	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/controllers/node"
 
@@ -63,6 +64,7 @@ func init() {
 	utilruntime.Must(topolvmv1.AddToScheme(scheme))
 	utilruntime.Must(snapapi.AddToScheme(scheme))
 	utilruntime.Must(secv1.Install(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -116,6 +118,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	clusterType, err := cluster.NewTypeResolver(setupClient).GetType(context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to determine cluster type")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                              scheme,
 		MetricsBindAddress:                  metricsAddr,
@@ -133,7 +141,7 @@ func main() {
 	if err = (&controllers.LVMClusterReconciler{
 		Client:                           mgr.GetClient(),
 		Scheme:                           mgr.GetScheme(),
-		ClusterTypeResolver:              cluster.NewTypeResolver(mgr.GetClient()),
+		ClusterType:                      clusterType,
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
 	}).SetupWithManager(mgr); err != nil {

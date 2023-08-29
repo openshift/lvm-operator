@@ -64,10 +64,10 @@ type resourceManager interface {
 // LVMClusterReconciler reconciles a LVMCluster object
 type LVMClusterReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	ClusterTypeResolver cluster.TypeResolver
-	Namespace           string
-	ImageName           string
+	Scheme      *runtime.Scheme
+	ClusterType cluster.Type
+	Namespace   string
+	ImageName   string
 
 	// TopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration
@@ -85,6 +85,7 @@ type LVMClusterReconciler struct {
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
 //+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
@@ -175,10 +176,8 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		&topolvmVolumeSnapshotClass{},
 	}
 
-	if clusterType, err := r.ClusterTypeResolver.GetType(ctx); clusterType == cluster.TypeOCP {
+	if r.ClusterType == cluster.TypeOCP {
 		resources = append(resources, openshiftSccs{})
-	} else if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to determine cluster type: %w", err)
 	}
 
 	resourceSyncStart := time.Now()
@@ -378,10 +377,8 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 			&vgManager{},
 		}
 
-		if clusterType, err := r.ClusterTypeResolver.GetType(ctx); clusterType == cluster.TypeOCP {
+		if r.ClusterType == cluster.TypeOCP {
 			resourceDeletionList = append(resourceDeletionList, openshiftSccs{})
-		} else if err != nil {
-			return fmt.Errorf("failed to determine cluster type: %w", err)
 		}
 
 		for _, unit := range resourceDeletionList {

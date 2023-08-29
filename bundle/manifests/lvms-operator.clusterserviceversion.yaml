@@ -124,6 +124,12 @@ spec:
           - update
           - watch
         - apiGroups:
+          - config.openshift.io
+          resources:
+          - infrastructures
+          verbs:
+          - get
+        - apiGroups:
           - ""
           resources:
           - events
