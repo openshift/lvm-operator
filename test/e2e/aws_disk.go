@@ -223,36 +223,37 @@ func getEC2Client(ctx context.Context, region string) (*ec2.EC2, error) {
 }
 
 func (m *AWSDiskManager) cleanupAWSDisks(ctx context.Context) error {
-	volumes, err := m.getAWSTestVolumes(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list AWS volumes to clean them up (detaching): %w", err)
-	}
-	for _, volume := range volumes {
-		m.log.Info("detaching AWS Volume", "size", volume.Size, "id", volume.VolumeId)
-		if _, err := m.ec2.DetachVolumeWithContext(ctx, &ec2.DetachVolumeInput{VolumeId: volume.VolumeId}); err != nil {
-			fmt.Printf("detaching Disk failed")
-			return err
-		}
-	}
-	err = wait.PollUntilContextTimeout(ctx, m.cleanupPollingInterval, m.cleanupTimeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, m.cleanupPollingInterval, m.cleanupTimeout, true, func(ctx context.Context) (bool, error) {
 		volumes, err := m.getAWSTestVolumes(ctx)
 		if err != nil {
 			return false, fmt.Errorf("failed to list AWS volumes for cleanup (deletion): %+v", err)
 		}
-		allDeleted := true
 		for _, volume := range volumes {
-			if *volume.State != ec2.VolumeStateAvailable {
-				m.log.Info("waiting for state", "desiredState", ec2.VolumeStateAvailable, "currentState", volume.State, "id", volume.VolumeId)
-				allDeleted = false
-				continue
+			if volume.State == nil {
+				m.log.Info("volume did not have a state", "id", volume.VolumeId)
+				return false, nil
 			}
+
+			if *volume.State == ec2.VolumeStateInUse {
+				m.log.Info("detaching AWS Volume", "size", volume.Size, "id", volume.VolumeId)
+				if attachment, err := m.ec2.DetachVolumeWithContext(ctx, &ec2.DetachVolumeInput{VolumeId: volume.VolumeId}); err != nil {
+					m.log.Error(err, "could not detach volume", "volume_attachment", attachment)
+				}
+				return false, nil
+			}
+
+			if *volume.State != ec2.VolumeStateAvailable {
+				m.log.Info("waiting for volume to become available after detach", "desiredState", ec2.VolumeStateAvailable, "currentState", volume.State, "id", volume.VolumeId)
+				return false, nil
+			}
+
 			m.log.Info("deleting AWS Volume", "size", volume.Size, "id", volume.VolumeId)
-			if _, err := m.ec2.DeleteVolumeWithContext(ctx, &ec2.DeleteVolumeInput{VolumeId: volume.VolumeId}); err != nil {
-				m.log.Error(err, "failed deleting AWS Volume", "size", volume.Size, "id", volume.VolumeId)
-				allDeleted = false
+			if deleteOut, err := m.ec2.DeleteVolumeWithContext(ctx, &ec2.DeleteVolumeInput{VolumeId: volume.VolumeId}); err != nil {
+				m.log.Error(err, "could not delete volume", "delete_out", deleteOut)
+				return false, nil
 			}
 		}
-		return allDeleted, nil
+		return true, nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed AWS Volume cleanup: %w", err)
