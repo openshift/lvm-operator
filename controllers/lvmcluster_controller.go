@@ -168,7 +168,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	resources := []resourceManager{
 		&csiDriver{},
-		&topolvmController{r.TopoLVMLeaderElectionPassthrough},
+		&topolvmController{},
 		&topolvmNode{},
 		&vgManager{},
 		&lvmVG{},

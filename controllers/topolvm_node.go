@@ -27,9 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -60,13 +58,11 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 		},
 	}
 
-	err := cutil.SetControllerReference(lvmCluster, ds, r.Scheme)
-	if err != nil {
-		return fmt.Errorf("failed to set controller reference to topolvm node daemonset: %w", err)
-	}
-
 	logger.Info("running CreateOrUpdate")
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, ds, func() error {
+		if err := cutil.SetControllerReference(lvmCluster, ds, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set controller reference to topolvm node daemonset: %w", err)
+		}
 		// at creation, deep copy the whole daemonSet
 		if ds.CreationTimestamp.IsZero() {
 			dsTemplate.DeepCopyInto(ds)
@@ -106,28 +102,8 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 	return nil
 }
 
-// ensureDeleted should wait for the resources to be cleaned up
-func (n topolvmNode) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
-	logger := log.FromContext(ctx).WithValues("topolvmNode", n.getName())
-	NodeDaemonSet := &appsv1.DaemonSet{}
-
-	if err := r.Client.Get(ctx,
-		types.NamespacedName{Name: TopolvmNodeDaemonsetName, Namespace: r.Namespace},
-		NodeDaemonSet); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	// if not deleted, initiate deletion
-	if !NodeDaemonSet.GetDeletionTimestamp().IsZero() {
-		return fmt.Errorf("topolvm csi node daemonset %s is already marked for deletion", TopolvmNodeDaemonsetName)
-	}
-
-	if err := r.Client.Delete(ctx, NodeDaemonSet); err != nil {
-		return fmt.Errorf("failed to delete topolvm node daemonset %s: %w", TopolvmNodeDaemonsetName, err)
-	}
-
-	logger.Info("initiated topolvm node DaemonSet deletion", "name", TopolvmNodeDaemonsetName)
-
+// ensureDeleted is a noop. Deletion will be handled by ownerref
+func (n topolvmNode) ensureDeleted(_ *LVMClusterReconciler, _ context.Context, _ *lvmv1alpha1.LVMCluster) error {
 	return nil
 }
 

@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -71,12 +72,20 @@ func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Contex
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	sccs := getAllSCCs(r.Namespace)
 	for _, scc := range sccs {
-		if err := r.Delete(ctx, scc); err != nil {
-			if !errors.IsNotFound(err) {
-				return fmt.Errorf("failed to delete SecurityContextConstraint %s: %w", scc.GetName(), err)
-			}
-			logger.Info("SecurityContextConstraint is already deleted", "SecurityContextConstraint", scc.Name)
+		name := types.NamespacedName{Name: scName}
+		logger := logger.WithValues("SecurityContextConstraint", scName)
+		if err := r.Client.Get(ctx, name, scc); err != nil {
+			return client.IgnoreNotFound(err)
 		}
+
+		if !scc.GetDeletionTimestamp().IsZero() {
+			return fmt.Errorf("the SecurityContextConstraint %s is still present, waiting for deletion", scName)
+		}
+
+		if err := r.Delete(ctx, scc); err != nil {
+			return fmt.Errorf("failed to delete SecurityContextConstraint %s: %w", scc.GetName(), err)
+		}
+		logger.Info("initiated SecurityContextConstraint deletion")
 	}
 	return nil
 }

@@ -25,10 +25,8 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -39,7 +37,6 @@ const (
 )
 
 type topolvmController struct {
-	topoLVMLeaderElectionPassthrough v1.LeaderElection
 }
 
 // topolvmController unit satisfies resourceManager interface
@@ -55,7 +52,7 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(lvmCluster, r.Namespace, r.ImageName, c.topoLVMLeaderElectionPassthrough)
+	desiredDeployment := getControllerDeployment(r.Namespace, r.ImageName, r.TopoLVMLeaderElectionPassthrough)
 	existingDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      desiredDeployment.Name,
@@ -63,12 +60,22 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 		},
 	}
 
-	if err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference for csi controller: %w", err)
-	}
-
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, existingDeployment, func() error {
-		return c.setTopolvmControllerDesiredState(existingDeployment, desiredDeployment)
+		if err := cutil.SetControllerReference(lvmCluster, existingDeployment, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set controller reference for csi controller: %w", err)
+		}
+		// at creation, deep copy desired deployment into existing
+		if existingDeployment.CreationTimestamp.IsZero() {
+			desiredDeployment.DeepCopyInto(existingDeployment)
+			return nil
+		}
+
+		// for update, topolvm controller is interested in only updating container images
+		// labels, volumes, service account etc can remain unchanged
+		existingDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
+		existingDeployment.Spec.Template.Spec.InitContainers = desiredDeployment.Spec.Template.Spec.InitContainers
+
+		return nil
 	})
 
 	if err != nil {
@@ -84,52 +91,12 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 	return nil
 }
 
+// ensureDeleted is a noop. Deletion will be handled by ownerref
 func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
-	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
-	existingDeployment := &appsv1.Deployment{}
-
-	err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmControllerDeploymentName, Namespace: r.Namespace}, existingDeployment)
-	// already deleted in previous reconcile
-	if k8serror.IsNotFound(err) {
-		logger.Info("csi controller deleted", "TopolvmController", existingDeployment.Name)
-		return nil
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to retrieve csi controller deployment %s: %w", existingDeployment.GetName(), err)
-	}
-
-	// if not deleted, initiate deletion
-	if !existingDeployment.GetDeletionTimestamp().IsZero() {
-		// set deletion in-progress for next reconcile to confirm deletion
-		return fmt.Errorf("topolvm controller deployment %s is already marked for deletion", existingDeployment.Name)
-	}
-
-	if err = r.Client.Delete(ctx, existingDeployment); err != nil {
-		return fmt.Errorf("failed to delete topolvm controller deployment %s: %w", existingDeployment.GetName(), err)
-	}
-
-	logger.Info("initiated topolvm controller deployment deletion", "TopolvmController", existingDeployment.Name)
 	return nil
 }
 
-func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *appsv1.Deployment) error {
-
-	// at creation, deep copy desired deployment into existing
-	if existing.CreationTimestamp.IsZero() {
-		desired.DeepCopyInto(existing)
-		return nil
-	}
-
-	// for update, topolvm controller is interested in only updating container images
-	// labels, volumes, service account etc can remain unchanged
-	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
-	existing.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
-
-	return nil
-}
-
-func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string, topoLVMLeaderElectionPassthrough v1.LeaderElection) *appsv1.Deployment {
+func getControllerDeployment(namespace string, initImage string, topoLVMLeaderElectionPassthrough v1.LeaderElection) *appsv1.Deployment {
 	// Topolvm CSI Controller Deployment
 	var replicas int32 = 1
 	volumes := []corev1.Volume{
