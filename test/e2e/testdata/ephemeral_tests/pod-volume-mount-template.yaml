@@ -5,7 +5,7 @@ metadata:
   namespace: %s
 spec:
   containers:
-    - name: nginx
+    - name: pause
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -13,7 +13,8 @@ spec:
         capabilities:
           drop:
             - "ALL"
-      image: public.ecr.aws/docker/library/nginx:latest
+      image: public.ecr.aws/docker/library/busybox:1.36
+      command: ["sh", "-c", "tail -f /dev/null"]
       volumeMounts:
         - mountPath: /test1
           name: my-volume
