@@ -20,8 +20,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/openshift/lvm-operator/controllers/node"
 	"os"
+
+	configv1 "github.com/openshift/api/config/v1"
+	secv1 "github.com/openshift/api/security/v1"
+	"github.com/openshift/lvm-operator/controllers/node"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -38,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	"github.com/openshift/library-go/pkg/config/leaderelection"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
@@ -61,6 +63,8 @@ func init() {
 	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(topolvmv1.AddToScheme(scheme))
 	utilruntime.Must(snapapi.AddToScheme(scheme))
+	utilruntime.Must(secv1.Install(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -114,6 +118,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	clusterType, err := cluster.NewTypeResolver(setupClient).GetType(context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to determine cluster type")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                              scheme,
 		MetricsBindAddress:                  metricsAddr,
@@ -131,7 +141,7 @@ func main() {
 	if err = (&controllers.LVMClusterReconciler{
 		Client:                           mgr.GetClient(),
 		Scheme:                           mgr.GetScheme(),
-		SecurityClient:                   secv1client.NewForConfigOrDie(mgr.GetConfig()),
+		ClusterType:                      clusterType,
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
 	}).SetupWithManager(mgr); err != nil {

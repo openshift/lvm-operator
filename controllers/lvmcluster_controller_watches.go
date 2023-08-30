@@ -19,7 +19,9 @@ package controllers
 import (
 	"context"
 
+	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,7 +35,7 @@ import (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMCluster{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroup{}).
@@ -45,8 +47,16 @@ func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&storagev1.StorageClass{},
 			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
-		).
-		Complete(r)
+		)
+
+	if r.ClusterType == cluster.TypeOCP {
+		builder = builder.Watches(
+			&secv1.SecurityContextConstraints{},
+			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
+		)
+	}
+
+	return builder.Complete(r)
 }
 
 func (r *LVMClusterReconciler) getLVMClusterObjsForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {

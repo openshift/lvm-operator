@@ -23,6 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
+	secv1 "github.com/openshift/api/security/v1"
+	"github.com/openshift/lvm-operator/pkg/cluster"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -33,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers/node"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
@@ -94,6 +96,12 @@ var _ = BeforeSuite(func() {
 	err = snapapi.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = secv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = configv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -110,12 +118,15 @@ var _ = BeforeSuite(func() {
 	testNamespace.Name = testLvmClusterNamespace
 	Expect(k8sClient.Create(ctx, testNamespace)).Should(Succeed())
 
+	clusterType, err := cluster.NewTypeResolver(k8sClient).GetType(ctx)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&LVMClusterReconciler{
-		Client:         k8sManager.GetClient(),
-		Scheme:         k8sManager.GetScheme(),
-		SecurityClient: secv1client.NewForConfigOrDie(k8sManager.GetConfig()),
-		Namespace:      testLvmClusterNamespace,
-		ImageName:      testImageName,
+		Client:      k8sManager.GetClient(),
+		Scheme:      k8sManager.GetScheme(),
+		ClusterType: clusterType,
+		Namespace:   testLvmClusterNamespace,
+		ImageName:   testImageName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
