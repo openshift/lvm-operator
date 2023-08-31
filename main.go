@@ -141,6 +141,7 @@ func main() {
 	if err = (&controllers.LVMClusterReconciler{
 		Client:                           mgr.GetClient(),
 		Scheme:                           mgr.GetScheme(),
+		EventRecorder:                    mgr.GetEventRecorderFor(controllers.ControllerName),
 		ClusterType:                      clusterType,
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,

@@ -122,11 +122,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&LVMClusterReconciler{
-		Client:      k8sManager.GetClient(),
-		Scheme:      k8sManager.GetScheme(),
-		ClusterType: clusterType,
-		Namespace:   testLvmClusterNamespace,
-		ImageName:   testImageName,
+		Client:        k8sManager.GetClient(),
+		EventRecorder: k8sManager.GetEventRecorderFor(ControllerName),
+		Scheme:        k8sManager.GetScheme(),
+		ClusterType:   clusterType,
+		Namespace:     testLvmClusterNamespace,
+		ImageName:     testImageName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
