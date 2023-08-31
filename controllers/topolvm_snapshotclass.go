@@ -69,32 +69,30 @@ func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx c
 func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 
-	// construct name of volume snapshot class based on CR spec deviceClass field and
-	// delete the corresponding volume snapshot class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
-		vsc := &snapapi.VolumeSnapshotClass{}
+		// construct name of volume snapshot class based on CR spec deviceClass field and
+		// delete the corresponding volume snapshot class
 		vscName := getVolumeSnapshotClassName(deviceClass.Name)
-		err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc)
+		logger := logger.WithValues("VolumeSnapshotClass", vscName)
 
+		vsc := &snapapi.VolumeSnapshotClass{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc); err != nil {
 			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
-				logger.Info("topolvm volume snapshot classes do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
+				logger.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
 				return nil
 			}
 			return client.IgnoreNotFound(err)
 		}
 
-		// VolumeSnapshotClass exists, initiate deletion
 		if !vsc.GetDeletionTimestamp().IsZero() {
-			// return error for next reconcile to confirm deletion
-			return fmt.Errorf("topolvm volume snapshot class %s is already marked for deletion", vscName)
+			return fmt.Errorf("the VolumeSnapshotClass %s is still present, waiting for deletion", vscName)
 		}
 
-		if err = r.Client.Delete(ctx, vsc); err != nil {
+		if err := r.Client.Delete(ctx, vsc); err != nil {
 			return fmt.Errorf("failed to delete topolvm VolumeSnapshotClass %s: %w", vscName, err)
 		}
-		logger.Info("initiated topolvm volume snapshot class deletion", "VolumeSnapshotClass", vscName)
+		logger.Info("initiated VolumeSnapshotClass deletion")
 	}
 	return nil
 }

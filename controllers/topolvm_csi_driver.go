@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/pkg/errors"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,16 +61,15 @@ func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, _
 }
 
 func (c csiDriver) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
-	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
+	name := types.NamespacedName{Name: TopolvmCSIDriverName}
+	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName(), "CSIDriver", TopolvmCSIDriverName)
 	csiDriverResource := &storagev1.CSIDriver{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: TopolvmCSIDriverName}, csiDriverResource); err != nil {
+	if err := r.Client.Get(ctx, name, csiDriverResource); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	// if not deleted, initiate deletion
 	if !csiDriverResource.GetDeletionTimestamp().IsZero() {
-		// set deletion in-progress for next reconcile to confirm deletion
-		return errors.Errorf("topolvm csi driver %s is already marked for deletion", csiDriverResource.Name)
+		return fmt.Errorf("the CSIDriver %s is still present, waiting for deletion", TopolvmCSIDriverName)
 	}
 
 	if err := r.Client.Delete(ctx, csiDriverResource); err != nil {

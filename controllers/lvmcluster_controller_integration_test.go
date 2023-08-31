@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,8 +39,6 @@ var _ = Describe("LVMCluster controller", func() {
 		timeout  = time.Second * 10
 		interval = time.Millisecond * 250
 	)
-
-	ctx := context.Background()
 
 	// LVMCluster CR details
 	lvmClusterName := types.NamespacedName{Name: testLvmClusterName, Namespace: testLvmClusterNamespace}
@@ -63,6 +62,13 @@ var _ = Describe("LVMCluster controller", func() {
 			},
 		},
 	}
+
+	// this is a custom matcher that verifies for a correct owner-ref set with LVMCluster
+	containLVMClusterOwnerRefField := ContainElement(SatisfyAll(
+		HaveField("Name", lvmClusterIn.Name),
+		HaveField("BlockOwnerDeletion", pointer.Bool(true)),
+		HaveField("Controller", pointer.Bool(true)),
+	))
 
 	nodeIn := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -114,7 +120,10 @@ var _ = Describe("LVMCluster controller", func() {
 	scOut := &storagev1.StorageClass{}
 
 	Context("Reconciliation on creating an LVMCluster CR", func() {
-		It("should reconcile LVMCluster CR creation, ", func() {
+		SetDefaultEventuallyTimeout(timeout)
+		SetDefaultEventuallyPollingInterval(interval)
+
+		It("should reconcile LVMCluster CR creation, ", func(ctx context.Context) {
 			By("verifying CR status on reconciliation")
 			// create node as it should be present
 			Expect(k8sClient.Create(ctx, nodeIn)).Should(Succeed())
@@ -129,135 +138,128 @@ var _ = Describe("LVMCluster controller", func() {
 			// lvmcluster controller expecting this to be present to set the status properly
 			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
 
-			// placeholder to check CR status.Ready field to be true
+			By("verifying LVMCluster .Status.Ready is true")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
-				if err != nil {
+				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
 					return false
 				}
 				return lvmClusterOut.Status.Ready
-			}, timeout, interval).Should(Equal(true))
+			}).Should(BeTrue())
 
-			// placeholder to check CR status.State field to be Ready
+			By("verifying LVMCluster .Status.State is Ready")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
-				if err != nil {
+				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
 					return false
 				}
 				return lvmClusterOut.Status.State == lvmv1alpha1.LVMStatusReady
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
-			By("confirming presence of CSIDriver resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			By("confirming presence of CSIDriver")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+			}).WithContext(ctx).Should(Succeed())
 
-			By("confirming presence of VgManager resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			By("confirming presence of vg-manager")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
+			}).WithContext(ctx).Should(Succeed())
 
-			By("confirming presence of Topolvm Controller deployment")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, controllerName, controllerOut)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			By("confirming presence of TopoLVM Controller Deployment")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, controllerName, controllerOut)
+			}).WithContext(ctx).Should(Succeed())
 
 			By("confirming the existence of CSI Node resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, csiNodeName, csiNodeOut)
+			}).WithContext(ctx).Should(Succeed())
 
 			By("confirming the existence of LVMVolumeGroup resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
+			}).WithContext(ctx).Should(Succeed())
 
 			By("confirming creation of TopolvmStorageClasses")
 			for _, scName := range scNames {
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx, scName, scOut)
-					return err == nil
-				}, timeout, interval).Should(BeTrue())
+				Eventually(func(ctx context.Context) error {
+					return k8sClient.Get(ctx, scName, scOut)
+				}).WithContext(ctx).Should(Succeed())
 				scOut = &storagev1.StorageClass{}
 			}
 		})
 	})
 
 	Context("Reconciliation on deleting the LVMCluster CR", func() {
-		It("should reconcile LVMCluster CR deletion ", func() {
-			By("confirming absence of lvm cluster CR and deletion of operator created resources")
+		It("should reconcile LVMCluster CR deletion ", func(ctx context.Context) {
 
 			// delete lvmVolumeGroupNodeStatus as it should be deleted by vgmanager
 			// and if it is present lvmcluster reconciler takes it as vg is present on node
-
 			// we will now remove the node which will cause the LVM cluster status to also lose that vg
+			By("confirming absence of lvm cluster CR and deletion of operator created resources")
 			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
 			// deletion of LVMCluster CR and thus also the NodeStatus through the removal controller
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn),
-					&lvmv1alpha1.LVMVolumeGroupNodeStatus{})
-				return errors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
 			// deletion of LVMCluster CR
-			Eventually(func() bool {
-				err := k8sClient.Delete(ctx, lvmClusterOut)
-				return err != nil
-			}, timeout, interval).Should(BeTrue())
+			By("deleting the LVMClusterCR")
+			Expect(k8sClient.Delete(ctx, lvmClusterOut)).Should(Succeed())
 
 			// auto deletion of CSI Driver resource based on CR deletion
 			By("confirming absence of CSI Driver Resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, csiDriverName, csiDriverOut)
-				return errors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, csiDriverName, csiDriverOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
-			// ensure that VgManager has owner reference of LVMCluster. (envTest does not support garbage collection)
-			By("confirming VgManager resource has owner reference of LVMCluster resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
-				return err == nil && vgManagerDaemonset.OwnerReferences[0].Name == lvmClusterIn.Name
-			}, timeout, interval).Should(BeTrue())
+			// envtest does not support garbage collection, so we simulate the deletion
+			// see https://book.kubebuilder.io/reference/envtest.html?highlight=considerations#testing-considerations
+			By("confirming vg-manager has owner reference of LVMCluster")
+			Expect(k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)).Should(Succeed())
+			Expect(vgManagerDaemonset.OwnerReferences).To(containLVMClusterOwnerRefField)
+			Expect(k8sClient.Delete(ctx, vgManagerDaemonset)).To(Succeed(), "simulated ownerref cleanup should succeed")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
-			// auto deletion of Topolvm Controller deployment based on CR deletion
-			By("confirming absence of Topolvm Controller Deployment")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, controllerName, controllerOut)
-				return errors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+			// envtest does not support garbage collection, so we simulate the deletion
+			// see https://book.kubebuilder.io/reference/envtest.html?highlight=considerations#testing-considerations
+			By("confirming TopoLVM controller resource has owner reference of LVMCluster")
+			Expect(k8sClient.Get(ctx, controllerName, controllerOut)).Should(Succeed())
+			Expect(controllerOut.OwnerReferences).To(containLVMClusterOwnerRefField)
+			Expect(k8sClient.Delete(ctx, controllerOut)).To(Succeed(), "simulated ownerref cleanup should succeed")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, controllerName, controllerOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
-			By("confirming absence of CSI Node Resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, csiNodeName, csiNodeOut)
-				return errors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+			// envtest does not support garbage collection, so we simulate the deletion
+			// see https://book.kubebuilder.io/reference/envtest.html?highlight=considerations#testing-considerations
+			By("confirming TopoLVM Node DaemonSet has owner reference of LVMCluster")
+			Expect(k8sClient.Get(ctx, csiNodeName, csiNodeOut)).Should(Succeed())
+			Expect(csiNodeOut.OwnerReferences).To(containLVMClusterOwnerRefField)
+			Expect(k8sClient.Delete(ctx, csiNodeOut)).To(Succeed(), "simulated ownerref cleanup should succeed")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, csiNodeName, csiNodeOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
 			By("confirming absence of LVMVolumeGroup Resource")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
-				return errors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+			// technically we also set ownerrefs on volume groups so we would also need to check,
+			// but our controller still deletes them (in addition to the ownerrefs)
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
 			By("confirming absence of TopolvmStorageClasses")
 			for _, scName := range scNames {
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx, scName, scOut)
-					return errors.IsNotFound(err)
-				}, timeout, interval).Should(BeTrue())
-				scOut = &storagev1.StorageClass{}
+				Eventually(func(ctx context.Context) error {
+					return k8sClient.Get(ctx, scName, scOut)
+				}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 			}
 
 			By("confirming absence of LVMCluster CR")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
-				return errors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
-
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 		})
 	})
 

@@ -66,22 +66,22 @@ func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.
 	// construct name of storage class based on CR spec deviceClass field and
 	// delete the corresponding storage class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
-		sc := &storagev1.StorageClass{}
 		scName := getStorageClassName(deviceClass.Name)
+		logger := logger.WithValues("StorageClass", scName)
 
+		sc := &storagev1.StorageClass{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
 			return client.IgnoreNotFound(err)
 		}
 
 		if !sc.GetDeletionTimestamp().IsZero() {
-			// return error for next reconcile to confirm deletion
-			return fmt.Errorf("topolvm storage class %s is already marked for deletion", scName)
+			return fmt.Errorf("the StorageClass %s is still present, waiting for deletion", scName)
 		}
 
 		if err := r.Client.Delete(ctx, sc); err != nil {
-			return fmt.Errorf("failed to delete topolvm storage class %s: %w", scName, err)
+			return fmt.Errorf("failed to delete StorageClass %s: %w", scName, err)
 		}
-		logger.Info("initiated topolvm storage class deletion", "StorageClass", scName)
+		logger.Info("initiated StorageClass deletion")
 	}
 	return nil
 }

@@ -18,19 +18,19 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/controllers/internal"
 	"github.com/openshift/lvm-operator/pkg/cluster"
 
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -126,7 +126,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Reconcile errors have higher priority than status update errors
 	if reconcileError != nil {
 		return result, reconcileError
-	} else if statusError != nil && !errors.IsNotFound(statusError) {
+	} else if statusError != nil && !k8serrors.IsNotFound(statusError) {
 		return result, fmt.Errorf("failed to update LVMCluster status: %w", statusError)
 	} else {
 		return result, nil
@@ -168,7 +168,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	resources := []resourceManager{
 		&csiDriver{},
-		&topolvmController{r.TopoLVMLeaderElectionPassthrough},
+		&topolvmController{},
 		&topolvmNode{},
 		&vgManager{},
 		&lvmVG{},
@@ -200,7 +200,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	resourceSyncElapsedTime := time.Since(resourceSyncStart)
 	if len(errs) > 0 {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile resources managed by LVMCluster within %v: %w",
-			resourceSyncElapsedTime, internal.NewMultiError(errs))
+			resourceSyncElapsedTime, errors.Join(errs...))
 	}
 
 	logger.Info("successfully reconciled LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)
