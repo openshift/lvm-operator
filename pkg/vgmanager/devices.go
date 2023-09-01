@@ -190,7 +190,7 @@ func isDeviceAlreadyPartOfVG(vgs []VolumeGroup, diskName string, volumeGroup *lv
 	for _, vg := range vgs {
 		if vg.Name == volumeGroup.Name {
 			for _, pv := range vg.PVs {
-				if pv == diskName {
+				if pv.PvName == diskName {
 					return true
 				}
 			}

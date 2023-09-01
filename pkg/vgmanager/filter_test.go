@@ -54,7 +54,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 		{label: "tc swap", device: internal.BlockDevice{FSType: "swap"}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := FilterMap[noFilesystemSignature](tc.device, nil)
+		result, err := FilterMap[noValidFilesystemSignature](tc.device, nil)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)

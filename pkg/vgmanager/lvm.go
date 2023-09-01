@@ -18,7 +18,9 @@ package vgmanager
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os/exec"
 
 	"github.com/openshift/lvm-operator/pkg/internal"
 )
@@ -32,15 +34,16 @@ var (
 )
 
 const (
-	lvmCmd      = "/usr/sbin/lvm"
-	vgCreateCmd = "/usr/sbin/vgcreate"
-	vgExtendCmd = "/usr/sbin/vgextend"
-	vgRemoveCmd = "/usr/sbin/vgremove"
-	pvRemoveCmd = "/usr/sbin/pvremove"
-	lvCreateCmd = "/usr/sbin/lvcreate"
-	lvExtendCmd = "/usr/sbin/lvextend"
-	lvRemoveCmd = "/usr/sbin/lvremove"
-	lvChangeCmd = "/usr/sbin/lvchange"
+	lvmCmd        = "/usr/sbin/lvm"
+	vgCreateCmd   = "/usr/sbin/vgcreate"
+	vgExtendCmd   = "/usr/sbin/vgextend"
+	vgRemoveCmd   = "/usr/sbin/vgremove"
+	pvRemoveCmd   = "/usr/sbin/pvremove"
+	lvCreateCmd   = "/usr/sbin/lvcreate"
+	lvExtendCmd   = "/usr/sbin/lvextend"
+	lvRemoveCmd   = "/usr/sbin/lvremove"
+	lvChangeCmd   = "/usr/sbin/lvchange"
+	lvmDevicesCmd = "/usr/sbin/lvmdevices"
 )
 
 // vgsOutput represents the output of the `vgs --reportformat json` command
@@ -56,10 +59,7 @@ type vgsOutput struct {
 // pvsOutput represents the output of the `pvs --reportformat json` command
 type pvsOutput struct {
 	Report []struct {
-		Pv []struct {
-			Name   string `json:"pv_name"`
-			VgName string `json:"vg_name"`
-		} `json:"pv"`
+		Pv []PhysicalVolume `json:"pv"`
 	} `json:"report"`
 }
 
@@ -86,7 +86,34 @@ type VolumeGroup struct {
 	VgSize string `json:"vg_size"`
 
 	// PVs is the list of physical volumes associated with the volume group
-	PVs []string `json:"pvs"`
+	PVs []PhysicalVolume `json:"pvs"`
+}
+
+// PhysicalVolume represents a physical volume of linux lvm.
+type PhysicalVolume struct {
+	// PvName is the name of the Physical Volume
+	PvName string `json:"pv_name"`
+
+	// UUID is the unique identifier of the Physical Volume used in the devices file
+	UUID string `json:"pv_uuid"`
+
+	// VgName is the name of the associated Volume Group, if any
+	VgName string `json:"vg_name"`
+
+	// PvFmt is the file format of the PhysicalVolume
+	PvFmt string `json:"pv_fmt"`
+
+	// PvAttr describes the attributes of the PhysicalVolume
+	PvAttr string `json:"pv_attr"`
+
+	// PvSize describes the total space of the PhysicalVolume
+	PvSize string `json:"pv_size"`
+
+	// PvFree describes the free space of the PhysicalVolume
+	PvFree string `json:"pv_free"`
+
+	// DevSize describes the size of the underlying device on which the PhysicalVolume was created
+	DevSize string `json:"dev_size"`
 }
 
 // Create creates a new volume group
@@ -132,20 +159,39 @@ func (vg VolumeGroup) Extend(exec internal.Executor, pvs []string) error {
 }
 
 // Delete deletes a volume group and the physical volumes associated with it
-func (vg VolumeGroup) Delete(exec internal.Executor) error {
+func (vg VolumeGroup) Delete(e internal.Executor) error {
 	// Remove Volume Group
 	vgArgs := []string{vg.Name}
-	_, err := exec.ExecuteCommandWithOutputAsHost(vgRemoveCmd, vgArgs...)
+	_, err := e.ExecuteCommandWithOutputAsHost(vgRemoveCmd, vgArgs...)
 	if err != nil {
-		return fmt.Errorf("failed to remove volume group %q. %v", vg.Name, err)
+		return fmt.Errorf("failed to remove volume group %s: %w", vg.Name, err)
 	}
 
 	// Remove physical volumes
-	pvArgs := vg.PVs
-	_, err = exec.ExecuteCommandWithOutputAsHost(pvRemoveCmd, pvArgs...)
-	if err != nil {
-		return fmt.Errorf("failed to remove physical volumes for the volume group %q. %v", vg.Name, err)
+	pvArgs := make([]string, len(vg.PVs))
+	for i := range vg.PVs {
+		pvArgs[i] = vg.PVs[i].PvName
 	}
+	_, err = e.ExecuteCommandWithOutputAsHost(pvRemoveCmd, pvArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to remove physical volumes for the volume group %s: %w", vg.Name, err)
+	}
+
+	for _, pv := range vg.PVs {
+		_, err = e.ExecuteCommandWithOutput(lvmDevicesCmd, "--delpvid", pv.UUID)
+		if err != nil {
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				switch exitError.ExitCode() {
+				// Exit Code 5 On lvmdevices --delpvid means that the PV with that UUID no longer exists
+				case 5:
+					continue
+				}
+			}
+			return fmt.Errorf("failed to delete PV %s from device file for the volume group %s: %w", pv.UUID, vg.Name, err)
+		}
+	}
+
 	return nil
 }
 
@@ -188,19 +234,32 @@ func GetVolumeGroup(exec internal.Executor, name string) (*VolumeGroup, error) {
 }
 
 // ListPhysicalVolumes returns list of physical volumes used to create the given volume group
-func ListPhysicalVolumes(exec internal.Executor, vgName string) ([]string, error) {
+func ListPhysicalVolumes(exec internal.Executor, vgName string) ([]PhysicalVolume, error) {
 	res := new(pvsOutput)
 	args := []string{
-		"pvs", "-S", fmt.Sprintf("vgname=%s", vgName), "--reportformat", "json",
+		"pvs", "--units", "g", "-v", "--reportformat", "json",
 	}
-	if err := execute(exec, res, args...); err != nil {
-		return []string{}, err
+	if vgName != "" {
+		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
 	}
 
-	pvs := []string{}
+	if err := execute(exec, res, args...); err != nil {
+		return nil, err
+	}
+
+	pvs := []PhysicalVolume{}
 	for _, report := range res.Report {
 		for _, pv := range report.Pv {
-			pvs = append(pvs, pv.Name)
+			pvs = append(pvs, PhysicalVolume{
+				PvName:  pv.PvName,
+				UUID:    pv.UUID,
+				VgName:  pv.VgName,
+				PvFmt:   pv.PvFmt,
+				PvAttr:  pv.PvAttr,
+				PvSize:  pv.PvSize,
+				PvFree:  pv.PvFree,
+				DevSize: pv.DevSize,
+			})
 		}
 	}
 	return pvs, nil
@@ -220,7 +279,7 @@ func ListVolumeGroups(exec internal.Executor) ([]VolumeGroup, error) {
 	vgList := []VolumeGroup{}
 	for _, report := range res.Report {
 		for _, vg := range report.Vg {
-			vgList = append(vgList, VolumeGroup{Name: vg.Name, PVs: []string{}})
+			vgList = append(vgList, VolumeGroup{Name: vg.Name, PVs: []PhysicalVolume{}})
 		}
 	}
 

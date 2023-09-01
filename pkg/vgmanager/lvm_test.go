@@ -79,9 +79,11 @@ func TestGetVolumeGroup(t *testing.T) {
 			if args[0] == "vgs" {
 				return mockVgsOutput, nil
 			} else if args[0] == "pvs" {
-				if strings.HasSuffix(args[2], "vg1") {
+				argsConcat := strings.Join(args, " ")
+				out := "pvs --units g -v --reportformat json -S vgname=%s"
+				if argsConcat == fmt.Sprintf(out, "vg1") {
 					return mockPvsOutputForVG1, nil
-				} else if strings.HasSuffix(args[2], "vg2") {
+				} else if argsConcat == fmt.Sprintf(out, "vg2") {
 					return mockPvsOutputForVG2, nil
 				}
 			}
@@ -115,9 +117,11 @@ func TestListVolumeGroup(t *testing.T) {
 			if args[0] == "vgs" {
 				return mockVgsOutput, nil
 			} else if args[0] == "pvs" {
-				if strings.HasSuffix(args[2], "vg1") {
+				argsConcat := strings.Join(args, " ")
+				out := "pvs --units g -v --reportformat json -S vgname=%s"
+				if argsConcat == fmt.Sprintf(out, "vg1") {
 					return mockPvsOutputForVG1, nil
-				} else if strings.HasSuffix(args[2], "vg2") {
+				} else if argsConcat == fmt.Sprintf(out, "vg2") {
 					return mockPvsOutputForVG2, nil
 				}
 			}

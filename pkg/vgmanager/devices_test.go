@@ -313,9 +313,9 @@ func TestAvailableDevicesForVG(t *testing.T) {
 			existingVGs: []VolumeGroup{
 				{
 					Name: "vg1",
-					PVs: []string{
-						calculateDevicePath(t, "nvme1n1p1"),
-						calculateDevicePath(t, "nvme1n1p2"),
+					PVs: []PhysicalVolume{
+						{PvName: calculateDevicePath(t, "nvme1n1p1")},
+						{PvName: calculateDevicePath(t, "nvme1n1p2")},
 					},
 				},
 			},

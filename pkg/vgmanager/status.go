@@ -175,7 +175,10 @@ func (r *VGReconciler) setDevices(status *lvmv1alpha1.VGStatus) (bool, error) {
 		if status.Name == vg.Name {
 			if len(vg.PVs) > 0 {
 				devicesExist = true
-				status.Devices = vg.PVs
+				status.Devices = make([]string, len(vg.PVs))
+				for i := range vg.PVs {
+					status.Devices[i] = vg.PVs[i].PvName
+				}
 			}
 		}
 	}
