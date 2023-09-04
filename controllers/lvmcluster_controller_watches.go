@@ -39,7 +39,6 @@ func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&lvmv1alpha1.LVMCluster{}).
 		Owns(&appsv1.DaemonSet{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroup{}).
-		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}).
 		Watches(
 			&lvmv1alpha1.LVMVolumeGroupNodeStatus{},
 			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
