@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -25,6 +26,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/controllers/node"
+	"k8s.io/client-go/discovery"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -124,6 +126,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	enableSnapshotting := true
+	vsc := &snapapi.VolumeSnapshotClassList{}
+	if err := setupClient.List(context.Background(), vsc, &client.ListOptions{Limit: 1}); err != nil {
+		// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
+		if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+			setupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
+			enableSnapshotting = false
+		}
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                              scheme,
 		MetricsBindAddress:                  metricsAddr,
@@ -141,10 +153,11 @@ func main() {
 	if err = (&controllers.LVMClusterReconciler{
 		Client:                           mgr.GetClient(),
 		Scheme:                           mgr.GetScheme(),
-		EventRecorder:                    mgr.GetEventRecorderFor(controllers.ControllerName),
+		EventRecorder:                    mgr.GetEventRecorderFor("LVMClusterReconciler"),
 		ClusterType:                      clusterType,
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
+		EnableSnapshotting:               enableSnapshotting,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
 		os.Exit(1)

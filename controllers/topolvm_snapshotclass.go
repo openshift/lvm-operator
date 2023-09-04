@@ -18,14 +18,15 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/labels"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -46,19 +47,17 @@ func (s topolvmVolumeSnapshotClass) getName() string {
 
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;create;delete;watch;list
 
-func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (s topolvmVolumeSnapshotClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 	// one volume snapshot class for every deviceClass based on CR is created
-	topolvmSnapshotClasses := getTopolvmSnapshotClasses(lvmCluster)
+	topolvmSnapshotClasses := getTopolvmSnapshotClasses(cluster)
 	for _, vsc := range topolvmSnapshotClasses {
 		// we anticipate no edits to volume snapshot class
-		result, err := cutil.CreateOrUpdate(ctx, r.Client, vsc, func() error { return nil })
+		result, err := cutil.CreateOrUpdate(ctx, r.Client, vsc, func() error {
+			labels.SetManagedLabels(r.Scheme, vsc, cluster)
+			return nil
+		})
 		if err != nil {
-			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
-			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
-				logger.Info("volume snapshot class CRDs do not exist on the cluster, ignoring", "VolumeSnapshotClass", vscName)
-				return nil
-			}
 			return fmt.Errorf("%s failed to reconcile: %w", s.getName(), err)
 		}
 		logger.Info("VolumeSnapshotClass applied to cluster", "operation", result, "name", vsc.Name)
@@ -77,11 +76,6 @@ func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx c
 
 		vsc := &snapapi.VolumeSnapshotClass{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc); err != nil {
-			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
-			if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
-				logger.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
-				return nil
-			}
 			return client.IgnoreNotFound(err)
 		}
 

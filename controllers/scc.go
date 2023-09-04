@@ -21,7 +21,10 @@ import (
 	"fmt"
 
 	secv1 "github.com/openshift/api/security/v1"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/labels"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +46,7 @@ func (c openshiftSccs) getName() string {
 	return sccName
 }
 
-func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	sccs := getAllSCCs(r.Namespace)
 	for _, scc := range sccs {
@@ -58,6 +61,7 @@ func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Contex
 			return fmt.Errorf("something went wrong when checking for SecurityContextConstraint: %w", err)
 		}
 
+		labels.SetManagedLabels(r.Scheme, scc, cluster)
 		if err := r.Create(ctx, scc); err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", c.getName(), err)
 		}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,9 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *VGReconciler) setVolumeGroupProgressingStatus(ctx context.Context, vgName string) error {
+func (r *VGReconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
 	status := &lvmv1alpha1.VGStatus{
-		Name:   vgName,
+		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusProgressing,
 	}
 
@@ -39,12 +40,12 @@ func (r *VGReconciler) setVolumeGroupProgressingStatus(ctx context.Context, vgNa
 		return err
 	}
 
-	return r.setVolumeGroupStatus(ctx, status)
+	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vgName string) error {
+func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
 	status := &lvmv1alpha1.VGStatus{
-		Name:   vgName,
+		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusReady,
 	}
 
@@ -53,12 +54,12 @@ func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vgName str
 		return err
 	}
 
-	return r.setVolumeGroupStatus(ctx, status)
+	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vgName string, err error) error {
+func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, err error) error {
 	status := &lvmv1alpha1.VGStatus{
-		Name:   vgName,
+		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusFailed,
 		Reason: err.Error(),
 	}
@@ -71,16 +72,21 @@ func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vgName st
 		status.Status = lvmv1alpha1.VGStatusDegraded
 	}
 
-	return r.setVolumeGroupStatus(ctx, status)
+	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, status *lvmv1alpha1.VGStatus) error {
-	logger := log.FromContext(ctx)
+func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) error {
+	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
 	// Get LVMVolumeGroupNodeStatus and set the relevant VGStatus
 	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, nodeStatus, func() error {
+		// set an owner instead of a controller reference, as there can be multiple volume groups.
+		if err := controllerutil.SetOwnerReference(nodeStatus, vg, r.Scheme); err != nil {
+			logger.Error(err, "failed to set owner-reference when updating volume-group status")
+		}
+
 		exists := false
 		for i, existingVGStatus := range nodeStatus.Spec.LVMVGStatus {
 			if existingVGStatus.Name == status.Name {
@@ -108,7 +114,7 @@ func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, status *lvmv1al
 	return nil
 }
 
-func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vgName string) error {
+func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
 	logger := log.FromContext(ctx)
 
 	// Get LVMVolumeGroupNodeStatus and remove the relevant VGStatus
@@ -123,7 +129,7 @@ func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vgName strin
 	index := 0
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, nodeStatus, func() error {
 		for i, existingVGStatus := range nodeStatus.Spec.LVMVGStatus {
-			if existingVGStatus.Name == vgName {
+			if existingVGStatus.Name == vg.GetName() {
 				exist = true
 				index = i
 			}
@@ -131,6 +137,16 @@ func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vgName strin
 
 		if exist {
 			nodeStatus.Spec.LVMVGStatus = append(nodeStatus.Spec.LVMVGStatus[:index], nodeStatus.Spec.LVMVGStatus[index+1:]...)
+			// if we remove the vgstatus, we also remove the owner reference
+			for ownerRefIndex, ownerRef := range nodeStatus.GetOwnerReferences() {
+				if ownerRef.UID == vg.GetUID() {
+					nodeStatus.SetOwnerReferences(append(
+						nodeStatus.GetOwnerReferences()[:ownerRefIndex],
+						nodeStatus.GetOwnerReferences()[ownerRefIndex+1:]...),
+					)
+					break
+				}
+			}
 		}
 
 		return nil

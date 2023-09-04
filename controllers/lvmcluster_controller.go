@@ -46,14 +46,12 @@ import (
 type EventReasonInfo string
 type EventReasonError string
 
-const EventReasonErrorDeletionPending EventReasonError = "DeletionPending"
-const EventReasonErrorResourceReconciliationFailed EventReasonError = "ResourceReconciliationFailed"
-const EventReasonResourceReconciliationSuccess EventReasonInfo = "ResourceReconciliationSuccess"
-
-var lvmClusterFinalizer = "lvmcluster.topolvm.io"
-
 const (
-	ControllerName = "lvmcluster-controller"
+	EventReasonErrorDeletionPending              EventReasonError = "DeletionPending"
+	EventReasonErrorResourceReconciliationFailed EventReasonError = "ResourceReconciliationFailed"
+	EventReasonResourceReconciliationSuccess     EventReasonInfo  = "ResourceReconciliationSuccess"
+
+	lvmClusterFinalizer = "lvmcluster.topolvm.io"
 )
 
 // NOTE: when updating this, please also update docs/design/lvm-operator-manager.md
@@ -73,10 +71,11 @@ type resourceManager interface {
 type LVMClusterReconciler struct {
 	client.Client
 	record.EventRecorder
-	Scheme      *runtime.Scheme
-	ClusterType cluster.Type
-	Namespace   string
-	ImageName   string
+	Scheme             *runtime.Scheme
+	ClusterType        cluster.Type
+	EnableSnapshotting bool
+	Namespace          string
+	ImageName          string
 
 	// TopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration
@@ -184,11 +183,14 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		&vgManager{},
 		&lvmVG{},
 		&topolvmStorageClass{},
-		&topolvmVolumeSnapshotClass{},
 	}
 
 	if r.ClusterType == cluster.TypeOCP {
 		resources = append(resources, openshiftSccs{})
+	}
+
+	if r.EnableSnapshotting {
+		resources = append(resources, &topolvmVolumeSnapshotClass{})
 	}
 
 	resourceSyncStart := time.Now()
@@ -391,6 +393,10 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 
 		if r.ClusterType == cluster.TypeOCP {
 			resourceDeletionList = append(resourceDeletionList, openshiftSccs{})
+		}
+
+		if r.EnableSnapshotting {
+			resourceDeletionList = append(resourceDeletionList, &topolvmVolumeSnapshotClass{})
 		}
 
 		for _, unit := range resourceDeletionList {
