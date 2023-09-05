@@ -34,8 +34,8 @@ func TestAvailableDevicesForVG(t *testing.T) {
 	}
 
 	r := &VGReconciler{}
-	r.Filters = func(instance lsblk.LSBLK) filter.Filters {
-		filters := filter.DefaultFilters(instance)
+	r.Filters = func(a lvm.LVM, b lsblk.LSBLK) filter.Filters {
+		filters := filter.DefaultFilters(a, b)
 		// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
 		delete(filters, "noBindMounts")
 		return filters

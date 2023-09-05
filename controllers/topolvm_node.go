@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/lvmd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -137,7 +138,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 		{Name: "lvmd-config-dir",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: filepath.Dir(LvmdConfigFile),
+					Path: filepath.Dir(lvmd.DefaultFileConfigPath),
 					Type: &hostPathDirectory}}},
 		{Name: "lvmd-socket-dir",
 			VolumeSource: corev1.VolumeSource{
@@ -202,11 +203,11 @@ func getNodeInitContainer(initImage string) *corev1.Container {
 	command := []string{
 		"/usr/bin/bash",
 		"-c",
-		fmt.Sprintf("until [ -f %s ]; do echo waiting for lvmd config file; sleep 5; done", LvmdConfigFile),
+		fmt.Sprintf("until [ -f %s ]; do echo waiting for lvmd config file; sleep 5; done", lvmd.DefaultFileConfigPath),
 	}
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(LvmdConfigFile)},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
 	}
 
 	fileChecker := &corev1.Container{
@@ -228,7 +229,7 @@ func getNodeInitContainer(initImage string) *corev1.Container {
 func getLvmdContainer() *corev1.Container {
 	command := []string{
 		"/lvmd",
-		fmt.Sprintf("--config=%s", LvmdConfigFile),
+		fmt.Sprintf("--config=%s", lvmd.DefaultFileConfigPath),
 		"--container=true",
 	}
 
@@ -241,7 +242,7 @@ func getLvmdContainer() *corev1.Container {
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(DefaultLVMdSocket)},
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(LvmdConfigFile)},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
 	}
 
 	privilege := true

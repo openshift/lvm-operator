@@ -139,7 +139,10 @@ SKIP_RANGE ?=
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+mocks: mockery ## Generate mocks for unit test code
+	$(shell $(MOCKERY) --log-level error)
+
+generate: controller-gen mocks ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations. Also retriggers mock generation
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 fmt: ## Run go fmt against code.
@@ -318,6 +321,10 @@ jsonnet: ## Download jsonnet locally if necessary.
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo and gomega locally if necessary.
 	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.9.5)
+
+MOCKERY = $(shell pwd)/bin/mockery
+mockery: ## Download mockery and add locally if necessary
+	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.33.2)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

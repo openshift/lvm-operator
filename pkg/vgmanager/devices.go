@@ -55,7 +55,7 @@ func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup
 
 	if existingVolumeGroup != nil {
 		logger.Info("extending an existing volume group", "VGName", vgName)
-		if _, err := existingVolumeGroup.ExtendVG(r.executor, args); err != nil {
+		if _, err := r.LVM.ExtendVG(*existingVolumeGroup, args); err != nil {
 			return fmt.Errorf("failed to extend volume group %s: %w", vgName, err)
 		}
 	} else {
@@ -64,11 +64,10 @@ func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup
 		for _, pvName := range args {
 			pvs = append(pvs, lvm.PhysicalVolume{PvName: pvName})
 		}
-		if err := (lvm.VolumeGroup{Name: vgName, PVs: pvs}).CreateVG(r.executor); err != nil {
+		if err := r.LVM.CreateVG(lvm.VolumeGroup{Name: vgName, PVs: pvs}); err != nil {
 			return fmt.Errorf("failed to create volume group %s: %w", vgName, err)
 		}
 	}
-
 	return nil
 }
 
@@ -99,14 +98,14 @@ DeviceLoop:
 		}
 
 		logger = logger.WithValues("Device.Name", blockDevice.Name)
-		for name, filterFunc := range r.Filters(r.LSBLK) {
-			logger := logger.WithValues("filterFunc.Name", name)
-			valid, err := filterFunc(blockDevice, r.executor)
+		for name, filter := range r.Filters(r.LVM, r.LSBLK) {
+			logger := logger.WithValues("filter.Name", name)
+			valid, err := filter(blockDevice)
 			if err != nil {
-				logger.Error(err, "filterFunc error")
+				logger.Error(err, "filter error")
 				continue DeviceLoop
 			} else if !valid {
-				logger.Info("does not match filterFunc")
+				logger.Info("does not match filter")
 				continue DeviceLoop
 			}
 		}

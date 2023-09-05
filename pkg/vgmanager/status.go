@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/pkg/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -166,7 +165,7 @@ func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alp
 }
 
 func (r *VGReconciler) setDevices(status *lvmv1alpha1.VGStatus) (bool, error) {
-	vgs, err := lvm.ListVolumeGroups(r.executor)
+	vgs, err := r.LVM.ListVGs()
 	if err != nil {
 		return false, fmt.Errorf("failed to list volume groups. %v", err)
 	}
