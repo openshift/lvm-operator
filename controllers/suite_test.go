@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -27,6 +28,7 @@ import (
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/pkg/cluster"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -121,13 +123,24 @@ var _ = BeforeSuite(func() {
 	clusterType, err := cluster.NewTypeResolver(k8sClient).GetType(ctx)
 	Expect(err).ToNot(HaveOccurred())
 
+	enableSnapshotting := true
+	vsc := &snapapi.VolumeSnapshotClassList{}
+	if err := k8sClient.List(ctx, vsc, &client.ListOptions{Limit: 1}); err != nil {
+		// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
+		if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+			logger.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
+			enableSnapshotting = false
+		}
+	}
+
 	err = (&LVMClusterReconciler{
-		Client:        k8sManager.GetClient(),
-		EventRecorder: k8sManager.GetEventRecorderFor(ControllerName),
-		Scheme:        k8sManager.GetScheme(),
-		ClusterType:   clusterType,
-		Namespace:     testLvmClusterNamespace,
-		ImageName:     testImageName,
+		Client:             k8sManager.GetClient(),
+		EventRecorder:      k8sManager.GetEventRecorderFor("LVMClusterReconciler"),
+		EnableSnapshotting: enableSnapshotting,
+		Scheme:             k8sManager.GetScheme(),
+		ClusterType:        clusterType,
+		Namespace:          testLvmClusterNamespace,
+		ImageName:          testImageName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

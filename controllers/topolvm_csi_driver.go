@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/labels"
+
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,11 +46,12 @@ func (c csiDriver) getName() string {
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list
 
-func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	csiDriverResource := getCSIDriverResource()
 
 	result, err := cutil.CreateOrUpdate(ctx, r.Client, csiDriverResource, func() error {
+		labels.SetManagedLabels(r.Scheme, csiDriverResource, cluster)
 		// no need to mutate any field
 		return nil
 	})

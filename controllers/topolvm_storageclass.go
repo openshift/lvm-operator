@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/labels"
+
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,14 +46,17 @@ func (s topolvmStorageClass) getName() string {
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;create;delete;watch;list
 
-func (s topolvmStorageClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (s topolvmStorageClass) ensureCreated(r *LVMClusterReconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.getName())
 
 	// one storage class for every deviceClass based on CR is created
-	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, lvmCluster)
+	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
 	for _, sc := range topolvmStorageClasses {
 		// we anticipate no edits to storage class
-		result, err := cutil.CreateOrUpdate(ctx, r.Client, sc, func() error { return nil })
+		result, err := cutil.CreateOrUpdate(ctx, r.Client, sc, func() error {
+			labels.SetManagedLabels(r.Scheme, sc, cluster)
+			return nil
+		})
 		if err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", s.getName(), err)
 		}
