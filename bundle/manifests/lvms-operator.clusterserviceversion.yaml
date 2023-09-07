@@ -834,6 +834,14 @@ spec:
           - get
           - patch
           - update
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+          - update
         serviceAccountName: vg-manager
     strategy: deployment
   installModes:

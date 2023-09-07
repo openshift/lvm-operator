@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -55,7 +57,9 @@ func main() {
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	opts.Development = developmentMode
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logr := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logr)
+	klog.SetLogger(logr)
 
 	setupLog := ctrl.Log.WithName("setup")
 
@@ -73,10 +77,11 @@ func main() {
 	}
 
 	if err = (&vgmanager.VGReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		NodeName:  os.Getenv("NODE_NAME"),
-		Namespace: os.Getenv("POD_NAMESPACE"),
+		Client:        mgr.GetClient(),
+		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		Scheme:        mgr.GetScheme(),
+		NodeName:      os.Getenv("NODE_NAME"),
+		Namespace:     os.Getenv("POD_NAMESPACE"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VGManager")
 		os.Exit(1)

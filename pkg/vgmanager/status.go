@@ -78,12 +78,7 @@ func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, status *lvmv1al
 	logger := log.FromContext(ctx)
 
 	// Get LVMVolumeGroupNodeStatus and set the relevant VGStatus
-	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.NodeName,
-			Namespace: r.Namespace,
-		},
-	}
+	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, nodeStatus, func() error {
 		exists := false
@@ -170,4 +165,13 @@ func (r *VGReconciler) setDevices(status *lvmv1alpha1.VGStatus) (bool, error) {
 	}
 
 	return devicesExist, nil
+}
+
+func (r *VGReconciler) getLVMVolumeGroupNodeStatus() *lvmv1alpha1.LVMVolumeGroupNodeStatus {
+	return &lvmv1alpha1.LVMVolumeGroupNodeStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.NodeName,
+			Namespace: r.Namespace,
+		},
+	}
 }

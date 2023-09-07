@@ -33,6 +33,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +42,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+type EventReasonInfo string
+type EventReasonError string
+
+const EventReasonErrorDeletionPending EventReasonError = "DeletionPending"
+const EventReasonErrorResourceReconciliationFailed EventReasonError = "ResourceReconciliationFailed"
+const EventReasonResourceReconciliationSuccess EventReasonInfo = "ResourceReconciliationSuccess"
 
 var lvmClusterFinalizer = "lvmcluster.topolvm.io"
 
@@ -64,6 +72,7 @@ type resourceManager interface {
 // LVMClusterReconciler reconciles a LVMCluster object
 type LVMClusterReconciler struct {
 	client.Client
+	record.EventRecorder
 	Scheme      *runtime.Scheme
 	ClusterType cluster.Type
 	Namespace   string
@@ -146,15 +155,17 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
 		}
 		if lvsExist {
+			waitForLVRemoval := time.Second * 10
+			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion: %w", waitForLVRemoval, err)
+			r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
 			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{RequeueAfter: time.Second * 10},
-				fmt.Errorf("found PVCs provisioned by topolvm, waiting for their deletion: %w", err)
+			return ctrl.Result{RequeueAfter: waitForLVRemoval}, err
 		}
 
 		logger.Info("processing LVMCluster deletion")
 		if err := r.processDelete(ctx, instance); err != nil {
 			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
-			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion")
+			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
 		}
 		return reconcile.Result{}, nil
 	}
@@ -199,11 +210,14 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 
 	resourceSyncElapsedTime := time.Since(resourceSyncStart)
 	if len(errs) > 0 {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile resources managed by LVMCluster within %v: %w",
-			resourceSyncElapsedTime, errors.Join(errs...))
+		err := fmt.Errorf("failed to reconcile resources managed by LVMCluster: %w", errors.Join(errs...))
+		r.WarningEvent(ctx, instance, EventReasonErrorResourceReconciliationFailed, err)
+		return ctrl.Result{}, err
 	}
 
-	logger.Info("successfully reconciled LVMCluster", "resourceSyncElapsedTime", resourceSyncElapsedTime)
+	msg := "successfully reconciled LVMCluster"
+	logger.Info(msg, "resourceSyncElapsedTime", resourceSyncElapsedTime)
+	r.NormalEvent(ctx, instance, EventReasonResourceReconciliationSuccess, msg)
 
 	return ctrl.Result{}, nil
 }
@@ -358,7 +372,6 @@ func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context) (bool, e
 		return false, fmt.Errorf("failed to get TopoLVM LogicalVolume list: %w", err)
 	}
 	if len(logicalVolumeList.Items) > 0 {
-
 		return true, nil
 	}
 	return false, nil
@@ -366,7 +379,6 @@ func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context) (bool, e
 
 func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
-
 		resourceDeletionList := []resourceManager{
 			&topolvmVolumeSnapshotClass{},
 			&topolvmStorageClass{},
@@ -383,16 +395,29 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 
 		for _, unit := range resourceDeletionList {
 			if err := unit.ensureDeleted(r, ctx, instance); err != nil {
-				return fmt.Errorf("failed cleaning up: %s %w", unit.getName(), err)
-			}
-		}
-
-		if update := controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer); update {
-			if err := r.Client.Update(ctx, instance); err != nil {
-				return fmt.Errorf("failed to remove finalizer from LVMCluster %s: %w", instance.GetName(), err)
+				err := fmt.Errorf("failed cleaning up %s: %w", unit.getName(), err)
+				r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
+				return err
 			}
 		}
 	}
 
+	if update := controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer); update {
+		if err := r.Client.Update(ctx, instance); err != nil {
+			return fmt.Errorf("failed to remove finalizer from LVMCluster %s: %w", instance.GetName(), err)
+		}
+	}
+
 	return nil
+}
+
+func (r *LVMClusterReconciler) WarningEvent(_ context.Context, obj client.Object, reason EventReasonError, err error) {
+	r.Event(obj, corev1.EventTypeWarning, string(reason), err.Error())
+}
+
+func (r *LVMClusterReconciler) NormalEvent(ctx context.Context, obj client.Object, reason EventReasonInfo, message string) {
+	if !log.FromContext(ctx).V(1).Enabled() {
+		return
+	}
+	r.Event(obj, corev1.EventTypeNormal, string(reason), message)
 }
