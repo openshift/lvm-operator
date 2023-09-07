@@ -324,37 +324,40 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		if err != ErrVolumeGroupNotFound {
 			return fmt.Errorf("failed to get volume group %s, %w", volumeGroup.GetName(), err)
 		}
-		return nil
-	}
+		logger.Info("volume group not found, assuming it was already deleted and continuing")
+	} else {
+		// Delete thin pool
+		if volumeGroup.Spec.ThinPoolConfig != nil {
+			thinPoolName := volumeGroup.Spec.ThinPoolConfig.Name
+			logger := logger.WithValues("ThinPool", thinPoolName)
 
-	// Delete thin pool
-	if volumeGroup.Spec.ThinPoolConfig != nil {
-		thinPoolName := volumeGroup.Spec.ThinPoolConfig.Name
-		lvExists, err := LVExists(r.executor, thinPoolName, volumeGroup.Name)
-		if err != nil {
-			return fmt.Errorf("failed to check existence of thin pool %q in volume group %q. %v", thinPoolName, volumeGroup.Name, err)
-		}
-
-		if lvExists {
-			if err := DeleteLV(r.executor, thinPoolName, volumeGroup.Name); err != nil {
-				err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
-				if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
-					logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
-				}
-				return err
+			thinPoolExists, err := LVExists(r.executor, thinPoolName, volumeGroup.Name)
+			if err != nil {
+				return fmt.Errorf("failed to check existence of thin pool %q in volume group %q. %v", thinPoolName, volumeGroup.Name, err)
 			}
-			logger.Info("thin pool deleted in the volume group", "VGName", volumeGroup.Name, "ThinPool", thinPoolName)
-		} else {
-			logger.Info("thin pool not found in the volume group", "VGName", volumeGroup.Name, "ThinPool", thinPoolName)
-		}
-	}
 
-	if err = vg.Delete(r.executor); err != nil {
-		err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
-		if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
-			logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
+			if thinPoolExists {
+				if err := DeleteLV(r.executor, thinPoolName, volumeGroup.Name); err != nil {
+					err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
+					if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
+						logger.Error(err, "failed to set status to failed")
+					}
+					return err
+				}
+				logger.Info("thin pool deleted")
+			} else {
+				logger.Info("thin pool not found, assuming it was already deleted and continuing")
+			}
 		}
-		return err
+
+		if err = vg.Delete(r.executor); err != nil {
+			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
+			if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
+				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
+			}
+			return err
+		}
+		logger.Info("volume group deleted")
 	}
 
 	// Remove this vg from the lvmdconf file
