@@ -9,7 +9,7 @@ spec:
   volumeMode: %s
   resources:
     requests:
-      storage: 5Gi
+      storage: 1Gi
   storageClassName: %s 
   dataSource:
     name: %s
