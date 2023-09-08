@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/pkg/labels"
-
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -58,7 +56,6 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 	// the anonymous mutate function modifies the daemonset object after fetching it.
 	// if the daemonset does not already exist, it creates it, otherwise, it updates it
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, ds, func() error {
-		labels.SetManagedLabels(r.Scheme, ds, lvmCluster)
 		if err := ctrl.SetControllerReference(lvmCluster, ds, r.Scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
 		}
