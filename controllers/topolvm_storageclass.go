@@ -24,9 +24,9 @@ import (
 	"github.com/openshift/lvm-operator/pkg/labels"
 
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -76,7 +76,10 @@ func (s topolvmStorageClass) ensureDeleted(r *LVMClusterReconciler, ctx context.
 
 		sc := &storagev1.StorageClass{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
-			return client.IgnoreNotFound(err)
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
 		}
 
 		if !sc.GetDeletionTimestamp().IsZero() {

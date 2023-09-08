@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -81,7 +83,10 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 		logger := logger.WithValues("LVMVolumeGroup", volumeGroup.GetName())
 
 		if err := r.Client.Get(ctx, vgName, volumeGroup); err != nil {
-			return client.IgnoreNotFound(err)
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
 		}
 
 		// if not marked for deletion, mark now.
