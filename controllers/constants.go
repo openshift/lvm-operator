@@ -52,9 +52,6 @@ const (
 	VgManagerMemRequest = "45Mi"
 	VgManagerCPURequest = "2m"
 
-	CertGeneratorMemRequest = "15Mi"
-	CertGeneratorCPURequest = "1m"
-
 	// topoLVM Node resource requests
 	TopolvmNodeMemRequest = "25Mi"
 	TopolvmNodeCPURequest = "1m"

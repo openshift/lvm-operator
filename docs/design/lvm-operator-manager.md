@@ -33,7 +33,7 @@ The `csiDriver` reconcile unit creates the TopoLVM `CSIDriver` resource.
 
 ### TopoLVM Controller
 
-The `topolvmController` reconcile unit is responsible for deploying a single instance of the TopoLVM controller plugin deployment and ensuring that any necessary updates are made to the deployment. As part of this process, an init container is used to generate openssl certificates that are utilized by the TopoLVM Controller. However, it should be noted that this method will be replaced with the use of cert-manager in the near future.
+The `topolvmController` reconcile unit is responsible for deploying a single instance of the TopoLVM controller plugin deployment and ensuring that any necessary updates are made to the deployment.
 
 ### Topolvm Node and lvmd
 
