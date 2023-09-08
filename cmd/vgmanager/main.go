@@ -21,6 +21,7 @@ import (
 	"os"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/lvmd"
 	"github.com/openshift/lvm-operator/pkg/vgmanager"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,6 +80,7 @@ func main() {
 	if err = (&vgmanager.VGReconciler{
 		Client:        mgr.GetClient(),
 		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		LVMD:          lvmd.DefaultConfigurator(),
 		Scheme:        mgr.GetScheme(),
 		NodeName:      os.Getenv("NODE_NAME"),
 		Namespace:     os.Getenv("POD_NAMESPACE"),
