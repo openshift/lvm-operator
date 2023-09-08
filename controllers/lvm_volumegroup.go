@@ -28,8 +28,12 @@ import (
 )
 
 const (
-	lvmVGName      = "lvmvg-manager"
-	lvmvgFinalizer = "lvm.openshift.io/lvmvolumegroup"
+	lvmVGName = "lvmvg-manager"
+
+	// legacyVGFinalizer is an old finalizer that was maintained before the Node specific finalizers in vgmanager
+	// DEPRECATED
+	// Use no finalizer and remove with 4.16
+	legacyVGFinalizer = "lvm.openshift.io/lvmvolumegroup"
 )
 
 type lvmVG struct{}
@@ -56,7 +60,12 @@ func (c lvmVG) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCl
 		}
 
 		result, err := cutil.CreateOrUpdate(ctx, r.Client, existingVolumeGroup, func() error {
-			existingVolumeGroup.Finalizers = volumeGroup.Finalizers
+			// removes the old finalizer that was maintained up until 4.15, now we have vgmanager owned finalizers
+			// per node starting with 4.15
+			// This code path makes sure to remove the old finalizer if it is encountered from a previous installation
+			if removed := cutil.RemoveFinalizer(existingVolumeGroup, legacyVGFinalizer); removed {
+				logger.Info("removed legacy finalizer")
+			}
 			existingVolumeGroup.Spec = volumeGroup.Spec
 			return nil
 		})
@@ -74,7 +83,7 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 	vgcrs := lvmVolumeGroups(r.Namespace, lvmCluster.Spec.Storage.DeviceClasses)
 
-	var volumeGroupsPendingInStatus []string
+	var volumeGroupsPendingDelete []string
 
 	for _, volumeGroup := range vgcrs {
 		vgName := client.ObjectKeyFromObject(volumeGroup)
@@ -91,28 +100,18 @@ func (c lvmVG) ensureDeleted(r *LVMClusterReconciler, ctx context.Context, lvmCl
 			if err := r.Client.Delete(ctx, volumeGroup); err != nil {
 				return fmt.Errorf("failed to delete LVMVolumeGroup %s: %w", volumeGroup.GetName(), err)
 			}
+			logger.Info("initiated LVMVolumeGroup deletion", "volumeGroup", client.ObjectKeyFromObject(volumeGroup))
+		} else {
+			logger.Info("waiting for LVMVolumeGroup to be deleted", "volumeGroup", client.ObjectKeyFromObject(volumeGroup),
+				"finalizers", volumeGroup.GetFinalizers())
 		}
 
-		// Has the VG been cleaned up on all hosts?
-		if doesVGExistInDeviceClassStatus(volumeGroup.Name, lvmCluster) {
-			volumeGroupsPendingInStatus = append(volumeGroupsPendingInStatus, vgName.String())
-			continue
-		}
-
-		// Remove finalizer
-		if update := cutil.RemoveFinalizer(volumeGroup, lvmvgFinalizer); update {
-			if err := r.Client.Update(ctx, volumeGroup); err != nil {
-				return fmt.Errorf("failed to remove finalizer from LVMVolumeGroup %s: %w", volumeGroup.GetName(), err)
-			}
-		}
-
-		logger.Info("initiated LVMVolumeGroup deletion")
-		volumeGroupsPendingInStatus = append(volumeGroupsPendingInStatus, vgName.String())
+		volumeGroupsPendingDelete = append(volumeGroupsPendingDelete, vgName.String())
 	}
 
-	if len(volumeGroupsPendingInStatus) > 0 {
-		return fmt.Errorf("waiting for LVMVolumeGroup's to be removed from nodestatus of %s: %v",
-			client.ObjectKeyFromObject(lvmCluster), volumeGroupsPendingInStatus)
+	if len(volumeGroupsPendingDelete) > 0 {
+		return fmt.Errorf("waiting for LVMVolumeGroup's to be removed of %s: %v",
+			client.ObjectKeyFromObject(lvmCluster), volumeGroupsPendingDelete)
 	}
 
 	return nil
@@ -127,9 +126,6 @@ func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) 
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      deviceClass.Name,
 				Namespace: namespace,
-				Finalizers: []string{
-					lvmvgFinalizer,
-				},
 			},
 			Spec: lvmv1alpha1.LVMVolumeGroupSpec{
 				NodeSelector:   deviceClass.NodeSelector,
@@ -141,14 +137,4 @@ func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) 
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)
 	}
 	return lvmVolumeGroups
-}
-
-func doesVGExistInDeviceClassStatus(volumeGroup string, instance *lvmv1alpha1.LVMCluster) bool {
-	dcStatuses := instance.Status.DeviceClassStatuses
-	for _, dc := range dcStatuses {
-		if dc.Name == volumeGroup {
-			return true
-		}
-	}
-	return false
 }
