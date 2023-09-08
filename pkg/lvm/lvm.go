@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vgmanager
+package lvm
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/openshift/lvm-operator/pkg/internal"
 )
@@ -34,16 +35,17 @@ var (
 )
 
 const (
-	lvmCmd        = "/usr/sbin/lvm"
-	vgCreateCmd   = "/usr/sbin/vgcreate"
-	vgExtendCmd   = "/usr/sbin/vgextend"
-	vgRemoveCmd   = "/usr/sbin/vgremove"
-	pvRemoveCmd   = "/usr/sbin/pvremove"
-	lvCreateCmd   = "/usr/sbin/lvcreate"
-	lvExtendCmd   = "/usr/sbin/lvextend"
-	lvRemoveCmd   = "/usr/sbin/lvremove"
-	lvChangeCmd   = "/usr/sbin/lvchange"
-	lvmDevicesCmd = "/usr/sbin/lvmdevices"
+	defaultChunkSize = "128"
+	lvmCmd           = "/usr/sbin/lvm"
+	vgCreateCmd      = "/usr/sbin/vgcreate"
+	vgExtendCmd      = "/usr/sbin/vgextend"
+	vgRemoveCmd      = "/usr/sbin/vgremove"
+	pvRemoveCmd      = "/usr/sbin/pvremove"
+	lvCreateCmd      = "/usr/sbin/lvcreate"
+	lvExtendCmd      = "/usr/sbin/lvextend"
+	lvRemoveCmd      = "/usr/sbin/lvremove"
+	lvChangeCmd      = "/usr/sbin/lvchange"
+	lvmDevicesCmd    = "/usr/sbin/lvmdevices"
 )
 
 // vgsOutput represents the output of the `vgs --reportformat json` command
@@ -156,6 +158,55 @@ func (vg VolumeGroup) Extend(exec internal.Executor, pvs []string) error {
 	}
 
 	return nil
+}
+
+// CreateVG creates a new volume group
+func (vg VolumeGroup) CreateVG(exec internal.Executor) error {
+	if vg.Name == "" {
+		return fmt.Errorf("failed to create volume group. Volume group name is empty")
+	}
+
+	if len(vg.PVs) == 0 {
+		return fmt.Errorf("failed to create volume group. Physical volume list is empty")
+	}
+
+	args := []string{vg.Name}
+
+	for _, pv := range vg.PVs {
+		args = append(args, pv.PvName)
+	}
+
+	_, err := exec.ExecuteCommandWithOutputAsHost(vgCreateCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to create volume group %q. %v", vg.Name, err)
+	}
+
+	return nil
+}
+
+// ExtendVG extends the volume group only if new physical volumes are available
+func (vg VolumeGroup) ExtendVG(exec internal.Executor, pvs []string) (VolumeGroup, error) {
+	if vg.Name == "" {
+		return VolumeGroup{}, fmt.Errorf("failed to extend volume group. Volume group name is empty")
+	}
+
+	if len(pvs) == 0 {
+		return VolumeGroup{}, fmt.Errorf("failed to extend volume group. Physical volume list is empty")
+	}
+
+	args := []string{vg.Name}
+	args = append(args, pvs...)
+
+	_, err := exec.ExecuteCommandWithOutputAsHost(vgExtendCmd, args...)
+	if err != nil {
+		return VolumeGroup{}, fmt.Errorf("failed to extend volume group %q. %v", vg.Name, err)
+	}
+
+	for _, pv := range pvs {
+		vg.PVs = append(vg.PVs, PhysicalVolume{PvName: pv})
+	}
+
+	return vg, nil
 }
 
 // Delete deletes a volume group and the physical volumes associated with it
@@ -354,6 +405,31 @@ func DeleteLV(exec internal.Executor, lvName, vgName string) error {
 	_, err = exec.ExecuteCommandWithOutputAsHost(lvRemoveCmd, lv)
 	if err != nil {
 		return fmt.Errorf("failed to delete logical volume %q in volume group %q. %v", lvName, vgName, err)
+	}
+
+	return nil
+}
+
+// CreateLV creates the logical volume
+func CreateLV(exec internal.Executor, lvName, vgName string, sizePercent int) error {
+	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent),
+		"-c", defaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
+
+	if _, err := exec.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...); err != nil {
+		return fmt.Errorf("failed to create logical volume %q in the volume group %q using command '%s': %w",
+			lvName, vgName, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
+	}
+
+	return nil
+}
+
+// ExtendLV extends the logical volume
+func ExtendLV(exec internal.Executor, lvName, vgName string, sizePercent int) error {
+	args := []string{"-l", fmt.Sprintf("%d%%Vg", sizePercent), fmt.Sprintf("%s/%s", vgName, lvName)}
+
+	if _, err := exec.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...); err != nil {
+		return fmt.Errorf("failed to extend logical volume %q in the volume group %q using command '%s': %w",
+			lvName, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
 	}
 
 	return nil

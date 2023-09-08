@@ -28,6 +28,7 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
 	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/topolvm/topolvm/lvmd"
 	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +48,6 @@ import (
 
 const (
 	ControllerName            = "vg-manager"
-	DefaultChunkSize          = "128"
 	reconcileInterval         = 15 * time.Second
 	metadataWarningPercentage = 95
 )
@@ -148,7 +148,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	}
 	existingLvmdConfig := *lvmdConfig
 
-	vgs, err := ListVolumeGroups(r.executor)
+	vgs, err := lvm.ListVolumeGroups(r.executor)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -319,9 +319,9 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 	}
 
 	// Check if volume group exists
-	vg, err := GetVolumeGroup(r.executor, volumeGroup.Name)
+	vg, err := lvm.GetVolumeGroup(r.executor, volumeGroup.Name)
 	if err != nil {
-		if err != ErrVolumeGroupNotFound {
+		if err != lvm.ErrVolumeGroupNotFound {
 			return fmt.Errorf("failed to get volume group %s, %w", volumeGroup.GetName(), err)
 		}
 		logger.Info("volume group not found, assuming it was already deleted and continuing")
@@ -331,13 +331,13 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 			thinPoolName := volumeGroup.Spec.ThinPoolConfig.Name
 			logger := logger.WithValues("ThinPool", thinPoolName)
 
-			thinPoolExists, err := LVExists(r.executor, thinPoolName, volumeGroup.Name)
+			thinPoolExists, err := lvm.LVExists(r.executor, thinPoolName, volumeGroup.Name)
 			if err != nil {
 				return fmt.Errorf("failed to check existence of thin pool %q in volume group %q. %v", thinPoolName, volumeGroup.Name, err)
 			}
 
 			if thinPoolExists {
-				if err := DeleteLV(r.executor, thinPoolName, volumeGroup.Name); err != nil {
+				if err := lvm.DeleteLV(r.executor, thinPoolName, volumeGroup.Name); err != nil {
 					err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
 					if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
 						logger.Error(err, "failed to set status to failed")
@@ -396,7 +396,7 @@ func (r *VGReconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1
 		return nil
 	}
 
-	resp, err := GetLVSOutput(r.executor, volumeGroup.Name)
+	resp, err := lvm.GetLVSOutput(r.executor, volumeGroup.Name)
 	if err != nil {
 		return fmt.Errorf("could not get logical volumes found inside volume group, volume group content is degraded or corrupt: %w", err)
 	}
@@ -450,9 +450,9 @@ func (r *VGReconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1
 }
 
 func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
 
-	resp, err := GetLVSOutput(r.executor, vgName)
+	resp, err := lvm.GetLVSOutput(r.executor, vgName)
 	if err != nil {
 		return fmt.Errorf("failed to list logical volumes in the volume group %q. %v", vgName, err)
 	}
@@ -461,7 +461,7 @@ func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, confi
 		for _, lv := range report.Lv {
 			if lv.Name == config.Name {
 				if strings.Contains(lv.LvAttr, "t") {
-					logger.Info("lvm thinpool already exists", "VGName", vgName, "ThinPool", config.Name)
+					logger.Info("lvm thinpool already exists")
 					if err := r.extendThinPool(ctx, vgName, lv.LvSize, config); err != nil {
 						return fmt.Errorf("failed to extend the lvm thinpool %s in volume group %s: %w", config.Name, vgName, err)
 					}
@@ -473,21 +473,21 @@ func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, confi
 		}
 	}
 
-	args := []string{"-l", fmt.Sprintf("%d%%FREE", config.SizePercent), "-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, config.Name)}
-
-	if _, err = r.executor.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...); err != nil {
-		return fmt.Errorf("failed to create thin pool %q in the volume group %q using command '%s': %v", config.Name, vgName, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
+	logger.Info("creating lvm thinpool")
+	if err := lvm.CreateLV(r.executor, config.Name, vgName, config.SizePercent); err != nil {
+		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
+	logger.Info("successfully created thinpool")
 
 	return nil
 }
 
 func (r *VGReconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
 
-	vg, err := GetVolumeGroup(r.executor, vgName)
+	vg, err := lvm.GetVolumeGroup(r.executor, vgName)
 	if err != nil {
-		if err != ErrVolumeGroupNotFound {
+		if err != lvm.ErrVolumeGroupNotFound {
 			return fmt.Errorf("failed to get volume group. %q, %v", vgName, err)
 		}
 		return nil
@@ -508,15 +508,11 @@ func (r *VGReconciler) extendThinPool(ctx context.Context, vgName string, lvSize
 		return nil
 	}
 
-	logger.Info("extending lvm thinpool ", "VGName", vgName, "ThinPool", config.Name)
-
-	args := []string{"-l", fmt.Sprintf("%d%%Vg", config.SizePercent), fmt.Sprintf("%s/%s", vgName, config.Name)}
-
-	if _, err = r.executor.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...); err != nil {
-		return fmt.Errorf("failed to extend thin pool %q in the volume group %q using command '%s': %v", config.Name, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
+	logger.Info("extending lvm thinpool ")
+	if err := lvm.ExtendLV(r.executor, config.Name, vgName, config.SizePercent); err != nil {
+		return fmt.Errorf("failed to extend thinpool: %w", err)
 	}
-
-	logger.Info("successfully extended the thin pool in the volume group ", "thinpool", config.Name, "vgName", vgName)
+	logger.Info("successfully extended thinpool")
 
 	return nil
 }

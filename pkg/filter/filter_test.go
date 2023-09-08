@@ -1,4 +1,4 @@
-package vgmanager
+package filter
 
 import (
 	"testing"
