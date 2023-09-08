@@ -295,27 +295,20 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		return fmt.Errorf("failed to read the lvmd config file: %w", err)
 	}
 	if lvmdConfig == nil {
-		logger.Info("lvmd config file does not exist, assuming deleted state and removing Volume Group Status for Node")
-		// Remove the VG entry in the LVMVolumeGroupNodeStatus that was added to indicate the failures to the user.
-		// This allows the LVMCluster to get deleted and not stuck/wait forever as LVMCluster looks for the LVMVolumeGroupNodeStatus before deleting.
-		if err := r.removeVolumeGroupStatus(ctx, volumeGroup); err != nil {
-			return fmt.Errorf("failed to remove status for volume group %s: %w", volumeGroup.Name, err)
+		logger.Info("lvmd config file does not exist, assuming deleted")
+	} else {
+		found := false
+		for i, deviceClass := range lvmdConfig.DeviceClasses {
+			if deviceClass.Name == volumeGroup.Name {
+				// Remove this vg from the lvmdconf file
+				lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses[:i], lvmdConfig.DeviceClasses[i+1:]...)
+				found = true
+				break
+			}
 		}
-		return nil
-	}
-	// To avoid having to iterate through device classes multiple times, map from name to config index
-	deviceClassMap := make(map[string]int)
-	for i, deviceClass := range lvmdConfig.DeviceClasses {
-		deviceClassMap[deviceClass.Name] = i
-	}
-	index, found := deviceClassMap[volumeGroup.Name]
-	if !found {
-		// Nothing to do here.
-		logger.Info("could not find volume group in lvmd deviceclasses list, assuming deleted state and removing Volume Group Status for Node")
-		if err := r.removeVolumeGroupStatus(ctx, volumeGroup); err != nil {
-			return fmt.Errorf("failed to remove status for volume group %s: %w", volumeGroup.Name, err)
+		if !found {
+			logger.Info("could not find volume group in lvmd deviceclasses list, assuming deleted")
 		}
-		return nil
 	}
 
 	// Check if volume group exists
@@ -360,23 +353,25 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 		logger.Info("volume group deleted")
 	}
 
-	// Remove this vg from the lvmdconf file
-	lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses[:index], lvmdConfig.DeviceClasses[index+1:]...)
-
-	if len(lvmdConfig.DeviceClasses) > 0 {
-		if err = saveLVMDConfig(lvmdConfig); err != nil {
-			return fmt.Errorf("failed to update lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
+	// in case we have an existing LVMDConfig, we either need to update it if there are still deviceClasses remaining
+	// or delete it, if we are dealing with the last deviceClass that is about to be removed.
+	// if there was no config file in the first place, nothing has to be removed.
+	if lvmdConfig != nil {
+		if len(lvmdConfig.DeviceClasses) > 0 {
+			if err = saveLVMDConfig(lvmdConfig); err != nil {
+				return fmt.Errorf("failed to update lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
+			}
+			msg := "updated lvmd config after deviceClass was removed"
+			logger.Info(msg)
+			r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
+		} else {
+			if err = deleteLVMDConfig(); err != nil {
+				return fmt.Errorf("failed to delete lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
+			}
+			msg := "removed lvmd config after last deviceClass was removed"
+			logger.Info(msg)
+			r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigDeleted, msg)
 		}
-		msg := "updated lvmd config after deviceClass was removed"
-		logger.Info(msg)
-		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
-	} else {
-		if err = deleteLVMDConfig(); err != nil {
-			return fmt.Errorf("failed to delete lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
-		}
-		msg := "removed lvmd config after last deviceClass was removed"
-		logger.Info(msg)
-		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigDeleted, msg)
 	}
 
 	if err := r.removeVolumeGroupStatus(ctx, volumeGroup); err != nil {
