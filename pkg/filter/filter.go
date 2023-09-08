@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vgmanager
+package filter
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lvm"
 )
 
 const (
@@ -69,7 +70,7 @@ var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, 
 		// if fstype is set to LVM2_member then it already was created as a PV
 		// this means that if the disk has no children, we can safely reuse it if it's a valid LVM PV.
 		if dev.FSType == "LVM2_member" && !dev.HasChildren() {
-			pvs, err := ListPhysicalVolumes(e, "")
+			pvs, err := lvm.ListPhysicalVolumes(e, "")
 			if err != nil {
 				return false, fmt.Errorf("could not determine if block device has valid filesystem signature, since it is flagged as LVM2_member but physical volumes could not be verified: %w", err)
 			}

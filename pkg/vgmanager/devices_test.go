@@ -9,7 +9,9 @@ import (
 
 	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -34,13 +36,13 @@ func TestAvailableDevicesForVG(t *testing.T) {
 	r := &VGReconciler{}
 
 	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
-	delete(FilterMap, "noBindMounts")
+	delete(filter.FilterMap, "noBindMounts")
 
 	testCases := []struct {
 		description           string
 		volumeGroup           v1alpha1.LVMVolumeGroup
 		existingBlockDevices  []internal.BlockDevice
-		existingVGs           []VolumeGroup
+		existingVGs           []lvm.VolumeGroup
 		numOfAvailableDevices int
 		expectError           bool
 	}{
@@ -310,10 +312,10 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingVGs: []VolumeGroup{
+			existingVGs: []lvm.VolumeGroup{
 				{
 					Name: "vg1",
-					PVs: []PhysicalVolume{
+					PVs: []lvm.PhysicalVolume{
 						{PvName: calculateDevicePath(t, "nvme1n1p1")},
 						{PvName: calculateDevicePath(t, "nvme1n1p2")},
 					},
@@ -354,7 +356,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingVGs: []VolumeGroup{
+			existingVGs: []lvm.VolumeGroup{
 				{
 					Name: "vg1",
 				},
@@ -386,7 +388,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingVGs: []VolumeGroup{
+			existingVGs: []lvm.VolumeGroup{
 				{
 					Name: "vg1",
 				},

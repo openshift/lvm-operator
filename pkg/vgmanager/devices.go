@@ -21,15 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []VolumeGroup, vgName string, devices []internal.BlockDevice) error {
+func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []internal.BlockDevice) error {
 	logger := log.FromContext(ctx)
 
 	if len(devices) < 1 {
@@ -37,24 +38,14 @@ func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []VolumeGroup, vg
 	}
 
 	// check if volume group is already present
-	vgFound := false
+	var existingVolumeGroup *lvm.VolumeGroup
 	for _, vg := range vgs {
 		if vg.Name == vgName {
-			vgFound = true
+			existingVolumeGroup = &vg
 		}
 	}
 
-	// TODO: Check if we can use functions from lvm.go here
-	var cmd string
-	if vgFound {
-		logger.Info("extending an existing volume group", "VGName", vgName)
-		cmd = "/usr/sbin/vgextend"
-	} else {
-		logger.Info("creating a new volume group", "VGName", vgName)
-		cmd = "/usr/sbin/vgcreate"
-	}
-
-	args := []string{vgName}
+	var args []string
 	for _, device := range devices {
 		if device.DevicePath != "" {
 			args = append(args, device.DevicePath)
@@ -63,16 +54,27 @@ func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []VolumeGroup, vg
 		}
 	}
 
-	_, err := r.executor.ExecuteCommandWithOutputAsHost(cmd, args...)
-	if err != nil {
-		return fmt.Errorf("failed to create or extend volume group %q using command '%s': %v", vgName, fmt.Sprintf("%s %s", cmd, strings.Join(args, " ")), err)
+	if existingVolumeGroup != nil {
+		logger.Info("extending an existing volume group", "VGName", vgName)
+		if _, err := existingVolumeGroup.ExtendVG(r.executor, args); err != nil {
+			return fmt.Errorf("failed to extend volume group %s: %w", vgName, err)
+		}
+	} else {
+		logger.Info("creating a new volume group", "VGName", vgName)
+		var pvs []lvm.PhysicalVolume
+		for _, pvName := range args {
+			pvs = append(pvs, lvm.PhysicalVolume{PvName: pvName})
+		}
+		if err := (lvm.VolumeGroup{Name: vgName, PVs: pvs}).CreateVG(r.executor); err != nil {
+			return fmt.Errorf("failed to create volume group %s: %w", vgName, err)
+		}
 	}
 
 	return nil
 }
 
 // getAvailableDevicesForVG determines the available devices that can be used to create a volume group.
-func (r *VGReconciler) getAvailableDevicesForVG(ctx context.Context, blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
+func (r *VGReconciler) getAvailableDevicesForVG(ctx context.Context, blockDevices []internal.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
 	// filter devices based on DeviceSelector.Paths if specified
 	availableDevices, err := r.filterMatchingDevices(ctx, blockDevices, vgs, volumeGroup)
 	if err != nil {
@@ -98,14 +100,14 @@ DeviceLoop:
 		}
 
 		logger = logger.WithValues("Device.Name", blockDevice.Name)
-		for name, filter := range FilterMap {
-			logger := logger.WithValues("filter.Name", name)
-			valid, err := filter(blockDevice, r.executor)
+		for name, filterFunc := range filter.FilterMap {
+			logger := logger.WithValues("filterFunc.Name", name)
+			valid, err := filterFunc(blockDevice, r.executor)
 			if err != nil {
-				logger.Error(err, "filter error")
+				logger.Error(err, "filterFunc error")
 				continue DeviceLoop
 			} else if !valid {
-				logger.Info("does not match filter")
+				logger.Info("does not match filterFunc")
 				continue DeviceLoop
 			}
 		}
@@ -115,7 +117,7 @@ DeviceLoop:
 }
 
 // filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.
-func (r *VGReconciler) filterMatchingDevices(ctx context.Context, blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
+func (r *VGReconciler) filterMatchingDevices(ctx context.Context, blockDevices []internal.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
 	logger := log.FromContext(ctx)
 
 	var filteredBlockDevices []internal.BlockDevice
@@ -186,7 +188,7 @@ func (r *VGReconciler) filterMatchingDevices(ctx context.Context, blockDevices [
 	return blockDevices, nil
 }
 
-func isDeviceAlreadyPartOfVG(vgs []VolumeGroup, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
+func isDeviceAlreadyPartOfVG(vgs []lvm.VolumeGroup, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
 	for _, vg := range vgs {
 		if vg.Name == volumeGroup.Name {
 			for _, pv := range vg.PVs {
@@ -255,7 +257,7 @@ func checkDuplicateDeviceSelectorPaths(selector *lvmv1alpha1.DeviceSelector) err
 //
 //	An error will be returned if the device is invalid
 //	No error and an empty BlockDevice object will be returned if this device should be skipped (ex: duplicate device)
-func getValidDevice(devicePath string, blockDevices []internal.BlockDevice, vgs []VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (internal.BlockDevice, error) {
+func getValidDevice(devicePath string, blockDevices []internal.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (internal.BlockDevice, error) {
 	// Make sure the symlink exists
 	diskName, err := filepath.EvalSymlinks(devicePath)
 	if err != nil {
