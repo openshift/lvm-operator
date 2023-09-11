@@ -156,6 +156,7 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-deps.sh
 	hack/verify-bundle.sh
 	hack/verify-generated.sh
+	hack/verify-commitlint.sh
 
 test: manifests generate envtest godeps-update ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v "e2e"`
