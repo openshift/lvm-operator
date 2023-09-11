@@ -27,7 +27,9 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
+	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
 
@@ -87,8 +89,10 @@ type VGReconciler struct {
 	Scheme    *runtime.Scheme
 	executor  internal.Executor
 	LVMD      lvmd.Configurator
+	lsblk.LSBLK
 	NodeName  string
 	Namespace string
+	Filters   func(lsblk.LSBLK) filter.Filters
 }
 
 func (r *VGReconciler) getFinalizer() string {
@@ -126,8 +130,6 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 			return ctrl.Result{}, fmt.Errorf("could not determine if LVMVolumeGroupNodeStatus still needs to be created: %w", err)
 		}
 	}
-
-	r.executor = &internal.CommandExecutor{}
 	return r.reconcile(ctx, volumeGroup)
 }
 
@@ -168,7 +170,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
 
-	blockDevices, err := internal.ListBlockDevices(r.executor)
+	blockDevices, err := r.ListBlockDevices()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
 	}

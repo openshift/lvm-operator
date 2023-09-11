@@ -23,14 +23,13 @@ import (
 	"path/filepath"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/pkg/filter"
-	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []internal.BlockDevice) error {
+func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
 	logger := log.FromContext(ctx)
 
 	if len(devices) < 1 {
@@ -74,7 +73,7 @@ func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup
 }
 
 // getAvailableDevicesForVG determines the available devices that can be used to create a volume group.
-func (r *VGReconciler) getAvailableDevicesForVG(ctx context.Context, blockDevices []internal.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
+func (r *VGReconciler) getAvailableDevicesForVG(ctx context.Context, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
 	// filter devices based on DeviceSelector.Paths if specified
 	availableDevices, err := r.filterMatchingDevices(ctx, blockDevices, vgs, volumeGroup)
 	if err != nil {
@@ -86,10 +85,10 @@ func (r *VGReconciler) getAvailableDevicesForVG(ctx context.Context, blockDevice
 
 // filterAvailableDevices returns:
 // availableDevices: the list of blockdevices considered available
-func (r *VGReconciler) filterAvailableDevices(ctx context.Context, blockDevices []internal.BlockDevice) []internal.BlockDevice {
+func (r *VGReconciler) filterAvailableDevices(ctx context.Context, blockDevices []lsblk.BlockDevice) []lsblk.BlockDevice {
 	logger := log.FromContext(ctx)
 
-	var availableDevices []internal.BlockDevice
+	var availableDevices []lsblk.BlockDevice
 	// using a label so `continue DeviceLoop` can be used to skip devices
 DeviceLoop:
 	for _, blockDevice := range blockDevices {
@@ -100,7 +99,7 @@ DeviceLoop:
 		}
 
 		logger = logger.WithValues("Device.Name", blockDevice.Name)
-		for name, filterFunc := range filter.FilterMap {
+		for name, filterFunc := range r.Filters(r.LSBLK) {
 			logger := logger.WithValues("filterFunc.Name", name)
 			valid, err := filterFunc(blockDevice, r.executor)
 			if err != nil {
@@ -117,10 +116,10 @@ DeviceLoop:
 }
 
 // filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.
-func (r *VGReconciler) filterMatchingDevices(ctx context.Context, blockDevices []internal.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]internal.BlockDevice, error) {
+func (r *VGReconciler) filterMatchingDevices(ctx context.Context, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
 	logger := log.FromContext(ctx)
 
-	var filteredBlockDevices []internal.BlockDevice
+	var filteredBlockDevices []lsblk.BlockDevice
 	devicesAlreadyInVG := false
 
 	if volumeGroup.Spec.DeviceSelector != nil {
@@ -202,7 +201,7 @@ func isDeviceAlreadyPartOfVG(vgs []lvm.VolumeGroup, diskName string, volumeGroup
 	return false
 }
 
-func hasExactDisk(blockDevices []internal.BlockDevice, deviceName string) (internal.BlockDevice, bool) {
+func hasExactDisk(blockDevices []lsblk.BlockDevice, deviceName string) (lsblk.BlockDevice, bool) {
 	for _, blockDevice := range blockDevices {
 		if blockDevice.KName == deviceName {
 			return blockDevice, true
@@ -213,7 +212,7 @@ func hasExactDisk(blockDevices []internal.BlockDevice, deviceName string) (inter
 			}
 		}
 	}
-	return internal.BlockDevice{}, false
+	return lsblk.BlockDevice{}, false
 }
 
 func checkDuplicateDeviceSelectorPaths(selector *lvmv1alpha1.DeviceSelector) error {
@@ -257,22 +256,22 @@ func checkDuplicateDeviceSelectorPaths(selector *lvmv1alpha1.DeviceSelector) err
 //
 //	An error will be returned if the device is invalid
 //	No error and an empty BlockDevice object will be returned if this device should be skipped (ex: duplicate device)
-func getValidDevice(devicePath string, blockDevices []internal.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (internal.BlockDevice, error) {
+func getValidDevice(devicePath string, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (lsblk.BlockDevice, error) {
 	// Make sure the symlink exists
 	diskName, err := filepath.EvalSymlinks(devicePath)
 	if err != nil {
-		return internal.BlockDevice{}, fmt.Errorf("unable to find symlink for disk path %s: %v", devicePath, err)
+		return lsblk.BlockDevice{}, fmt.Errorf("unable to find symlink for disk path %s: %v", devicePath, err)
 	}
 
 	// Make sure this isn't a duplicate in the VG
 	if isDeviceAlreadyPartOfVG(vgs, diskName, volumeGroup) {
-		return internal.BlockDevice{}, nil // No error, we just don't want a duplicate
+		return lsblk.BlockDevice{}, nil // No error, we just don't want a duplicate
 	}
 
 	// Make sure the block device exists
 	blockDevice, ok := hasExactDisk(blockDevices, diskName)
 	if !ok {
-		return internal.BlockDevice{}, fmt.Errorf("can not find device name %s in the available block devices", devicePath)
+		return lsblk.BlockDevice{}, fmt.Errorf("can not find device name %s in the available block devices", devicePath)
 	}
 
 	blockDevice.DevicePath = devicePath
