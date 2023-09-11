@@ -21,13 +21,13 @@ import (
 	"fmt"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/labels"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -76,7 +76,10 @@ func (s topolvmVolumeSnapshotClass) ensureDeleted(r *LVMClusterReconciler, ctx c
 
 		vsc := &snapapi.VolumeSnapshotClass{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: vscName}, vsc); err != nil {
-			return client.IgnoreNotFound(err)
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
 		}
 
 		if !vsc.GetDeletionTimestamp().IsZero() {

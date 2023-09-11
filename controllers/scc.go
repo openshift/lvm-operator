@@ -79,7 +79,10 @@ func (c openshiftSccs) ensureDeleted(r *LVMClusterReconciler, ctx context.Contex
 		name := types.NamespacedName{Name: scName}
 		logger := logger.WithValues("SecurityContextConstraint", scName)
 		if err := r.Client.Get(ctx, name, scc); err != nil {
-			return client.IgnoreNotFound(err)
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
 		}
 
 		if !scc.GetDeletionTimestamp().IsZero() {
