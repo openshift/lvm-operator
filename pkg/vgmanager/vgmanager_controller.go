@@ -25,10 +25,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
+	"github.com/openshift/lvm-operator/pkg/dmsetup"
 	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
+	"github.com/openshift/lvm-operator/pkg/wipefs"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,6 +90,8 @@ type VGReconciler struct {
 	LVMD lvmd.Configurator
 	lvm.LVM
 	lsblk.LSBLK
+	wipefs.Wipefs
+	dmsetup.Dmsetup
 	NodeName  string
 	Namespace string
 	Filters   func(*lvmv1alpha1.LVMVolumeGroup, lvm.LVM, lsblk.LSBLK) filter.Filters
@@ -128,12 +133,13 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		}
 	}
 
-	return r.reconcile(ctx, volumeGroup)
+	return r.reconcile(ctx, volumeGroup, nodeStatus)
 }
 
 func (r *VGReconciler) reconcile(
 	ctx context.Context,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
+	nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus,
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	// Check if the LVMVolumeGroup resource is deleted
@@ -165,6 +171,32 @@ func (r *VGReconciler) reconcile(
 	}
 	existingLvmdConfig := *lvmdConfig
 
+	blockDevices, err := r.LSBLK.ListBlockDevices()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
+	}
+
+	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, nodeStatus, blockDevices)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
+	}
+	if wiped {
+		blockDevices, err = r.LSBLK.ListBlockDevices()
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
+		}
+	}
+
+	// Get the available block devices that can be used for this volume group
+	// valid means that it can be used to create or extend the volume group
+	// devices that are already part of the volume group will not be returned
+	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, nodeStatus, volumeGroup)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
+	}
+
+	devices := r.filterDevices(ctx, newDevices, r.Filters(volumeGroup, r.LVM, r.LSBLK))
+
 	vgs, err := r.LVM.ListVGs()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
@@ -178,21 +210,6 @@ func (r *VGReconciler) reconcile(
 			}
 		}
 	}
-
-	blockDevices, err := r.LSBLK.ListBlockDevices()
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
-	}
-
-	// Get the available block devices that can be used for this volume group
-	// valid means that it can be used to create or extend the volume group
-	// devices that are already part of the volume group will not be returned
-	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, vgs, volumeGroup)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
-	}
-
-	devices := r.filterDevices(ctx, newDevices, r.Filters(volumeGroup, r.LVM, r.LSBLK))
 
 	// If there are no available devices, that could mean either
 	// - There is no available devices to attach to the volume group

@@ -26,7 +26,7 @@ var (
 	nsenterPath = "/usr/bin/nsenter"
 )
 
-// Executor is the  interface for running exec commands
+// Executor is the interface for running exec commands
 type Executor interface {
 	ExecuteCommandWithOutput(command string, arg ...string) (string, error)
 	ExecuteCommandWithOutputAsHost(command string, arg ...string) (string, error)

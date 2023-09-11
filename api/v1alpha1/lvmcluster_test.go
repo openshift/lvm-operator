@@ -8,9 +8,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/lvm-operator/pkg/cluster"
+
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func generateUniqueNameForTestCase(ctx SpecContext) string {
@@ -398,6 +400,42 @@ var _ = Describe("webhook acceptance tests", func() {
 		statusError := &k8serrors.StatusError{}
 		Expect(errors.As(err, &statusError)).To(BeTrue())
 		Expect(statusError.Status().Message).To(ContainSubstring("optional device paths were deleted from the LVMCluster"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("force wipe option cannot be added in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To[bool](true)
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrForceWipeOptionCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("force wipe option cannot be changed in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}, ForceWipeDevicesAndDestroyAllData: ptr.To[bool](false)}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To[bool](true)
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrForceWipeOptionCannotBeChanged.Error()))
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})

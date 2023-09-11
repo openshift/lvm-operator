@@ -10,7 +10,6 @@ import (
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
-	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -42,7 +41,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 		description           string
 		volumeGroup           v1alpha1.LVMVolumeGroup
 		existingBlockDevices  []lsblk.BlockDevice
-		existingVGs           []lvm.VolumeGroup
+		nodeStatus            v1alpha1.LVMVolumeGroupNodeStatus
 		numOfAvailableDevices int
 		expectError           bool
 	}{
@@ -312,12 +311,16 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					},
 				},
 			},
-			existingVGs: []lvm.VolumeGroup{
-				{
-					Name: "vg1",
-					PVs: []lvm.PhysicalVolume{
-						{PvName: calculateDevicePath(t, "nvme1n1p1")},
-						{PvName: calculateDevicePath(t, "nvme1n1p2")},
+			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{
+				Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
+					LVMVGStatus: []v1alpha1.VGStatus{
+						{
+							Name: "vg1",
+							Devices: []string{
+								calculateDevicePath(t, "nvme1n1p1"),
+								calculateDevicePath(t, "nvme1n1p2"),
+							},
+						},
 					},
 				},
 			},
@@ -356,9 +359,13 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					},
 				},
 			},
-			existingVGs: []lvm.VolumeGroup{
-				{
-					Name: "vg1",
+			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{
+				Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
+					LVMVGStatus: []v1alpha1.VGStatus{
+						{
+							Name: "vg1",
+						},
+					},
 				},
 			},
 			existingBlockDevices: []lsblk.BlockDevice{
@@ -388,9 +395,13 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					},
 				},
 			},
-			existingVGs: []lvm.VolumeGroup{
-				{
-					Name: "vg1",
+			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{
+				Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
+					LVMVGStatus: []v1alpha1.VGStatus{
+						{
+							Name: "vg1",
+						},
+					},
 				},
 			},
 			existingBlockDevices: []lsblk.BlockDevice{
@@ -570,7 +581,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
-			availableDevices, err := r.getNewDevicesToBeAdded(ctx, tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
+			availableDevices, err := r.getNewDevicesToBeAdded(ctx, tc.existingBlockDevices, &tc.nodeStatus, &tc.volumeGroup)
 			if !tc.expectError {
 				assert.NoError(t, err)
 			} else {
