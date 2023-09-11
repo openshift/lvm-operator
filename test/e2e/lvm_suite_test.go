@@ -64,7 +64,7 @@ var _ = Describe("LVM Operator e2e tests", func() {
 	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
 
 	Describe("LVM Operator", Ordered, func() {
-		// Ordered to give the BeforeAll/AfterAll functionality to achieve common setup
+		// Ordered to give the before all/after all functionality to achieve common setup
 		var clusterConfig *v1alpha1.LVMCluster
 
 		BeforeAll(func(ctx SpecContext) {

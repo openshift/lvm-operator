@@ -151,7 +151,17 @@ vet: ## Run go vet against code.
 godeps-update: ## Run go mod tidy and go mod vendor.
 	go mod tidy && go mod vendor
 
-verify: ## Verify go formatting and generated files.
+CODESPELL_IMAGE_NAME=$(MANAGER_NAME_PREFIX)codespell
+codespell: ## Run codespell spellchecking
+	$(IMAGE_BUILD_CMD) build -t $(CODESPELL_IMAGE_NAME) . --file hack/codespell.Dockerfile
+	$(IMAGE_BUILD_CMD) run --cap-drop=all -v $(PWD):/repo:Z \
+ 		--rm $(CODESPELL_IMAGE_NAME) codespell /repo \
+		--ignore-words-list "afterall" \
+		--check-filenames \
+		--check-hidden \
+		--skip vendor,./LICENSE,.git
+
+verify: codespell ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
 	hack/verify-deps.sh
 	hack/verify-bundle.sh

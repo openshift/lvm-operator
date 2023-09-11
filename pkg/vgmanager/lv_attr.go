@@ -109,7 +109,7 @@ const (
 // LvAttr has mapped lv_attr information, see https://linux.die.net/man/8/lvs
 // It is a complete parsing of the entire attribute byte flags that is attached to each LV.
 // This is useful when attaching logic to the state of an LV as the state of an LV can be determined
-// from the Attributes, e.g. for determining wether an LV is considered a Thin-Pool or not.
+// from the Attributes, e.g. for determining whether an LV is considered a Thin-Pool or not.
 type LvAttr struct {
 	VolumeType
 	Permissions

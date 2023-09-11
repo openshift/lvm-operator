@@ -325,7 +325,7 @@ To perform a full cleanup, follow these steps:
 
 There are a few steps required to run the end-to-end tests for LVMS. 
 
-You will need the following evironment variables set:
+You will need the following environment variables set:
 ```bash
 IMAGE_REGISTRY={{REGISTRY_URL}} # Ex: quay.io
 REGISTRY_NAMESPACE={{REGISTRY_NAMESPACE}} # Ex: lvms-dev, this should be your own personal namespace
@@ -386,7 +386,7 @@ It is not possible to upgrade from release-4.10 and release-4.11 to a newer vers
 
 Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs. 
 This is backed by an LVM Logical Volume of type `thin`, which is reflected in the LVM flags as an attribute.
-When trying to use LVM's inbuilt RAID capabilities, it conflicts with this `thin` attribute as the same flag is also indicative wether a volume is part of LVM RAID configurations (`r` or `R` flag).
+When trying to use LVM's inbuilt RAID capabilities, it conflicts with this `thin` attribute as the same flag is also indicative whether a volume is part of LVM RAID configurations (`r` or `R` flag).
 This means that the only way to support RAID configuration from within `LVM` would be to do a conversion from two RAID Arrays into a thinpool with `lvconvert`, after which the RAID is no longer recognized by LVM (due to said conflict in the volume attributes).
 While this would enable initial synchronization and redundancy, all repair and extend operations would not longer respect the RAID topology in the Volume Group, and operations like `lvconvert --repair` are not even supported anymore. 
 This means that it would be quite a complex situation to recover from.

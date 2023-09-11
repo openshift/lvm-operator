@@ -90,7 +90,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "testing pending PVC is proccessed",
+			name: "testing pending PVC is processed",
 			req: controllerruntime.Request{NamespacedName: types.NamespacedName{
 				Namespace: defaultNamespace,
 				Name:      "test-pending-PVC",
