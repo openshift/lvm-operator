@@ -42,6 +42,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
@@ -50,6 +51,11 @@ const (
 	ControllerName            = "vg-manager"
 	reconcileInterval         = 15 * time.Second
 	metadataWarningPercentage = 95
+
+	// NodeCleanupFinalizer should be set on a LVMVolumeGroup for every Node matching that LVMVolumeGroup.
+	// When the LVMVolumeGroup gets deleted, this finalizer will stay on the VolumeGroup until the vgmanager instance
+	// on that node has fulfilled all cleanup routines for the vg (remove lvs, vgs, pvs and lvmd conf entry).
+	NodeCleanupFinalizer = "cleanup.vgmanager.node.topolvm.io"
 )
 
 type EventReasonInfo string
@@ -83,6 +89,10 @@ type VGReconciler struct {
 	executor  internal.Executor
 	NodeName  string
 	Namespace string
+}
+
+func (r *VGReconciler) getFinalizer() string {
+	return fmt.Sprintf("%s/%s", NodeCleanupFinalizer, r.NodeName)
 }
 
 func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -126,6 +136,11 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	// Check if the LVMVolumeGroup resource is deleted
 	if !volumeGroup.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.processDelete(ctx, volumeGroup)
+	} else {
+		if added := controllerutil.AddFinalizer(volumeGroup, r.getFinalizer()); added {
+			logger.Info("adding finalizer")
+			return ctrl.Result{}, r.Client.Update(ctx, volumeGroup)
+		}
 	}
 
 	// Read the lvmd config file
@@ -376,6 +391,11 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 
 	if err := r.removeVolumeGroupStatus(ctx, volumeGroup); err != nil {
 		return fmt.Errorf("failed to remove status for volume group %s: %w", volumeGroup.Name, err)
+	}
+
+	if removed := controllerutil.RemoveFinalizer(volumeGroup, r.getFinalizer()); removed {
+		logger.Info("removing finalizer")
+		return r.Client.Update(ctx, volumeGroup)
 	}
 
 	return nil
