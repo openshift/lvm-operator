@@ -19,18 +19,18 @@ package vgmanager
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
 	"github.com/openshift/lvm-operator/pkg/internal"
 	"github.com/openshift/lvm-operator/pkg/lvm"
-	"github.com/topolvm/topolvm/lvmd"
-	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
+	"github.com/openshift/lvm-operator/pkg/lvmd"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -87,6 +86,7 @@ type VGReconciler struct {
 	record.EventRecorder
 	Scheme    *runtime.Scheme
 	executor  internal.Executor
+	LVMD      lvmd.Configurator
 	NodeName  string
 	Namespace string
 }
@@ -144,7 +144,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 	}
 
 	// Read the lvmd config file
-	lvmdConfig, err := loadLVMDConfig()
+	lvmdConfig, err := r.LVMD.Load()
 	if err != nil {
 		err = fmt.Errorf("failed to read the lvmd config file: %w", err)
 		if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
@@ -157,7 +157,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		msg := "lvmd config file doesn't exist, will attempt to create a fresh config"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigMissing, msg)
-		lvmdConfig = &lvmdCMD.Config{
+		lvmdConfig = &lvmd.Config{
 			SocketName: controllers.DefaultLVMdSocket,
 		}
 	}
@@ -279,7 +279,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 
 	// Apply and save lvmd config
 	if !cmp.Equal(existingLvmdConfig, lvmdConfig) {
-		if err := saveLVMDConfig(lvmdConfig); err != nil {
+		if err := r.LVMD.Save(lvmdConfig); err != nil {
 			err := fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 			if err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
@@ -304,7 +304,7 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	// Read the lvmd config file
-	lvmdConfig, err := loadLVMDConfig()
+	lvmdConfig, err := r.LVMD.Load()
 	if err != nil {
 		// Failed to read lvmdconfig file. Reconcile again
 		return fmt.Errorf("failed to read the lvmd config file: %w", err)
@@ -373,14 +373,14 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 	// if there was no config file in the first place, nothing has to be removed.
 	if lvmdConfig != nil {
 		if len(lvmdConfig.DeviceClasses) > 0 {
-			if err = saveLVMDConfig(lvmdConfig); err != nil {
+			if err = r.LVMD.Save(lvmdConfig); err != nil {
 				return fmt.Errorf("failed to update lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
 			}
 			msg := "updated lvmd config after deviceClass was removed"
 			logger.Info(msg)
 			r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
 		} else {
-			if err = deleteLVMDConfig(); err != nil {
+			if err = r.LVMD.Delete(); err != nil {
 				return fmt.Errorf("failed to delete lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
 			}
 			msg := "removed lvmd config after last deviceClass was removed"
@@ -598,40 +598,4 @@ func (r *VGReconciler) matchesThisNode(ctx context.Context, selector *corev1.Nod
 		return false, err
 	}
 	return NodeSelectorMatchesNodeLabels(node, selector)
-}
-
-func loadLVMDConfig() (*lvmdCMD.Config, error) {
-
-	cfgBytes, err := os.ReadFile(controllers.LvmdConfigFile)
-	if os.IsNotExist(err) {
-		// If the file does not exist, return nil for both
-		return nil, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to load config file %s: %w", controllers.LvmdConfigFile, err)
-	} else {
-		lvmdconfig := &lvmdCMD.Config{}
-		if err = yaml.Unmarshal(cfgBytes, lvmdconfig); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal config file %s: %w", controllers.LvmdConfigFile, err)
-		}
-		return lvmdconfig, nil
-	}
-}
-
-func saveLVMDConfig(lvmdConfig *lvmdCMD.Config) error {
-	out, err := yaml.Marshal(lvmdConfig)
-	if err == nil {
-		err = os.WriteFile(controllers.LvmdConfigFile, out, 0600)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to save config file %s: %w", controllers.LvmdConfigFile, err)
-	}
-	return nil
-}
-
-func deleteLVMDConfig() error {
-	err := os.Remove(controllers.LvmdConfigFile)
-	if err != nil {
-		return fmt.Errorf("failed to delete config file %s: %w", controllers.LvmdConfigFile, err)
-	}
-	return err
 }
