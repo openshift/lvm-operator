@@ -28,7 +28,7 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/controllers"
 	"github.com/openshift/lvm-operator/pkg/filter"
-	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal/exec"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
@@ -77,6 +77,7 @@ var (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VGReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.executor = &exec.CommandExecutor{}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, builder.MatchEveryOwner).
@@ -86,9 +87,9 @@ func (r *VGReconciler) SetupWithManager(mgr ctrl.Manager) error {
 type VGReconciler struct {
 	client.Client
 	record.EventRecorder
-	Scheme    *runtime.Scheme
-	executor  internal.Executor
-	LVMD      lvmd.Configurator
+	Scheme   *runtime.Scheme
+	executor exec.Executor
+	LVMD     lvmd.Configurator
 	lsblk.LSBLK
 	NodeName  string
 	Namespace string

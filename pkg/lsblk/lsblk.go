@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal/exec"
 )
 
 var (
@@ -49,17 +49,17 @@ type LSBLK interface {
 }
 
 type HostLSBLK struct {
-	internal.Executor
+	exec.Executor
 	lsblk     string
 	mountInfo string
 	losetup   string
 }
 
 func NewDefaultHostLSBLK() *HostLSBLK {
-	return NewHostLSBLK(&internal.CommandExecutor{}, DefaultLsblk, DefaultMountinfo, DefaultLosetup)
+	return NewHostLSBLK(&exec.CommandExecutor{}, DefaultLsblk, DefaultMountinfo, DefaultLosetup)
 }
 
-func NewHostLSBLK(executor internal.Executor, lsblk, mountInfo, losetup string) *HostLSBLK {
+func NewHostLSBLK(executor exec.Executor, lsblk, mountInfo, losetup string) *HostLSBLK {
 	hostLsblk := &HostLSBLK{
 		lsblk:     lsblk,
 		Executor:  executor,

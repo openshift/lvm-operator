@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal/exec"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 )
@@ -51,31 +51,31 @@ const (
 	usableDeviceType           = "usableDeviceType"
 )
 
-type Filters map[string]func(lsblk.BlockDevice, internal.Executor) (bool, error)
+type Filters map[string]func(lsblk.BlockDevice, exec.Executor) (bool, error)
 
 func DefaultFilters(lsblkInstance lsblk.LSBLK) Filters {
 	return Filters{
-		notReadOnly: func(dev lsblk.BlockDevice, _ internal.Executor) (bool, error) {
+		notReadOnly: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
 			return !dev.ReadOnly, nil
 		},
 
-		notSuspended: func(dev lsblk.BlockDevice, _ internal.Executor) (bool, error) {
+		notSuspended: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
 			matched := dev.State != StateSuspended
 			return matched, nil
 		},
 
-		noBiosBootInPartLabel: func(dev lsblk.BlockDevice, _ internal.Executor) (bool, error) {
+		noBiosBootInPartLabel: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
 			biosBootInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("bios")) ||
 				strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("boot"))
 			return !biosBootInPartLabel, nil
 		},
 
-		noReservedInPartLabel: func(dev lsblk.BlockDevice, _ internal.Executor) (bool, error) {
+		noReservedInPartLabel: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
 			reservedInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), "reserved")
 			return !reservedInPartLabel, nil
 		},
 
-		noValidFilesystemSignature: func(dev lsblk.BlockDevice, e internal.Executor) (bool, error) {
+		noValidFilesystemSignature: func(dev lsblk.BlockDevice, e exec.Executor) (bool, error) {
 			// if no fs type is set, it's always okay
 			if dev.FSType == "" {
 				return true, nil
@@ -108,17 +108,17 @@ func DefaultFilters(lsblkInstance lsblk.LSBLK) Filters {
 			return false, nil
 		},
 
-		noBindMounts: func(dev lsblk.BlockDevice, _ internal.Executor) (bool, error) {
+		noBindMounts: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
 			hasBindMounts, _, err := lsblkInstance.HasBindMounts(dev)
 			return !hasBindMounts, err
 		},
 
-		noChildren: func(dev lsblk.BlockDevice, _ internal.Executor) (bool, error) {
+		noChildren: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
 			hasChildren := dev.HasChildren()
 			return !hasChildren, nil
 		},
 
-		usableDeviceType: func(dev lsblk.BlockDevice, executor internal.Executor) (bool, error) {
+		usableDeviceType: func(dev lsblk.BlockDevice, executor exec.Executor) (bool, error) {
 			switch dev.Type {
 			case DeviceTypeLoop:
 				// check loop device isn't being used by kubernetes

@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-logr/logr/testr"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/pkg/internal"
-	mockExec "github.com/openshift/lvm-operator/pkg/internal/test"
+	"github.com/openshift/lvm-operator/pkg/internal/exec"
+	mockExec "github.com/openshift/lvm-operator/pkg/internal/exec/test"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
@@ -92,7 +92,7 @@ var mockLvsOutputRAID = `
 
 func TestVGReconciler_validateLVs(t *testing.T) {
 	type fields struct {
-		executor internal.Executor
+		executor exec.Executor
 	}
 	type args struct {
 		volumeGroup *lvmv1alpha1.LVMVolumeGroup
@@ -108,7 +108,7 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 		"json",
 	}
 
-	mockExecutorForLVSOutput := func(output string) internal.Executor {
+	mockExecutorForLVSOutput := func(output string) exec.Executor {
 		return &mockExec.MockExecutor{
 			MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (string, error) {
 				if !slices.Equal(args, lvsCommandForVG1) {
