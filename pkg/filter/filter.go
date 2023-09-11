@@ -20,8 +20,23 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/internal/exec"
+	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
+)
+
+const (
+	// StateSuspended is a possible value of BlockDevice.State
+	StateSuspended = "suspended"
+
+	// DeviceTypeLoop is the device type for loop devices in lsblk output
+	DeviceTypeLoop = "loop"
+
+	// DeviceTypeROM is the device type for ROM devices in lsblk output
+	DeviceTypeROM = "rom"
+
+	// DeviceTypeLVM is the device type for lvm devices in lsblk output
+	DeviceTypeLVM = "lvm"
 )
 
 const (
@@ -36,85 +51,85 @@ const (
 	usableDeviceType           = "usableDeviceType"
 )
 
-// maps of function identifier (for logs) to filter function.
-// These are passed the localv1alpha1.DeviceInclusionSpec to make testing easier,
-// but they aren't expected to use it
-// they verify that the device itself is good to use
-var FilterMap = map[string]func(internal.BlockDevice, internal.Executor) (bool, error){
-	notReadOnly: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		return !dev.ReadOnly, nil
-	},
+type Filters map[string]func(lsblk.BlockDevice, exec.Executor) (bool, error)
 
-	notSuspended: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		matched := dev.State != internal.StateSuspended
-		return matched, nil
-	},
+func DefaultFilters(lsblkInstance lsblk.LSBLK) Filters {
+	return Filters{
+		notReadOnly: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
+			return !dev.ReadOnly, nil
+		},
 
-	noBiosBootInPartLabel: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		biosBootInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("bios")) ||
-			strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("boot"))
-		return !biosBootInPartLabel, nil
-	},
+		notSuspended: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
+			matched := dev.State != StateSuspended
+			return matched, nil
+		},
 
-	noReservedInPartLabel: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		reservedInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), "reserved")
-		return !reservedInPartLabel, nil
-	},
+		noBiosBootInPartLabel: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
+			biosBootInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("bios")) ||
+				strings.Contains(strings.ToLower(dev.PartLabel), strings.ToLower("boot"))
+			return !biosBootInPartLabel, nil
+		},
 
-	noValidFilesystemSignature: func(dev internal.BlockDevice, e internal.Executor) (bool, error) {
-		// if no fs type is set, it's always okay
-		if dev.FSType == "" {
-			return true, nil
-		}
+		noReservedInPartLabel: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
+			reservedInPartLabel := strings.Contains(strings.ToLower(dev.PartLabel), "reserved")
+			return !reservedInPartLabel, nil
+		},
 
-		// if fstype is set to LVM2_member then it already was created as a PV
-		// this means that if the disk has no children, we can safely reuse it if it's a valid LVM PV.
-		if dev.FSType == "LVM2_member" && !dev.HasChildren() {
-			pvs, err := lvm.ListPhysicalVolumes(e, "")
-			if err != nil {
-				return false, fmt.Errorf("could not determine if block device has valid filesystem signature, since it is flagged as LVM2_member but physical volumes could not be verified: %w", err)
+		noValidFilesystemSignature: func(dev lsblk.BlockDevice, e exec.Executor) (bool, error) {
+			// if no fs type is set, it's always okay
+			if dev.FSType == "" {
+				return true, nil
 			}
 
-			for _, pv := range pvs {
-				// a volume is a valid PV if it has the same name as the block device and no associated volume group and has available disk space
-				// however if there is a PV that matches the Device and there is a VG associated with it or no available space, we cannot use it
-				if pv.PvName == dev.KName {
-					if pv.VgName == "" && pv.PvFree != "0G" {
-						return true, nil
-					} else {
-						return false, nil
+			// if fstype is set to LVM2_member then it already was created as a PV
+			// this means that if the disk has no children, we can safely reuse it if it's a valid LVM PV.
+			if dev.FSType == "LVM2_member" && !dev.HasChildren() {
+				pvs, err := lvm.ListPhysicalVolumes(e, "")
+				if err != nil {
+					return false, fmt.Errorf("could not determine if block device has valid filesystem signature, since it is flagged as LVM2_member but physical volumes could not be verified: %w", err)
+				}
+
+				for _, pv := range pvs {
+					// a volume is a valid PV if it has the same name as the block device and no associated volume group and has available disk space
+					// however if there is a PV that matches the Device and there is a VG associated with it or no available space, we cannot use it
+					if pv.PvName == dev.KName {
+						if pv.VgName == "" && pv.PvFree != "0G" {
+							return true, nil
+						} else {
+							return false, nil
+						}
 					}
 				}
+
+				// if there was no PV that matched it and it still is flagged as LVM2_member, it is formatted but not recognized by LVM
+				// configuration. We can assume that in this case, the Volume can be reused by simply recalling the vgcreate command on it
+				return true, nil
 			}
-
-			// if there was no PV that matched it and it still is flagged as LVM2_member, it is formatted but not recognized by LVM
-			// configuration. We can assume that in this case, the Volume can be reused by simply recalling the vgcreate command on it
-			return true, nil
-		}
-		return false, nil
-	},
-
-	noBindMounts: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		hasBindMounts, _, err := dev.HasBindMounts()
-		return !hasBindMounts, err
-	},
-
-	noChildren: func(dev internal.BlockDevice, _ internal.Executor) (bool, error) {
-		hasChildren := dev.HasChildren()
-		return !hasChildren, nil
-	},
-
-	usableDeviceType: func(dev internal.BlockDevice, executor internal.Executor) (bool, error) {
-		switch dev.Type {
-		case internal.DeviceTypeLoop:
-			// check loop device isn't being used by kubernetes
-			return dev.IsUsableLoopDev(executor)
-		case internal.DeviceTypeROM:
 			return false, nil
-		case internal.DeviceTypeLVM:
-			return false, nil
-		default:
-			return true, nil
-		}
-	},
+		},
+
+		noBindMounts: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
+			hasBindMounts, _, err := lsblkInstance.HasBindMounts(dev)
+			return !hasBindMounts, err
+		},
+
+		noChildren: func(dev lsblk.BlockDevice, _ exec.Executor) (bool, error) {
+			hasChildren := dev.HasChildren()
+			return !hasChildren, nil
+		},
+
+		usableDeviceType: func(dev lsblk.BlockDevice, executor exec.Executor) (bool, error) {
+			switch dev.Type {
+			case DeviceTypeLoop:
+				// check loop device isn't being used by kubernetes
+				return lsblkInstance.IsUsableLoopDev(dev)
+			case DeviceTypeROM:
+				return false, nil
+			case DeviceTypeLVM:
+				return false, nil
+			default:
+				return true, nil
+			}
+		},
+	}
 }

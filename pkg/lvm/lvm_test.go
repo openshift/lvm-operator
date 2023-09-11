@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	mockExec "github.com/openshift/lvm-operator/pkg/internal/test"
+	mockExec "github.com/openshift/lvm-operator/pkg/internal/exec/test"
 	"github.com/stretchr/testify/assert"
 )
 

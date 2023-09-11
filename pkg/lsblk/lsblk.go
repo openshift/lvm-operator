@@ -1,20 +1,4 @@
-/*
-Copyright © 2023 Red Hat, Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package internal
+package lsblk
 
 import (
 	"encoding/json"
@@ -22,25 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/openshift/lvm-operator/pkg/internal/exec"
 )
 
 var (
-	mountFile = "/proc/1/mountinfo"
+	DefaultMountinfo = "/proc/1/mountinfo"
+	DefaultLosetup   = "/usr/sbin/losetup"
+	DefaultLsblk     = "/usr/bin/lsblk"
 )
 
 const (
-	// StateSuspended is a possible value of BlockDevice.State
-	StateSuspended = "suspended"
-
-	// DeviceTypeLoop is the device type for loop devices in lsblk output
-	DeviceTypeLoop = "loop"
-
-	// DeviceTypeROM is the device type for ROM devices in lsblk output
-	DeviceTypeROM = "rom"
-
-	// DeviceTypeLVM is the device type for lvm devices in lsblk output
-	DeviceTypeLVM = "lvm"
-
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
 )
@@ -66,14 +42,46 @@ type BlockDevice struct {
 	DevicePath string
 }
 
+type LSBLK interface {
+	ListBlockDevices() ([]BlockDevice, error)
+	IsUsableLoopDev(b BlockDevice) (bool, error)
+	HasBindMounts(b BlockDevice) (bool, string, error)
+}
+
+type HostLSBLK struct {
+	exec.Executor
+	lsblk     string
+	mountInfo string
+	losetup   string
+}
+
+func NewDefaultHostLSBLK() *HostLSBLK {
+	return NewHostLSBLK(&exec.CommandExecutor{}, DefaultLsblk, DefaultMountinfo, DefaultLosetup)
+}
+
+func NewHostLSBLK(executor exec.Executor, lsblk, mountInfo, losetup string) *HostLSBLK {
+	hostLsblk := &HostLSBLK{
+		lsblk:     lsblk,
+		Executor:  executor,
+		mountInfo: mountInfo,
+		losetup:   losetup,
+	}
+	return hostLsblk
+}
+
+// HasChildren checks if the disk has partitions
+func (b BlockDevice) HasChildren() bool {
+	return len(b.Children) > 0
+}
+
 // ListBlockDevices lists the block devices using the lsblk command
-func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
+func (lsblk *HostLSBLK) ListBlockDevices() ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "--paths", "-o", columns}
 
-	output, err := exec.ExecuteCommandWithOutput("lsblk", args...)
+	output, err := lsblk.ExecuteCommandWithOutput(lsblk.lsblk, args...)
 	if err != nil {
 		return []BlockDevice{}, err
 	}
@@ -89,46 +97,40 @@ func ListBlockDevices(exec Executor) ([]BlockDevice, error) {
 // IsUsableLoopDev returns true if the loop device isn't in use by Kubernetes
 // by matching the back file path against a standard string used to mount devices
 // from host into pods
-func (b BlockDevice) IsUsableLoopDev(exec Executor) (bool, error) {
+func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 	// holds back-file string of the loop device
 	var loopDeviceMap map[string][]struct {
 		BackFile string `json:"back-file"`
 	}
 
-	usable := true
 	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
-	output, err := exec.ExecuteCommandWithOutput(losetupPath, args...)
+	output, err := lsblk.ExecuteCommandWithOutput(lsblk.losetup, args...)
 	if err != nil {
-		return usable, err
+		return true, err
 	}
 
 	err = json.Unmarshal([]byte(output), &loopDeviceMap)
 	if err != nil {
-		return usable, err
+		return false, err
 	}
 
 	for _, backFile := range loopDeviceMap["loopdevices"] {
 		if strings.Contains(backFile.BackFile, pluginString) {
 			// this loop device is being used by kubernetes and can't be
 			// added to volume group
-			usable = false
+			return false, nil
 		}
 	}
 
-	return usable, nil
-}
-
-// HasChildren checks if the disk has partitions
-func (b BlockDevice) HasChildren() bool {
-	return len(b.Children) > 0
+	return true, nil
 }
 
 // HasBindMounts checks for bind mounts and returns mount point for a device by parsing `proc/1/mountinfo`.
 // HostPID should be set to true inside the POD spec to get details of host's mount points inside `proc/1/mountinfo`.
-func (b BlockDevice) HasBindMounts() (bool, string, error) {
-	data, err := os.ReadFile(mountFile)
+func (lsblk *HostLSBLK) HasBindMounts(b BlockDevice) (bool, string, error) {
+	data, err := os.ReadFile(lsblk.mountInfo)
 	if err != nil {
-		return false, "", fmt.Errorf("failed to read file %s: %v", mountFile, err)
+		return false, "", fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
 	}
 
 	mountString := string(data)

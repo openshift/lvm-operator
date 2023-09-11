@@ -10,7 +10,7 @@ import (
 	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/filter"
-	"github.com/openshift/lvm-operator/pkg/internal"
+	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,14 +34,17 @@ func TestAvailableDevicesForVG(t *testing.T) {
 	}
 
 	r := &VGReconciler{}
-
-	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
-	delete(filter.FilterMap, "noBindMounts")
+	r.Filters = func(instance lsblk.LSBLK) filter.Filters {
+		filters := filter.DefaultFilters(instance)
+		// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
+		delete(filters, "noBindMounts")
+		return filters
+	}
 
 	testCases := []struct {
 		description           string
 		volumeGroup           v1alpha1.LVMVolumeGroup
-		existingBlockDevices  []internal.BlockDevice
+		existingBlockDevices  []lsblk.BlockDevice
 		existingVGs           []lvm.VolumeGroup
 		numOfAvailableDevices int
 		expectError           bool
@@ -53,7 +56,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "/dev/nvme1n1",
 					Type:     "disk",
@@ -72,7 +75,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "/dev/nvme1n1",
 					Type:     "disk",
@@ -91,7 +94,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "/dev/nvme1n1",
 					Type:     "disk",
@@ -110,7 +113,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:      "/dev/nvme1n1",
 					Type:      "disk",
@@ -130,7 +133,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:      "/dev/nvme1n1",
 					Type:      "disk",
@@ -150,7 +153,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "/dev/nvme1n1",
 					Type:     "disk",
@@ -170,7 +173,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "/dev/nvme1n1",
 					Type:     "disk",
@@ -178,7 +181,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					ReadOnly: false,
 					State:    "live",
 					KName:    "/dev/nvme1n1",
-					Children: []internal.BlockDevice{
+					Children: []lsblk.BlockDevice{
 						{
 							Name:     "/dev/nvme1n1p1",
 							ReadOnly: true,
@@ -195,7 +198,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "/dev/nvme1n1",
 					Type:     "disk",
@@ -203,7 +206,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					ReadOnly: false,
 					State:    "live",
 					KName:    "/dev/nvme1n1",
-					Children: []internal.BlockDevice{
+					Children: []lsblk.BlockDevice{
 						{
 							Name:     "/dev/nvme1n1p1",
 							Type:     "disk",
@@ -239,7 +242,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -265,7 +268,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices:  []internal.BlockDevice{},
+			existingBlockDevices:  []lsblk.BlockDevice{},
 			numOfAvailableDevices: 0,
 			expectError:           true,
 		},
@@ -283,7 +286,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -321,7 +324,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -361,7 +364,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -393,7 +396,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Name: "vg1",
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -401,7 +404,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					Size:     "279.4G",
 					ReadOnly: false,
 					State:    "live",
-					Children: []internal.BlockDevice{
+					Children: []lsblk.BlockDevice{
 						{
 							Name:     "nvme1n1p2",
 							KName:    calculateDevicePath(t, "nvme1n1p2"),
@@ -433,7 +436,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -469,7 +472,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),
@@ -496,7 +499,7 @@ func TestAvailableDevicesForVG(t *testing.T) {
 					},
 				},
 			},
-			existingBlockDevices: []internal.BlockDevice{
+			existingBlockDevices: []lsblk.BlockDevice{
 				{
 					Name:     "nvme1n1p1",
 					KName:    calculateDevicePath(t, "nvme1n1p1"),

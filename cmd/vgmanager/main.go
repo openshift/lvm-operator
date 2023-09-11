@@ -21,6 +21,8 @@ import (
 	"os"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/filter"
+	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
 	"github.com/openshift/lvm-operator/pkg/vgmanager"
 
@@ -82,8 +84,10 @@ func main() {
 		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
 		LVMD:          lvmd.DefaultConfigurator(),
 		Scheme:        mgr.GetScheme(),
+		LSBLK:         lsblk.NewDefaultHostLSBLK(),
 		NodeName:      os.Getenv("NODE_NAME"),
 		Namespace:     os.Getenv("POD_NAMESPACE"),
+		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VGManager")
 		os.Exit(1)
