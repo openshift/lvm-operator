@@ -45,9 +45,19 @@ func GetDeviceClassKey() string {
 	return fmt.Sprintf("%s/device-class", GetPluginName())
 }
 
+// GetDeviceClassKey returns the key used in CSI volume create requests to specify a lvcreate-option-class.
+func GetLvcreateOptionClassKey() string {
+	return fmt.Sprintf("%s/lvcreate-option-class", GetPluginName())
+}
+
 // GetResizeRequestedAtKey returns the key of LogicalVolume that represents the timestamp of the resize request.
 func GetResizeRequestedAtKey() string {
 	return fmt.Sprintf("%s/resize-requested-at", GetPluginName())
+}
+
+// GetPendingDeletionKey returns the name of the pending-deletion annotation
+func GetLVPendingDeletionKey() string {
+	return fmt.Sprintf("%s/pendingdeletion", GetPluginName())
 }
 
 // GetLogicalVolumeFinalizer returns the name of LogicalVolume finalizer
@@ -60,10 +70,11 @@ func GetNodeFinalizer() string {
 	return fmt.Sprintf("%s/node", GetPluginName())
 }
 
-// GetPVCFinalizer returns the name of PVC finalizer of TopoLVM
-func GetPVCFinalizer() string {
-	return fmt.Sprintf("%s/pvc", GetPluginName())
-}
+// PVCFinalizer is a finalizer of PVC.
+const PVCFinalizer = pluginName + "/pvc"
+
+// LegacyPVCFinalizer is a legacy finalizer of PVC.
+const LegacyPVCFinalizer = legacyPluginName + "/pvc"
 
 // DefaultCSISocket is the default path of the CSI socket file.
 const DefaultCSISocket = "/run/topolvm/csi-topolvm.sock"

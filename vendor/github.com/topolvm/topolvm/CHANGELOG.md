@@ -7,6 +7,203 @@ This file itself is based on [Keep a CHANGELOG](https://keepachangelog.com/en/0.
 
 ## [Unreleased]
 
+## [0.20.0] - 2023-08-08
+
+### Added
+
+- feat: allow passing leaderelection config values to topolvm-controller ([#728](https://github.com/topolvm/topolvm/pull/728))
+
+### Changed
+
+- Start building images independently of unit tests ([#719](https://github.com/topolvm/topolvm/pull/719))
+- add Ryotaro Banno to owners ([#722](https://github.com/topolvm/topolvm/pull/722))
+- Use pre-build cri-dockerd ([#725](https://github.com/topolvm/topolvm/pull/725))
+- Use dependabot grouping feature ([#724](https://github.com/topolvm/topolvm/pull/724))
+
+### Fixed
+
+- Don't re-add finalizer to LogicalVolumes that are about to be deleted ([#723](https://github.com/topolvm/topolvm/pull/723))
+
+### Contributors
+
+- @jakobmoellerdev
+- @toshipp
+- @llamerada-jp
+- @spmason
+
+## [0.19.1] - 2023-07-07
+
+### Changed
+
+- Specify kind node image digest ([#705](https://github.com/topolvm/topolvm/pull/705))
+- Add an item to the check list for Kubernetes upgrade to ensure that t… ([#708](https://github.com/topolvm/topolvm/pull/708))
+- doc: update limitation about retain policy ([#714](https://github.com/topolvm/topolvm/pull/714))
+- Stabilize logical volume test ([#706](https://github.com/topolvm/topolvm/pull/706))
+- build(deps): bump google.golang.org/grpc from 1.49.0 to 1.53.0 ([#716](https://github.com/topolvm/topolvm/pull/716))
+
+### Contributors
+
+- @peng225
+- @satoru-takeuchi
+- @toshipp
+
+## [0.19.0] - 2023-05-18
+
+### Changed
+
+- Refactor getting objects ([#679](https://github.com/topolvm/topolvm/pull/679))
+- build(deps): bump actions/stale from 7 to 8 ([#688](https://github.com/topolvm/topolvm/pull/688))
+- Unify LV check logic ([#685](https://github.com/topolvm/topolvm/pull/685))
+- Combine capacity test and scheduler test ([#689](https://github.com/topolvm/topolvm/pull/689))
+- Cleanup publish test ([#693](https://github.com/topolvm/topolvm/pull/693))
+- Update cleanup test to check if topolvm re-create pods of STS if the node is deleted. ([#696](https://github.com/topolvm/topolvm/pull/696))
+- Organize metrics tests ([#698](https://github.com/topolvm/topolvm/pull/698))
+- Run thick and thin sanity at once ([#700](https://github.com/topolvm/topolvm/pull/700))
+- support Kubernetes 1.26 ([#697](https://github.com/topolvm/topolvm/pull/697))
+
+### Contributors
+
+- @llamerada-jp
+- @toshipp
+
+## [0.18.2] - 2023-04-04
+
+### Added
+
+- Add tests for NodeReconciler ([#670](https://github.com/topolvm/topolvm/pull/670))
+- add a workflow job to check the do-not-merge label ([#677](https://github.com/topolvm/topolvm/pull/677))
+
+### Changed
+
+- Use csi go module instead of generating sources from proto ([#669](https://github.com/topolvm/topolvm/pull/669))
+- move legacy mode test to e2e test ([#665](https://github.com/topolvm/topolvm/pull/665))
+- Refactor: use controllerutil to operate finalizers ([#671](https://github.com/topolvm/topolvm/pull/671))
+- test the example only when the helm chart is released  ([#673](https://github.com/topolvm/topolvm/pull/673))
+- Fill Status.CurrentSize ([#666](https://github.com/topolvm/topolvm/pull/666))
+- ci: reuse topolvm.img in e2e test matrix ([#675](https://github.com/topolvm/topolvm/pull/675))
+- Refactor e2e ([#678](https://github.com/topolvm/topolvm/pull/678))
+- Remove hook test from e2e ([#684](https://github.com/topolvm/topolvm/pull/684))
+- build(deps): bump helm/chart-testing-action from 2.3.1 to 2.4.0 ([#686](https://github.com/topolvm/topolvm/pull/686))
+- build(deps): bump actions/setup-go from 3 to 4 ([#687](https://github.com/topolvm/topolvm/pull/687))
+
+### Fixed
+
+- driver/node: recreate device if owner or device mode is unexpected ([#680](https://github.com/topolvm/topolvm/pull/680))
+
+### Contributors
+
+- @toshipp
+- @peng225
+- @daichimukai
+
+## [0.18.1] - 2023-03-03
+
+### Added
+
+- add cleanup procedure ([#656](https://github.com/topolvm/topolvm/pull/656))
+- Add container-structure-test ([#664](https://github.com/topolvm/topolvm/pull/664))
+
+### Changed
+
+- Clarify lock usage ([#659](https://github.com/topolvm/topolvm/pull/659))
+
+### Contributors
+
+- @peng225
+- @bells17
+- @toshipp
+
+## [0.18.0] - 2023-02-20
+
+### Added
+
+- add proposal to specify lvcreate options on SC ([#627](https://github.com/topolvm/topolvm/pull/627))
+- Add CONTRIBUTING.md ([#631](https://github.com/topolvm/topolvm/pull/631))
+- add a note describing how to maintain go version ([#633](https://github.com/topolvm/topolvm/pull/633))
+- Add the lvcreate-option-on-storageclass proposal implementation ([#640](https://github.com/topolvm/topolvm/pull/640))
+- artifacthub ([#641](https://github.com/topolvm/topolvm/pull/641))
+
+### Changed
+
+- Revert "Drop a PVC finalizer to delete pods(#536)" ([#620](https://github.com/topolvm/topolvm/pull/620))
+  - **Note**: The PVC finalizer is not added to the existing PVCs. If the problem explained in [issue #614](https://github.com/topolvm/topolvm/issues/614) happens for those PVCs, you need to resolve it manually.
+- build(deps): bump actions/stale from 6 to 7 ([#628](https://github.com/topolvm/topolvm/pull/628))
+- Update go directive and use the version for setup-go ([#629](https://github.com/topolvm/topolvm/pull/629))
+- Make CI faster again ([#638](https://github.com/topolvm/topolvm/pull/638))
+- try to update go 1.19 to fix ci ([#652](https://github.com/topolvm/topolvm/pull/652))
+
+### Fixed
+
+- fix the proposal ([#642](https://github.com/topolvm/topolvm/pull/642))
+- fix: set default capacity to thin class capacity when default ([#632](https://github.com/topolvm/topolvm/pull/632))
+
+### Contributors
+
+- @bells17
+- @cupnes
+- @llamerada-jp
+- @peng225
+- @suleymanakbas91
+- @toshipp
+
+## [0.17.0] - 2023-01-10
+
+### Added
+
+- Added arm64 images ([#600](https://github.com/topolvm/topolvm/pull/600))
+- Add ppc64le arch ([#626](https://github.com/topolvm/topolvm/pull/626))
+
+### Changed 
+
+- Support Kubernetes 1.25 ([#610](https://github.com/topolvm/topolvm/pull/610))
+- Remove cybozu images ([#621](https://github.com/topolvm/topolvm/pull/621))
+- Update api version. ([#630](https://github.com/topolvm/topolvm/pull/630))
+
+### Contributors
+
+- @bells17
+- @cupnes
+- @toshipp
+
+## [0.16.0] - 2022-12-05
+
+### Caution
+
+This release contains the domain name change([#592](https://github.com/topolvm/topolvm/pull/592)). Before you use this release, **you must choose what to do about this change**. You have two options:
+1. Migrate to use `topolvm.io`
+2. Continue to use `topolvm.cybozu.com`
+
+If you choose option 1, [this document](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md#migrate-from-topolvmcybozucom-to-topolvmio) will help you to migrate your system. Note that this procedure is risky, and you may lose your data. Please back up your data and test the migration procedure before you migrate your production system.
+
+If you choose option 2, you must enable `.Values.useLegacy` flag, otherwise you will lose all of your data.
+
+Check [this document](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md) before you upgrade your system to this version.
+
+### Added
+
+- Add health check ([#594](https://github.com/topolvm/topolvm/pull/594))
+- add issute template to update supporting kubernetes ([#598](https://github.com/topolvm/topolvm/pull/598))
+
+### Changed
+
+- change reviewer from nbalacha to suleymanakbas91 ([#591](https://github.com/topolvm/topolvm/pull/591))
+- add a command to list the relevant PRs in the release procedure. ([#590](https://github.com/topolvm/topolvm/pull/590))
+- topolvm.io ([#592](https://github.com/topolvm/topolvm/pull/592))
+  - **BREAKING**: Changed the default domain name used in the CRD and plugin name of TopoLVM from `topolvm.cybozu.com` to `topolvm.io`.
+- improve issue template ([#602](https://github.com/topolvm/topolvm/pull/602))
+
+### Fixed
+
+- fix: consider spare-gb in free space calculations ([#597](https://github.com/topolvm/topolvm/pull/597))
+
+### Contributors
+
+- @cupnes
+- @peng225
+- @bells17
+- @toshipp
+- @nbalacha
+
 ## [0.15.3] - 2022-11-04
 
 ### Changed
@@ -614,7 +811,15 @@ Only cosmetic changes.
 
 This is the first release.
 
-[Unreleased]: https://github.com/topolvm/topolvm/compare/v0.15.3...HEAD
+[Unreleased]: https://github.com/topolvm/topolvm/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/topolvm/topolvm/compare/v0.19.1...v0.20.0
+[0.19.1]: https://github.com/topolvm/topolvm/compare/v0.19.0...v0.19.1
+[0.19.0]: https://github.com/topolvm/topolvm/compare/v0.18.2...v0.19.0
+[0.18.2]: https://github.com/topolvm/topolvm/compare/v0.18.1...v0.18.2
+[0.18.1]: https://github.com/topolvm/topolvm/compare/v0.18.0...v0.18.1
+[0.18.0]: https://github.com/topolvm/topolvm/compare/v0.17.0...v0.18.0
+[0.17.0]: https://github.com/topolvm/topolvm/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/topolvm/topolvm/compare/v0.15.3...v0.16.0
 [0.15.3]: https://github.com/topolvm/topolvm/compare/v0.15.2...v0.15.3
 [0.15.2]: https://github.com/topolvm/topolvm/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/topolvm/topolvm/compare/v0.15.0...v0.15.1

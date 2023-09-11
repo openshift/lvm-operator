@@ -27,6 +27,7 @@ message CreateLVRequest {
     uint64 size_gb = 2;           // Volume size in GiB.
     repeated string tags = 3;     // Tags to add to the volume during creation
     string device_class = 4;
+    string lvcreate_option_class = 5;
 }
 
 // Represents the response of CreateLV.
@@ -83,7 +84,7 @@ message GetFreeBytesRequest {
 
 // Represents the stream output from Watch.
 message WatchResponse {
-    uint64 free_bytes = 1;  // Free space of the default volume group in bytes.
+    uint64 free_bytes = 1;  // Free space of the default volume group in bytes. In the case of thin pools, free space on the thinpool with overprovision in bytes.
     repeated WatchItem items = 2;
 }
 
