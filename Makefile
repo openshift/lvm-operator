@@ -40,7 +40,8 @@ OPERATOR_VERSION ?= 0.0.1
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
-OPERATOR_SDK_VERSION ?= 1.31.0
+# TODO: Upgrades > 1.25.3 will lead to createdAt being included in the CSV which currently breaks our change detection. Thus we need to stick to this version until we have a fix.
+OPERATOR_SDK_VERSION ?= 1.25.3
 RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
 
 MANAGER_NAME_PREFIX ?= lvms-
