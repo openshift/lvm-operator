@@ -200,16 +200,16 @@ After successful deployment, the necessary LVM physical volumes, volume groups, 
 
 ```bash
 sh-4.4# pvs
-  PV           VG  Fmt  Attr PSize  PFree 
+  PV           VG  Fmt  Attr PSize  PFree
   /dev/nvme0n1 vg1 lvm2 a--  <1.46t <1.46t
   /dev/nvme1n1 vg1 lvm2 a--  <1.46t <1.46t
   /dev/nvme2n1 vg1 lvm2 a--  <1.46t <1.46t
 sh-4.4# vgs
-  VG  #PV #LV #SN Attr   VSize  VFree 
+  VG  #PV #LV #SN Attr   VSize  VFree
   vg1   3   0   0 wz--n- <4.37t <4.37t
 sh-4.4# lvs
   LV          VG  Attr       LSize  Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
-  thin-pool-1 vg1 twi-a-tz-- <3.93t             0.00   1.19      
+  thin-pool-1 vg1 twi-a-tz-- <3.93t             0.00   1.19
 ```
 
 ### Testing the Operator
@@ -294,17 +294,17 @@ To perform a full cleanup, follow these steps:
 2. Ensure that there are no remaining `LogicalVolume` custom resources that were created by LVMS.
 
     ```bash
-    $ oc get logicalvolumes.topolvm.io 
+    $ oc get logicalvolumes.topolvm.io
     No resources found
     ```
 
 3. Remove the `LVMCluster` CR.
-    
+
     ```bash
     $ oc delete lvmclusters.lvm.topolvm.io my-lvmcluster
     lvmcluster.lvm.topolvm.io "my-lvmcluster" deleted
     ```
-   
+
     If the previous command is stuck, it may be necessary to perform a [forced cleanup procedure](./docs/troubleshooting.md#forced-cleanup).
 
 4. Verify that the only remaining resource in the `openshift-storage` namespace is the Operator.
@@ -323,9 +323,9 @@ To perform a full cleanup, follow these steps:
 
 ## E2E Tests
 
-There are a few steps required to run the end-to-end tests for LVMS. 
+There are a few steps required to run the end-to-end tests for LVMS.
 
-You will need the following evironment variables set:
+You will need the following environment variables set:
 ```bash
 IMAGE_REGISTRY={{REGISTRY_URL}} # Ex: quay.io
 REGISTRY_NAMESPACE={{REGISTRY_NAMESPACE}} # Ex: lvms-dev, this should be your own personal namespace
@@ -342,7 +342,7 @@ $ oc -n openshift-storage get pods
 # lvms-operator-579fbf46d5-vjwhp   3/3     Running   0          3m27s
 
 # run the e2e tests
-$ make e2e 
+$ make e2e
 
 # undeploy the operator from the cluster
 $ make undeploy
@@ -366,7 +366,7 @@ Forwarding from [::1]:41685 -> 8080
 ...
 ...
 
-# in another terminal, view the metrics in localhost using the specified port above 
+# in another terminal, view the metrics in localhost using the specified port above
 $ curl -s localhost:50000/metrics | grep -Ei 'topolvm_volumegroup_.*?_bytes\{'
 topolvm_volumegroup_available_bytes{device_class="vg1",node="kube-node"} 4.790222323712e+12
 topolvm_volumegroup_size_bytes{device_class="vg1",node="kube-node"} 4.800959741952e+12
@@ -384,11 +384,11 @@ It is not possible to upgrade from release-4.10 and release-4.11 to a newer vers
 
 ### Missing native LVM RAID Configuration support
 
-Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs. 
+Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs.
 This is backed by an LVM Logical Volume of type `thin`, which is reflected in the LVM flags as an attribute.
-When trying to use LVM's inbuilt RAID capabilities, it conflicts with this `thin` attribute as the same flag is also indicative wether a volume is part of LVM RAID configurations (`r` or `R` flag).
+When trying to use LVM's inbuilt RAID capabilities, it conflicts with this `thin` attribute as the same flag is also indicative whether a volume is part of LVM RAID configurations (`r` or `R` flag).
 This means that the only way to support RAID configuration from within `LVM` would be to do a conversion from two RAID Arrays into a thinpool with `lvconvert`, after which the RAID is no longer recognized by LVM (due to said conflict in the volume attributes).
-While this would enable initial synchronization and redundancy, all repair and extend operations would not longer respect the RAID topology in the Volume Group, and operations like `lvconvert --repair` are not even supported anymore. 
+While this would enable initial synchronization and redundancy, all repair and extend operations would not longer respect the RAID topology in the Volume Group, and operations like `lvconvert --repair` are not even supported anymore.
 This means that it would be quite a complex situation to recover from.
 
 Instead of doing LVM based RAIDs, we recommend using the [`mdraid`](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#linux-raid-subsystems_managing-raid) subsystem in linux instead of the LVM RAID capabilities.

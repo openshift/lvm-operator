@@ -18,8 +18,6 @@ package vgmanager
 
 import (
 	"context"
-	"log"
-	"os/user"
 	"path/filepath"
 	"testing"
 	"time"
@@ -32,8 +30,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -56,13 +52,11 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg              *rest.Config
 	k8sClient        client.Client
 	testEnv          *envtest.Environment
 	ctx              context.Context
 	cancel           context.CancelFunc
 	testNodeSelector corev1.NodeSelector
-	testLVMDFile     string
 	mockLSBLK        *lsblkmocks.MockLSBLK
 	mockLVM          *lvmmocks.MockLVM
 )
@@ -176,11 +170,3 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	Expect(testEnv.Stop()).To(Succeed())
 })
-
-func isRoot() bool {
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Fatalf("[isRoot] Unable to get current user: %s", err)
-	}
-	return currentUser.Username == "root" || currentUser.Uid == "0"
-}

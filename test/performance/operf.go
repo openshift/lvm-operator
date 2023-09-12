@@ -23,7 +23,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -74,7 +74,7 @@ const (
 
 const (
 	UsageHelp = `Usage of operf:
-This script retrieves cpu and memory usage metrics for all the workloads created by the logical volume manager storage (lvms). 
+This script retrieves cpu and memory usage metrics for all the workloads created by the logical volume manager storage (lvms).
 
 	It creates <instances> of "busybox" pods using PVCs provisioned via the Storage class provided
 	Example:
@@ -532,7 +532,7 @@ func (unit *LvmUnitMetrics) getMetrics(start, end int64, query string) string {
 		}
 		return ""
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Error reading response from ", req.URL, ":", err)
 	}

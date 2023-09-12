@@ -27,7 +27,7 @@ printf "collecting output of node related commands\n" | tee -a "${BASE_COLLECTIO
 
 # Create the command, push all the commands to a temp file
 COMMAND_INPUT_FILE="${BASE_COLLECTION_PATH}/temp_file"
-printf "chroot /host" >> "${COMMAND_INPUT_FILE}"
+printf "chroot /host" >>"${COMMAND_INPUT_FILE}"
 
 STRING="\\\n"
 for command_get in "${commands_get[@]}"; do
@@ -36,11 +36,11 @@ for command_get in "${commands_get[@]}"; do
         printf "printf \"%s\"\n" "${STRING}"
         printf "%s\n" "${command_get}"
         printf "printf \"%s\"\n" "${STRING}"
- } >> "${COMMAND_INPUT_FILE}"
+    } >>"${COMMAND_INPUT_FILE}"
 done
 
 node=$(oc get nodes -oname)
 
-{ timeout 120 cat "${COMMAND_INPUT_FILE}" | oc debug  -q "${node}" >> "${COMMAND_OUTPUT_FILE}"; }
+{ timeout 120 cat "${COMMAND_INPUT_FILE}" | oc debug -q "${node}" >>"${COMMAND_OUTPUT_FILE}"; }
 
 rm "${COMMAND_INPUT_FILE}"

@@ -64,14 +64,14 @@ type State rune
 
 const (
 	StateActive                                State = 'a'
-	StateSuspended                                   = 's'
-	StateInvalidSnapshot                             = 'I'
-	StateSuspendedSnapshot                           = 'S'
-	StateSnapshotMergeFailed                         = 'm'
-	StateSuspendedSnapshotMergeFailed                = 'M'
-	StateMappedDevicePresentWithoutTables            = 'd'
-	StateMappedDevicePresentWithInactiveTables       = 'i'
-	StateNone                                        = '-'
+	StateSuspended                             State = 's'
+	StateInvalidSnapshot                       State = 'I'
+	StateSuspendedSnapshot                     State = 'S'
+	StateSnapshotMergeFailed                   State = 'm'
+	StateSuspendedSnapshotMergeFailed          State = 'M'
+	StateMappedDevicePresentWithoutTables      State = 'd'
+	StateMappedDevicePresentWithInactiveTables State = 'i'
+	StateNone                                  State = '-'
 )
 
 type Open rune
@@ -109,7 +109,7 @@ const (
 // LvAttr has mapped lv_attr information, see https://linux.die.net/man/8/lvs
 // It is a complete parsing of the entire attribute byte flags that is attached to each LV.
 // This is useful when attaching logic to the state of an LV as the state of an LV can be determined
-// from the Attributes, e.g. for determining wether an LV is considered a Thin-Pool or not.
+// from the Attributes, e.g. for determining whether an LV is considered a Thin-Pool or not.
 type LvAttr struct {
 	VolumeType
 	Permissions

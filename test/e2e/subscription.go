@@ -22,7 +22,7 @@ import (
 	"time"
 
 	v1 "github.com/operator-framework/api/pkg/operators/v1"
-	v1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -126,7 +126,7 @@ func waitForLVMCatalogSource(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
+	err = utilwait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
 
 		pods := &k8sv1.PodList{}
 		err = crClient.List(ctx, pods, &crclient.ListOptions{
@@ -176,7 +176,7 @@ func waitForLVMOperator(ctx context.Context) error {
 
 	lastReason := ""
 
-	err := utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
+	err := utilwait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
 		for _, name := range deployments {
 			deployment := &appsv1.Deployment{}
 			err = crClient.Get(ctx, types.NamespacedName{Name: name, Namespace: installNamespace}, deployment)

@@ -1,6 +1,6 @@
 # The LVM Operator Manager
 
-The LVM Operator Manager runs the LVM Cluster controller/reconciler that manages the following reconcile units: 
+The LVM Operator Manager runs the LVM Cluster controller/reconciler that manages the following reconcile units:
 
 - [LVMCluster Custom Resource (CR)](#lvmcluster-custom-resource-cr)
 - [TopoLVM CSI](#topolvm-csi)

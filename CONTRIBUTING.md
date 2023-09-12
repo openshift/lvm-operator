@@ -18,6 +18,15 @@ Developers must follow these steps to make a change:
 
 ## Developer Environment Installation
 
+### Installing `pre-commit`
+
+For our local development, we supply a `pre-commit` configuration that can be used to verify common issues before
+submitting them to a pipeline (which is a common prerogative called shift-left). You can follow the installation instructions at https://pre-commit.com/#installation.
+pre-commit hooks contain all important verifications that are also checked by our pipelines, and you will be able to easily use a commit hook that way.
+
+After installing `pre-commit`, navigate to the repository root and run `pre-commit install`. Now, whenever you commit, all pre-commit checks will be executed for you.
+Also, you can run `pre-commit run` to run the check with all currently staged files.
+
 ### Cluster builds
 In order to build on the cluster you need to first have your kubeconfig configured. Once configured you can run the following steps to build on the cluster:
 

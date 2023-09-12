@@ -10,7 +10,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: %s 
+  storageClassName: %s
   dataSource:
     name: %s
     kind: VolumeSnapshot

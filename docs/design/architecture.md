@@ -20,4 +20,4 @@ The following table provides a view of the containers in these components:
 |                      |            | [csi-registrar](https://github.com/kubernetes-csi/node-driver-registrar#node-driver-registrar)      |
 |                      |            | [liveness-probe](https://github.com/kubernetes-csi/livenessprobe#liveness-probe)                    |
 
-This architecture diagram describes how the LVMS components work together to enable dynamic provisioning and management of logical volumes using Logical Volume Manager (LVM) in OpenShift clusters. See also [this page](https://github.com/topolvm/topolvm/blob/main/docs/design.md) for further details on the TopoLVM design. 
+This architecture diagram describes how the LVMS components work together to enable dynamic provisioning and management of logical volumes using Logical Volume Manager (LVM) in OpenShift clusters. See also [this page](https://github.com/topolvm/topolvm/blob/main/docs/design.md) for further details on the TopoLVM design.
