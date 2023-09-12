@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 
 	"github.com/go-logr/logr/testr"
@@ -587,8 +586,5 @@ func TestAvailableDevicesForVG(t *testing.T) {
 // it has /private in the beginning because /tmp symlinks are evaluated as with /private in the beginning on darwin.
 func calculateDevicePath(t *testing.T, deviceName string) string {
 	t.Helper()
-	if runtime.GOOS == "darwin" {
-		return fmt.Sprintf("/private%s", devicePaths[deviceName])
-	}
-	return devicePaths[deviceName]
+	return getKNameFromDevice(devicePaths[deviceName])
 }
