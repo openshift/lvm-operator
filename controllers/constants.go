@@ -81,7 +81,6 @@ const (
 	CSIKubeletRootDir               = "/var/lib/kubelet/"
 	NodeContainerName               = "topolvm-node"
 	TopolvmNodeContainerHealthzName = "healthz"
-	LvmdConfigFile                  = "/etc/topolvm/lvmd.yaml"
 
 	DefaultCSISocket  = "/run/topolvm/csi-topolvm.sock"
 	DefaultLVMdSocket = "/run/lvmd/lvmd.sock"

@@ -93,7 +93,7 @@ func TestGetVolumeGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vg, err := GetVolumeGroup(executor, tt.vgName)
+			vg, err := NewHostLVM(executor).GetVG(tt.vgName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -131,7 +131,7 @@ func TestListVolumeGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vgs, err := ListVolumeGroups(executor)
+			vgs, err := NewHostLVM(executor).ListVGs()
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -151,13 +151,12 @@ func TestListVolumeGroup(t *testing.T) {
 func TestCreateVolumeGroup(t *testing.T) {
 	tests := []struct {
 		name        string
-		volumeGroup *VolumeGroup
-		pvs         []string
+		volumeGroup VolumeGroup
 		wantErr     bool
 	}{
-		{"No Volume Group Name", &VolumeGroup{}, []string{}, true},
-		{"No Physical Volumes", &VolumeGroup{Name: "vg1"}, []string{}, true},
-		{"Volume Group created successfully", &VolumeGroup{Name: "vg1"}, []string{"/dev/sdb"}, false},
+		{"No Volume Group Name", VolumeGroup{}, true},
+		{"No Physical Volumes", VolumeGroup{Name: "vg1"}, true},
+		{"Volume Group created successfully", VolumeGroup{Name: "vg1", PVs: []PhysicalVolume{{PvName: "/dev/sdb"}}}, false},
 	}
 
 	executor := &mockExec.MockExecutor{
@@ -168,7 +167,7 @@ func TestCreateVolumeGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.volumeGroup.Create(executor, tt.pvs)
+			err := NewHostLVM(executor).CreateVG(tt.volumeGroup)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -181,12 +180,12 @@ func TestCreateVolumeGroup(t *testing.T) {
 func TestExtendVolumeGroup(t *testing.T) {
 	tests := []struct {
 		name        string
-		volumeGroup *VolumeGroup
+		volumeGroup VolumeGroup
 		PVs         []string
 		wantErr     bool
 	}{
-		{"No PVs are available", &VolumeGroup{Name: "vg1"}, []string{}, true},
-		{"New PVs are available", &VolumeGroup{Name: "vg1"}, []string{"/dev/sdb", "/dev/sdc"}, false},
+		{"No PVs are available", VolumeGroup{Name: "vg1"}, []string{}, true},
+		{"New PVs are available", VolumeGroup{Name: "vg1"}, []string{"/dev/sdb", "/dev/sdc"}, false},
 	}
 
 	executor := &mockExec.MockExecutor{
@@ -197,12 +196,17 @@ func TestExtendVolumeGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.volumeGroup.Extend(executor, tt.PVs)
+			newVG, err := NewHostLVM(executor).ExtendVG(tt.volumeGroup, tt.PVs)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
+			newPVs := make([]string, len(newVG.PVs))
+			for i, pv := range newVG.PVs {
+				newPVs[i] = pv.PvName
+			}
+			assert.ElementsMatch(t, newPVs, tt.PVs)
 		})
 	}
 }

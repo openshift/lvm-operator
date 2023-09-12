@@ -23,6 +23,7 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
+	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
 	"github.com/openshift/lvm-operator/pkg/vgmanager"
 
@@ -85,6 +86,7 @@ func main() {
 		LVMD:          lvmd.DefaultConfigurator(),
 		Scheme:        mgr.GetScheme(),
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
+		LVM:           lvm.NewDefaultHostLVM(),
 		NodeName:      os.Getenv("NODE_NAME"),
 		Namespace:     os.Getenv("POD_NAMESPACE"),
 		Filters:       filter.DefaultFilters,

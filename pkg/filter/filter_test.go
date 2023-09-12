@@ -20,7 +20,7 @@ func TestNotReadOnly(t *testing.T) {
 		{label: "tc true", device: lsblk.BlockDevice{ReadOnly: true}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[notReadOnly](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[notReadOnly](tc.device)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)
@@ -37,7 +37,7 @@ func TestNotSuspended(t *testing.T) {
 		{label: "tc running", device: lsblk.BlockDevice{State: "running"}, expected: true, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[notSuspended](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[notSuspended](tc.device)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)
@@ -54,7 +54,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 		{label: "tc swap", device: lsblk.BlockDevice{FSType: "swap"}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[noValidFilesystemSignature](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[noValidFilesystemSignature](tc.device)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)
@@ -70,7 +70,7 @@ func TestNoChildren(t *testing.T) {
 		{label: "tc no child", device: lsblk.BlockDevice{Name: "dev2", Children: []lsblk.BlockDevice{}}, expected: true, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[noChildren](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[noChildren](tc.device)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)
@@ -86,7 +86,7 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: lsblk.BlockDevice{Name: "dev2", Type: "disk"}, expected: true, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[usableDeviceType](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[usableDeviceType](tc.device)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)
@@ -106,7 +106,7 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 		{label: "tc 6", device: lsblk.BlockDevice{Name: "dev6", PartLabel: "BOOT"}, expected: false, expectErr: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[noBiosBootInPartLabel](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[noBiosBootInPartLabel](tc.device)
 		assert.Equal(t, tc.expected, result)
 		if tc.expectErr {
 			assert.Error(t, err)
@@ -125,7 +125,7 @@ func TestNoReservedInPartLabel(t *testing.T) {
 		{label: "tc 5", device: lsblk.BlockDevice{Name: "dev5", PartLabel: "Reserved"}, expected: false},
 	}
 	for _, tc := range testcases {
-		result, err := DefaultFilters(nil)[noReservedInPartLabel](tc.device, nil)
+		result, err := DefaultFilters(nil, nil)[noReservedInPartLabel](tc.device)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.expected, result)
 	}

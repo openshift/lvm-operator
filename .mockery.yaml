@@ -1,0 +1,12 @@
+with-expecter: true
+filename: "mock_{{.InterfaceNameSnake}}.go"
+dir: "{{.InterfaceDir}}/mocks"
+mockname: "{{.Mock}}{{.InterfaceName}}"
+outpkg: "{{.PackageName}}"
+packages:
+  github.com/openshift/lvm-operator/pkg/lsblk:
+      interfaces:
+        LSBLK:
+  github.com/openshift/lvm-operator/pkg/lvm:
+      interfaces:
+        LVM:
