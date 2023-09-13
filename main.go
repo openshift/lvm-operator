@@ -41,6 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/openshift/library-go/pkg/config/leaderelection"
@@ -137,9 +139,13 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                              scheme,
-		MetricsBindAddress:                  metricsAddr,
-		Port:                                9443,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
+			Port: 9443,
+		}},
 		HealthProbeBindAddress:              probeAddr,
 		LeaderElectionResourceLockInterface: le.Lock,
 		LeaderElection:                      !leaderElectionConfig.Disable,

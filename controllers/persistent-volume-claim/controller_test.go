@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -66,7 +66,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-nonApplicableStorageClassName"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.String("blabla"),
+						StorageClassName: ptr.To("blabla"),
 					},
 				},
 			},
@@ -81,7 +81,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-non-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.String(controllers.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To(controllers.StorageClassPrefix + "bla"),
 					},
 					Status: v1.PersistentVolumeClaimStatus{
 						Phase: v1.ClaimBound,
@@ -99,7 +99,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.String(controllers.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To(controllers.StorageClassPrefix + "bla"),
 					},
 					Status: v1.PersistentVolumeClaimStatus{
 						Phase: v1.ClaimPending,
@@ -118,7 +118,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.String(controllers.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To(controllers.StorageClassPrefix + "bla"),
 						Resources: v1.ResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(100, resource.DecimalSI),
@@ -145,7 +145,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.String(controllers.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To(controllers.StorageClassPrefix + "bla"),
 						Resources: v1.ResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(10, resource.DecimalSI),
@@ -172,7 +172,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.String(controllers.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To(controllers.StorageClassPrefix + "bla"),
 						Resources: v1.ResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(10, resource.DecimalSI),

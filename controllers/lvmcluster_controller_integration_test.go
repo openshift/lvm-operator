@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -66,8 +66,8 @@ var _ = Describe("LVMCluster controller", func() {
 	// this is a custom matcher that verifies for a correct owner-ref set with LVMCluster
 	containLVMClusterOwnerRefField := ContainElement(SatisfyAll(
 		HaveField("Name", lvmClusterIn.Name),
-		HaveField("BlockOwnerDeletion", pointer.Bool(true)),
-		HaveField("Controller", pointer.Bool(true)),
+		HaveField("BlockOwnerDeletion", ptr.To(true)),
+		HaveField("Controller", ptr.To(true)),
 	))
 
 	nodeIn := &corev1.Node{
