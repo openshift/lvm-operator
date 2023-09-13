@@ -545,9 +545,6 @@ func (r *VGReconciler) matchesThisNode(ctx context.Context, selector *corev1.Nod
 	if selector == nil {
 		return true, nil
 	}
-	if node == nil {
-		return false, fmt.Errorf("node cannot be nil")
-	}
 
 	matches, err := corev1helper.MatchNodeSelectorTerms(node, selector)
 	return matches, err

@@ -13,7 +13,7 @@ There can be many reasons why a `PersistentVolumeClaim` (`PVC`) gets stuck in a 
 To troubleshoot the issue, inspect the events associated with the PVC. These events can provide valuable insights into any errors or issues encountered during the provisioning process.
 
  ```bash
- $ oc describe pvc lvms-test  
+ $ oc describe pvc lvms-test
  Events:
    Type     Reason              Age               From                         Message
    ----     ------              ----              ----                         -------
@@ -23,7 +23,7 @@ To troubleshoot the issue, inspect the events associated with the PVC. These eve
 ### `LVMCluster` CR or the Logical Volume Manager Storage (LVMS) components are missing
 
 If you encounter a `storageclass.storage.k8s.io 'lvms-vg1' not found` error, verify the presence of the `LVMCluster` resource:
- 
+
  ```bash
  $ oc get lvmcluster -n openshift-storage
  NAME            AGE
@@ -37,8 +37,8 @@ $ oc create -n openshift-storage -f https://github.com/openshift/lvm-operator/ra
 ```
 
 If an `LVMCluster` already exists, check if all the pods from LVMS are in the `Running` state in the `openshift-storage` namespace:
- 
- ```bash 
+
+ ```bash
  $ oc get pods -n openshift-storage
  NAME                                  READY   STATUS    RESTARTS      AGE
  lvms-operator-7b9fb858cb-6nsml        3/3     Running   0             70m
@@ -46,7 +46,7 @@ If an `LVMCluster` already exists, check if all the pods from LVMS are in the `R
  topolvm-node-dr26h                    4/4     Running   0             66m
  vg-manager-r6zdv                      1/1     Running   0             66m
  ```
- 
+
 There should be one running instance of `lvms-operator` and `vg-manager`, and multiple instances of `topolvm-controller` and `topolvm-node` depending on the number of nodes.
 
 #### `topolvm-node` is stuck in `Init:0/1`
@@ -63,7 +63,7 @@ If you encounter a failure message such as `no available devices found` while in
 $ lsblk --paths --json -o NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE
 ```
 
-This prints information about the disks on the host. Review this information to see why a device is not considered available for LVMS utilization. For example, if a device has partlabel `bios` or `reserved`, or if they are suspended or read-only, or if they have children disks or `fstype` set, LVMS considers them unavailable. Check [filter.go](../pkg/vgmanager/filter.go) for the complete list of filters LVMS makes use of.  
+This prints information about the disks on the host. Review this information to see why a device is not considered available for LVMS utilization. For example, if a device has partlabel `bios` or `reserved`, or if they are suspended or read-only, or if they have children disks or `fstype` set, LVMS considers them unavailable. Check [filter.go](../pkg/vgmanager/filter.go) for the complete list of filters LVMS makes use of.
 
 > If you set a device path in the `LVMCluster` CR under `spec.storage.deviceClasses.deviceSelector.paths`, make sure the paths match with `kname` of the device from the `lsblk` output.
 
@@ -78,7 +78,7 @@ $ oc logs -l app.kubernetes.io/name=vg-manager -n openshift-storage
 If you encounter a failure message such as `failed to check volume existence` while inspecting the events associated with the `PVC`, it might indicate a potential issue related to the underlying volume or disk. This failure message suggests that there is problem with the availability or accessibility of the specified volume. Further investigation is recommended to identify the exact cause and resolve the underlying issue.
 
 ```bash
-$ oc describe pvc lvms-test  
+$ oc describe pvc lvms-test
 Events:
 Type     Reason              Age               From                         Message
 ----     ------              ----              ----                         -------
@@ -89,9 +89,9 @@ To investigate the issue further, establish a direct connection to the host wher
 
 ### Node failure
 
-If PVCs associated with a specific node remain in a `Pending` state, it suggests a potential issue with that particular node. To identify the problematic node, you can examine the restart count of the `topolvm-node` pod. An increased restart count indicates potential problems with the underlying node, which may require further investigation and troubleshooting. 
+If PVCs associated with a specific node remain in a `Pending` state, it suggests a potential issue with that particular node. To identify the problematic node, you can examine the restart count of the `topolvm-node` pod. An increased restart count indicates potential problems with the underlying node, which may require further investigation and troubleshooting.
 
- ```bash 
+ ```bash
  $ oc get pods -n openshift-storage
  NAME                                  READY   STATUS    RESTARTS      AGE
  lvms-operator-7b9fb858cb-6nsml        3/3     Running   0             70m

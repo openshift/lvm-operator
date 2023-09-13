@@ -82,7 +82,7 @@ func deleteNamespaceAndWait(ctx context.Context, namespace string) error {
 	interval := 10 * time.Second
 
 	// wait for namespace to terminate
-	err = utilwait.PollImmediate(interval, timeout, func() (done bool, err error) {
+	err = utilwait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
 		err = crClient.Get(ctx, types.NamespacedName{Name: namespace, Namespace: namespace}, ns)
 		if err != nil && !errors.IsNotFound(err) {
 			lastReason = fmt.Sprintf("Error talking to k8s apiserver: %v", err)

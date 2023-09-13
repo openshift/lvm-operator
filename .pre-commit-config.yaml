@@ -1,0 +1,77 @@
+repos:
+  - repo: local
+    hooks:
+      - id: make-verify
+        name: make-verify
+        language: system
+        entry: make
+        args: ['verify']
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: fix-byte-order-marker
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+        exclude: ^vendor
+      - id: check-shebang-scripts-are-executable
+        exclude: ^vendor
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+      - id: check-yaml
+        args: [-m]
+        exclude: ^test/e2e/testdata
+      - id: check-json
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^vendor
+      - id: no-commit-to-branch
+      - id: trailing-whitespace
+        exclude: ^vendor
+
+  - repo: https://github.com/openstack/bashate.git
+    rev: 2.1.1
+    hooks:
+      - id: bashate
+        # Run bashate check for all bash scripts
+        # Ignores the following rules:
+        # E006: Line longer than 79 columns (as many scripts use jinja
+        #       templating, this is very difficult)
+        # E040: Syntax error determined using `bash -n` (as many scripts
+        #       use jinja templating, this will often fail and the syntax
+        #       error will be discovered in execution anyway)
+        # E020: Function declaration not in format ^function name {$
+        # E011: Then keyword is not on same line as if or elif keyword
+        # E012: here doc didn't end before EOF
+        entry: bashate --error . --ignore=E006,E040,E020,E012,E011
+        exclude: ^vendor/
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.54.2
+    hooks:
+      - id: golangci-lint
+        entry: golangci-lint run --fix
+        args:
+          - "--modules-download-mode=vendor"
+        types: [go]
+        language: golang
+        require_serial: true
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.5
+    hooks:
+      - id: codespell
+        args: [
+          "--ignore-words-list",
+          "afterall",
+          "--check-filenames",
+          "--check-hidden",
+        ]
+        exclude: ^vendor/
+        pass_filenames: true
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.5.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]

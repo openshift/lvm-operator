@@ -21,4 +21,4 @@ spec:
   volumes:
     - name: my-volume
       persistentVolumeClaim:
-        claimName: %s 
+        claimName: %s

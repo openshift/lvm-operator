@@ -7,4 +7,3 @@ spec:
   volumeSnapshotClassName: lvms-vg1
   source:
     persistentVolumeClaimName: lvmfilepvc
-

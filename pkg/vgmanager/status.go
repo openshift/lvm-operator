@@ -29,20 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *VGReconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
-	status := &lvmv1alpha1.VGStatus{
-		Name:   vg.GetName(),
-		Status: lvmv1alpha1.VGStatusProgressing,
-	}
-
-	// Set devices for the VGStatus.
-	if _, err := r.setDevices(status); err != nil {
-		return err
-	}
-
-	return r.setVolumeGroupStatus(ctx, vg, status)
-}
-
 func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),

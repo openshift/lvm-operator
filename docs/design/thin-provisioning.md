@@ -36,26 +36,26 @@ The LVMS will create a thin pool LV in the Volume Group in order to create thinl
     +   // +kubebuilder:validation:Required
     +   // +required
     +   Name string `json:"name,omitempty"`
-    
+
     +   // SizePercent represents percentage of remaining space in the volume group that should be used
     +   // for creating the thin pool.
     +   // +kubebuilder:validation:default=90
     +   // +kubebuilder:validation:Minimum=10
     +   // +kubebuilder:validation:Maximum=90
     +   SizePercent int `json:"sizePercent,omitempty"`
-    
+
     +   // OverProvisionRatio represents the ratio of overprovision that can
     +   // be allowed on thin pools
     +   // +kubebuilder:validation:Minimum=2
     +   OverprovisionRatio int `json:"overprovisionRatio,omitempty"`
     }
-    
+
     type DeviceClass struct {
         Name string `json:"name,omitempty"`
-    
+
         DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
         NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
-    
+
     +   // ThinPoolConfig contains configurations for the thin-pool
     +   // +kubebuilder:validation:Required
     +   // +required
@@ -70,18 +70,18 @@ The LVMS will create a thin pool LV in the Volume Group in order to create thinl
         - **OverprovisionRatio**: The factor by which additional storage can be provisioned compared to the available storage in the thin pool.
 
 - `LVMVolumeGroup` API changes:
-    
+
     ```go
     type LVMVolumeGroupSpec struct {
         // DeviceSelector is a set of rules that should match for a device to be
         // included in this VolumeGroup
         // +optional
         DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
-    
+
         // NodeSelector chooses nodes
         // +optional
         NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
-    
+
     +   // ThinPoolConfig contains configurations for the thin-pool
     +   // +kubebuilder:validation:Required
     +   // +required
@@ -92,11 +92,11 @@ The LVMS will create a thin pool LV in the Volume Group in order to create thinl
 ### Volume Group Manager
 - [Volume Group Manager](vg-manager.md) is responsible for creating the thin pools after creating the volume group.
 - Command used for creating a thin pool:
-    
+
     ```bash
     lvcreate -L <Size>%FREE -c <Chunk size> -T <vg_name>/<thin-pool-name>
     ```
-  
+
     where:
     - Size is `LVMClusterSpec.Storage.DeviceClass.ThinPoolConfig.SizePercent`
     - chunk size is 128KiB, which is the default.

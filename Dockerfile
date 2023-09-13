@@ -23,7 +23,7 @@ COPY pkg/ pkg/
 # Build
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o manager main.go
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/main.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2

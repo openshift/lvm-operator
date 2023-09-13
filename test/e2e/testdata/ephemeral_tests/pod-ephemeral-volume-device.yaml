@@ -31,5 +31,5 @@ spec:
           resources:
             requests:
               storage: 1Gi
-          storageClassName: %s 
+          storageClassName: %s
           volumeMode: Block
