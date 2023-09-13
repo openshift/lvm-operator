@@ -67,6 +67,8 @@ repos:
           "afterall",
           "--check-filenames",
           "--check-hidden",
+          "--exclude-file",
+          "go.sum"
         ]
         exclude: ^vendor/
         pass_filenames: true
