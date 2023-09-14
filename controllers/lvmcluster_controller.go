@@ -155,10 +155,10 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 		}
 		if lvsExist {
 			waitForLVRemoval := time.Second * 10
-			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion: %w", waitForLVRemoval, err)
+			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion", waitForLVRemoval)
 			r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
 			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{RequeueAfter: waitForLVRemoval}, err
+			return ctrl.Result{RequeueAfter: waitForLVRemoval}, nil
 		}
 
 		logger.Info("processing LVMCluster deletion")

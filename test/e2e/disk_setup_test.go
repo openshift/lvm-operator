@@ -27,13 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func diskSetup(ctx context.Context) error {
+func diskSetup(ctx context.Context) {
 	// get nodes
 	By(fmt.Sprintf("getting all worker nodes by label %s", labelNodeRoleWorker))
 	nodeList := &corev1.NodeList{}
-	if err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker}); err != nil {
-		return fmt.Errorf("could not list worker nodes nodes for Disk setup: %w", err)
-	}
+	Expect(crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})).To(Succeed())
 
 	By("getting AWS region info from the first Node spec")
 	nodeInfo, err := getAWSNodeInfo(nodeList.Items[0])
@@ -51,8 +49,6 @@ func diskSetup(ctx context.Context) error {
 	// create and attach volumes
 	By("creating and attaching Disks")
 	Expect(NewAWSDiskManager(ec2, GinkgoLogr).CreateAndAttachAWSVolumes(ctx, nodeEnv)).To(Succeed())
-
-	return nil
 }
 
 func getNodeEnvironmentFromNodeList(nodeList *corev1.NodeList) ([]NodeDisks, error) {
@@ -76,13 +72,11 @@ func getNodeEnvironmentFromNodeList(nodeList *corev1.NodeList) ([]NodeDisks, err
 	return nodeEnv, nil
 }
 
-func diskRemoval(ctx context.Context) error {
+func diskTeardown(ctx context.Context) {
 	// get nodes
 	By(fmt.Sprintf("getting all worker nodes by label %s", labelNodeRoleWorker))
 	nodeList := &corev1.NodeList{}
-	if err := crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker}); err != nil {
-		return fmt.Errorf("could not list worker nodes nodes for Disk setup: %w", err)
-	}
+	Expect(crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})).To(Succeed())
 
 	By("getting AWS region info from the first Node spec")
 	nodeInfo, err := getAWSNodeInfo(nodeList.Items[0])
@@ -96,6 +90,4 @@ func diskRemoval(ctx context.Context) error {
 	// cleaning Disk
 	By("cleaning up Disks")
 	Expect(NewAWSDiskManager(ec2, GinkgoLogr).cleanupAWSDisks(ctx)).To(Succeed())
-
-	return err
 }

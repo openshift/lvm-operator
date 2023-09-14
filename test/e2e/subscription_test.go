@@ -18,11 +18,14 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	v1 "github.com/operator-framework/api/pkg/operators/v1"
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -117,31 +119,19 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 }
 
 // waitForLVMCatalogSource waits for LVM catalog source.
-func waitForLVMCatalogSource(ctx context.Context) error {
-	timeout := 300 * time.Second
-	interval := 10 * time.Second
-	lastReason := ""
-
+func waitForLVMCatalogSource(ctx context.Context) bool {
 	labelSelector, err := labels.Parse("olm.catalogSource in (lvms-catalogsource)")
-	if err != nil {
-		return err
-	}
-	err = utilwait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
+	Expect(err).ToNot(HaveOccurred())
 
+	return Eventually(func(g Gomega, ctx context.Context) {
 		pods := &k8sv1.PodList{}
-		err = crClient.List(ctx, pods, &crclient.ListOptions{
+		g.Expect(crClient.List(ctx, pods, &crclient.ListOptions{
 			LabelSelector: labelSelector,
 			Namespace:     installNamespace,
-		})
-		if err != nil {
-			lastReason = fmt.Sprintf("error talking to k8s apiserver: %v", err)
-			return false, nil
-		}
+		})).To(Succeed())
 
-		if len(pods.Items) == 0 {
-			lastReason = "waiting on lvms catalog source pod to be created"
-			return false, nil
-		}
+		g.Expect(pods.Items).ToNot(BeEmpty(), "waiting on lvms catalog source pod to be created")
+
 		isReady := false
 		for _, pod := range pods.Items {
 			for _, condition := range pod.Status.Conditions {
@@ -151,39 +141,19 @@ func waitForLVMCatalogSource(ctx context.Context) error {
 				}
 			}
 		}
-		if !isReady {
-			lastReason = "waiting on lvms catalog source pod to reach ready state"
-			return false, nil
-		}
+		g.Expect(isReady).To(BeTrue())
 
-		// if we get here, then all deployments are created and available
-		return true, nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, lastReason)
-	}
-
-	return nil
+	}).WithTimeout(300 * time.Second).WithPolling(10 * time.Second).WithContext(ctx).Should(Succeed())
 }
 
 // waitForLVMOperator waits for the lvm-operator to come online.
-func waitForLVMOperator(ctx context.Context) error {
+func waitForLVMOperator(ctx context.Context) bool {
 	deployments := []string{"lvms-operator"}
 
-	timeout := 1000 * time.Second
-	interval := 10 * time.Second
-
-	lastReason := ""
-
-	err := utilwait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (done bool, err error) {
+	return Eventually(func(g Gomega, ctx context.Context) {
 		for _, name := range deployments {
 			deployment := &appsv1.Deployment{}
-			err = crClient.Get(ctx, types.NamespacedName{Name: name, Namespace: installNamespace}, deployment)
-			if err != nil {
-				lastReason = fmt.Sprintf("waiting on deployment %s to be created", name)
-				return false, nil
-			}
+			g.Expect(crClient.Get(ctx, types.NamespacedName{Name: name, Namespace: installNamespace}, deployment)).To(Succeed())
 
 			isAvailable := false
 			for _, condition := range deployment.Status.Conditions {
@@ -193,55 +163,37 @@ func waitForLVMOperator(ctx context.Context) error {
 				}
 			}
 
-			if !isAvailable {
-				lastReason = fmt.Sprintf("waiting on deployment %s to become available", name)
-				return false, nil
-			}
+			g.Expect(isAvailable).To(BeTrue())
 		}
-
-		// if we get here, then all deployments are created and available
-		return true, nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, lastReason)
-	}
-
-	return nil
+	}).WithTimeout(1000 * time.Second).WithPolling(10 * time.Second).WithContext(ctx).Should(Succeed())
 }
 
 // deployClusterObjects deploys the cluster objects.
-func deployClusterObjects(ctx context.Context, co *clusterObjects) error {
+func deployClusterObjects(ctx context.Context, co *clusterObjects) {
 
 	for _, namespace := range co.namespaces {
-		err := createNamespace(ctx, namespace.Name)
-		if err != nil {
-			return err
-		}
+		createNamespace(ctx, namespace.Name)
 	}
 
 	for _, operatorGroup := range co.operatorGroups {
 		operatorGroup := operatorGroup
 		operatorGroups := &v1.OperatorGroupList{}
-		err := crClient.List(ctx, operatorGroups, &crclient.ListOptions{
+		Expect(crClient.List(ctx, operatorGroups, &crclient.ListOptions{
 			Namespace: installNamespace,
-		})
-		if err != nil {
-			return err
-		}
-		if len(operatorGroups.Items) > 1 {
-			// There should be only one operatorgroup in a namespace.
-			// The system is already misconfigured - error out.
-			return fmt.Errorf("more than one operatorgroup detected in namespace %v - aborting", operatorGroup.Namespace)
-		}
+		})).To(Succeed())
+
+		// There should be only one operatorgroup in a namespace.
+		// The system is already misconfigured - error out.
+		Expect(operatorGroups.Items).To(HaveLen(1), "more than one operatorgroup per namespace is not allowed")
+
 		if len(operatorGroups.Items) > 0 {
 			// There should be only one operatorgroup in a namespace.
 			// Skip this one, so we don't make the system bad.
 			continue
 		}
-		err = crClient.Create(ctx, &operatorGroup)
+		err := crClient.Create(ctx, &operatorGroup)
 		if err != nil && !errors.IsAlreadyExists(err) {
-			return err
+			Expect(err).ToNot(HaveOccurred())
 		}
 	}
 
@@ -249,94 +201,52 @@ func deployClusterObjects(ctx context.Context, co *clusterObjects) error {
 		catalogSource := catalogSource
 		err := crClient.Create(ctx, &catalogSource)
 		if err != nil && !errors.IsAlreadyExists(err) {
-			return err
+			Expect(err).ToNot(HaveOccurred())
 		}
 	}
 
 	// Wait for catalog source before posting subscription
-	err := waitForLVMCatalogSource(ctx)
-	if err != nil {
-		return err
-	}
+	waitForLVMCatalogSource(ctx)
 
 	for _, subscription := range co.subscriptions {
 		subscription := subscription
 		err := crClient.Create(ctx, &subscription)
 		if err != nil && !errors.IsAlreadyExists(err) {
-			return err
+			Expect(err).ToNot(HaveOccurred())
 		}
 	}
 
 	// Wait on lvm-operator to come online.
-	err = waitForLVMOperator(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	waitForLVMOperator(ctx)
 }
 
 // deployLVMWithOLM deploys lvm operator via an olm subscription.
-func deployLVMWithOLM(ctx context.Context, lvmCatalogImage string, subscriptionChannel string) error {
-
-	if lvmCatalogImage == "" {
-		return fmt.Errorf("catalog registry images not supplied")
-	}
-
+func deployLVMWithOLM(ctx context.Context, lvmCatalogImage string, subscriptionChannel string) {
+	Expect(lvmCatalogImage).ToNot(BeEmpty(), "catalog registry images must be supplied")
 	co := generateClusterObjects(lvmCatalogImage, subscriptionChannel)
-	err := deployClusterObjects(ctx, co)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// deleteClusterObjects deletes remaining operator manifests.
-func deleteClusterObjects(ctx context.Context, co *clusterObjects) error {
-
-	for _, operatorGroup := range co.operatorGroups {
-		operatorgroup := operatorGroup
-		err := crClient.Delete(ctx, &operatorgroup)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-
-	}
-
-	for _, catalogSource := range co.catalogSources {
-		catalogsource := catalogSource
-		err := crClient.Delete(ctx, &catalogsource)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	for _, subscription := range co.subscriptions {
-		subs := subscription
-		err := crClient.Delete(ctx, &subs)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	return nil
+	deployClusterObjects(ctx, co)
 }
 
 // uninstallLVM uninstalls lvm operator.
-func uninstallLVM(ctx context.Context, lvmCatalogImage string, subscriptionChannel string) error {
+func uninstallLVM(ctx context.Context, lvmCatalogImage string, subscriptionChannel string) {
+	GinkgoHelper()
+
 	// Delete remaining operator manifests
 	co := generateClusterObjects(lvmCatalogImage, subscriptionChannel)
-	err := deleteClusterObjects(ctx, co)
-	if err != nil {
-		return err
-	}
-	for _, namespace := range co.namespaces {
-		err = deleteNamespaceAndWait(ctx, namespace.Name)
-		if err != nil {
-			return err
-		}
+
+	for _, operatorGroup := range co.operatorGroups {
+		DeleteResource(ctx, &operatorGroup)
 	}
 
-	return nil
+	for _, catalogSource := range co.catalogSources {
+		DeleteResource(ctx, &catalogSource)
+	}
+
+	for _, subscription := range co.subscriptions {
+		DeleteResource(ctx, &subscription)
+	}
+
+	for _, namespace := range co.namespaces {
+		DeleteResource(ctx, &namespace)
+	}
 }
