@@ -382,7 +382,6 @@ func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context) (bool, e
 func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		resourceDeletionList := []resourceManager{
-			&topolvmVolumeSnapshotClass{},
 			&topolvmStorageClass{},
 			&lvmVG{},
 			&topolvmController{},
