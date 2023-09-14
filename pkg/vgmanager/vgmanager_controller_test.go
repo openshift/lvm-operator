@@ -25,10 +25,8 @@ var _ = Describe("vgmanager controller", func() {
 })
 
 func testMockedBlockDeviceOnHost(ctx context.Context) {
-	DeferCleanup(func() {
-		mockLVM.AssertExpectations(GinkgoT())
-		mockLSBLK.AssertExpectations(GinkgoT())
-	})
+	By("injecting mocked LVM and LSBLK")
+	mockLVM, mockLSBLK := setupMocks()
 
 	By("setting up the disk as a block device with losetup")
 	device := filepath.Join(GinkgoT().TempDir(), "mock0")
@@ -52,7 +50,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	mockLSBLK.EXPECT().ListBlockDevices().Return([]lsblk.BlockDevice{
 		{
 			Name:       "mock0",
-			KName:      device,
+			KName:      getKNameFromDevice(device),
 			Type:       "mocked",
 			Model:      "mocked",
 			Vendor:     "mocked",

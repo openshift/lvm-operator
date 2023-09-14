@@ -24,10 +24,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
+	lsblkmocks "github.com/openshift/lvm-operator/pkg/lsblk/mocks"
+	lvmmocks "github.com/openshift/lvm-operator/pkg/lvm/mocks"
+	"github.com/openshift/lvm-operator/pkg/lvmd"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -36,15 +38,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/pkg/filter"
-	lsblkmocks "github.com/openshift/lvm-operator/pkg/lsblk/mocks"
-	lvmmocks "github.com/openshift/lvm-operator/pkg/lvm/mocks"
-	"github.com/openshift/lvm-operator/pkg/lvmd"
-
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
 )
@@ -58,8 +57,7 @@ var (
 	ctx              context.Context
 	cancel           context.CancelFunc
 	testNodeSelector corev1.NodeSelector
-	mockLSBLK        *lsblkmocks.MockLSBLK
-	mockLVM          *lvmmocks.MockLVM
+	testVGReconciler *VGReconciler
 )
 
 func TestAPIs(t *testing.T) {
@@ -144,20 +142,15 @@ var _ = BeforeSuite(func() {
 	}}}
 	Expect(k8sClient.Create(ctx, testNode)).Should(Succeed())
 
-	testLVMD := lvmd.NewFileConfigurator(filepath.Join(GinkgoT().TempDir(), "lvmd.yaml"))
-	mockLSBLK = lsblkmocks.NewMockLSBLK(GinkgoT())
-	mockLVM = lvmmocks.NewMockLVM(GinkgoT())
-	err = (&VGReconciler{
+	testVGReconciler = &VGReconciler{
 		Client:        k8sManager.GetClient(),
 		Scheme:        k8sManager.GetScheme(),
 		EventRecorder: k8sManager.GetEventRecorderFor(ControllerName),
-		LVM:           mockLVM,
-		LSBLK:         mockLSBLK,
-		LVMD:          testLVMD,
 		Namespace:     testNamespaceName,
 		NodeName:      testNodeName,
 		Filters:       filter.DefaultFilters,
-	}).SetupWithManager(k8sManager)
+	}
+	err = (testVGReconciler).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
@@ -173,3 +166,31 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	Expect(testEnv.Stop()).To(Succeed())
 })
+
+func setupMocks() (*lvmmocks.MockLVM, *lsblkmocks.MockLSBLK) {
+	t := GinkgoT()
+	t.Helper()
+
+	mockLSBLK := &lsblkmocks.MockLSBLK{}
+	mockLSBLK.Mock.Test(t)
+	DeferCleanup(func() {
+		mockLSBLK.AssertExpectations(t)
+	})
+	mockLVM := &lvmmocks.MockLVM{}
+	mockLVM.Mock.Test(t)
+	DeferCleanup(func() {
+		mockLVM.AssertExpectations(t)
+	})
+	testLVMD := lvmd.NewFileConfigurator(filepath.Join(t.TempDir(), "lvmd.yaml"))
+
+	testVGReconciler.LSBLK = mockLSBLK
+	testVGReconciler.LVM = mockLVM
+	testVGReconciler.LVMD = testLVMD
+	DeferCleanup(func() {
+		testVGReconciler.LVMD = nil
+		testVGReconciler.LSBLK = nil
+		testVGReconciler.LVM = nil
+	})
+
+	return mockLVM, mockLSBLK
+}
