@@ -14,7 +14,6 @@ resources:
 - topolvm_controller_role.yaml
 - topolvm_controller_role_bindings.yaml
 # lvm-node metric rbac
-- lvms_metric_service_config.yaml
 - lvms_node_role_n_rolebindings.yaml
 # topolvm-node metric rbac
 - topolvm_metric_service_config.yaml

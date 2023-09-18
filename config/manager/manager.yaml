@@ -34,7 +34,6 @@ spec:
         app.kubernetes.io/name: lvms-operator
         app.kubernetes.io/part-of: lvms-provisioner
         app.kubernetes.io/component: lvms-operator
-        exporter: lvms-operator
     spec:
       securityContext:
         runAsNonRoot: true
@@ -74,13 +73,5 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-      - command:
-        - /metricsexporter
-        image: controller:latest
-        name: metricsexporter
-        resources:
-          requests:
-            cpu: 1m
-            memory: 20Mi
       serviceAccountName: lvms-operator
       terminationGracePeriodSeconds: 10

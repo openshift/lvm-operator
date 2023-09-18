@@ -3,6 +3,7 @@ kind: Service
 metadata:
   labels:
     app.kubernetes.io/name: lvms-operator
+    app.kubernetes.io/compose: metrics
   name: lvms-operator-metrics-service
   namespace: system
 spec:

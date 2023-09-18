@@ -8,7 +8,6 @@ The following table provides a view of the containers in these components:
 |----------------------|------------|-----------------------------------------------------------------------------------------------------|
 | LVM Operator         | Deployment | [manager](lvm-operator-manager.md)                                                                  |
 |                      |            | [kube-rbac-proxy](https://github.com/brancz/kube-rbac-proxy#kube-rbac-proxy)                        |
-|                      |            | [metricsexporter](../../README.md#metrics)                                                          |
 | Volume Group Manager | DaemonSet  | [vg-manager](vg-manager.md)                                                                         |
 | TopoLVM Controller   | Deployment | [topolvm-controller](https://github.com/topolvm/topolvm/blob/main/docs/topolvm-controller.md)       |
 |                      |            | [csi-provisioner](https://github.com/kubernetes-csi/external-provisioner/blob/master/doc/design.md) |

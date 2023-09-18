@@ -3,6 +3,7 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
+    app.kubernetes.io/compose: metrics
     app.kubernetes.io/name: lvms-operator
   name: lvms-operator-metrics-service
 spec:

@@ -23,7 +23,6 @@ COPY pkg/ pkg/
 # Build
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o manager main.go
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/main.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
@@ -37,8 +36,6 @@ RUN microdnf update -y && \
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/vgmanager .
-COPY --from=builder /workspace/metricsexporter .
-EXPOSE 23532
 USER 65532:65532
 
 # '/manager' is lvm-operator entrypoint
