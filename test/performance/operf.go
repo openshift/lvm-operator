@@ -422,16 +422,6 @@ func (unit *LvmUnitMetrics) parseMetrics(metricsResult string) map[string]Metric
 	                      [1654680112, "0.005354719799999981"]
 	                  ]
 	              },
-	              {
-	                  "metric": {
-	                      "container": "metricsexporter"
-	                  },
-	                  "values": [
-	                      [1654680100, "9.652999999998358e-07"],
-	                      [1654680106, "0"],
-	                      [1654680112, "0"]
-	                  ]
-	              }
 	          ]
 	      }
 	  }

@@ -586,7 +586,6 @@ spec:
                 app.kubernetes.io/component: lvms-operator
                 app.kubernetes.io/name: lvms-operator
                 app.kubernetes.io/part-of: lvms-provisioner
-                exporter: lvms-operator
             spec:
               containers:
               - args:
@@ -655,14 +654,6 @@ spec:
                 - containerPort: 8443
                   name: https
                   protocol: TCP
-                resources:
-                  requests:
-                    cpu: 1m
-                    memory: 20Mi
-              - command:
-                - /metricsexporter
-                image: quay.io/lvms_dev/lvms-operator:latest
-                name: metricsexporter
                 resources:
                   requests:
                     cpu: 1m
