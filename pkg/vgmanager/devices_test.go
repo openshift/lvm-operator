@@ -19,8 +19,8 @@ import (
 
 var devicePaths map[string]string
 
-func TestAvailableDevicesForVG(t *testing.T) {
-	// create a folder for each disk to resolve filepath.EvalSymlinks(path) call in filterMatchingDevices.
+func Test_getNewDevicesToBeAdded(t *testing.T) {
+	// create a folder for each disk to resolve filepath.EvalSymlinks(path) call in getNewDevicesToBeAdded.
 	tmpDir := t.TempDir()
 	devicePaths = make(map[string]string)
 	devicePaths["nvme1n1p1"] = fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p1")
@@ -33,12 +33,10 @@ func TestAvailableDevicesForVG(t *testing.T) {
 	}
 
 	r := &VGReconciler{}
-	r.Filters = func(a lvm.LVM, b lsblk.LSBLK) filter.Filters {
-		filters := filter.DefaultFilters(a, b)
-		// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
-		delete(filters, "noBindMounts")
-		return filters
-	}
+
+	filters := filter.DefaultFilters(nil, nil, nil)
+	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
+	delete(filters, "noBindMounts")
 
 	testCases := []struct {
 		description           string
@@ -571,13 +569,20 @@ func TestAvailableDevicesForVG(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			availableDevices, err := r.getAvailableDevicesForVG(log.IntoContext(context.Background(), testr.New(t)), tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			availableDevices, err := r.getNewDevicesToBeAdded(ctx, tc.existingBlockDevices, tc.existingVGs, &tc.volumeGroup)
 			if !tc.expectError {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
 			}
-			assert.Equal(t, tc.numOfAvailableDevices, len(availableDevices), "expected numOfAvailableDevices is not equal to actual number")
+			devices := r.filterDevices(ctx, availableDevices, filters)
+			if !tc.expectError {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+			assert.Equal(t, tc.numOfAvailableDevices, len(devices.Available), "expected numOfAvailableDevices is not equal to actual number")
 		})
 	}
 }

@@ -42,14 +42,24 @@ const (
 )
 
 type VGStatus struct {
-	// Name is the name of the VG
+	// Name is the name of the volume group
 	Name string `json:"name,omitempty"`
-	// Status tells if the VG was created on the node
+	// Status tells if the volume group was created on the node
 	Status VGStatusType `json:"status,omitempty"`
-	// Reason provides more detail on the VG creation status
+	// Reason provides more detail on the volume group creation status
 	Reason string `json:"reason,omitempty"`
-	//Devices is the list of devices used by the VG
+	// Devices is the list of devices used by the volume group
 	Devices []string `json:"devices,omitempty"`
+	// Excluded contains the per node status of applied device exclusions that were picked up via selector,
+	// but were not used for other reasons.
+	Excluded []ExcludedDevice `json:"excluded,omitempty"`
+}
+
+type ExcludedDevice struct {
+	// Name is the device that was filtered
+	Name string `json:"name"`
+	// Reasons are the human-readable reasons why the device was excluded from the volume group
+	Reasons []string `json:"reasons"`
 }
 
 // LVMVolumeGroupNodeStatusStatus defines the observed state of LVMVolumeGroupNodeStatus

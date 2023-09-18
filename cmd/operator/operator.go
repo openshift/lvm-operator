@@ -183,6 +183,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if err = (&lvmv1alpha1.LVMCluster{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create LVMCluster webhook: %w", err)
 	}
+	if err = (&lvmv1alpha1.LVMVolumeGroup{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create LVMVolumeGroup webhoook: %w", err)
+	}
 
 	pvController := persistent_volume.NewPersistentVolumeReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-pv-controller"))
 	if err := pvController.SetupWithManager(mgr); err != nil {

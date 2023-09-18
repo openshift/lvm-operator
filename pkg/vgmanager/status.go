@@ -19,8 +19,10 @@ package vgmanager
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/filter"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -29,21 +31,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
+func (r *VGReconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices) (bool, error) {
+	status := &lvmv1alpha1.VGStatus{
+		Name:   vg.GetName(),
+		Status: lvmv1alpha1.VGStatusProgressing,
+	}
+
+	// Set devices for the VGStatus.
+	if _, err := r.setDevices(status, devices); err != nil {
+		return false, err
+	}
+
+	return r.setVolumeGroupStatus(ctx, vg, status)
+}
+
+func (r *VGReconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusReady,
 	}
 
 	// Set devices for the VGStatus.
-	if _, err := r.setDevices(status); err != nil {
-		return err
+	if _, err := r.setDevices(status, devices); err != nil {
+		return false, err
 	}
 
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, err error) error {
+func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices, err error) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusFailed,
@@ -52,8 +68,8 @@ func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1
 
 	// Set devices for the VGStatus.
 	// If there is backing volume group, then set as degraded
-	if devicesExist, err := r.setDevices(status); err != nil {
-		return fmt.Errorf("could not set devices in VGStatus: %w", err)
+	if devicesExist, err := r.setDevices(status, devices); err != nil {
+		return false, fmt.Errorf("could not set devices in VGStatus: %w", err)
 	} else if devicesExist {
 		status.Status = lvmv1alpha1.VGStatusDegraded
 	}
@@ -61,7 +77,7 @@ func (r *VGReconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) error {
+func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
 	// Get LVMVolumeGroupNodeStatus and set the relevant VGStatus
@@ -69,7 +85,7 @@ func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1
 
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, nodeStatus, func() error {
 		// set an owner instead of a controller reference, as there can be multiple volume groups.
-		if err := controllerutil.SetOwnerReference(nodeStatus, vg, r.Scheme); err != nil {
+		if err := controllerutil.SetOwnerReference(vg, nodeStatus, r.Scheme); err != nil {
 			logger.Error(err, "failed to set owner-reference when updating volume-group status")
 		}
 
@@ -87,17 +103,14 @@ func (r *VGReconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1
 		return nil
 	})
 
+	updated := result != controllerutil.OperationResultNone
 	if err != nil {
-		return fmt.Errorf("LVMVolumeGroupNodeStatus could not be updated: %w", err)
+		return updated, fmt.Errorf("LVMVolumeGroupNodeStatus could not be updated: %w", err)
 	}
-
-	if result != controllerutil.OperationResultNone {
+	if updated {
 		logger.Info("LVMVolumeGroupNodeStatus modified", "operation", result, "name", nodeStatus.Name)
-	} else {
-		logger.Info("LVMVolumeGroupNodeStatus unchanged")
 	}
-
-	return nil
+	return updated, nil
 }
 
 func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
@@ -150,7 +163,7 @@ func (r *VGReconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alp
 	return nil
 }
 
-func (r *VGReconciler) setDevices(status *lvmv1alpha1.VGStatus) (bool, error) {
+func (r *VGReconciler) setDevices(status *lvmv1alpha1.VGStatus, devices *FilteredBlockDevices) (bool, error) {
 	vgs, err := r.LVM.ListVGs()
 	if err != nil {
 		return false, fmt.Errorf("failed to list volume groups. %v", err)
@@ -167,6 +180,35 @@ func (r *VGReconciler) setDevices(status *lvmv1alpha1.VGStatus) (bool, error) {
 				}
 			}
 		}
+	}
+
+	if devices != nil {
+		status.Excluded = []lvmv1alpha1.ExcludedDevice{}
+		for _, excluded := range devices.Excluded {
+			reasons := make([]string, len(excluded.FilterErrors))
+
+			skip := false
+			for i, err := range excluded.FilterErrors {
+				// for already setup devices we ignore the filter result
+				if filter.IsExpectedDeviceErrorAfterSetup(err) {
+					skip = true
+					break
+				}
+				reasons[i] = err.Error()
+			}
+			if skip {
+				continue
+			}
+
+			sort.Strings(reasons)
+			status.Excluded = append(status.Excluded, lvmv1alpha1.ExcludedDevice{
+				Name:    excluded.Name,
+				Reasons: reasons,
+			})
+		}
+		sort.Slice(status.Excluded, func(i, j int) bool {
+			return status.Excluded[i].Name < status.Excluded[j].Name
+		})
 	}
 
 	return devicesExist, nil

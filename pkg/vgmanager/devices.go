@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -71,119 +72,132 @@ func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup
 	return nil
 }
 
-// getAvailableDevicesForVG determines the available devices that can be used to create a volume group.
-func (r *VGReconciler) getAvailableDevicesForVG(ctx context.Context, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
-	// filter devices based on DeviceSelector.Paths if specified
-	availableDevices, err := r.filterMatchingDevices(ctx, blockDevices, vgs, volumeGroup)
-	if err != nil {
-		return nil, fmt.Errorf("failed to filter matching devices for volume group %s: %w", volumeGroup.GetName(), err)
-	}
-
-	return r.filterAvailableDevices(ctx, availableDevices), nil
+type FilteredBlockDevice struct {
+	lsblk.BlockDevice
+	FilterErrors []error
 }
 
-// filterAvailableDevices returns:
+type FilteredBlockDevices struct {
+	Available []lsblk.BlockDevice
+	Excluded  []FilteredBlockDevice
+}
+
+// filterDevices returns:
 // availableDevices: the list of blockdevices considered available
-func (r *VGReconciler) filterAvailableDevices(ctx context.Context, blockDevices []lsblk.BlockDevice) []lsblk.BlockDevice {
+func (r *VGReconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters filter.Filters) *FilteredBlockDevices {
 	logger := log.FromContext(ctx)
 
 	var availableDevices []lsblk.BlockDevice
-	// using a label so `continue DeviceLoop` can be used to skip devices
-DeviceLoop:
-	for _, blockDevice := range blockDevices {
-		// check for partitions recursively
-		if blockDevice.HasChildren() {
-			childAvailableDevices := r.filterAvailableDevices(ctx, blockDevice.Children)
-			availableDevices = append(availableDevices, childAvailableDevices...)
-		}
+	excludedByKName := make(map[string]FilteredBlockDevice)
 
-		logger = logger.WithValues("Device.Name", blockDevice.Name)
-		for name, filter := range r.Filters(r.LVM, r.LSBLK) {
-			logger := logger.WithValues("filter.Name", name)
-			valid, err := filter(blockDevice)
-			if err != nil {
-				logger.Error(err, "filter error")
-				continue DeviceLoop
-			} else if !valid {
-				logger.Info("does not match filter")
-				continue DeviceLoop
+	for _, device := range devices {
+		logger := logger.WithValues("device.KName", device.KName)
+		// check for partitions recursively
+		if device.HasChildren() {
+			filteredChildDevices := r.filterDevices(ctx, device.Children, filters)
+			availableDevices = append(availableDevices, filteredChildDevices.Available...)
+			for _, excludedChildDevice := range filteredChildDevices.Excluded {
+				if excluded, ok := excludedByKName[excludedChildDevice.KName]; ok {
+					excluded.FilterErrors = append(excluded.FilterErrors, excludedChildDevice.FilterErrors...)
+				} else {
+					excludedByKName[excludedChildDevice.KName] = excludedChildDevice
+				}
 			}
 		}
-		availableDevices = append(availableDevices, blockDevice)
+
+		var filterErrs []error
+		for name, filterFunc := range filters {
+			logger := logger.WithValues("filter.Name", name)
+			if err := filterFunc(device); err != nil {
+				logger.Error(err, "excluded")
+				filterErrs = append(filterErrs, err)
+			}
+		}
+		if len(filterErrs) == 0 {
+			availableDevices = append(availableDevices, device)
+			continue
+		}
+
+		filtered, found := excludedByKName[device.KName]
+		if found {
+			filtered.FilterErrors = append(filtered.FilterErrors, filterErrs...)
+		} else {
+			excludedByKName[device.KName] = FilteredBlockDevice{device, filterErrs}
+		}
 	}
-	return availableDevices
+
+	var excluded []FilteredBlockDevice
+	for _, device := range excludedByKName {
+		excluded = append(excluded, device)
+	}
+
+	return &FilteredBlockDevices{
+		Available: availableDevices,
+		Excluded:  excluded,
+	}
 }
 
-// filterMatchingDevices filters devices based on DeviceSelector.Paths if specified.
-func (r *VGReconciler) filterMatchingDevices(ctx context.Context, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
+// getNewDevicesToBeAdded gets all devices that should be added to the volume group
+func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
 	logger := log.FromContext(ctx)
 
-	var filteredBlockDevices []lsblk.BlockDevice
-	devicesAlreadyInVG := false
+	var validBlockDevices []lsblk.BlockDevice
+	atLeastOneDeviceIsAlreadyInVolumeGroup := false
 
-	if volumeGroup.Spec.DeviceSelector != nil {
-
-		if err := checkDuplicateDeviceSelectorPaths(volumeGroup.Spec.DeviceSelector); err != nil {
-			return nil, fmt.Errorf("unable to validate device selector paths: %v", err)
-		}
-
-		// If Paths is specified, treat it as required paths
-		if len(volumeGroup.Spec.DeviceSelector.Paths) > 0 {
-			for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-				blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
-				if err != nil {
-					// An error for required devices is critical
-					return nil, fmt.Errorf("unable to validate device %s: %v", path, err)
-				}
-
-				// Check if we should skip this device
-				if blockDevice.DevicePath == "" {
-					logger.Info(fmt.Sprintf("skipping required device that is already part of volume group %s: %s", volumeGroup.Name, path))
-					devicesAlreadyInVG = true
-					continue
-				}
-
-				filteredBlockDevices = append(filteredBlockDevices, blockDevice)
-			}
-		}
-
-		// Check for any optional paths
-		if len(volumeGroup.Spec.DeviceSelector.OptionalPaths) > 0 {
-			for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
-				blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
-
-				// Check if we should skip this device
-				if err != nil {
-					logger.Info(fmt.Sprintf("skipping optional device path: %v", err))
-					continue
-				}
-
-				// Check if we should skip this device
-				if blockDevice.DevicePath == "" {
-					logger.Info(fmt.Sprintf("skipping optional device path that is already part of volume group %s: %s", volumeGroup.Name, path))
-					devicesAlreadyInVG = true
-					continue
-				}
-
-				filteredBlockDevices = append(filteredBlockDevices, blockDevice)
-			}
-
-			// At least 1 of the optional paths are required if:
-			//   - OptionalPaths was specified AND
-			//   - There were no required paths
-			//   - Devices were not already part of the volume group (meaning this was run after vg creation)
-			// This guarantees at least 1 device could be found between optionalPaths and paths
-			// if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
-			if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
-				return nil, errors.New("at least 1 valid device is required if DeviceSelector paths or optionalPaths are specified")
-			}
-		}
-
-		return filteredBlockDevices, nil
+	if volumeGroup.Spec.DeviceSelector == nil {
+		// return all available block devices if none is specified in the CR
+		return blockDevices, nil
 	}
 
-	// return all available block devices if none is specified in the CR
-	return blockDevices, nil
+	// If Paths is specified, treat it as required paths
+	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+		blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
+		if err != nil {
+			// An error for required devices is critical
+			return nil, fmt.Errorf("unable to validate device %s: %v", path, err)
+		}
+
+		// Check if we should skip this device
+		if blockDevice.DevicePath == "" {
+			logger.Info(fmt.Sprintf("skipping required device that is already part of volume group %s: %s", volumeGroup.Name, path))
+			atLeastOneDeviceIsAlreadyInVolumeGroup = true
+			continue
+		}
+
+		validBlockDevices = append(validBlockDevices, blockDevice)
+	}
+
+	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+		blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
+
+		// Check if we should skip this device
+		if err != nil {
+			logger.Info(fmt.Sprintf("skipping optional device path: %v", err))
+			continue
+		}
+
+		// Check if we should skip this device
+		if blockDevice.DevicePath == "" {
+			logger.Info(fmt.Sprintf("skipping optional device path that is already part of volume group %s: %s", volumeGroup.Name, path))
+			atLeastOneDeviceIsAlreadyInVolumeGroup = true
+			continue
+		}
+
+		validBlockDevices = append(validBlockDevices, blockDevice)
+	}
+
+	// Check for any optional paths
+	// At least 1 of the optional paths are required if:
+	//   - OptionalPaths was specified AND
+	//   - There were no required paths
+	//   - Devices were not already part of the volume group (meaning this was run after vg creation)
+	// This guarantees at least 1 device could be found between optionalPaths and paths
+	// if len(FilteredBlockDevices) == 0 && !atLeastOneDeviceIsAlreadyInVolumeGroup {
+	if len(validBlockDevices) == 0 && !atLeastOneDeviceIsAlreadyInVolumeGroup {
+		return nil, errors.New("at least 1 valid device is required if DeviceSelector paths or optionalPaths are specified")
+	}
+
+	return validBlockDevices, nil
 }
 
 func isDeviceAlreadyPartOfVG(vgs []lvm.VolumeGroup, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
@@ -212,43 +226,6 @@ func hasExactDisk(blockDevices []lsblk.BlockDevice, deviceName string) (lsblk.Bl
 		}
 	}
 	return lsblk.BlockDevice{}, false
-}
-
-func checkDuplicateDeviceSelectorPaths(selector *lvmv1alpha1.DeviceSelector) error {
-	uniquePaths := make(map[string]bool)
-	duplicatePaths := make(map[string]bool)
-
-	// Check for duplicate required paths
-	for _, path := range selector.Paths {
-		if _, exists := uniquePaths[path]; exists {
-			duplicatePaths[path] = true
-			continue
-		}
-
-		uniquePaths[path] = true
-	}
-
-	// Check for duplicate optional paths
-	for _, path := range selector.OptionalPaths {
-		if _, exists := uniquePaths[path]; exists {
-			duplicatePaths[path] = true
-			continue
-		}
-
-		uniquePaths[path] = true
-	}
-
-	// Report any duplicate paths
-	if len(duplicatePaths) > 0 {
-		keys := make([]string, 0, len(duplicatePaths))
-		for k := range duplicatePaths {
-			keys = append(keys, k)
-		}
-
-		return fmt.Errorf("duplicate device paths found: %v", keys)
-	}
-
-	return nil
 }
 
 // getValidDevice will do various checks on a device path to make sure it is a valid device
