@@ -2,14 +2,13 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 
 	configv1 "github.com/openshift/api/config/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -66,17 +65,9 @@ func (r DefaultTypeResolver) GetType(ctx context.Context) (Type, error) {
 		return TypeOther, nil
 	}
 
-	// Introduced in controller-runtime v0.15.0, which makes a simple
-	// `k8serrors.IsNotFound(err)` not work any more
-	// see https://github.com/kubernetes-sigs/controller-runtime/issues/2354
-	groupErr := &discovery.ErrGroupDiscoveryFailed{}
-	if errors.As(err, &groupErr) {
-		for _, err := range groupErr.Groups {
-			if k8serrors.IsNotFound(err) {
-				logger.Info("Openshift Infrastructure not available in the cluster, setting cluster type to other")
-				return TypeOther, nil
-			}
-		}
+	if meta.IsNoMatchError(err) {
+		logger.Info("Openshift Infrastructure not available in the cluster, setting cluster type to other")
+		return TypeOther, nil
 	}
 
 	return "", fmt.Errorf("failed to get Openshift Infrastructure 'cluster': %w", err)
