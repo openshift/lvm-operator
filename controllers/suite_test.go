@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"testing"
 
@@ -28,7 +27,7 @@ import (
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/pkg/cluster"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/discovery"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -125,7 +124,7 @@ var _ = BeforeSuite(func() {
 	vsc := &snapapi.VolumeSnapshotClassList{}
 	if err := k8sClient.List(ctx, vsc, &client.ListOptions{Limit: 1}); err != nil {
 		// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
-		if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+		if meta.IsNoMatchError(err) {
 			logger.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
 			enableSnapshotting = false
 		}

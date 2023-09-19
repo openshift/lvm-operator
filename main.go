@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -26,7 +25,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/controllers/node"
-	"k8s.io/client-go/discovery"
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -132,7 +131,7 @@ func main() {
 	vsc := &snapapi.VolumeSnapshotClassList{}
 	if err := setupClient.List(context.Background(), vsc, &client.ListOptions{Limit: 1}); err != nil {
 		// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
-		if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+		if meta.IsNoMatchError(err) {
 			setupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
 			enableSnapshotting = false
 		}

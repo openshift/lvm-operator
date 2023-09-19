@@ -19,16 +19,14 @@ package e2e
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
-
-	"k8s.io/client-go/discovery"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	k8sv1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -106,7 +104,7 @@ func ephemeralTest() {
 					snapshot, err = getVolumeSnapshot(snapshotYaml)
 					Expect(err).To(BeNil())
 					err = crClient.Create(ctx, snapshot)
-					if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+					if meta.IsNoMatchError(err) {
 						skipSnapshotOps = true
 						Skip("Skipping Testing of Snapshot Operations due to lack of volume snapshot support")
 					}
@@ -245,7 +243,7 @@ func ephemeralTest() {
 					snapshot, err = getVolumeSnapshot(snapshotYaml)
 					Expect(err).To(BeNil())
 					err = crClient.Create(ctx, snapshot)
-					if discovery.IsGroupDiscoveryFailedError(errors.Unwrap(err)) {
+					if meta.IsNoMatchError(err) {
 						skipSnapshotOps = true
 						Skip("Skipping Testing of Snapshot Operations due to lack of volume snapshot support")
 					}
