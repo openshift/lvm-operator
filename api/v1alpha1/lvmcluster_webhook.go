@@ -17,11 +17,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/openshift/lvm-operator/pkg/cluster"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -30,11 +35,18 @@ import (
 // log is for logging in this package.
 var lvmclusterlog = logf.Log.WithName("lvmcluster-webhook")
 
-var _ webhook.Validator = &LVMCluster{}
+type lvmClusterValidator struct {
+	client.Client
+}
+
+var _ webhook.CustomValidator = &lvmClusterValidator{}
 
 var (
-	ErrDeviceClassNotFound  = fmt.Errorf("DeviceClass not found in the LVMCluster")
-	ErrThinPoolConfigNotSet = fmt.Errorf("ThinPoolConfig is not set for the DeviceClass")
+	ErrDeviceClassNotFound  = errors.New("DeviceClass not found in the LVMCluster")
+	ErrThinPoolConfigNotSet = errors.New("ThinPoolConfig is not set for the DeviceClass")
+	ErrInvalidNamespace     = errors.New("invalid namespace was supplied")
+	ErrNoValidLVMCluster    = errors.New("object passed to lvmClusterValidator is not LVMCluster")
+	ErrDuplicateLVMCluster  = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -42,36 +54,59 @@ var (
 func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(l).
+		WithValidator(&lvmClusterValidator{Client: mgr.GetClient()}).
 		Complete()
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (l *LVMCluster) ValidateCreate() (admission.Warnings, error) {
-	lvmclusterlog.Info("validate create", "name", l.Name)
-	warnings := admission.Warnings{}
+func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	l, ok := obj.(*LVMCluster)
+	if !ok {
+		return nil, ErrNoValidLVMCluster
+	}
 
-	deviceClassWarnings, err := l.verifyDeviceClass()
+	warnings := admission.Warnings{}
+	lvmclusterlog.Info("validate create", "name", l.Name)
+
+	if namespace, err := cluster.GetOperatorNamespace(); err != nil {
+		return warnings, fmt.Errorf("could not verify namespace of lvmcluster: %w", err)
+	} else if namespace != l.GetNamespace() {
+		return warnings, fmt.Errorf(
+			"creating LVMCluster is only supported within namespace %q: %w",
+			namespace, ErrInvalidNamespace,
+		)
+	}
+
+	existing := &LVMClusterList{}
+	if err := v.List(ctx, existing, &client.ListOptions{Limit: 1, Namespace: l.GetNamespace()}); err != nil {
+		return warnings, fmt.Errorf("could not verify that LVMCluster was not already created %w", err)
+	} else if len(existing.Items) > 0 {
+		return warnings, fmt.Errorf("LVMCluster exists at %q: %w",
+			client.ObjectKeyFromObject(&existing.Items[0]), ErrDuplicateLVMCluster)
+	}
+
+	deviceClassWarnings, err := v.verifyDeviceClass(l)
 	warnings = append(warnings, deviceClassWarnings...)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyPathsAreNotEmpty()
+	err = v.verifyPathsAreNotEmpty(l)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyAbsolutePath()
+	err = v.verifyAbsolutePath(l)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyNoDeviceOverlap()
+	err = v.verifyNoDeviceOverlap(l)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyFstype()
+	err = v.verifyFstype(l)
 	if err != nil {
 		return warnings, err
 	}
@@ -80,32 +115,36 @@ func (l *LVMCluster) ValidateCreate() (admission.Warnings, error) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
+	l, ok := new.(*LVMCluster)
+	if !ok {
+		return nil, ErrNoValidLVMCluster
+	}
 	lvmclusterlog.Info("validate update", "name", l.Name)
 	warnings := admission.Warnings{}
 
-	deviceClassWarnings, err := l.verifyDeviceClass()
+	deviceClassWarnings, err := v.verifyDeviceClass(l)
 	warnings = append(warnings, deviceClassWarnings...)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyPathsAreNotEmpty()
+	err = v.verifyPathsAreNotEmpty(l)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyAbsolutePath()
+	err = v.verifyAbsolutePath(l)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyNoDeviceOverlap()
+	err = v.verifyNoDeviceOverlap(l)
 	if err != nil {
 		return warnings, err
 	}
 
-	err = l.verifyFstype()
+	err = v.verifyFstype(l)
 	if err != nil {
 		return warnings, err
 	}
@@ -120,7 +159,7 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, err
 		var newDevices, newOptionalDevices, oldDevices, oldOptionalDevices []string
 
 		newThinPoolConfig = deviceClass.ThinPoolConfig
-		oldThinPoolConfig, err = oldLVMCluster.getThinPoolsConfigOfDeviceClass(deviceClass.Name)
+		oldThinPoolConfig, err = v.getThinPoolsConfigOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
 		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && err != ErrDeviceClassNotFound) ||
 			(newThinPoolConfig == nil && oldThinPoolConfig != nil) {
@@ -142,7 +181,7 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, err
 			newOptionalDevices = deviceClass.DeviceSelector.OptionalPaths
 		}
 
-		oldDevices, oldOptionalDevices, err = oldLVMCluster.getPathsOfDeviceClass(deviceClass.Name)
+		oldDevices, oldOptionalDevices, err = v.getPathsOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
 		// Is this a new device class?
 		if err == ErrDeviceClassNotFound {
@@ -195,13 +234,18 @@ func validateDevicePathsStillExist(old, new []string) error {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (l *LVMCluster) ValidateDelete() (admission.Warnings, error) {
+func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	l, ok := obj.(*LVMCluster)
+	if !ok {
+		return nil, ErrNoValidLVMCluster
+	}
+
 	lvmclusterlog.Info("validate delete", "name", l.Name)
 
 	return []string{}, nil
 }
 
-func (l *LVMCluster) verifyDeviceClass() (admission.Warnings, error) {
+func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnings, error) {
 	deviceClasses := l.Spec.Storage.DeviceClasses
 	if len(deviceClasses) < 1 {
 		return nil, fmt.Errorf("at least one deviceClass is required")
@@ -222,7 +266,7 @@ func (l *LVMCluster) verifyDeviceClass() (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (l *LVMCluster) verifyPathsAreNotEmpty() error {
+func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) error {
 
 	var deviceClassesWithoutPaths []string
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -241,8 +285,7 @@ func (l *LVMCluster) verifyPathsAreNotEmpty() error {
 	return nil
 }
 
-func (l *LVMCluster) verifyAbsolutePath() error {
-
+func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
@@ -262,7 +305,7 @@ func (l *LVMCluster) verifyAbsolutePath() error {
 	return nil
 }
 
-func (l *LVMCluster) verifyNoDeviceOverlap() error {
+func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 
 	// make sure no device overlap with another VGs
 	// use map to find the duplicate entries for paths
@@ -327,7 +370,7 @@ func (l *LVMCluster) verifyNoDeviceOverlap() error {
 	return nil
 }
 
-func (l *LVMCluster) getPathsOfDeviceClass(deviceClassName string) (required []string, optional []string, err error) {
+func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassName string) (required []string, optional []string, err error) {
 	required, optional, err = []string{}, []string{}, nil
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
@@ -344,7 +387,7 @@ func (l *LVMCluster) getPathsOfDeviceClass(deviceClassName string) (required []s
 	return
 }
 
-func (l *LVMCluster) getThinPoolsConfigOfDeviceClass(deviceClassName string) (*ThinPoolConfig, error) {
+func (v *lvmClusterValidator) getThinPoolsConfigOfDeviceClass(l *LVMCluster, deviceClassName string) (*ThinPoolConfig, error) {
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
@@ -358,7 +401,7 @@ func (l *LVMCluster) getThinPoolsConfigOfDeviceClass(deviceClassName string) (*T
 	return nil, ErrDeviceClassNotFound
 }
 
-func (l *LVMCluster) verifyFstype() error {
+func (v *lvmClusterValidator) verifyFstype(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.FilesystemType != FilesystemTypeExt4 && deviceClass.FilesystemType != FilesystemTypeXFS {
 			return fmt.Errorf("fstype '%s' is not a supported filesystem type", deviceClass.FilesystemType)

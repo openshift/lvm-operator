@@ -19,13 +19,13 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/controllers/node"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -56,9 +56,8 @@ import (
 )
 
 var (
-	scheme                  = runtime.NewScheme()
-	setupLog                = ctrl.Log.WithName("setup")
-	operatorNamespaceEnvVar = "POD_NAMESPACE"
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
@@ -90,7 +89,7 @@ func main() {
 	ctrl.SetLogger(logr)
 	klog.SetLogger(logr)
 
-	operatorNamespace, err := getOperatorNamespace()
+	operatorNamespace, err := cluster.GetOperatorNamespace()
 	if err != nil {
 		setupLog.Error(err, "unable to get operatorNamespace"+
 			"Exiting")
@@ -145,6 +144,9 @@ func main() {
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
 		}},
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{operatorNamespace: {}},
+		},
 		HealthProbeBindAddress:              probeAddr,
 		LeaderElectionResourceLockInterface: le.Lock,
 		LeaderElection:                      !leaderElectionConfig.Disable,
@@ -216,16 +218,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-// getOperatorNamespace returns the Namespace the operator should be watching for changes
-func getOperatorNamespace() (string, error) {
-	// The env variable POD_NAMESPACE which specifies the Namespace the pod is running in
-	// and hence will watch.
-
-	ns, found := os.LookupEnv(operatorNamespaceEnvVar)
-	if !found {
-		return "", fmt.Errorf("%s not found", operatorNamespaceEnvVar)
-	}
-	return ns, nil
 }
