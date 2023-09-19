@@ -9,7 +9,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
+
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -21,8 +22,8 @@ import (
 type ContentMode string
 
 const (
-	ContentModeFile  = "file"
-	ContentModeBlock = "block"
+	ContentModeFile  ContentMode = "file"
+	ContentModeBlock ContentMode = "block"
 )
 
 // PodRunner is a helper to run commands in pods via remote execution. similar to kubectl exec
@@ -129,7 +130,7 @@ func (t *PodRunner) ExecCommandInFirstPodContainer(ctx context.Context, pod *k8s
 
 // WriteDataInPod writes the data to pod.
 func (t *PodRunner) WriteDataInPod(ctx context.Context, pod *k8sv1.Pod, content string, mode ContentMode) error {
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	Expect(pod.Spec.Containers).NotTo(BeEmpty())
 	var filePath string
 	if mode == "file" {
 		filePath = pod.Spec.Containers[0].VolumeMounts[0].MountPath + "/test"

@@ -22,12 +22,15 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+
+	"github.com/go-logr/logr"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/go-logr/logr"
-	"github.com/onsi/ginkgo/v2"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -211,7 +214,7 @@ func getEC2Client(ctx context.Context, region string) (*ec2.EC2, error) {
 		Region:      aws.String(region),
 		Credentials: credentials.NewStaticCredentials(string(id), string(key), ""),
 		Logger: aws.LoggerFunc(func(args ...interface{}) {
-			ginkgo.GinkgoLogr.Info(fmt.Sprint(args), "source", "aws")
+			GinkgoLogr.Info(fmt.Sprint(args), "source", "aws")
 		}),
 	})
 	if err != nil {
