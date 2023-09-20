@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -29,15 +30,17 @@ var (
 	directoryHostPath         = corev1.HostPathDirectory
 	HostPathDirectoryOrCreate = corev1.HostPathDirectoryOrCreate
 
-	LVMdVolName   = "lvmd-conf"
-	UdevVolName   = "run-udev"
-	DevDirVolName = "device-dir"
-	SysVolName    = "sys"
+	LVMdVolName         = "lvmd-conf"
+	UdevVolName         = "run-udev"
+	DevDirVolName       = "device-dir"
+	SysVolName          = "sys"
+	MetricsCertsVolName = "metrics-cert"
 
-	LVMdDir    = "/etc/topolvm"
-	devDirPath = "/dev"
-	udevPath   = "/run/udev"
-	sysPath    = "/sys"
+	LVMdDir             = "/etc/topolvm"
+	devDirPath          = "/dev"
+	udevPath            = "/run/udev"
+	sysPath             = "/sys"
+	metricsCertsDirPath = "/tmp/k8s-metrics-server/serving-certs"
 
 	// LVMDConfVol is the corev1.Volume definition for the directory on host ("/etc/topolvm") for storing
 	// the lvmd.conf file
@@ -71,7 +74,7 @@ var (
 		},
 	}
 
-	// DevMount is the corresponding mount for DevHostDirVol
+	// DevHostDirVolMount is the corresponding mount for DevHostDirVol
 	DevHostDirVolMount = corev1.VolumeMount{
 		Name:             DevDirVolName,
 		MountPath:        devDirPath,
@@ -88,7 +91,7 @@ var (
 		},
 	}
 
-	// UDevMount is the corresponding mount for UDevHostDirVol
+	// UDevHostDirVolMount is the corresponding mount for UDevHostDirVol
 	UDevHostDirVolMount = corev1.VolumeMount{
 		Name:             UdevVolName,
 		MountPath:        udevPath,
@@ -104,11 +107,30 @@ var (
 		},
 	}
 
-	// SysMount is the corresponding mount for SysHostDirVol
+	// SysHostDirVolMount is the corresponding mount for SysHostDirVol
 	SysHostDirVolMount = corev1.VolumeMount{
 		Name:             SysVolName,
 		MountPath:        sysPath,
 		MountPropagation: &hostContainerPropagation,
+	}
+
+	// MetricsCertsDirVol is the corev1.Volume definition for the
+	// certs to be used in metrics endpoint.
+	MetricsCertsDirVol = corev1.Volume{
+		Name: MetricsCertsVolName,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName:  "vg-manager-metrics-cert",
+				DefaultMode: ptr.To[int32](420),
+			},
+		},
+	}
+
+	// MetricsCertsDirVolMount is the corresponding mount for MetricsCertsDirVol
+	MetricsCertsDirVolMount = corev1.VolumeMount{
+		Name:      MetricsCertsVolName,
+		MountPath: metricsCertsDirPath,
+		ReadOnly:  true,
 	}
 )
 
@@ -116,8 +138,8 @@ var (
 func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, vgImage string) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	nodeSelector, tolerations := extractNodeSelectorAndTolerations(lvmCluster)
-	volumes := []corev1.Volume{LVMDConfVol, DevHostDirVol, UDevHostDirVol, SysHostDirVol}
-	volumeMounts := []corev1.VolumeMount{LVMDConfVolMount, DevHostDirVolMount, UDevHostDirVolMount, SysHostDirVolMount}
+	volumes := []corev1.Volume{LVMDConfVol, DevHostDirVol, UDevHostDirVol, SysHostDirVol, MetricsCertsDirVol}
+	volumeMounts := []corev1.VolumeMount{LVMDConfVolMount, DevHostDirVolMount, UDevHostDirVolMount, SysHostDirVolMount, MetricsCertsDirVolMount}
 	privileged := true
 	var zero int64 = 0
 

@@ -38,18 +38,19 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 )
 
 const (
-	DefaultMetricsAddr = ":8080"
-	DefaultProbeAddr   = ":8081"
+	DefaultDiagnosticsAddr = ":8443"
+	DefaultProbeAddr       = ":8081"
 )
 
 type Options struct {
 	Scheme   *runtime.Scheme
 	SetupLog logr.Logger
 
-	metricsAddr     string
+	diagnosticsAddr string
 	healthProbeAddr string
 }
 
@@ -67,7 +68,7 @@ func NewCmd(opts *Options) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(
-		&opts.metricsAddr, "metrics-bind-address", DefaultMetricsAddr, "The address the metric endpoint binds to.",
+		&opts.diagnosticsAddr, "diagnosticsAddr", DefaultDiagnosticsAddr, "The address the diagnostics endpoint binds to.",
 	)
 	cmd.Flags().StringVar(
 		&opts.healthProbeAddr, "health-probe-bind-address", DefaultProbeAddr, "The address the probe endpoint binds to.",
@@ -80,7 +81,9 @@ func run(_ *cobra.Command, _ []string, opts *Options) error {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: opts.Scheme,
 		Metrics: metricsserver.Options{
-			BindAddress: opts.metricsAddr,
+			BindAddress:    opts.diagnosticsAddr,
+			SecureServing:  true,
+			FilterProvider: filters.WithAuthenticationAndAuthorization,
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,

@@ -350,27 +350,13 @@ $ make undeploy
 
 ## Metrics
 
-The LVM Operator runs a metrics exporter sidecar to export Prometheus metrics. To enable monitoring on OpenShift clusters, assign the `openshift.io/cluster-monitoring` label to the same namespace that you deployed LVMS to.
+To enable monitoring on OpenShift clusters, assign the `openshift.io/cluster-monitoring` label to the same namespace that you deployed LVMS to.
 
 ```bash
 $ oc patch namespace/openshift-storage -p '{"metadata": {"labels": {"openshift.io/cluster-monitoring": "true"}}}'
 ```
 
-Currently, LVMS provides only TopoLVM metrics, which can be accessed either via OpenShift Console or by port-forwarding the relevant service.
-
-```bash
-# port-forward service in one terminal
-$ oc port-forward svc/topolvm-node-metrics 50000:8080
-Forwarding from 127.0.0.1:41685 -> 8080
-Forwarding from [::1]:41685 -> 8080
-...
-...
-
-# in another terminal, view the metrics in localhost using the specified port above
-$ curl -s localhost:50000/metrics | grep -Ei 'topolvm_volumegroup_.*?_bytes\{'
-topolvm_volumegroup_available_bytes{device_class="vg1",node="kube-node"} 4.790222323712e+12
-topolvm_volumegroup_size_bytes{device_class="vg1",node="kube-node"} 4.800959741952e+12
-```
+LVMS provides [TopoLVM metrics](https://github.com/topolvm/topolvm/blob/v0.21.0/docs/topolvm-node.md#prometheus-metrics) and `controller-runtime` metrics, which can be accessed via OpenShift Console.
 
 ## Known Limitations
 

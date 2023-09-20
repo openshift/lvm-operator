@@ -557,6 +557,18 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
         serviceAccountName: topolvm-node
       - rules:
         - apiGroups:
@@ -567,6 +579,18 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
         serviceAccountName: vg-manager
       deployments:
       - label:
@@ -590,7 +614,6 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
                 command:
                 - /lvms
@@ -598,6 +621,8 @@ spec:
                 env:
                 - name: TOPOLVM_CSI_IMAGE
                   value: quay.io/lvms_dev/topolvm:latest
+                - name: RBAC_PROXY_IMAGE
+                  value: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
                 - name: CSI_LIVENESSPROBE_IMAGE
                   value: k8s.gcr.io/sig-storage/livenessprobe:v2.8.0
                 - name: CSI_PROVISIONER_IMAGE
@@ -644,21 +669,9 @@ spec:
                 - mountPath: /tmp/k8s-webhook-server/serving-certs
                   name: cert
                   readOnly: true
-              - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=0
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources:
-                  requests:
-                    cpu: 1m
-                    memory: 20Mi
+                - mountPath: /tmp/k8s-metrics-server/serving-certs
+                  name: metrics-cert
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator
@@ -668,6 +681,10 @@ spec:
                 secret:
                   defaultMode: 420
                   secretName: lvms-operator-webhook-server-cert
+              - name: metrics-cert
+                secret:
+                  defaultMode: 420
+                  secretName: lvms-operator-metrics-cert
       permissions:
       - rules:
         - apiGroups:
