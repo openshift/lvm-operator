@@ -7,9 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/openshift/lvm-operator/pkg/cluster"
-
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +41,7 @@ var _ = Describe("webhook acceptance tests", func() {
 		},
 	}
 
-	It("minimum viable configuration", func(ctx SpecContext) {
+	defaultLVMClusterInUniqueNamespace := func(ctx SpecContext) *LVMCluster {
 		generatedName := generateUniqueNameForTestCase(ctx)
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, generatedName)
 		namespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
@@ -51,11 +49,14 @@ var _ = Describe("webhook acceptance tests", func() {
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
 		})
-
 		resource := defaultClusterTemplate.DeepCopy()
 		resource.SetName(generatedName)
 		resource.SetNamespace(namespace.GetName())
+		return resource
+	}
 
+	It("minimum viable create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
@@ -134,4 +135,270 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrInvalidNamespace.Error()))
 	})
 
+	It("no device classes are not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses = nil
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrAtLeastOneDeviceClassRequired.Error()))
+	})
+
+	It("two default device classes are not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses = append(resource.Spec.Storage.DeviceClasses, DeviceClass{
+			Name:           "dupe",
+			Default:        true,
+			ThinPoolConfig: resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.DeepCopy(),
+		})
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrOnlyOneDefaultDeviceClassAllowed.Error()))
+	})
+
+	It("no default device classes is allowed but outputs a warning", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].Default = false
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("device selector without path is invalid", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector.Error()))
+	})
+
+	It("multiple device classes without path list are not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses = append(resource.Spec.Storage.DeviceClasses, DeviceClass{Name: "test",
+			ThinPoolConfig: resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.DeepCopy()})
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrEmptyPathsWithMultipleDeviceClasses.Error()))
+	})
+
+	It("device selector with non-dev path is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{
+			"some-random-path",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("must be an absolute path to the device"))
+	})
+
+	It("device selector with non-dev optional path is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{
+			"some-random-path",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("must be an absolute path to the device"))
+	})
+
+	It("device selector with overlapping devices in paths is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{
+			"/dev/test1",
+		}}
+		dupe := *resource.Spec.Storage.DeviceClasses[0].DeepCopy()
+		dupe.Name = "dupe"
+		dupe.Default = false
+		resource.Spec.Storage.DeviceClasses = append(resource.Spec.Storage.DeviceClasses, dupe)
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("overlaps in two different deviceClasss"))
+	})
+
+	It("device selector with overlapping devices in optional paths is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{
+			"/dev/test1",
+		}}
+		dupe := *resource.Spec.Storage.DeviceClasses[0].DeepCopy()
+		dupe.Name = "dupe"
+		dupe.Default = false
+		resource.Spec.Storage.DeviceClasses = append(resource.Spec.Storage.DeviceClasses, dupe)
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("overlaps in two different deviceClasss"))
+	})
+
+	It("minimum viable update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		Expect(k8sClient.Update(ctx, updated)).To(Succeed())
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating ThinPoolConfig.Name is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.Name = "blub"
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating ThinPoolConfig.SizePercent is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.SizePercent--
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating ThinPoolConfig.OverprovisionRatio is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.OverprovisionRatio--
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("device paths cannot be added to device class in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}}
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrDevicePathsCannotBeAddedInUpdate.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("optional device paths cannot be added to device class in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{"/dev/newpath"}}
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrDevicePathsCannotBeAddedInUpdate.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("device paths cannot be removed from device class in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []string{"/dev/otherpath"}
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("required device paths were deleted from the LVMCluster"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("optional device paths cannot be removed from device class in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{"/dev/newpath"}}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []string{"/dev/otherpath"}
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("optional device paths were deleted from the LVMCluster"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
 })

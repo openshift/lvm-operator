@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/openshift/lvm-operator/pkg/cluster"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,11 +41,16 @@ type lvmClusterValidator struct {
 var _ webhook.CustomValidator = &lvmClusterValidator{}
 
 var (
-	ErrDeviceClassNotFound  = errors.New("DeviceClass not found in the LVMCluster")
-	ErrThinPoolConfigNotSet = errors.New("ThinPoolConfig is not set for the DeviceClass")
-	ErrInvalidNamespace     = errors.New("invalid namespace was supplied")
-	ErrNoValidLVMCluster    = errors.New("object passed to lvmClusterValidator is not LVMCluster")
-	ErrDuplicateLVMCluster  = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
+	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
+	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
+	ErrInvalidNamespace                                      = errors.New("invalid namespace was supplied")
+	ErrAtLeastOneDeviceClassRequired                         = errors.New("at least one deviceClass is required")
+	ErrOnlyOneDefaultDeviceClassAllowed                      = errors.New("only one default deviceClass is allowed")
+	ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector = errors.New("either paths or optionalPaths must be specified when DeviceSelector is specified")
+	ErrEmptyPathsWithMultipleDeviceClasses                   = errors.New("path list should not be empty when there are multiple deviceClasses")
+	ErrDuplicateLVMCluster                                   = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
+	ErrThinPoolConfigCannotBeChanged                         = errors.New("ThinPoolConfig can not be changed")
+	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -60,10 +64,7 @@ func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	l, ok := obj.(*LVMCluster)
-	if !ok {
-		return nil, ErrNoValidLVMCluster
-	}
+	l := obj.(*LVMCluster)
 
 	warnings := admission.Warnings{}
 	lvmclusterlog.Info("validate create", "name", l.Name)
@@ -115,11 +116,9 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
-	l, ok := new.(*LVMCluster)
-	if !ok {
-		return nil, ErrNoValidLVMCluster
-	}
+func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime.Object) (admission.Warnings, error) {
+	l := new.(*LVMCluster)
+
 	lvmclusterlog.Info("validate update", "name", l.Name)
 	warnings := admission.Warnings{}
 
@@ -161,18 +160,18 @@ func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runti
 		newThinPoolConfig = deviceClass.ThinPoolConfig
 		oldThinPoolConfig, err = v.getThinPoolsConfigOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
-		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && err != ErrDeviceClassNotFound) ||
+		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && !errors.Is(err, ErrDeviceClassNotFound)) ||
 			(newThinPoolConfig == nil && oldThinPoolConfig != nil) {
 			return warnings, fmt.Errorf("ThinPoolConfig can not be changed")
 		}
 
 		if newThinPoolConfig != nil && oldThinPoolConfig != nil {
 			if newThinPoolConfig.Name != oldThinPoolConfig.Name {
-				return warnings, fmt.Errorf("ThinPoolConfig.Name can not be changed")
+				return warnings, fmt.Errorf("ThinPoolConfig.Name is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if newThinPoolConfig.SizePercent != oldThinPoolConfig.SizePercent {
-				return warnings, fmt.Errorf("ThinPoolConfig.SizePercent can not be changed")
+				return warnings, fmt.Errorf("ThinPoolConfig.SizePercent is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if newThinPoolConfig.OverprovisionRatio != oldThinPoolConfig.OverprovisionRatio {
-				return warnings, fmt.Errorf("ThinPoolConfig.OverprovisionRatio can not be changed")
+				return warnings, fmt.Errorf("ThinPoolConfig.OverprovisionRatio is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			}
 		}
 
@@ -190,24 +189,24 @@ func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runti
 
 		// Make sure a device path list was not added
 		if len(oldDevices) == 0 && len(newDevices) > 0 {
-			return warnings, fmt.Errorf("invalid: device paths can not be added after a device class has been initialized")
+			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
 		// Make sure an optionalPaths list was not added
 		if len(oldOptionalDevices) == 0 && len(newOptionalDevices) > 0 {
-			return warnings, fmt.Errorf("invalid: optional device paths can not be added after a device class has been initialized")
+			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
 		// Validate all the old paths still exist
 		err := validateDevicePathsStillExist(oldDevices, newDevices)
 		if err != nil {
-			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %v", err)
+			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
 		}
 
 		// Validate all the old optional paths still exist
 		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
 		if err != nil {
-			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %v", err)
+			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
 		}
 	}
 
@@ -235,10 +234,7 @@ func validateDevicePathsStillExist(old, new []string) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	l, ok := obj.(*LVMCluster)
-	if !ok {
-		return nil, ErrNoValidLVMCluster
-	}
+	l := obj.(*LVMCluster)
 
 	lvmclusterlog.Info("validate delete", "name", l.Name)
 
@@ -248,7 +244,7 @@ func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Ob
 func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnings, error) {
 	deviceClasses := l.Spec.Storage.DeviceClasses
 	if len(deviceClasses) < 1 {
-		return nil, fmt.Errorf("at least one deviceClass is required")
+		return nil, ErrAtLeastOneDeviceClassRequired
 	}
 	countDefault := 0
 	for _, deviceClass := range deviceClasses {
@@ -257,7 +253,7 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 		}
 	}
 	if countDefault > 1 {
-		return nil, fmt.Errorf("only one default deviceClass is allowed. Currently, there are %d default deviceClasses", countDefault)
+		return nil, fmt.Errorf("%w. Currently, there are %d default deviceClasses", ErrOnlyOneDefaultDeviceClassAllowed, countDefault)
 	}
 	if countDefault == 0 {
 		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly"}, nil
@@ -272,14 +268,14 @@ func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			if len(deviceClass.DeviceSelector.Paths) == 0 && len(deviceClass.DeviceSelector.OptionalPaths) == 0 {
-				return fmt.Errorf("either paths or optionalPaths must be specified when DeviceSelector is specified")
+				return ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector
 			}
 		} else {
 			deviceClassesWithoutPaths = append(deviceClassesWithoutPaths, deviceClass.Name)
 		}
 	}
 	if len(l.Spec.Storage.DeviceClasses) > 1 && len(deviceClassesWithoutPaths) > 0 {
-		return fmt.Errorf("path list should not be empty when there are multiple deviceClasses. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", strings.Join(deviceClassesWithoutPaths, `,`))
+		return fmt.Errorf("%w. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", ErrEmptyPathsWithMultipleDeviceClasses, strings.Join(deviceClassesWithoutPaths, `,`))
 	}
 
 	return nil
