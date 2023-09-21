@@ -179,10 +179,7 @@ ARCH ?= amd64
 all: build
 
 build: generate fmt vet ## Build manager binary.
-	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/manager main.go
-
-build-vgmanager: generate fmt vet ## Build vg manager binary.
-	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/vgmanager cmd/vgmanager/main.go
+	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/lvms cmd/main.go
 
 build-prometheus-alert-rules: jsonnet monitoring/mixin.libsonnet monitoring/alerts/alerts.jsonnet monitoring/alerts/*.libsonnet
 	$(JSONNET) -S monitoring/alerts/alerts.jsonnet > config/prometheus/prometheus_rules.yaml

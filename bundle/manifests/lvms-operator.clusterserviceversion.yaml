@@ -593,7 +593,8 @@ spec:
                 - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
                 command:
-                - /manager
+                - /lvms
+                - operator
                 env:
                 - name: TOPOLVM_CSI_IMAGE
                   value: quay.io/lvms_dev/topolvm:latest

@@ -122,7 +122,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	var zero int64 = 0
 
 	command := []string{
-		"/vgmanager",
+		"/lvms", "vgmanager",
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{

@@ -14,32 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package operator
 
 import (
 	"context"
-	"flag"
-	"os"
+	"fmt"
 
-	configv1 "github.com/openshift/api/config/v1"
-	secv1 "github.com/openshift/api/security/v1"
+	"github.com/go-logr/logr"
 	"github.com/openshift/lvm-operator/controllers/node"
+	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -51,79 +45,84 @@ import (
 	persistent_volume "github.com/openshift/lvm-operator/controllers/persistent-volume"
 	persistent_volume_claim "github.com/openshift/lvm-operator/controllers/persistent-volume-claim"
 	"github.com/openshift/lvm-operator/pkg/cluster"
-	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+const (
+	DefaultMetricsAddr          = ":8080"
+	DefaultProbeAddr            = ":8081"
+	DefaultEnableLeaderElection = false
 )
 
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(topolvmv1.AddToScheme(scheme))
-	utilruntime.Must(snapapi.AddToScheme(scheme))
-	utilruntime.Must(secv1.Install(scheme))
-	utilruntime.Must(configv1.Install(scheme))
-	//+kubebuilder:scaffold:scheme
+type Options struct {
+	Scheme   *runtime.Scheme
+	SetupLog logr.Logger
+
+	metricsAddr          string
+	healthProbeAddr      string
+	enableLeaderElection bool
 }
 
-func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	opts := zap.Options{
-		Development: false,
+// NewCmd creates a new CLI command
+func NewCmd(opts *Options) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "operator",
+		Short:         "Commands for running LVMS Operator",
+		Long:          `Operator reconciling LVMCluster LVMVolumeGroup and LVMVolumeGroupNodeStatus`,
+		SilenceErrors: false,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd, args, opts)
+		},
 	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
 
-	logr := zap.New(zap.UseFlagOptions(&opts))
-	ctrl.SetLogger(logr)
-	klog.SetLogger(logr)
+	cmd.Flags().StringVar(
+		&opts.metricsAddr, "metrics-bind-address", DefaultMetricsAddr, "The address the metric endpoint binds to.",
+	)
+	cmd.Flags().StringVar(
+		&opts.healthProbeAddr, "health-probe-bind-address", DefaultProbeAddr, "The address the probe endpoint binds to.",
+	)
+	cmd.Flags().BoolVar(
+		&opts.enableLeaderElection, "leader-elect", DefaultEnableLeaderElection,
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.",
+	)
 
+	return cmd
+}
+
+func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	operatorNamespace, err := cluster.GetOperatorNamespace()
 	if err != nil {
-		setupLog.Error(err, "unable to get operatorNamespace"+
-			"Exiting")
-		os.Exit(1)
+		return fmt.Errorf("unable to get operatorNamespace: %w", err)
 	}
-	setupLog.Info("Watching namespace", "Namespace", operatorNamespace)
 
-	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
+	opts.SetupLog.Info("Watching namespace", "Namespace", operatorNamespace)
+
+	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: opts.Scheme})
 	if err != nil {
-		setupLog.Error(err, "unable to initialize setup client for pre-manager startup checks")
-		os.Exit(1)
+		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
 	}
+
 	snoCheck := cluster.NewMasterSNOCheck(setupClient)
-	leaderElectionResolver, err := cluster.NewLeaderElectionResolver(snoCheck, enableLeaderElection, operatorNamespace)
+	leaderElectionResolver, err := cluster.NewLeaderElectionResolver(snoCheck, opts.enableLeaderElection, operatorNamespace)
 	if err != nil {
-		setupLog.Error(err, "unable to setup leader election")
-		os.Exit(1)
+		return fmt.Errorf("unable to setup leader election: %w", err)
 	}
-	leaderElectionConfig, err := leaderElectionResolver.Resolve(context.Background())
+
+	leaderElectionConfig, err := leaderElectionResolver.Resolve(cmd.Context())
 	if err != nil {
-		setupLog.Error(err, "unable to resolve leader election config")
-		os.Exit(1)
+		return fmt.Errorf("unable to resolve leader election config: %w", err)
 	}
+
 	le, err := leaderelection.ToLeaderElectionWithLease(
 		ctrl.GetConfigOrDie(), leaderElectionConfig, "lvms", "")
 	if err != nil {
-		setupLog.Error(err, "unable to setup leader election with lease configuration")
-		os.Exit(1)
+		return fmt.Errorf("unable to setup leader election with lease configuration: %w", err)
 	}
 
 	clusterType, err := cluster.NewTypeResolver(setupClient).GetType(context.Background())
 	if err != nil {
-		setupLog.Error(err, "unable to determine cluster type")
-		os.Exit(1)
+		return fmt.Errorf("unable to determine cluster type: %w", err)
 	}
 
 	enableSnapshotting := true
@@ -131,15 +130,15 @@ func main() {
 	if err := setupClient.List(context.Background(), vsc, &client.ListOptions{Limit: 1}); err != nil {
 		// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 		if meta.IsNoMatchError(err) {
-			setupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
+			opts.SetupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
 			enableSnapshotting = false
 		}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
+		Scheme: opts.Scheme,
 		Metrics: metricsserver.Options{
-			BindAddress: metricsAddr,
+			BindAddress: opts.metricsAddr,
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
@@ -147,13 +146,12 @@ func main() {
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{operatorNamespace: {}},
 		},
-		HealthProbeBindAddress:              probeAddr,
+		HealthProbeBindAddress:              opts.healthProbeAddr,
 		LeaderElectionResourceLockInterface: le.Lock,
 		LeaderElection:                      !leaderElectionConfig.Disable,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
 	// register controllers
@@ -166,56 +164,47 @@ func main() {
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
 		EnableSnapshotting:               enableSnapshotting,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "LVMCluster")
-		os.Exit(1)
+		return fmt.Errorf("unable to create LVMCluster controller: %w", err)
 	}
 
-	if !snoCheck.IsSNO(context.Background()) {
-		setupLog.Info("starting node-removal controller to observe node removal in MultiNode")
-		if err = (&node.RemovalController{
-			Client: mgr.GetClient(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "NodeRemovalControlelr")
-			os.Exit(1)
+	if !snoCheck.IsSNO(cmd.Context()) {
+		opts.SetupLog.Info("starting node-removal controller to observe node removal in MultiNode")
+		if err = (&node.RemovalController{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
+			return fmt.Errorf("unable to create NodeRemovalController controller: %w", err)
 		}
 	}
 
 	if err = mgr.GetFieldIndexer().IndexField(context.Background(), &lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
 		return []string{object.GetName()}
 	}); err != nil {
-		setupLog.Error(err, "unable to create name index on LVMVolumeGroupNodeStatus")
-		os.Exit(1)
+		return fmt.Errorf("unable to create name index on LVMVolumeGroupNodeStatus: %w", err)
 	}
 
 	if err = (&lvmv1alpha1.LVMCluster{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "LVMCluster")
-		os.Exit(1)
+		return fmt.Errorf("unable to create LVMCluster webhook: %w", err)
 	}
 
 	pvController := persistent_volume.NewPersistentVolumeReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-pv-controller"))
 	if err := pvController.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
-		os.Exit(1)
+		return fmt.Errorf("unable to create PersistentVolume controller: %w", err)
 	}
 
 	pvcController := persistent_volume_claim.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetEventRecorderFor("lvms-pvc-controller"))
 	if err := pvcController.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
-		os.Exit(1)
+		return fmt.Errorf("unable to create PersistentVolumeClaim controller: %w", err)
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
-	setupLog.Info("starting manager")
+	opts.SetupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+		return fmt.Errorf("problem running manager: %w", err)
 	}
+
+	return nil
 }

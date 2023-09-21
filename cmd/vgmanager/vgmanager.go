@@ -14,71 +14,78 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package vgmanager
 
 import (
-	"flag"
+	"fmt"
 	"os"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/go-logr/logr"
 	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
 	"github.com/openshift/lvm-operator/pkg/vgmanager"
+	"github.com/spf13/cobra"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var (
-	scheme = runtime.NewScheme()
+const (
+	DefaultMetricsAddr = ":8080"
+	DefaultProbeAddr   = ":8081"
 )
 
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(lvmv1alpha1.AddToScheme(scheme))
+type Options struct {
+	Scheme   *runtime.Scheme
+	SetupLog logr.Logger
+
+	metricsAddr     string
+	healthProbeAddr string
 }
 
-func main() {
-	var metricsAddr string
-	var probeAddr string
-	var developmentMode bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&developmentMode, "development", false, "The switch to enable development mode.")
-	flag.Parse()
+// NewCmd creates a new CLI command
+func NewCmd(opts *Options) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "vgmanager",
+		Short:         "Commands for running vgmanager",
+		Long:          `Controller reconciling LVMVolumeGroup on individual nodes`,
+		SilenceErrors: false,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd, args, opts)
+		},
+	}
 
-	opts := zap.Options{}
-	opts.BindFlags(flag.CommandLine)
-	opts.Development = developmentMode
-	logr := zap.New(zap.UseFlagOptions(&opts))
-	ctrl.SetLogger(logr)
-	klog.SetLogger(logr)
+	cmd.Flags().StringVar(
+		&opts.metricsAddr, "metrics-bind-address", DefaultMetricsAddr, "The address the metric endpoint binds to.",
+	)
+	cmd.Flags().StringVar(
+		&opts.healthProbeAddr, "health-probe-bind-address", DefaultProbeAddr, "The address the probe endpoint binds to.",
+	)
 
-	setupLog := ctrl.Log.WithName("setup")
+	return cmd
+}
 
+func run(_ *cobra.Command, _ []string, opts *Options) error {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
+		Scheme: opts.Scheme,
 		Metrics: metricsserver.Options{
-			BindAddress: metricsAddr,
+			BindAddress: opts.metricsAddr,
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
 		}},
-		HealthProbeBindAddress: probeAddr,
+		HealthProbeBindAddress: opts.healthProbeAddr,
 		LeaderElection:         false,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
@@ -87,8 +94,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
 	if err = (&vgmanager.VGReconciler{
@@ -102,22 +108,20 @@ func main() {
 		Namespace:     os.Getenv("POD_NAMESPACE"),
 		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VGManager")
-		os.Exit(1)
+		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
-	setupLog.Info("starting manager")
+	opts.SetupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+		return fmt.Errorf("problem running manager: %w", err)
 	}
+
+	return nil
 }
