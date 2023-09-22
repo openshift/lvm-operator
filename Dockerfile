@@ -29,7 +29,6 @@ FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
 
 # Update the image to get the latest CVE updates
 RUN microdnf update -y && \
-    microdnf install -y openssl && \
     microdnf install -y util-linux && \
     microdnf clean all
 

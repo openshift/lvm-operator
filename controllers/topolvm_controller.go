@@ -23,6 +23,7 @@ import (
 
 	v1 "github.com/openshift/api/config/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -52,7 +53,7 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.getName())
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(r.Namespace, r.ImageName, r.TopoLVMLeaderElectionPassthrough)
+	desiredDeployment := getControllerDeployment(r.Namespace, r.TopoLVMLeaderElectionPassthrough)
 	existingDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      desiredDeployment.Name,
@@ -73,7 +74,6 @@ func (c topolvmController) ensureCreated(r *LVMClusterReconciler, ctx context.Co
 		// for update, topolvm controller is interested in only updating container images
 		// labels, volumes, service account etc can remain unchanged
 		existingDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
-		existingDeployment.Spec.Template.Spec.InitContainers = desiredDeployment.Spec.Template.Spec.InitContainers
 
 		return nil
 	})
@@ -96,16 +96,11 @@ func (c topolvmController) ensureDeleted(r *LVMClusterReconciler, ctx context.Co
 	return nil
 }
 
-func getControllerDeployment(namespace string, initImage string, topoLVMLeaderElectionPassthrough v1.LeaderElection) *appsv1.Deployment {
+func getControllerDeployment(namespace string, topoLVMLeaderElectionPassthrough v1.LeaderElection) *appsv1.Deployment {
 	// Topolvm CSI Controller Deployment
 	var replicas int32 = 1
 	volumes := []corev1.Volume{
 		{Name: "socket-dir", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
-		{Name: "certs", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
-	}
-
-	initContainers := []corev1.Container{
-		initContainer(initImage),
 	}
 
 	// get all containers that are part of csi controller deployment
@@ -147,38 +142,10 @@ func getControllerDeployment(namespace string, initImage string, topoLVMLeaderEl
 					Labels:    labels,
 				},
 				Spec: corev1.PodSpec{
-					InitContainers:     initContainers,
 					Containers:         containers,
 					ServiceAccountName: TopolvmControllerServiceAccount,
 					Volumes:            volumes,
 				},
-			},
-		},
-	}
-}
-
-func initContainer(initImage string) corev1.Container {
-
-	// generation of tls certs
-	command := []string{
-		"/usr/bin/bash",
-		"-c",
-		"openssl req -nodes -x509 -newkey rsa:4096 -subj '/DC=self_signed_certificate' -keyout /certs/tls.key -out /certs/tls.crt -days 3650",
-	}
-
-	volumeMounts := []corev1.VolumeMount{
-		{Name: "certs", MountPath: "/certs"},
-	}
-
-	return corev1.Container{
-		Name:         "self-signed-cert-generator",
-		Image:        initImage,
-		Command:      command,
-		VolumeMounts: volumeMounts,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(CertGeneratorCPURequest),
-				corev1.ResourceMemory: resource.MustParse(CertGeneratorMemRequest),
 			},
 		},
 	}
@@ -189,7 +156,7 @@ func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) cor
 	// topolvm controller plugin container
 	command := []string{
 		"/topolvm-controller",
-		"--cert-dir=/certs",
+		"--enable-webhooks=false",
 		fmt.Sprintf("--leader-election-namespace=%s", topoLVMLeaderElectionPassthrough.Namespace),
 		fmt.Sprintf("--leader-election-lease-duration=%s", topoLVMLeaderElectionPassthrough.LeaseDuration.Duration),
 		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
@@ -205,7 +172,6 @@ func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) cor
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "socket-dir", MountPath: filepath.Dir(DefaultCSISocket)},
-		{Name: "certs", MountPath: "/certs"},
 	}
 
 	return corev1.Container{
