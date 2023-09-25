@@ -42,11 +42,11 @@ ENVTEST_K8S_VERSION = 1.28.0
 
 # TODO: Upgrades > 1.25.3 will lead to createdAt being included in the CSV which currently breaks our change detection. Thus we need to stick to this version until we have a fix.
 OPERATOR_SDK_VERSION ?= 1.25.3
-RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
 TOPOLVM_CSI_IMAGE ?= quay.io/lvms_dev/topolvm:latest
+RBAC_PROXY_IMAGE ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
 CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.2
 CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0
 CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.8.0
@@ -56,6 +56,7 @@ CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.1.0
 define MANAGER_ENV_VARS
 OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE)
 TOPOLVM_CSI_IMAGE=$(TOPOLVM_CSI_IMAGE)
+RBAC_PROXY_IMAGE=$(RBAC_PROXY_IMAGE)
 CSI_REGISTRAR_IMAGE=$(CSI_REGISTRAR_IMAGE)
 CSI_PROVISIONER_IMAGE=$(CSI_PROVISIONER_IMAGE)
 CSI_LIVENESSPROBE_IMAGE=$(CSI_LIVENESSPROBE_IMAGE)
@@ -69,6 +70,7 @@ update-mgr-env: ## Feed environment variables to the manager ConfigMap.
 	cp config/default/manager_custom_env.yaml.in config/default/manager_custom_env.yaml
 ifeq ($(UNAME), Darwin)
 	sed -i '' 's|TOPOLVM_CSI_IMAGE_VAL|$(TOPOLVM_CSI_IMAGE)|g' config/default/manager_custom_env.yaml
+	sed -i '' 's|RBAC_PROXY_IMAGE_VAL|$(RBAC_PROXY_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_LIVENESSPROBE_IMAGE_VAL|$(CSI_LIVENESSPROBE_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' config/default/manager_custom_env.yaml
@@ -76,6 +78,7 @@ ifeq ($(UNAME), Darwin)
 	sed -i '' 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' config/default/manager_custom_env.yaml
 else
 	sed 's|TOPOLVM_CSI_IMAGE_VAL|$(TOPOLVM_CSI_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
+	sed 's|RBAC_PROXY_IMAGE_VAL|$(RBAC_PROXY_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_LIVENESSPROBE_IMAGE_VAL|$(CSI_LIVENESSPROBE_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
@@ -204,7 +207,6 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
@@ -236,7 +238,6 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	cd config/default && $(KUSTOMIZE) edit set image rbac-proxy=$(RBAC_PROXY_IMG)
 	cd config/manifests/bases && \
 		rm -rf kustomization.yaml && \
 		$(KUSTOMIZE) create --resources $(BUNDLE_PACKAGE).clusterserviceversion.yaml && \

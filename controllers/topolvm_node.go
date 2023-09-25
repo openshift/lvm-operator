@@ -29,12 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	topolvmNodeName = "topolvm-node"
+	topolvmNodeName          = "topolvm-node"
+	topolvmMetricsSecretName = "topolvm-metrics-cert"
 )
 
 type topolvmNode struct{}
@@ -143,10 +145,17 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 		{Name: "lvmd-socket-dir",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: storageMedium}}},
+		{Name: "metrics-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  topolvmMetricsSecretName,
+					DefaultMode: ptr.To[int32](420),
+				},
+			}},
 	}
 
 	initContainers := []corev1.Container{*getNodeInitContainer(initImage)}
-	containers := []corev1.Container{*getLvmdContainer(), *getNodeContainer(), *getCsiRegistrarContainer(), *getNodeLivenessProbeContainer()}
+	containers := []corev1.Container{*getLvmdContainer(), *getNodeContainer(), *getRBACProxyContainer(), *getCsiRegistrarContainer(), *getNodeLivenessProbeContainer()}
 
 	// Affinity and tolerations
 	nodeSelector, tolerations := extractNodeSelectorAndTolerations(lvmCluster)
@@ -317,6 +326,44 @@ func getNodeContainer() *corev1.Container {
 			PeriodSeconds:       60},
 		Resources:    requirements,
 		Env:          env,
+		VolumeMounts: volumeMounts,
+	}
+	return node
+}
+
+func getRBACProxyContainer() *corev1.Container {
+	args := []string{
+		"--secure-listen-address=0.0.0.0:8443",
+		"--upstream=http://127.0.0.1:8080/",
+		"--logtostderr=true",
+		"--v=0",
+		"--tls-cert-file=/var/run/secrets/serving-cert/tls.crt",
+		"--tls-private-key-file=/var/run/secrets/serving-cert/tls.key",
+	}
+
+	requirements := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(TopolvmNodeCPURequest),
+			corev1.ResourceMemory: resource.MustParse(TopolvmNodeMemRequest),
+		},
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{Name: "metrics-cert", ReadOnly: true, MountPath: "/var/run/secrets/serving-cert"},
+	}
+
+	node := &corev1.Container{
+		Name:  "kube-rbac-proxy",
+		Image: RbacProxyImage,
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "https",
+				ContainerPort: int32(8443),
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		Args:         args,
+		Resources:    requirements,
 		VolumeMounts: volumeMounts,
 	}
 	return node

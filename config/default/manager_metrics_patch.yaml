@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operator
+  namespace: system
+  annotations:
+    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          args:
+            - "--health-probe-bind-address=:8081"
+            - "--leader-elect"
+          volumeMounts:
+            - mountPath: /tmp/k8s-metrics-server/serving-certs
+              name: metrics-cert
+              readOnly: true
+      volumes:
+        - name: metrics-cert
+          secret:
+            defaultMode: 420
+            secretName: lvms-operator-metrics-cert

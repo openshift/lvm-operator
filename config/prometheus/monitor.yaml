@@ -12,16 +12,25 @@ spec:
   endpoints:
     - path: /metrics
       port: topolvm-metrics
-      scheme: http
+      scheme: https
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
-        insecureSkipVerify: true
+        caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+        serverName: topolvm-node-metrics.openshift-storage.svc
     - path: /metrics
       port: https
       scheme: https
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
-        insecureSkipVerify: true
+        caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+        serverName: lvms-operator-metrics-service.openshift-storage.svc
+    - path: /metrics
+      port: vg-manager-https
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+        serverName: vg-manager-metrics-service.openshift-storage.svc
   selector:
     matchLabels:
       app.kubernetes.io/compose: metrics

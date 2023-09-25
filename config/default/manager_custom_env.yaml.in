@@ -13,6 +13,8 @@ spec:
         env:
         - name: TOPOLVM_CSI_IMAGE
           value: TOPOLVM_CSI_IMAGE_VAL
+        - name: RBAC_PROXY_IMAGE
+          value: RBAC_PROXY_IMAGE_VAL
         - name: CSI_LIVENESSPROBE_IMAGE
           value: CSI_LIVENESSPROBE_IMAGE_VAL
         - name: CSI_PROVISIONER_IMAGE
