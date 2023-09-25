@@ -41,19 +41,41 @@ spec:
                 items:
                   properties:
                     devices:
-                      description: Devices is the list of devices used by the VG
+                      description: Devices is the list of devices used by the volume
+                        group
                       items:
                         type: string
                       type: array
+                    excluded:
+                      description: Excluded contains the per node status of applied
+                        device exclusions that were picked up via selector, but were
+                        not used for other reasons.
+                      items:
+                        properties:
+                          name:
+                            description: Name is the device that was filtered
+                            type: string
+                          reasons:
+                            description: Reasons are the human-readable reasons why
+                              the device was excluded from the volume group
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - name
+                        - reasons
+                        type: object
+                      type: array
                     name:
-                      description: Name is the name of the VG
+                      description: Name is the name of the volume group
                       type: string
                     reason:
-                      description: Reason provides more detail on the VG creation
-                        status
+                      description: Reason provides more detail on the volume group
+                        creation status
                       type: string
                     status:
-                      description: Status tells if the VG was created on the node
+                      description: Status tells if the volume group was created on
+                        the node
                       type: string
                   type: object
                 type: array

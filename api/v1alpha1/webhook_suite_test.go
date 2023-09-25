@@ -103,8 +103,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&LVMCluster{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
+	Expect((&LVMCluster{}).SetupWebhookWithManager(mgr)).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:webhook
 
