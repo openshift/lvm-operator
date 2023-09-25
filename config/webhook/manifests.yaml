@@ -24,23 +24,3 @@ webhooks:
     resources:
     - lvmclusters
   sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-lvm-topolvm-io-v1alpha1-lvmvolumegroup
-  failurePolicy: Fail
-  name: vlvmvolumegroup.kb.io
-  rules:
-  - apiGroups:
-    - lvm.topolvm.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - lvmvolumegroups
-  sideEffects: None

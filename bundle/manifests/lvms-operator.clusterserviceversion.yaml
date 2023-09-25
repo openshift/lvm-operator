@@ -880,23 +880,3 @@ spec:
     targetPort: 9443
     type: ValidatingAdmissionWebhook
     webhookPath: /validate-lvm-topolvm-io-v1alpha1-lvmcluster
-  - admissionReviewVersions:
-    - v1
-    containerPort: 443
-    deploymentName: lvms-operator
-    failurePolicy: Fail
-    generateName: vlvmvolumegroup.kb.io
-    rules:
-    - apiGroups:
-      - lvm.topolvm.io
-      apiVersions:
-      - v1alpha1
-      operations:
-      - CREATE
-      - UPDATE
-      resources:
-      - lvmvolumegroups
-    sideEffects: None
-    targetPort: 9443
-    type: ValidatingAdmissionWebhook
-    webhookPath: /validate-lvm-topolvm-io-v1alpha1-lvmvolumegroup
