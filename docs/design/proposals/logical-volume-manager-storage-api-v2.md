@@ -1,23 +1,24 @@
 ---
 title: logical-volume-manager-storage-api-v2
 authors:
-  - @jakobmoellerdev
+  - "@jakobmoellerdev"
 reviewers: # Include a comment about what domain expertise a reviewer is expected to bring and what area of the enhancement you expect them to focus on. For example: - "@networkguru, for networking aspects, please look at IP bootstrapping aspect"
-  - @brandisher, LVM Operator team manager
-  - @suleymanakbas91
-  - @jeff-roche
+  - "@brandisher, LVM Operator team manager"
+  - "@suleymanakbas91"
+  - "@jeff-roche"
+  - "@DanielFroehlich, Product Owner"
 approvers: # A single approver is preferred, the role of the approver is to raise important questions, help ensure the enhancement receives reviews from all applicable areas/SMEs, and determine when consensus is achieved such that the EP can move forward to implementation.  Having multiple approvers makes it difficult to determine who is responsible for the actual approval.
-  - @jerpeter1, LVM Operator staff engineer
-  - @suleymanakbas91
-  - @jeff-roche
+  - "@jerpeter1, LVM Operator staff engineer"
+  - "@suleymanakbas91"
+  - "@jeff-roche"
 api-approvers: # In case of new or modified APIs or API extensions (CRDs, aggregated apiservers, webhooks, finalizers). If there is no API change, use "None"
-  - @suleymanakbas91
-  - @jeff-roche
+  - "@suleymanakbas91"
+  - "@jeff-roche"
 creation-date: 2023-09-22
-last-updated: 2023-09-22
+last-updated: 2023-10-17
 tracking-link: # link to the tracking ticket (for example: Jira Feature or Epic ticket) that corresponds to this enhancement
-  - [OCPVE-662](https://issues.redhat.com/browse/OCPVE-662)
-  - [OCPVE-703](https://issues.redhat.com/browse/OCPVE-703)
+  - "[OCPVE-662](https://issues.redhat.com/browse/OCPVE-662)"
+  - "[OCPVE-703](https://issues.redhat.com/browse/OCPVE-703)"
 see-also:
   - N/A
 replaces:
@@ -30,7 +31,7 @@ superseded-by:
 
 ## Summary
 
-This document is an Enhancement Proposal for implementing a new API version for the Logical Volume Manager Storage.
+This document is an Enhancement Proposal for implementing a new major API version for the Logical Volume Manager Storage.
 The objective of the proposal is to eliminate the assumptions made for single-node development, enabling greater configurability and ease of debugging.
 It introduces changes such as the use of a Set and template which are similar to DaemonSet and Deployment respectively from Kubernetes.
 The status aggregation and API interaction have been extensively rewritten.
@@ -46,6 +47,23 @@ The proposed changes are designed to facilitate future development by permitting
 This, in turn, should expedite the iteration process for developers aiming to report extra status updates.
 Furthermore, we aim to simplify the process of debugging and collecting issues when encountering problems with LVMS, which currently lacks a streamlined reporting system. Hence, this proposal ultimately seeks to mitigate such issues and improve the overall user experience.
 
+## Decision
+
+After an unanimous decision by the LVMS team on October 17, 2023, the proposal was reviewed and postponed.
+Mainly, the proposal was rejected due to the fact that the proposal was considered to be too complex to GA and implement reliably.
+Notably, the v2 API is considered worthy to have but since LVMS is trying to stabilize the v1 API, the v2 API is considered to be too much of a risk to implement.
+Main Factors also include that the value-add would be mostly of technical nature and not give direct customer value beyond being more in line with other Kubernetes API extensions.
+
+Decision Takers:
+- @suleymanakbas91
+- @jeff-roche
+- @DanielFroehlich
+- @jakobmoellerdev
+
+### Follow-Up
+
+The decision will be followed-up with a reevaluation of the proposal after stabilizing the current v1 API within the next year (EOY 2024).
+
 ### User Stories
 
 * As an OpenShift engineer, I want to be able to quickly debug issues with the Logical Volume Manager Storage (LVMS) without having to analyze separate resources for the desired and actual state. This means that the system should clearly display the difference between the expected and current system states, which would allow me to identify and resolve any discrepancies more efficiently.
@@ -56,7 +74,6 @@ Furthermore, we aim to simplify the process of debugging and collecting issues w
 * As an OpenShift cluster administrator, I need to limit the minimum permissions of LVMS to namespace-level as much as possible. By doing so, I can mitigate the risk of privilege escalation into other namespaces, enhancing the overall security of the system. This would help me maintain the integrity and confidentiality of data across different namespaces, providing peace of mind and aiding in regulatory compliance.
 * As an OpenShift cluster administrator, I wish to have the flexibility to deploy multiple configurations of the Logical Volume Manager Storage (LVMS) tailored to different use cases.
   This implies that the system should provide the capability to setup and manage distinct LVMS configurations concurrently. Such a feature would be beneficial in scenarios where different applications or services have diverse storage needs or performance requirements.
-
 
 ### Goals
 
@@ -71,56 +88,87 @@ Furthermore, we aim to simplify the process of debugging and collecting issues w
 
 ## Proposal
 
-This is where we get down to the nitty gritty of what the proposal
-actually is. Describe clearly what will be changed, including all of
-the components that need to be modified and how they will be
-different. Include the reason for each choice in the design and
-implementation that is proposed here, and expand on reasons for not
-choosing alternatives in the Alternatives section at the end of the
-document.
+We want to create a breaking change of all APIs involved in LVMS: The LVMCluster, LVMVolumeGroup and LVMVolumeGroupNodeStatus.
+Specifically we want to get rid of the Topology Issues that come from LVMVolumeGroup being responsible for multiple nodes and LVMVolumeGroupNodeStatus being responsible for multiple volume groups.
+
+At the same time, we want to change the resource following `LVMCluster` to no longer be confined to a single resource in the cluster.
+Instead, we want to replace it with a namespaced resource that can be deployed as many times as an administrator desires.
 
 ### Workflow Description
+**LVMS Administrator** is a human user responsible for deploying lvms in an OpenShift cluster.
 
-Explain how the user will use the feature. Be detailed and explicit.
-Describe all of the actors, their roles, and the APIs or interfaces
-involved. Define a starting state and then list the steps that the
-user would need to go through to trigger the feature described in the
-enhancement. Optionally add a
-[mermaid](https://github.com/mermaid-js/mermaid#readme) sequence
-diagram.
+```mermaid
+graph TD;
+    LVMSAdmin[LVMS Administrator]
+    LVMNodeSetAlpha[v2alpha1/LVMNodeSet α]
+    LVMNodeAlpha1[v2alpha1/LVMNode α 1]
+    LVMNodeAlpha2[v2alpha1/LVMNode α 2]
 
-Use sub-sections to explain variations, such as for error handling,
-failure recovery, or alternative outcomes.
+    LVMNodeSetBeta[v2alpha1/LVMNodeSet β]
+    LVMNodeBeta1[v2alpha1/LVMNode β 1]
 
-For example:
+    NodeN1[v1/Node N1]
+    NodeN2[v1/Node N2]
+    NodeN2[v1/Node N3]
 
-**cluster creator** is a human user responsible for deploying a
-cluster.
+    LVMSAdmin-->|Creates|LVMNodeSetAlpha;
+    LVMSAdmin-->|Creates|LVMNodeSetBeta;
 
-**application administrator** is a human user responsible for
-deploying an application in a cluster.
+    LVMNodeSetAlpha-->|OwnedBy|LVMNodeAlpha1;
+    LVMNodeSetAlpha-->|OwnedBy|LVMNodeAlpha2;
+    LVMNodeAlpha1-->|sync DeviceClasses and VGs on host|NodeN1;
+    LVMNodeAlpha2-->|sync DeviceClasses and VGs on host|NodeN2;
+    LVMNodeSetBeta-->|OwnedBy|LVMNodeBeta1;
+    LVMNodeBeta1-->|sync DeviceClasses and VGs on host|NodeN3;
+```
 
-1. The cluster creator sits down at their keyboard...
-2. ...
-3. The cluster creator sees that their cluster is ready to receive
-   applications, and gives the application administrator their
-   credentials.
+1. LVMS Administrator installs LVMS through ClusterServiceVersion
+2. LVMS Administrator creates any combination of `LVMNodeSet` with NodeSelector and Template for VolumeGroups and DeviceClasses based on the cluster topology.
+3. `LVMNodeProviderReconciler` verifies we have a provider (e.g. TopoLVM) for the LVMNode in the cluster and installs it if necessary
+4. If the provider is ready, `LVMNode.Status.Conditions[].(type=ProviderReady)` is set to `True`
+5. As soon as the provider is ready, `LVMNode` is picked up by`vgmanager`.
+6. `LVMNode.spec.volumeGroups` are created and reconciled by `vgmanager`.
+7. `LVMNode.status.volumeGroups` are synchronized and `LVMNode.Status.Conditions[].(type=VolumeGroupsHealthy)` is set to `True`
+8. `LVMNode.spec.deviceClasses` are created (with thin-pool LV on top) and synchronized to `lvmd.conf` by `vgmanager`.
+9. `StorageClass` and `SnapshotClass` get created for DeviceClass by `vgmanager`.
+10. `LVMNode.status.deviceClasses` are synchronized and `LVMNode.Status.Conditions[].(type=DeviceClassesHealthy)` is set to `True`
+11. `LVMNode.status.state` is set to `Ready` after all conditions succeed.
+12. `LVMNodeSetReconciler` picks up the `Ready` condition and sets `LVMNodeSet.Status.Conditions[].(type=LVMNodesReady)` to `True`
+13. `LVMNodeSet.status.state` is set to `Ready` after all conditions succeed.
 
-#### Variation [optional]
-
-If the cluster creator uses a standing desk, in step 1 above they can
-stand instead of sitting down.
-
-See
-https://github.com/openshift/enhancements/blob/master/enhancements/workload-partitioning/management-workload-partitioning.md#high-level-end-to-end-workflow
-and https://github.com/openshift/enhancements/blob/master/enhancements/agent-installer/automated-workflow-for-agent-based-installer.md for more detailed examples.
+Contrasting this to the old workflow, we have significantly easier resource tracking ability.
+This is because now, `.spec` and `.status` correlate with each other for both `LVMNode` and `LVMNodeSet`. Previously,
+one had to look at `LVMCluster`, `LVMVolumeGroup` and `LVMVolumeGroupNodeStatus` as well as logs to get detailed information on the `lvm` subsystem.
+With this proposed change, it is easily possible to recognize the `lvm` subsystem for single nodes by looking at `LVMNode` alone.
 
 ### API Extensions
 
+#### Summary
 
-#### LVMCluster
+1. The usage of a `LVMNodeSet` akin to `DaemonSet`. This is used to align the different `Node`'s into one single configurable object.
+2. The introduction of a `spec.template`, similar to a `Deployment`. This template will be used by all nodes in the `LVMNodeSet` to configure individual nodes.
+3. Generic Conditions for checking if the LVMNodeSetup for all nodes is ready.
+4. Separation of `deviceClasses` from `volumeGroups`. This is because VolumeGroups in theory can be reused by different deviceClasses
+5. Alignment of the deviceSelector to use `deviceSelectorTerms` akin to `nodeSelectorTerms` to make configuration more straight-forward for users familiar with kubernetes APIs
+6. `Thin` strategy within `deviceClasses` to allow Thick provisioning extension later on
+7. `storageClass` settings within `deviceClasses` to allow custom naming and alignment of `StorageClass`
+8. `snapshotClass` settings within `deviceClasses` to allow custom naming and alignment of `SnapshotClass`
+9. The split-up also allows to deploy multiple `LVMNodeSet` in the future, allowing us to stop prohibiting the creation of only a single `NodeSet`
 
-The current LVMCluster will be broken up into node-specific configurations
+Each individual node receives the entirety of the `LVMNodeSet` configuration in it's spec. However, compared to the NodeSet,
+it contains detailed information about `status` elements from `volumeGroups` and `deviceClasses`, where each lvm volume group as well
+as the contents of provisioned deviceClass are checked for consistency and are reported in status. In additions to this,
+the Node contains more detailed conditions that allow setting up detailed status checks
+
+#### `LVMCluster` replaced by `LVMNodeSet`
+
+The current LVMCluster will be broken up into node-specific configurations, wherein each configuration is created through the `LVMNodeSet`,
+which contains a few key spec elements:
+
+1. `spec.nodeSelector` to determine on which nodes to create LVM configurations
+2. `spec.template.volumeGroups` to determine which volumeGroups to create and with which devices based on a `deviceSelector`
+3. `spec.template.deviceClasses` to determine which [TopoLVM device classes](https://github.com/topolvm/topolvm/blob/main/docs/lvmd.md#lvmd) should be prepared and configured for lvm.
+   This also configures a corresponding StorageClass and SnapshotClass for that deviceClass.
 
 ```yaml
 ---
@@ -128,7 +176,6 @@ apiVersion: lvm.topolvm.io/v2alpha1
 kind: LVMNodeSet
 metadata:
   name: my-lvmnodeset
-  namespace: openshift-storage
   uid: 31167fec-f8d3-47af-883f-05aaa153da88
 spec:
   nodeSelector:
@@ -144,8 +191,6 @@ spec:
             operator: In
             values:
               - archive-storage
-  provider:
-    strategy: ManagedTopoLVM
   template:
     volumeGroups:
       - name: vg1
@@ -168,6 +213,18 @@ spec:
             - matchExpressions:
                 - key: kname
                   operator: Any
+                - key: size
+                  operator: GreaterThan
+                  values:
+                    - "30Gi"
+      - name: specific-serials
+        deviceSelector:
+          deviceSelectorTerms:
+            - matchExpressions:
+                - key: serial
+                  operator: In
+                  values:
+                    - "2313AW459310"
     deviceClasses:
       - name: thinly-provisioned
         strategy: Thin
@@ -188,8 +245,6 @@ status:
   nodes:
     - name: archive-storage-node-in-antarctica-east1
       state: Ready
-  provider:
-    state: Ready
   conditions:
     - lastTransitionTime: "2044-10-22T16:29:24Z"
       status: "True"
@@ -199,27 +254,17 @@ status:
       type: ProviderReady
 ```
 
-As one can see there are a few key distinctions compared to the old API:
+#### `LVMVolumeGroup` and `LVMVolumeGroupNodeStatus` replaced by `LVMNode`
 
-1. The usage of a `Set` akin to `DaemonSet`. This is used to align the different `Node`'s into one single configurable object.
-2. The introduction of a `template`, similar to a `Deployment`. This template will be used by all nodes in the `LVMNodeSet`.
-3. Generic Conditions for checking if the LVMNodeSetup for all nodes is ready.
-4. Separation of `deviceClasses` from `volumeGroups`. This is because VolumeGroups in theory can be reused by different deviceClasses
-5. Alignment of the deviceSelector to use `deviceSelectorTerms` akin to `nodeSelectorTerms` to make configuration more straight-forward for users familiar with kubernetes APIs
-6. `Thin` strategy within `deviceClasses` to allow Thick provisioning extension later on
-7. `storageClass` settings within `deviceClasses` to allow custom naming and alignment of `StorageClass`
-8. `snapshotClass` settings within `deviceClasses` to allow custom naming and alignment of `SnapshotClass`
-9. `provider` introduces customizability of the TopoLVM resources and LVMD socket used within TopoLVM later on.
-10. The split-up also allows to deploy multiple `LVMNodeSet` in the future, allowing us to stop prohibiting the creation of only a single `NodeSet`
-
+Each node that fits the node selector from `LVMNodeSet` will get a `LVMNode` created for it, where the template content becomes part of its spec.
+The LVMNode reports the status of each of its volume groups and device classes into the status, and is the basis for reconciliation on a node-level.
 
 ```yaml
 ---
 apiVersion: lvm.topolvm.io/v2alpha1
 kind: LVMNode
 metadata:
-  name: archive-storage-node-in-antarctica-east1 # name of v1/Node
-  namespace: openshift-storage
+  name: archive-storage-node-in-antarctica-east1 # same name as v1/Node
   ownerReferences:
     - apiVersion: apps/v1
       blockOwnerDeletion: true
@@ -249,6 +294,18 @@ spec:
           - matchExpressions:
               - key: kname
                 operator: Any
+              - key: size
+                operator: GreaterThan
+                values:
+                  - "30Gi"
+    - name: specific-serials
+      deviceSelector:
+        deviceSelectorTerms:
+          - matchExpressions:
+              - key: serial
+                operator: In
+                values:
+                  - "2313AW459310"
   deviceClasses:
     - name: thinly-provisioned
       strategy: Thin
@@ -259,9 +316,11 @@ spec:
         sizePercent: 90
         overprovisionRatio: 10
       storageClass:
+        creationPolicy: CreateIfNotExists
         namingPolicy: Prefixed
         prefix: "lvms"
       snapshotClass:
+        creationPolicy: CreateIfNotExists
         namingPolicy: Prefixed
         prefix: "lvms"
   lvmd:
@@ -270,7 +329,7 @@ status:
   state: Ready
   volumeGroups:
     - name: vg1
-      size: "2Gi"
+      size: "30Gi"
       state: Healthy
       devices:
         included:
@@ -287,7 +346,7 @@ status:
           attributes: "twi-a-tz--"
     - name: othervg
       state: Healthy
-      size: "10Gi"
+      size: "50Gi"
       devices:
         included:
           - kname: "/dev/sda2"
@@ -301,15 +360,21 @@ status:
           - kname: "/dev/mapper/some-default-device"
             reasons:
               - "/dev/mapper/some-default-device is already being used by vg1 and cannot be used by a wildcard (Any) volumeGroup"
+    - name: specific-serials
+      state: Healthy
+      size: "750Mi"
+      devices:
+        included:
+          - kname: "/dev/somedevwithserial"
   deviceClasses:
     - name: thinly-provisioned
       volumeGroup: vg1
       state: Healthy
       storageClass:
-        name: "lvms-vg1"
+        name: "lvms-thinly-provisioned"
         state: Exists
       snapshotClass:
-        name: "lvms-vg1"
+        name: "lvms-thinly-provisioned"
         state: Exists
   conditions:
     - lastTransitionTime: "2044-10-22T16:29:24Z"
@@ -318,24 +383,52 @@ status:
     - lastTransitionTime: "2044-10-22T16:29:24Z"
       status: "True"
       type: DeviceClassesHealthy
-    - lastTransitionTime: "2044-10-22T16:29:24Z"
-      status: "True"
-      type: StorageClassesHealthy
-    - lastTransitionTime: "2044-10-22T16:29:24Z"
-      status: "True"
-      type: LVMDConfigured
 ```
 
-Each individual node receives the entirety of the `LVMNodeSet` configuration in it's spec. However, compared to the NodeSet,
-it contains detailed information about `status` elements from `volumeGroups` and `deviceClasses`, where each lvm volume group as well
-as the contents of provisioned deviceClass are checked for consistency and are reported in status. In additions to this,
-the Node contains more detailed conditions that allow setting up detailed status checks.
+Important to note is that any single deviceClass can only be mapped to one volumeGroup.
+Thus, all previous thin-pool configurations have the same limitation of being assignable to 1 volume group only.
+However, this should not be problematic as the `lvm2` system also strictly couples a thin-pool logical volume to a volume group, thus making this limit unimportant to the end user.
 
-### Implementation Details/Notes/Constraints [optional]
+### Implementation Details/Notes/Constraints
 
-What are the caveats to the implementation? What are some important details that
-didn't come across above. Go in to as much detail as necessary here. This might
-be a good place to talk about core concepts and how they relate.
+#### When to deploy TopoLVM
+
+TopoLVM will be created once `LVMNodeSet` gets created based on the NodeSelector, just like `LVMCluster`.
+
+#### Constraints when creating LVMNode
+
+A validation webhook will prohibit creation of `LVMNode` outside of the scope of a `LVMNodeSet`.
+This is because within `LVMNodeSet`, the NodeSelector is used to create the DaemonSet for TopoLVM. If no NodeSet is present in the owner-references,
+the `LVMNode` will be rejected.
+
+Validation Pseudo-code:
+
+```
+nodeSetRef = first element in LVMNode.metadata.ownerReferences that contains LVMNodeSet and is controller-ref
+
+if nodeSetRef == nil
+    return error on create / update
+
+if object behind nodeSetRef.nodeSelector does not contain Node targeted by LVMNode
+    return error on create / update
+```
+
+#### Constraints when using multiple LVMNodeSets
+
+We suggest limiting LVMNodeSets to have singular ownership over any given node. That entails that one `LVMNode` is only able to be managed by one `LVMNodeSet`.
+Whenever an LVMNodeSet is created that would target a node that is already being covered by another `LVMNodeSet`, we suggest rejecting it through admission webhook.
+
+We also suggest binding the TopoLVM deployment / daemonset to a single `LVMNodeSet`, thus meaning that 2 `LVMNodeSet`'s would also deploy 2 instances of `TopoLVM` that should not be conflicting with each other.
+This is because the TopoLVM DaemonSet Node Selector is directly correlated to the `LVMNodeSet` node selector.
+
+```
+nodeSetToCreateOrUpdate := NodeSetA
+
+allOtherNodeSets := NodeSetB, NodeSetC
+
+if nodeSetToCreateOrUpdate.spec.nodeSelector overlaps with allOtherNodeSets.spec.nodeSelector
+    return error on create / update
+```
 
 ### Risks and Mitigations
 
@@ -357,12 +450,7 @@ in the new code path due to the size of the change as well as adoption side-effe
 
 ## Design Details
 
-### Open Questions [optional]
-
-This is where to call out areas of the design that require closure before deciding
-to implement the design.  For instance,
-> 1. This requires exposing previously private resources which contain sensitive
-     information.  Can we do this?
+### Open Questions
 
 ### Test Plan
 
@@ -379,37 +467,14 @@ We'll use both automated testing (to catch regressions and common use cases) and
 
 ### Graduation Criteria
 
-**Note:** *Section not required until targeted at a release.*
-
-Define graduation milestones.
-
-These may be defined in terms of API maturity, or as something else. Initial proposal
-should keep this high-level with a focus on what signals will be looked at to
-determine graduation.
-
-Consider the following in developing the graduation criteria for this
-enhancement:
-
-- Maturity levels
-    - [`alpha`, `beta`, `stable` in upstream Kubernetes][maturity-levels]
-    - `Dev Preview`, `Tech Preview`, `GA` in OpenShift
-- [Deprecation policy][deprecation-policy]
-
-Clearly define what graduation means by either linking to the [API doc definition](https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-versioning),
-or by redefining what graduation means.
-
-In general, we try to use the same stages (alpha, beta, GA), regardless how the functionality is accessed.
-
-[maturity-levels]: https://git.k8s.io/community/contributors/devel/sig-architecture/api_changes.md#alpha-beta-and-stable-versions
-[deprecation-policy]: https://kubernetes.io/docs/reference/using-api/deprecation-policy/
-
-**If this is a user facing change requiring new or updated documentation in [openshift-docs](https://github.com/openshift/openshift-docs/),
-please be sure to include in the graduation criteria.**
-
-**Examples**: These are generalized examples to consider, in addition
-to the aforementioned [maturity levels][maturity-levels].
+We want to rollout `v2alpha1` as an optional API in alpha stage and only graduate it to beta once we feel confident in its behavior.
+This means that we only want to graduate if we feel confident in v1alpha1 compatibility.
 
 #### Dev Preview -> Tech Preview
+
+Once introduced as Tech Preview, `v2alpha1` will be usable if no `v1alpha1` `LVMCluster` is found in the OpenShift Cluster.
+Any freshly created cluster will be able to use the `v2alpha1` API.
+We can take as much time as we want to rollout `v2alpha1` functionality and rework it in technical preview until we are satisfied.
 
 - Ability to utilize the enhancement end to end
 - End user documentation, relative API stability
@@ -417,9 +482,17 @@ to the aforementioned [maturity levels][maturity-levels].
 - Gather feedback from users rather than just developers
 - Enumerate service level indicators (SLIs), expose SLIs as metrics
 - Write symptoms-based alerts for the component(s)
+- User facing documentation created in [openshift-docs](https://github.com/openshift/openshift-docs/)
+- end-to-end tests
 
 #### Tech Preview -> GA
 
+Prerequisite: `LVMClusters` in states other than `Ready` cannot be automatically migrated safely due to state being unpredictable.
+
+Once Technical Preview is completed, we will start introducing automatic upgrades to `v2alpha1` with a mixture of a conversion webhook and automatic
+migration on startup.
+
+Additionally:
 - More testing (upgrade, downgrade, scale)
 - Sufficient time for feedback
 - Available by default
@@ -427,154 +500,97 @@ to the aforementioned [maturity levels][maturity-levels].
 - Document SLOs for the component
 - Conduct load testing
 - User facing documentation created in [openshift-docs](https://github.com/openshift/openshift-docs/)
+- QE Tests
 
-**For non-optional features moving to GA, the graduation criteria must include
-end to end tests.**
+#### Removing `v1alpha1` API Version after successful GA
 
-#### Removing a deprecated feature
-
-- Announce deprecation and support policy of the existing feature
+Once `v2alpha1` is GA, we will proceed with removing `v1alpha1` with the following steps:
+- Announce deprecation and support policy of the existing `v1alpha1`
 - Deprecate the feature
 
 ### Upgrade / Downgrade Strategy
-
-If applicable, how will the component be upgraded and downgraded? Make sure this
-is in the test plan.
-
-Consider the following in developing an upgrade/downgrade strategy for this
-enhancement:
-- What changes (in invocations, configurations, API use, etc.) is an existing
-  cluster required to make on upgrade in order to keep previous behavior?
-- What changes (in invocations, configurations, API use, etc.) is an existing
-  cluster required to make on upgrade in order to make use of the enhancement?
 
 Upgrade expectations:
 - Each component should remain available for user requests and
   workloads during upgrades. Ensure the components leverage best practices in handling [voluntary
   disruption](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/). Any exception to
-  this should be identified and discussed here.
-- Micro version upgrades - users should be able to skip forward versions within a
-  minor release stream without being required to pass through intermediate
-  versions - i.e. `x.y.N->x.y.N+2` should work without requiring `x.y.N->x.y.N+1`
-  as an intermediate step.
-- Minor version upgrades - you only need to support `x.N->x.N+1` upgrade
-  steps. So, for example, it is acceptable to require a user running 4.3 to
-  upgrade to 4.5 with a `4.3->4.4` step followed by a `4.4->4.5` step.
-- While an upgrade is in progress, new component versions should
-  continue to operate correctly in concert with older component
-  versions (aka "version skew"). For example, if a node is down, and
-  an operator is rolling out a daemonset, the old and new daemonset
-  pods must continue to work correctly even while the cluster remains
-  in this partially upgraded state for some time.
+  this should be identified and discussed here: TopoLVM will not receive any downtime during the API upgrade.
+- v2alpha1 will be upgradeable between any micro / z-stream versions as long as we keep `v1alpha1`.
+- Since we are in [API Tier 3](https://docs.openshift.com/container-platform/4.13/rest_api/understanding-api-support-tiers.html), we do not require to keep `v1alpha1` around for longer than 1 minor version.
+  minor upgrades / downgrades will be supported until GA and removal of `v1alpha1`
+- Due to us changing the API without changing `TopoLVM` we will not impact availability of the CSI driver we deploy.
 
 Downgrade expectations:
 - If an `N->N+1` upgrade fails mid-way through, or if the `N+1` cluster is
   misbehaving, it should be possible for the user to rollback to `N`. It is
   acceptable to require some documented manual steps in order to fully restore
-  the downgraded cluster to its previous state. Examples of acceptable steps
-  include:
-    - Deleting any CVO-managed resources added by the new version. The
-      CVO does not currently delete resources that no longer exist in
-      the target version.
+  the downgraded cluster to its previous state: as long as v1alpha1 is kept as a valid version,
+  it is possible to downgrade again by also providing a conversion webhook to `v1alpha1` for `LVMCluster` from `LVMNodeSet`.
+  However, the controller has to be stopped, `LVMNode` must have their finalizers removed and be deleted, and the CRD must have
+  v1alpha1 restored again.
+
+#### Automatic Upgrades accompanying switch from Tech Preview -> GA
+
+If the CSV or the Administrator uses the `v1alpha1` API for `LVMCluster`, a conversion webhook migrates the API Contents to `v2alpha1` due to [API Tier 3](https://docs.openshift.com/container-platform/4.13/rest_api/understanding-api-support-tiers.html).
+All calls to create `LVMVolumeGroup` or `LVMVolumeGroupNodeStatus` will be rejected by the conversion webhook as they fall into [API Tier 4](https://docs.openshift.com/container-platform/4.13/rest_api/understanding-api-support-tiers.html).
+
+To ensure automatic upgrades we will do these changes:
+- On startup of the operator, we will mark all existing `v1alpha1` Objects with the `deprecation.topolvm.io/no-cleanup=true` annotation.
+- For any `v1alpha1` `LVMCluster`, an `LVMNodeSet` is created and expected to be in `Ready` state.
+- Any `LVMVolumeGroup` and `LVMVolumeGroupNodeStatus` owned by the `LVMCluster` will be triggered for deletion after the `LVMNodeSet` is `Ready`.
+- The deletion process in `vgmanager` will respect the `deprecation.topolvm.io/no-cleanup` label and not actually remove any contents on the node, but simply remove its finalizer.
+- Once deletion succeeded, `LVMCluster` will be deleted as well, with the same behavior as `LVMVolumeGroup` and `LVMVolumeGroupNodeStatus`.
+- After the old objects are removed, all `v1alpha1` calls will be redirected to `v2alpha1` or rejected completely.
+
+This upgrade is part of the test plan cases that need to be added.
 
 ### Version Skew Strategy
 
-How will the component handle version skew with other components?
-What are the guarantees? Make sure this is in the test plan.
-
-Consider the following in developing a version skew strategy for this
-enhancement:
-- During an upgrade, we will always have skew among components, how will this impact your work?
-- Does this enhancement involve coordinating behavior in the control plane and
-  in the kubelet? How does an n-2 kubelet without this feature available behave
-  when this feature is used?
-- Will any other components on the node change? For example, changes to CSI, CRI
-  or CNI may require updating that component before the kubelet.
+The CSI Drivers as well as all content behind TopoLVM will not be touched in this change. Only the APIs and the method for status collection will change.
 
 ### Operational Aspects of API Extensions
 
-Describe the impact of API extensions (mentioned in the proposal section, i.e. CRDs,
-admission and conversion webhooks, aggregated API servers, finalizers) here in detail,
-especially how they impact the OCP system architecture and operational aspects.
-
 - For conversion/admission webhooks and aggregated apiservers: what are the SLIs (Service Level
   Indicators) an administrator or support can use to determine the health of the API extensions
-
-  Examples (metrics, alerts, operator conditions)
-    - authentication-operator condition `APIServerDegraded=False`
-    - authentication-operator condition `APIServerAvailable=True`
-    - openshift-authentication/oauth-apiserver deployment and pods health
-
+    - `LVMNodeSet` condition `LVMNodesReady=True`
+    - `LVMNodeSet` condition `ProviderReady=True`
+    - `LVMNode` condition `VolumeGroupsHealthy=True`
+    - `LVMNode` condition `DeviceClassesHealthy=True`
+    - openshift-storage/lvms-operator deployment and pods health
+    - openshift-storage/topolvm-controller deployment and pods health
+    - openshift-storage/topolvm-node daemon set and pods health
+    - openshift-storage/vgmanager daemon set and pods health
+    - metric `lvm_nodes_healthy` which reports any `LVMNode` that is in `Ready` state
+    - metric `lvm_nodes_degraded` which reports any `LVMNode` that drops out of `Ready` into `Degraded` state
+    - metric `lvm_nodes_failed` which reports any `LVMNode` that drops out of `Ready` into `Failed` state
+    - existing metrics from TopoLVM can be used to debug LVM-specific issues
 - What impact do these API extensions have on existing SLIs (e.g. scalability, API throughput,
   API availability)
-
-  Examples:
-    - Adds 1s to every pod update in the system, slowing down pod scheduling by 5s on average.
-    - Fails creation of ConfigMap in the system when the webhook is not available.
-    - Adds a dependency on the SDN service network for all resources, risking API availability in case
-      of SDN issues.
-    - Expected use-cases require less than 1000 instances of the CRD, not impacting
-      general API throughput.
-
+  - Expected use-cases of `v2alpha1` compared to `v1alpha1` reduce load on the API Server by changing the CRD cardinality
+    from `LVMVolumeGroup` and `LVMVolumeGroupNodeStatus` to `LVMNode`
 - How is the impact on existing SLIs to be measured and when (e.g. every release by QE, or
   automatically in CI) and by whom (e.g. perf team; name the responsible person and let them review
   this enhancement)
+  - Automatic CI coverage by e2e testing as well as QE will ensure we will always have green signals for the API change.
+    we will run side by side with `v1alpha1` and expect these signals to not change.
 
 #### Failure Modes
 
-- Describe the possible failure modes of the API extensions.
-- Describe how a failure or behaviour of the extension will impact the overall cluster health
-  (e.g. which kube-controller-manager functionality will stop working), especially regarding
-  stability, availability, performance and security.
-- Describe which OCP teams are likely to be called upon in case of escalation with one of the failure modes
-  and add them as reviewers to this enhancement.
+- All Failure modes will be describable through standardized conditions according to [KEP-1623: Standardize Conditions](https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1623-standardize-conditions/README.md)
+- We have a major failure scenario when our automatic upgrades fail. In this case it can happen that `LVMCluster` or any accompanying `LVMVolumeGroup` gets removed
+  without being exempt from node-removal of the vg and lvs. In this case we can endanger storage provisioning for all pods that are in the Cluster.
+  After the upgrade is successful, we cannot endanger Availability with CSI again.
+- All failure modes will be handled by the LVMS engineering team.
 
 #### Support Procedures
 
-Describe how to
-- detect the failure modes in a support situation, describe possible symptoms (events, metrics,
-  alerts, which log output in which component)
+All support procedures will be engaged with either `must-gather` or reporting of cluster state by receiving the status subresource of involved `LVMNodeSet` and `LVMNode` objects.
+We will use the conditions and deployment verifications as per chapter [Operational Aspects of API Extensions](#operational-aspects-of-api-extensions) to analyze issues.
+Any failure of the operator will result in degrading state by setting any of the available conditions to false with an appropriate status message.
 
-  Examples:
-    - If the webhook is not running, kube-apiserver logs will show errors like "failed to call admission webhook xyz".
-    - Operator X will degrade with message "Failed to launch webhook server" and reason "WehhookServerFailed".
-    - The metric `webhook_admission_duration_seconds("openpolicyagent-admission", "mutating", "put", "false")`
-      will show >1s latency and alert `WebhookAdmissionLatencyHigh` will fire.
+We can use `status.State` on both `LVMNodeSet` and `LVMNode` to report issues within the setup.
 
-- disable the API extension (e.g. remove MutatingWebhookConfiguration `xyz`, remove APIService `foo`)
-
-    - What consequences does it have on the cluster health?
-
-      Examples:
-        - Garbage collection in kube-controller-manager will stop working.
-        - Quota will be wrongly computed.
-        - Disabling/removing the CRD is not possible without removing the CR instances. Customer will lose data.
-          Disabling the conversion webhook will break garbage collection.
-
-    - What consequences does it have on existing, running workloads?
-
-      Examples:
-        - New namespaces won't get the finalizer "xyz" and hence might leak resource X
-          when deleted.
-        - SDN pod-to-pod routing will stop updating, potentially breaking pod-to-pod
-          communication after some minutes.
-
-    - What consequences does it have for newly created workloads?
-
-      Examples:
-        - New pods in namespace with Istio support will not get sidecars injected, breaking
-          their networking.
-
-- Does functionality fail gracefully and will work resume when re-enabled without risking
-  consistency?
-
-  Examples:
-    - The mutating admission webhook "xyz" has FailPolicy=Ignore and hence
-      will not block the creation or updates on objects when it fails. When the
-      webhook comes back online, there is a controller reconciling all objects, applying
-      labels that were not applied during admission webhook downtime.
-    - Namespaces deletion will not delete all objects in etcd, leading to zombie
-      objects when another namespace with the same name is created.
+Disabling the operator to circumvent CSI issues is based on removing the operator like with `v1alpha1`, basic troubleshooting does not change.
 
 ## Implementation History
 
@@ -583,14 +599,11 @@ History`.
 
 ## Alternatives
 
-Similar to the `Drawbacks` section the `Alternatives` section is used to
-highlight and record other possible approaches to delivering the value proposed
-by an enhancement.
+The biggest alternative is to leave `v1alpha1` as is and upgrade to the next `v1alpha2` by introducing only some of the changes, such
+as better deviceSelectors and conditions into `LVMCluster` and `LVMVolumeGroupNodeStatus`.
+While this doesn't fix the cardinality issue or the binding of one deviceClass to a volume group, it is much easier to design and upgrade to as we do not have different CRD topologies. It might make sense to start with a `v1alpha2` first
+before trying to tackle all changes in the `v2alpha1` proposal due to the size of the change.
 
-## Infrastructure Needed [optional]
+## Infrastructure Needed
 
-Use this section if you need things from the project. Examples include a new
-subproject, repos requested, github details, and/or testing infrastructure.
-
-Listing these here allows the community to get the process for these resources
-started right away.
+Additional Testing infrastructure necessary for upgrade and `v2alpha1` scenarios while `v1alpha1` needs to continue as is.
