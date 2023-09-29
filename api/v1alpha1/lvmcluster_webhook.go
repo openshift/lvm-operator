@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/lvm-operator/pkg/cluster"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

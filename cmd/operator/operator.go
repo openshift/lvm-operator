@@ -21,7 +21,10 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/openshift/lvm-operator/controllers/node"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
+	"github.com/openshift/lvm-operator/internal/controllers/node"
+	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
+	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,10 +45,7 @@ import (
 	"github.com/openshift/library-go/pkg/config/leaderelection"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/controllers"
-	persistent_volume "github.com/openshift/lvm-operator/controllers/persistent-volume"
-	persistent_volume_claim "github.com/openshift/lvm-operator/controllers/persistent-volume-claim"
-	"github.com/openshift/lvm-operator/pkg/cluster"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -158,9 +158,8 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	// register controllers
-	if err = (&controllers.LVMClusterReconciler{
+	if err = (&lvmcluster.LVMClusterReconciler{
 		Client:                           mgr.GetClient(),
-		Scheme:                           mgr.GetScheme(),
 		EventRecorder:                    mgr.GetEventRecorderFor("LVMClusterReconciler"),
 		ClusterType:                      clusterType,
 		Namespace:                        operatorNamespace,
