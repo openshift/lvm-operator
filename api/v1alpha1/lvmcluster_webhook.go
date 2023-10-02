@@ -51,6 +51,7 @@ var (
 	ErrDuplicateLVMCluster                                   = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
 	ErrThinPoolConfigCannotBeChanged                         = errors.New("ThinPoolConfig can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
+	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -156,6 +157,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		var newThinPoolConfig, oldThinPoolConfig *ThinPoolConfig
 		var newDevices, newOptionalDevices, oldDevices, oldOptionalDevices []string
+		var oldForceWipeOption, newForceWipeOption *bool
 
 		newThinPoolConfig = deviceClass.ThinPoolConfig
 		oldThinPoolConfig, err = v.getThinPoolsConfigOfDeviceClass(oldLVMCluster, deviceClass.Name)
@@ -178,13 +180,22 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		if deviceClass.DeviceSelector != nil {
 			newDevices = deviceClass.DeviceSelector.Paths
 			newOptionalDevices = deviceClass.DeviceSelector.OptionalPaths
+			newForceWipeOption = deviceClass.DeviceSelector.ForceWipeDevicesAndDestroyAllData
 		}
 
-		oldDevices, oldOptionalDevices, err = v.getPathsOfDeviceClass(oldLVMCluster, deviceClass.Name)
+		oldDevices, oldOptionalDevices, oldForceWipeOption, err = v.getPathsOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
 		// Is this a new device class?
 		if err == ErrDeviceClassNotFound {
 			continue
+		}
+
+		// Make sure ForceWipeDevicesAndDestroyAllData was not changed
+		if (oldForceWipeOption == nil && newForceWipeOption != nil) ||
+			(oldForceWipeOption != nil && newForceWipeOption == nil) ||
+			(oldForceWipeOption != nil && newForceWipeOption != nil &&
+				*oldForceWipeOption != *newForceWipeOption) {
+			return warnings, ErrForceWipeOptionCannotBeChanged
 		}
 
 		// Make sure a device path list was not added
@@ -366,13 +377,14 @@ func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 	return nil
 }
 
-func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassName string) (required []string, optional []string, err error) {
+func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassName string) (required []string, optional []string, forceWipe *bool, err error) {
 	required, optional, err = []string{}, []string{}, nil
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
 			if deviceClass.DeviceSelector != nil {
 				required = deviceClass.DeviceSelector.Paths
 				optional = deviceClass.DeviceSelector.OptionalPaths
+				forceWipe = deviceClass.DeviceSelector.ForceWipeDevicesAndDestroyAllData
 			}
 
 			return

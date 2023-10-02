@@ -10,3 +10,9 @@ packages:
   github.com/openshift/lvm-operator/pkg/lvm:
       interfaces:
         LVM:
+  github.com/openshift/lvm-operator/pkg/wipefs:
+      interfaces:
+        Wipefs:
+  github.com/openshift/lvm-operator/pkg/dmsetup:
+    interfaces:
+      Dmsetup:

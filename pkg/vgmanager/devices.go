@@ -138,7 +138,7 @@ func (r *VGReconciler) filterDevices(ctx context.Context, devices []lsblk.BlockD
 }
 
 // getNewDevicesToBeAdded gets all devices that should be added to the volume group
-func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
+func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
 	logger := log.FromContext(ctx)
 
 	var validBlockDevices []lsblk.BlockDevice
@@ -151,7 +151,7 @@ func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices 
 
 	// If Paths is specified, treat it as required paths
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-		blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
+		blockDevice, err := getValidDevice(path, blockDevices, nodeStatus, volumeGroup)
 		if err != nil {
 			// An error for required devices is critical
 			return nil, fmt.Errorf("unable to validate device %s: %v", path, err)
@@ -168,7 +168,7 @@ func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices 
 	}
 
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
-		blockDevice, err := getValidDevice(path, blockDevices, vgs, volumeGroup)
+		blockDevice, err := getValidDevice(path, blockDevices, nodeStatus, volumeGroup)
 
 		// Check if we should skip this device
 		if err != nil {
@@ -200,11 +200,14 @@ func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices 
 	return validBlockDevices, nil
 }
 
-func isDeviceAlreadyPartOfVG(vgs []lvm.VolumeGroup, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
-	for _, vg := range vgs {
-		if vg.Name == volumeGroup.Name {
-			for _, pv := range vg.PVs {
-				if pv.PvName == diskName {
+func isDeviceAlreadyPartOfVG(nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, diskName string, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
+	if nodeStatus == nil {
+		return false
+	}
+	for _, vgStatus := range nodeStatus.Spec.LVMVGStatus {
+		if vgStatus.Name == volumeGroup.Name {
+			for _, pv := range vgStatus.Devices {
+				if pv == diskName {
 					return true
 				}
 			}
@@ -232,7 +235,7 @@ func hasExactDisk(blockDevices []lsblk.BlockDevice, deviceName string) (lsblk.Bl
 //
 //	An error will be returned if the device is invalid
 //	No error and an empty BlockDevice object will be returned if this device should be skipped (ex: duplicate device)
-func getValidDevice(devicePath string, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (lsblk.BlockDevice, error) {
+func getValidDevice(devicePath string, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (lsblk.BlockDevice, error) {
 	// Make sure the symlink exists
 	diskName, err := filepath.EvalSymlinks(devicePath)
 	if err != nil {
@@ -240,7 +243,7 @@ func getValidDevice(devicePath string, blockDevices []lsblk.BlockDevice, vgs []l
 	}
 
 	// Make sure this isn't a duplicate in the VG
-	if isDeviceAlreadyPartOfVG(vgs, diskName, volumeGroup) {
+	if isDeviceAlreadyPartOfVG(nodeStatus, diskName, volumeGroup) {
 		return lsblk.BlockDevice{}, nil // No error, we just don't want a duplicate
 	}
 

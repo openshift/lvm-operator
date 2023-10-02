@@ -42,6 +42,11 @@ spec:
                 description: DeviceSelector is a set of rules that should match for
                   a device to be included in this TopoLVMCluster
                 properties:
+                  forceWipeDevicesAndDestroyAllData:
+                    description: ForceWipeDevicesAndDestroyAllData runs wipefs to
+                      wipe the devices. This can lead to data lose. Enable this only
+                      when you know that the disk does not contain any important data.
+                    type: boolean
                   optionalPaths:
                     description: A list of device paths which could be chosen for
                       creating Volume Group. For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"

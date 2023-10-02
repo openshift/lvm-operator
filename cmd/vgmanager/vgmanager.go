@@ -21,11 +21,13 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/openshift/lvm-operator/pkg/dmsetup"
 	"github.com/openshift/lvm-operator/pkg/filter"
 	"github.com/openshift/lvm-operator/pkg/lsblk"
 	"github.com/openshift/lvm-operator/pkg/lvm"
 	"github.com/openshift/lvm-operator/pkg/lvmd"
 	"github.com/openshift/lvm-operator/pkg/vgmanager"
+	"github.com/openshift/lvm-operator/pkg/wipefs"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -106,6 +108,8 @@ func run(_ *cobra.Command, _ []string, opts *Options) error {
 		LVMD:          lvmd.DefaultConfigurator(),
 		Scheme:        mgr.GetScheme(),
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
+		Wipefs:        wipefs.NewDefaultHostWipefs(),
+		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
 		LVM:           lvm.NewDefaultHostLVM(),
 		NodeName:      os.Getenv("NODE_NAME"),
 		Namespace:     os.Getenv("POD_NAMESPACE"),

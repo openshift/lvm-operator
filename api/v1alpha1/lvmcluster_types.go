@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // LVMClusterSpec defines the desired state of LVMCluster
 type LVMClusterSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
@@ -114,15 +111,13 @@ type DeviceSelector struct {
 	// We discourage using the device names as they can change over node restarts.
 	// +optional
 	OptionalPaths []string `json:"optionalPaths,omitempty"`
+
+	// ForceWipeDevicesAndDestroyAllData runs wipefs to wipe the devices.
+	// This can lead to data lose. Enable this only when you know that the disk
+	// does not contain any important data.
+	// +optional
+	ForceWipeDevicesAndDestroyAllData *bool `json:"forceWipeDevicesAndDestroyAllData,omitempty"`
 }
-
-// type DeviceClassConfig struct {
-// 	LVMConfig *LVMConfig `json:"lvmConfig,omitempty"`
-// }
-
-// type LVMConfig struct {
-// 	thinProvision bool `json:"thinProvision,omitempty"`
-// }
 
 type LVMStateType string
 
