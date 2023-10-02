@@ -12,19 +12,32 @@ import (
 )
 
 func (r *VGReconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, blockDevices []lsblk.BlockDevice) (bool, error) {
+	logger := log.FromContext(ctx)
+
 	if volumeGroup.Spec.DeviceSelector == nil || volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData == nil || !*volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData {
 		return false, nil
 	}
 
-	allPaths := append(volumeGroup.Spec.DeviceSelector.Paths, volumeGroup.Spec.DeviceSelector.OptionalPaths...)
 	wiped := false
-	for _, path := range allPaths {
+	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
 		if isDeviceAlreadyPartOfVG(nodeStatus, path, volumeGroup) { // Do not only check the vg devices, but also node status device paths
 			continue
 		}
 		deviceWiped, err := r.wipeDevice(ctx, path, blockDevices)
 		if err != nil {
 			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
+		}
+		if deviceWiped {
+			wiped = true
+		}
+	}
+	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+		if isDeviceAlreadyPartOfVG(nodeStatus, path, volumeGroup) {
+			continue
+		}
+		deviceWiped, err := r.wipeDevice(ctx, path, blockDevices)
+		if err != nil {
+			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
 		}
 		if deviceWiped {
 			wiped = true
