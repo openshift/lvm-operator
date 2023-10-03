@@ -20,6 +20,7 @@ func TestWipeDevices(t *testing.T) {
 		name                 string
 		forceWipeNotEnabled  bool
 		devicePaths          []string
+		optionalDevicePaths  []string
 		blockDevices         []lsblk.BlockDevice
 		nodeStatus           v1alpha1.LVMVolumeGroupNodeStatus
 		wipeCount            int
@@ -112,6 +113,30 @@ func TestWipeDevices(t *testing.T) {
 			removeReferenceCount: 1,
 		},
 		{
+			name:                "One required and one optional device exist in the device list",
+			devicePaths:         []string{"/dev/loop1"},
+			optionalDevicePaths: []string{"/dev/loop2"},
+			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
+			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
+				LVMVGStatus: []v1alpha1.VGStatus{
+					{Name: "vg1", Devices: []string{"/dev/sda"}}},
+			}},
+			wipeCount:            2,
+			removeReferenceCount: 1,
+		},
+		{
+			name:                "Optional device does not exist in the device list",
+			devicePaths:         []string{"/dev/loop1"},
+			optionalDevicePaths: []string{"/dev/loop2"},
+			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}},
+			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
+				LVMVGStatus: []v1alpha1.VGStatus{
+					{Name: "vg1", Devices: []string{"/dev/sda"}}},
+			}},
+			wipeCount:            1,
+			removeReferenceCount: 0,
+		},
+		{
 			name:         "Both devices, one of them is a child, exist in the device list",
 			devicePaths:  []string{"/dev/loop1", "/dev/loop2p1"},
 			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
@@ -160,6 +185,7 @@ func TestWipeDevices(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "vg1"},
 				Spec: v1alpha1.LVMVolumeGroupSpec{DeviceSelector: &v1alpha1.DeviceSelector{
 					Paths:                             tt.devicePaths,
+					OptionalPaths:                     tt.optionalDevicePaths,
 					ForceWipeDevicesAndDestroyAllData: ptr.To[bool](!tt.forceWipeNotEnabled),
 				}},
 			}
