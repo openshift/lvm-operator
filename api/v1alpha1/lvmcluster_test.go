@@ -150,6 +150,73 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrAtLeastOneDeviceClassRequired.Error()))
 	})
 
+	It("device classes cannot be removed in update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses = []DeviceClass{
+			{
+				Name: "test-device-class-1",
+				ThinPoolConfig: &ThinPoolConfig{
+					Name:               "thin-pool-1",
+					SizePercent:        90,
+					OverprovisionRatio: 10,
+				},
+				DeviceSelector: &DeviceSelector{Paths: []string{
+					"/dev/test1",
+				}},
+				FilesystemType: "xfs",
+			},
+			{
+				Name: "test-device-class-2",
+				ThinPoolConfig: &ThinPoolConfig{
+					Name:               "thin-pool-1",
+					SizePercent:        90,
+					OverprovisionRatio: 10,
+				},
+				DeviceSelector: &DeviceSelector{Paths: []string{
+					"/dev/test2",
+				}},
+				FilesystemType: "xfs",
+			},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses = []DeviceClass{
+			{
+				Name: "test-device-class-1",
+				ThinPoolConfig: &ThinPoolConfig{
+					Name:               "thin-pool-1",
+					SizePercent:        90,
+					OverprovisionRatio: 10,
+				},
+				DeviceSelector: &DeviceSelector{Paths: []string{
+					"/dev/test1",
+				}},
+				FilesystemType: "xfs",
+			},
+			{
+				Name: "test-device-class-3",
+				ThinPoolConfig: &ThinPoolConfig{
+					Name:               "thin-pool-1",
+					SizePercent:        90,
+					OverprovisionRatio: 10,
+				},
+				DeviceSelector: &DeviceSelector{Paths: []string{
+					"/dev/test3",
+				}},
+				FilesystemType: "xfs",
+			},
+		}
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("device classes were deleted from the LVMCluster"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 	It("two default device classes are not allowed", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		resource.Spec.Storage.DeviceClasses = append(resource.Spec.Storage.DeviceClasses, DeviceClass{

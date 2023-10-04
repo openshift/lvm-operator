@@ -151,7 +151,13 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
-		return warnings, fmt.Errorf("Failed to parse LVMCluster.")
+		return warnings, fmt.Errorf("failed to parse LVMCluster")
+	}
+
+	// Validate all the old device classes still exist
+	err = validateDeviceClassesStillExist(oldLVMCluster.Spec.Storage.DeviceClasses, l.Spec.Storage.DeviceClasses)
+	if err != nil {
+		return warnings, fmt.Errorf("invalid: device classes were deleted from the LVMCluster: %w", err)
 	}
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -222,6 +228,25 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	}
 
 	return warnings, nil
+}
+
+func validateDeviceClassesStillExist(old, new []DeviceClass) error {
+	deviceClassMap := make(map[string]bool)
+
+	for _, deviceClass := range old {
+		deviceClassMap[deviceClass.Name] = true
+	}
+
+	for _, deviceClass := range new {
+		delete(deviceClassMap, deviceClass.Name)
+	}
+
+	// if any old device class is removed now
+	if len(deviceClassMap) != 0 {
+		return fmt.Errorf("device classes can not be removed from the LVMCluster once added oldDeviceClasses:%v, newDeviceClasses:%v", old, new)
+	}
+
+	return nil
 }
 
 func validateDevicePathsStillExist(old, new []string) error {
