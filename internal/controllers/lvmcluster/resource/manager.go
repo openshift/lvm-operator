@@ -14,6 +14,7 @@ type Reconciler interface {
 	GetNamespace() string
 	GetImageName() string
 	SnapshotsEnabled() bool
+	GetVGManagerCommand() []string
 
 	// GetTopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration

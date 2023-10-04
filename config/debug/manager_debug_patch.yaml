@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operator
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          command:
+            - "/usr/sbin/dlv"
+            - "exec"
+            - "--listen=:2345"
+            - "--headless=true"
+            - "--log=true"
+            - "--accept-multiclient"
+            - "--api-version=2"
+            - "--continue"
+            - "/usr/sbin/lvms"
+            - "--"
+            - "operator"
+          args:
+            - "--vgmanager-cmd=/usr/sbin/dlv,exec,--listen=:2345,--headless=true,--log=true,--accept-multiclient,--api-version=2,--continue,/usr/sbin/lvms,--,vgmanager"
+          ports:
+            - containerPort: 2345
+              name: "debug"

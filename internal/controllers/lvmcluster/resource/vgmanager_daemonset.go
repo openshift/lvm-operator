@@ -137,7 +137,7 @@ var (
 )
 
 // newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, vgImage string) appsv1.DaemonSet {
+func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command []string) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{LVMDConfVol, DevHostDirVol, UDevHostDirVol, SysHostDirVol, MetricsCertsDirVol}
@@ -145,8 +145,8 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace string,
 	privileged := true
 	var zero int64 = 0
 
-	command := []string{
-		"/lvms", "vgmanager",
+	if len(command) == 0 {
+		command = []string{"/lvms", "vgmanager"}
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{

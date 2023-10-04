@@ -182,13 +182,16 @@ ARCH ?= amd64
 all: build
 
 build: generate fmt vet ## Build manager binary.
-	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/lvms cmd/main.go
+	GOOS=$(OS) GOARCH=$(ARCH) go build -gcflags='all=-N -l' -o bin/lvms cmd/main.go
 
 build-prometheus-alert-rules: jsonnet monitoring/mixin.libsonnet monitoring/alerts/alerts.jsonnet monitoring/alerts/*.libsonnet
 	$(JSONNET) -S monitoring/alerts/alerts.jsonnet > config/prometheus/prometheus_rules.yaml
 
 docker-build: ## Build docker image with the manager.
 	$(IMAGE_BUILD_CMD) build --platform=${OS}/${ARCH} -t ${IMG} .
+
+docker-build-debug: ## Build remote-debugging enabled docker image with the manager. See CONTRIBUTING.md for more information
+	$(IMAGE_BUILD_CMD) build -f hack/debug.Dockerfile --platform=${OS}/${ARCH} -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
 	$(IMAGE_BUILD_CMD) push ${IMG}
@@ -209,6 +212,11 @@ deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s clust
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+deploy-debug: update-mgr-env manifests kustomize ## Deploy controller started through delve to the K8s cluster specified in ~/.kube/config. See CONTRIBUTING.md for more information
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
+	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
+	$(KUSTOMIZE) build config/debug | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -

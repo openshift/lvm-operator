@@ -55,6 +55,8 @@ const (
 	DefaultEnableLeaderElection = false
 )
 
+var DefaultVGManagerCommand = []string{"/lvms", "vgmanager"}
+
 type Options struct {
 	Scheme   *runtime.Scheme
 	SetupLog logr.Logger
@@ -62,6 +64,8 @@ type Options struct {
 	diagnosticsAddr      string
 	healthProbeAddr      string
 	enableLeaderElection bool
+
+	vgManagerCommand []string
 }
 
 // NewCmd creates a new CLI command
@@ -86,6 +90,10 @@ func NewCmd(opts *Options) *cobra.Command {
 	cmd.Flags().BoolVar(
 		&opts.enableLeaderElection, "leader-elect", DefaultEnableLeaderElection,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&opts.vgManagerCommand, "vgmanager-cmd", DefaultVGManagerCommand, "The command that should be used to start vgmanager on the node. Useful for debugging purposes but normally not changed.",
 	)
 
 	return cmd
@@ -165,6 +173,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
 		EnableSnapshotting:               enableSnapshotting,
+		VGManagerCommand:                 opts.vgManagerCommand,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create LVMCluster controller: %w", err)
 	}
