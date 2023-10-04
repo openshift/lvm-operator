@@ -17,12 +17,12 @@ RUN go mod verify
 
 # Copy the go source
 COPY api/ api/
-COPY controllers/ controllers/
 COPY cmd/ cmd/
-COPY pkg/ pkg/
+COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
