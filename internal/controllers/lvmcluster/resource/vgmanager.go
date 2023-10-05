@@ -47,7 +47,13 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	logger := log.FromContext(ctx).WithValues("resourceManager", v.GetName())
 
 	// get desired daemonset spec
-	dsTemplate := newVGManagerDaemonset(lvmCluster, r.GetNamespace(), r.GetImageName(), r.GetVGManagerCommand())
+	dsTemplate := newVGManagerDaemonset(
+		lvmCluster,
+		r.GetNamespace(),
+		r.GetImageName(),
+		r.GetVGManagerCommand(),
+		r.GetLogPassthroughOptions().VGManager.AsArgs(),
+	)
 
 	// create desired daemonset or update mutable fields on existing one
 	ds := &appsv1.DaemonSet{

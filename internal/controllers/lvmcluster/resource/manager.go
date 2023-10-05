@@ -5,6 +5,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -19,6 +20,9 @@ type Reconciler interface {
 	// GetTopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration
 	GetTopoLVMLeaderElectionPassthrough() configv1.LeaderElection
+
+	// GetLogPassthroughOptions passes log information for resource managers to consume
+	GetLogPassthroughOptions() *logpassthrough.Options
 }
 
 // Manager NOTE: when updating this, please also update docs/design/lvm-operator-manager.md

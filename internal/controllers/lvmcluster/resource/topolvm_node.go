@@ -57,7 +57,13 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 	logger := log.FromContext(ctx).WithValues("topolvmNode", n.GetName())
 
 	// get desired daemonSet spec
-	dsTemplate := getNodeDaemonSet(lvmCluster, r.GetNamespace(), r.GetImageName())
+	dsTemplate := getNodeDaemonSet(lvmCluster,
+		r.GetNamespace(),
+		r.GetImageName(),
+		r.GetLogPassthroughOptions().TopoLVMNode.AsArgs(),
+		r.GetLogPassthroughOptions().LVMD.AsArgs(),
+		r.GetLogPassthroughOptions().CSISideCar.AsArgs(),
+	)
 
 	// create desired daemonSet or update mutable fields on existing one
 	ds := &appsv1.DaemonSet{
@@ -116,7 +122,7 @@ func (n topolvmNode) EnsureDeleted(_ Reconciler, _ context.Context, _ *lvmv1alph
 	return nil
 }
 
-func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string) *appsv1.DaemonSet {
+func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string, args, lvmdArgs, csiArgs []string) *appsv1.DaemonSet {
 
 	hostPathDirectory := corev1.HostPathDirectory
 	hostPathDirectoryOrCreateType := corev1.HostPathDirectoryOrCreate
@@ -161,7 +167,13 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 	}
 
 	initContainers := []corev1.Container{*getNodeInitContainer(initImage)}
-	containers := []corev1.Container{*getLvmdContainer(), *getNodeContainer(), *getRBACProxyContainer(), *getCsiRegistrarContainer(), *getNodeLivenessProbeContainer()}
+	containers := []corev1.Container{
+		*getLvmdContainer(lvmdArgs),
+		*getNodeContainer(args),
+		*getRBACProxyContainer(),
+		*getCsiRegistrarContainer(csiArgs),
+		*getNodeLivenessProbeContainer(),
+	}
 
 	// Affinity and tolerations
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
@@ -241,12 +253,14 @@ func getNodeInitContainer(initImage string) *corev1.Container {
 	return fileChecker
 }
 
-func getLvmdContainer() *corev1.Container {
+func getLvmdContainer(args []string) *corev1.Container {
 	command := []string{
 		"/lvmd",
 		fmt.Sprintf("--config=%s", lvmd.DefaultFileConfigPath),
 		"--container=true",
 	}
+
+	command = append(command, args...)
 
 	resourceRequirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -276,14 +290,13 @@ func getLvmdContainer() *corev1.Container {
 	return lvmd
 }
 
-func getNodeContainer() *corev1.Container {
-	privileged := true
-	runAsUser := int64(0)
-
+func getNodeContainer(args []string) *corev1.Container {
 	command := []string{
 		"/topolvm-node",
 		fmt.Sprintf("--lvmd-socket=%s", constants.DefaultLVMdSocket),
 	}
+
+	command = append(command, args...)
 
 	requirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -316,8 +329,8 @@ func getNodeContainer() *corev1.Container {
 		Image:   TopolvmCsiImage,
 		Command: command,
 		SecurityContext: &corev1.SecurityContext{
-			Privileged: &privileged,
-			RunAsUser:  &runAsUser,
+			Privileged: ptr.To(true),
+			RunAsUser:  ptr.To(int64(0)),
 		},
 		Ports: []corev1.ContainerPort{{Name: constants.TopolvmNodeContainerHealthzName,
 			ContainerPort: 9808,
@@ -374,11 +387,12 @@ func getRBACProxyContainer() *corev1.Container {
 	return node
 }
 
-func getCsiRegistrarContainer() *corev1.Container {
+func getCsiRegistrarContainer(additionalArgs []string) *corev1.Container {
 	args := []string{
 		fmt.Sprintf("--csi-address=%s", constants.DefaultCSISocket),
 		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.io/node/csi-topolvm.sock", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
 	}
+	args = append(args, additionalArgs...)
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},

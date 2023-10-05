@@ -63,7 +63,13 @@ func (c topolvmController) EnsureCreated(r Reconciler, ctx context.Context, lvmC
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 
 	// get the desired state of topolvm controller deployment
-	desiredDeployment := getControllerDeployment(r.GetNamespace(), r.SnapshotsEnabled(), r.GetTopoLVMLeaderElectionPassthrough())
+	desiredDeployment := getControllerDeployment(
+		r.GetNamespace(),
+		r.SnapshotsEnabled(),
+		r.GetTopoLVMLeaderElectionPassthrough(),
+		r.GetLogPassthroughOptions().TopoLVMController.AsArgs(),
+		r.GetLogPassthroughOptions().CSISideCar.AsArgs(),
+	)
 	existingDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      desiredDeployment.Name,
@@ -106,7 +112,7 @@ func (c topolvmController) EnsureDeleted(_ Reconciler, _ context.Context, _ *lvm
 	return nil
 }
 
-func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLeaderElectionPassthrough v1.LeaderElection) *appsv1.Deployment {
+func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLeaderElectionPassthrough v1.LeaderElection, args []string, csiArgs []string) *appsv1.Deployment {
 	// Topolvm CSI Controller Deployment
 	var replicas int32 = 1
 	volumes := []corev1.Volume{
@@ -115,14 +121,14 @@ func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLead
 
 	// get all containers that are part of csi controller deployment
 	containers := []corev1.Container{
-		controllerContainer(topoLVMLeaderElectionPassthrough),
-		csiProvisionerContainer(topoLVMLeaderElectionPassthrough),
-		csiResizerContainer(topoLVMLeaderElectionPassthrough),
+		controllerContainer(topoLVMLeaderElectionPassthrough, args),
+		csiProvisionerContainer(topoLVMLeaderElectionPassthrough, csiArgs),
+		csiResizerContainer(topoLVMLeaderElectionPassthrough, csiArgs),
 		livenessProbeContainer(),
 	}
 
 	if enableSnapshots {
-		containers = append(containers, csiSnapshotterContainer(topoLVMLeaderElectionPassthrough))
+		containers = append(containers, csiSnapshotterContainer(topoLVMLeaderElectionPassthrough, csiArgs))
 	}
 
 	annotations := map[string]string{
@@ -157,7 +163,7 @@ func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLead
 	}
 }
 
-func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
+func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection, args []string) corev1.Container {
 
 	// topolvm controller plugin container
 	command := []string{
@@ -168,6 +174,8 @@ func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) cor
 		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
 		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
+
+	command = append(command, args...)
 
 	resourceRequirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -215,7 +223,7 @@ func controllerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) cor
 	}
 }
 
-func csiProvisionerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
+func csiProvisionerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection, additionalArgs []string) corev1.Container {
 
 	// csi provisioner container
 	args := []string{
@@ -229,6 +237,8 @@ func csiProvisionerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection)
 		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
 		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
+
+	args = append(args, additionalArgs...)
 
 	resourceRequirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -248,7 +258,7 @@ func csiProvisionerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection)
 	}
 }
 
-func csiResizerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
+func csiResizerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection, additionalArgs []string) corev1.Container {
 
 	// csi resizer container
 	args := []string{
@@ -258,6 +268,8 @@ func csiResizerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) cor
 		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
 		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
+
+	args = append(args, additionalArgs...)
 
 	resourceRequirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -275,7 +287,7 @@ func csiResizerContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) cor
 	}
 }
 
-func csiSnapshotterContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection) corev1.Container {
+func csiSnapshotterContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection, additionalArgs []string) corev1.Container {
 
 	args := []string{
 		fmt.Sprintf("--csi-address=%s", constants.DefaultCSISocket),
@@ -284,6 +296,8 @@ func csiSnapshotterContainer(topoLVMLeaderElectionPassthrough v1.LeaderElection)
 		fmt.Sprintf("--leader-election-renew-deadline=%s", topoLVMLeaderElectionPassthrough.RenewDeadline.Duration),
 		fmt.Sprintf("--leader-election-retry-period=%s", topoLVMLeaderElectionPassthrough.RetryPeriod.Duration),
 	}
+
+	args = append(args, additionalArgs...)
 
 	resourceRequirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{

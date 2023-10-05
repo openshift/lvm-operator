@@ -40,24 +40,30 @@ func NewCmd(setupLog logr.Logger) *cobra.Command {
 	utilruntime.Must(secv1.Install(scheme))
 	utilruntime.Must(configv1.Install(scheme))
 
+	zapOpts := zap.Options{}
+	zapFlagSet := flag.NewFlagSet("zap", flag.ExitOnError)
+	zapOpts.BindFlags(zapFlagSet)
+
+	klogFlagSet := flag.NewFlagSet("klog", flag.ExitOnError)
+	klog.InitFlags(klogFlagSet)
+
 	cmd := &cobra.Command{
 		Use:           "lvms",
 		Short:         "Commands for running LVMS",
 		Long:          `Contains commands that control various components reconciling of the main cluster resources within LVMS`,
 		SilenceErrors: false,
 		SilenceUsage:  true,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			zapLogger := zap.New(zap.UseFlagOptions(&zapOpts))
+			ctrl.SetLogger(zapLogger)
+			klog.SetLogger(zapLogger)
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}
-
-	zapOpts := zap.Options{}
-	zapFlagSet := flag.NewFlagSet("zap", flag.ExitOnError)
-	zapOpts.BindFlags(zapFlagSet)
+	cmd.PersistentFlags().AddGoFlagSet(klogFlagSet)
 	cmd.PersistentFlags().AddGoFlagSet(zapFlagSet)
-	zapLogger := zap.New(zap.UseFlagOptions(&zapOpts))
-	ctrl.SetLogger(zapLogger)
-	klog.SetLogger(zapLogger)
 
 	cmd.AddCommand(
 		operator.NewCmd(&operator.Options{
