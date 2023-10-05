@@ -86,6 +86,30 @@ Prerequisites: Ensure you have a running CRC Cluster (Step 6)
 3. `oc apply -k https://github.com/kubernetes-csi/external-snapshotter//deploy/kubernetes/snapshot-controller`
 4. Start again at Step 7
 
+#### Remotely debugging LVMS inside a cluster
+
+A typical issue for any workload interacting with nodes in kubernetes is that it is hard to test properly.
+This is because nodes usually have their own specific environment and can be hard to debug.
+During development, you can still remotely debug into both `lvm-operator` and `vgmanager` by attaching remotely to the debugger.
+
+For this you need 2 things:
+1. An image made specifically to include a debugging server and debugging symbols for stack trace information.
+   Run `make docker-build-debug` to build one for you.
+2. A deployment that starts the operator through the debugging server.
+   We have the [`debug`](config/debug) kustomize target for this.
+   Run `deploy-debug` after building the image to run the debugger for you.
+
+Now we can remotely attach to the binaries in the cluster on port `2345`.
+However, we first need to port-forward into the cluster:
+1. Run `oc port-forward deploy/lvms-operator 2345:2345` to port-forward to the controller.
+2. Run `oc port-forward pod/vgmanager-xxx 2345:2345` to port-forward to a vgmanager pod on a node.
+
+After opening the port, you will only need to connect to the debugger and set breakpoints.
+Here are some tutorials on remotely connecting to a running binary:
+
+- [Visual Studio Code](https://github.com/golang/vscode-go/blob/master/docs/debugging.md#connect-to-headless-delve-with-target-specified-at-server-start-up)
+- [Goland](https://www.jetbrains.com/help/go/attach-to-running-go-processes-with-debugger.html#step-3-create-the-remote-run-debug-configuration-on-the-client-computer)
+
 ## Commits Per Pull Request
 
 Pull requests should always represent a complete logical change. Where possible, pull requests should be composed of multiple commits that each make small but meaningful changes. Striking a balance between minimal commits and logically complete changes is an art as much as a science, but when it is possible and reasonable, divide your pull request into more commits.

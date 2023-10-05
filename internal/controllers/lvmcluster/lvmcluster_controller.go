@@ -64,6 +64,9 @@ type LVMClusterReconciler struct {
 	Namespace          string
 	ImageName          string
 
+	// VGManagerCommand is the command that will be used to start vgmanager
+	VGManagerCommand []string
+
 	// TopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration
 	TopoLVMLeaderElectionPassthrough configv1.LeaderElection
@@ -83,6 +86,10 @@ func (r *LVMClusterReconciler) GetClient() client.Client {
 
 func (r *LVMClusterReconciler) SnapshotsEnabled() bool {
 	return r.EnableSnapshotting
+}
+
+func (r *LVMClusterReconciler) GetVGManagerCommand() []string {
+	return r.VGManagerCommand
 }
 
 func (r *LVMClusterReconciler) GetTopoLVMLeaderElectionPassthrough() configv1.LeaderElection {
