@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/node"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -65,6 +65,8 @@ type Options struct {
 	healthProbeAddr      string
 	enableLeaderElection bool
 
+	LogPassthroughOptions *logpassthrough.Options
+
 	vgManagerCommand []string
 }
 
@@ -80,6 +82,9 @@ func NewCmd(opts *Options) *cobra.Command {
 			return run(cmd, args, opts)
 		},
 	}
+
+	opts.LogPassthroughOptions = logpassthrough.NewOptions()
+	opts.LogPassthroughOptions.BindFlags(cmd.Flags())
 
 	cmd.Flags().StringVar(
 		&opts.diagnosticsAddr, "diagnostics-address", DefaultDiagnosticsAddr, "The address the diagnostics endpoint binds to.",
@@ -173,6 +178,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
 		EnableSnapshotting:               enableSnapshotting,
+		LogPassthroughOptions:            opts.LogPassthroughOptions,
 		VGManagerCommand:                 opts.vgManagerCommand,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create LVMCluster controller: %w", err)

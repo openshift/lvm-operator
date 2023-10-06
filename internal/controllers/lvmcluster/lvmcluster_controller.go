@@ -27,6 +27,7 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
 
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
@@ -70,6 +71,9 @@ type LVMClusterReconciler struct {
 	// TopoLVMLeaderElectionPassthrough uses the given leaderElection when initializing TopoLVM to synchronize
 	// leader election configuration
 	TopoLVMLeaderElectionPassthrough configv1.LeaderElection
+
+	// LogPassthroughOptions define multiple settings for passing down log settings to created resources
+	LogPassthroughOptions *logpassthrough.Options
 }
 
 func (r *LVMClusterReconciler) GetNamespace() string {
@@ -94,6 +98,10 @@ func (r *LVMClusterReconciler) GetVGManagerCommand() []string {
 
 func (r *LVMClusterReconciler) GetTopoLVMLeaderElectionPassthrough() configv1.LeaderElection {
 	return r.TopoLVMLeaderElectionPassthrough
+}
+
+func (r *LVMClusterReconciler) GetLogPassthroughOptions() *logpassthrough.Options {
+	return r.LogPassthroughOptions
 }
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete

@@ -26,6 +26,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/internal/cluster"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/node"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -131,12 +132,13 @@ var _ = BeforeSuite(func() {
 	}
 
 	err = (&LVMClusterReconciler{
-		Client:             k8sManager.GetClient(),
-		EventRecorder:      k8sManager.GetEventRecorderFor("LVMClusterReconciler"),
-		EnableSnapshotting: enableSnapshotting,
-		ClusterType:        clusterType,
-		Namespace:          testLvmClusterNamespace,
-		ImageName:          testImageName,
+		Client:                k8sManager.GetClient(),
+		EventRecorder:         k8sManager.GetEventRecorderFor("LVMClusterReconciler"),
+		EnableSnapshotting:    enableSnapshotting,
+		ClusterType:           clusterType,
+		Namespace:             testLvmClusterNamespace,
+		ImageName:             testImageName,
+		LogPassthroughOptions: logpassthrough.NewOptions(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

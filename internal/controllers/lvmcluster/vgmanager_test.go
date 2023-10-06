@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
 	"gotest.tools/v3/assert"
 
@@ -57,8 +58,9 @@ func newFakeLVMClusterReconciler(t *testing.T, objs ...client.Object) *LVMCluste
 	assert.NilError(t, err, "adding snapshot api to scheme")
 
 	return &LVMClusterReconciler{
-		Client:    fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build(),
-		Namespace: "default",
+		Client:                fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build(),
+		Namespace:             "default",
+		LogPassthroughOptions: logpassthrough.NewOptions(),
 	}
 }
 
