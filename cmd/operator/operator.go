@@ -23,13 +23,14 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
-	"github.com/openshift/lvm-operator/internal/controllers/node"
+	"github.com/openshift/lvm-operator/internal/controllers/node/removal"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -171,7 +172,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	// register controllers
-	if err = (&lvmcluster.LVMClusterReconciler{
+	if err = (&lvmcluster.Reconciler{
 		Client:                           mgr.GetClient(),
 		EventRecorder:                    mgr.GetEventRecorderFor("LVMClusterReconciler"),
 		ClusterType:                      clusterType,
@@ -186,7 +187,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if !snoCheck.IsSNO(cmd.Context()) {
 		opts.SetupLog.Info("starting node-removal controller to observe node removal in MultiNode")
-		if err = (&node.RemovalController{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
+		if err = (&removal.Reconciler{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
 			return fmt.Errorf("unable to create NodeRemovalController controller: %w", err)
 		}
 	}
@@ -201,12 +202,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create LVMCluster webhook: %w", err)
 	}
 
-	pvController := persistent_volume.NewPersistentVolumeReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-pv-controller"))
+	pvController := persistent_volume.NewReconciler(mgr.GetClient(), mgr.GetAPIReader(), mgr.GetEventRecorderFor("lvms-pv-controller"))
 	if err := pvController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create PersistentVolume controller: %w", err)
 	}
 
-	pvcController := persistent_volume_claim.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetEventRecorderFor("lvms-pvc-controller"))
+	pvcController := persistent_volume_claim.NewReconciler(mgr.GetClient(), mgr.GetEventRecorderFor("lvms-pvc-controller"))
 	if err := pvcController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create PersistentVolumeClaim controller: %w", err)
 	}

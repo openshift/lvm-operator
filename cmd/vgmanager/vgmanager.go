@@ -102,7 +102,7 @@ func run(_ *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	if err = (&vgmanager.VGReconciler{
+	if err = (&vgmanager.Reconciler{
 		Client:        mgr.GetClient(),
 		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
 		LVMD:          lvmd.DefaultConfigurator(),

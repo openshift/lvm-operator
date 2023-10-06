@@ -220,7 +220,7 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &VGReconciler{LVM: lvm.NewHostLVM(tt.fields.executor)}
+			r := &Reconciler{LVM: lvm.NewHostLVM(tt.fields.executor)}
 			tt.wantErr(t, r.validateLVs(log.IntoContext(context.Background(), testr.New(t)), tt.args.volumeGroup), fmt.Sprintf("validateLVs(%v)", tt.args.volumeGroup))
 		})
 	}

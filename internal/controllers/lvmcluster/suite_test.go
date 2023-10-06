@@ -27,7 +27,7 @@ import (
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
-	"github.com/openshift/lvm-operator/internal/controllers/node"
+	"github.com/openshift/lvm-operator/internal/controllers/node/removal"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -131,7 +131,7 @@ var _ = BeforeSuite(func() {
 		}
 	}
 
-	err = (&LVMClusterReconciler{
+	err = (&Reconciler{
 		Client:                k8sManager.GetClient(),
 		EventRecorder:         k8sManager.GetEventRecorderFor("LVMClusterReconciler"),
 		EnableSnapshotting:    enableSnapshotting,
@@ -142,7 +142,7 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&node.RemovalController{
+	err = (&removal.Reconciler{
 		Client: k8sManager.GetClient(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())

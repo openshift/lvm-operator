@@ -196,7 +196,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := record.NewFakeRecorder(1)
-			r := &persistentvolumeclaim.PersistentVolumeClaimReconciler{
+			r := &persistentvolumeclaim.Reconciler{
 				Client:   fake.NewClientBuilder().WithObjects(tt.objs...).Build(),
 				Recorder: recorder,
 			}

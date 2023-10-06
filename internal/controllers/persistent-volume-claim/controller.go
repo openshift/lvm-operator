@@ -24,15 +24,15 @@ const (
 	CapacityAnnotation = "capacity.topolvm.io/"
 )
 
-// PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
-type PersistentVolumeClaimReconciler struct {
+// Reconciler reconciles a PersistentVolumeClaim object
+type Reconciler struct {
 	Client   client.Client
 	Recorder record.EventRecorder
 }
 
-// NewPersistentVolumeClaimReconciler returns PersistentVolumeClaimReconciler.
-func NewPersistentVolumeClaimReconciler(client client.Client, eventRecorder record.EventRecorder) *PersistentVolumeClaimReconciler {
-	return &PersistentVolumeClaimReconciler{
+// NewReconciler returns Reconciler.
+func NewReconciler(client client.Client, eventRecorder record.EventRecorder) *Reconciler {
+	return &Reconciler{
 		Client:   client,
 		Recorder: eventRecorder,
 	}
@@ -43,7 +43,7 @@ func NewPersistentVolumeClaimReconciler(client client.Client, eventRecorder reco
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 // Reconcile PVC
-func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.Log.WithName("pvc-controller").WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
 
 	pvc := &corev1.PersistentVolumeClaim{}
@@ -120,7 +120,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.Funcs{
 		CreateFunc:  func(event.CreateEvent) bool { return true },
 		DeleteFunc:  func(event.DeleteEvent) bool { return false },

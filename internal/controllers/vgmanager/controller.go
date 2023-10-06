@@ -75,14 +75,14 @@ var (
 )
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *VGReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, builder.MatchEveryOwner, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
 }
 
-type VGReconciler struct {
+type Reconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	record.EventRecorder
@@ -96,11 +96,11 @@ type VGReconciler struct {
 	Filters   func(*lvmv1alpha1.LVMVolumeGroup, lvm.LVM, lsblk.LSBLK) filter.Filters
 }
 
-func (r *VGReconciler) getFinalizer() string {
+func (r *Reconciler) getFinalizer() string {
 	return fmt.Sprintf("%s/%s", NodeCleanupFinalizer, r.NodeName)
 }
 
-func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("reconciling")
 
@@ -135,7 +135,7 @@ func (r *VGReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	return r.reconcile(ctx, volumeGroup, nodeStatus)
 }
 
-func (r *VGReconciler) reconcile(
+func (r *Reconciler) reconcile(
 	ctx context.Context,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
 	nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus,
@@ -340,7 +340,7 @@ func (r *VGReconciler) reconcile(
 	return reconcileAgain, nil
 }
 
-func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
+func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 	logger.Info("deleting")
 
@@ -442,7 +442,7 @@ func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alph
 
 // validateLVs verifies that all lvs that should have been created in the volume group are present and
 // in their correct state
-func (r *VGReconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
+func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
 	logger := log.FromContext(ctx)
 
 	// If we don't have a ThinPool, VG Manager has no authority about the top Level LVs inside the VG, but TopoLVM
@@ -503,7 +503,7 @@ func (r *VGReconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1
 	return nil
 }
 
-func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
+func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
 	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
 
 	resp, err := r.LVM.ListLVs(vgName)
@@ -540,7 +540,7 @@ func (r *VGReconciler) addThinPoolToVG(ctx context.Context, vgName string, confi
 	return nil
 }
 
-func (r *VGReconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
+func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
 	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
 
 	vg, err := r.LVM.GetVG(vgName)
@@ -575,7 +575,7 @@ func (r *VGReconciler) extendThinPool(ctx context.Context, vgName string, lvSize
 	return nil
 }
 
-func (r *VGReconciler) matchesThisNode(ctx context.Context, selector *corev1.NodeSelector) (bool, error) {
+func (r *Reconciler) matchesThisNode(ctx context.Context, selector *corev1.NodeSelector) (bool, error) {
 	node := &corev1.Node{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: r.NodeName}, node)
 	if err != nil {
@@ -590,7 +590,7 @@ func (r *VGReconciler) matchesThisNode(ctx context.Context, selector *corev1.Nod
 }
 
 // WarningEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
-func (r *VGReconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonError, err error) {
+func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonError, err error) {
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 	nodeStatus.SetName(r.NodeName)
 	nodeStatus.SetNamespace(r.Namespace)
@@ -612,7 +612,7 @@ func (r *VGReconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVol
 }
 
 // NormalEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
-func (r *VGReconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonInfo, message string) {
+func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonInfo, message string) {
 	if !log.FromContext(ctx).V(1).Enabled() {
 		return
 	}
