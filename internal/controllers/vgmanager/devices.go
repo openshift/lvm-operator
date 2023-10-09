@@ -30,7 +30,7 @@ import (
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *VGReconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
+func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
 	logger := log.FromContext(ctx)
 
 	if len(devices) < 1 {
@@ -84,7 +84,7 @@ type FilteredBlockDevices struct {
 
 // filterDevices returns:
 // availableDevices: the list of blockdevices considered available
-func (r *VGReconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters filter.Filters) *FilteredBlockDevices {
+func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters filter.Filters) *FilteredBlockDevices {
 	logger := log.FromContext(ctx)
 
 	var availableDevices []lsblk.BlockDevice
@@ -138,7 +138,7 @@ func (r *VGReconciler) filterDevices(ctx context.Context, devices []lsblk.BlockD
 }
 
 // getNewDevicesToBeAdded gets all devices that should be added to the volume group
-func (r *VGReconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
+func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) ([]lsblk.BlockDevice, error) {
 	logger := log.FromContext(ctx)
 
 	var validBlockDevices []lsblk.BlockDevice

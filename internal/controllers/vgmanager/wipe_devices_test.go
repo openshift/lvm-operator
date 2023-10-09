@@ -174,7 +174,7 @@ func TestWipeDevices(t *testing.T) {
 	mockDmsetup := dmsetupmocks.NewMockDmsetup(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &VGReconciler{Wipefs: mockWipefs, Dmsetup: mockDmsetup}
+			r := &Reconciler{Wipefs: mockWipefs, Dmsetup: mockDmsetup}
 			if tt.wipeCount > 0 {
 				mockWipefs.EXPECT().Wipe(mock.Anything).Return(nil).Times(tt.wipeCount)
 			}

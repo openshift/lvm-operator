@@ -58,7 +58,7 @@ type testInstances struct {
 	client       client.WithWatch
 	recorder     *record.FakeRecorder
 
-	Reconciler *VGReconciler
+	Reconciler *Reconciler
 }
 
 func setupInstances() testInstances {
@@ -106,7 +106,7 @@ func setupInstances() testInstances {
 			}},
 		}}},
 		client: fakeClient,
-		Reconciler: &VGReconciler{
+		Reconciler: &Reconciler{
 			Client:        fakeClient,
 			Scheme:        scheme.Scheme,
 			EventRecorder: fakeRecorder,

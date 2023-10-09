@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func (r *VGReconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, blockDevices []lsblk.BlockDevice) (bool, error) {
+func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, blockDevices []lsblk.BlockDevice) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	if volumeGroup.Spec.DeviceSelector == nil || volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData == nil || !*volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData {
@@ -47,7 +47,7 @@ func (r *VGReconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *
 	return wiped, nil
 }
 
-func (r *VGReconciler) wipeDevice(ctx context.Context, deviceName string, blockDevices []lsblk.BlockDevice) (bool, error) {
+func (r *Reconciler) wipeDevice(ctx context.Context, deviceName string, blockDevices []lsblk.BlockDevice) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("deviceName", deviceName)
 
 	wiped := false
@@ -77,7 +77,7 @@ func (r *VGReconciler) wipeDevice(ctx context.Context, deviceName string, blockD
 }
 
 // removeMapperReference remove the device-mapper reference of the device starting from the most inner child
-func (r *VGReconciler) removeMapperReference(ctx context.Context, device lsblk.BlockDevice) {
+func (r *Reconciler) removeMapperReference(ctx context.Context, device lsblk.BlockDevice) {
 	logger := log.FromContext(ctx).WithValues("deviceName", device.KName)
 	if device.HasChildren() {
 		for _, child := range device.Children {

@@ -1,4 +1,4 @@
-package node
+package removal
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 const cleanupFinalizer = "lvm.topolvm.io/node-removal-hook"
 const fieldOwner = "lvms"
 
-type RemovalController struct {
+type Reconciler struct {
 	client.Client
 }
 
@@ -33,7 +33,7 @@ type RemovalController struct {
 // the unwanted LVMVolumeGroupNodeStatus that was associated with the node, before removing the finalizer.
 // It does nothing on active Nodes. If it can be assumed that there will always be only one node (SNO),
 // this controller should not be started.
-func (r *RemovalController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	node := &v1.Node{}
@@ -85,12 +85,12 @@ func (r *RemovalController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *RemovalController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).For(&v1.Node{}).Watches(&lvmv1alpha1.LVMVolumeGroupNodeStatus{},
 		handler.EnqueueRequestsFromMapFunc(r.getNodeForLVMVolumeGroupNodeStatus)).Complete(r)
 }
 
-func (r *RemovalController) getNodeForLVMVolumeGroupNodeStatus(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *Reconciler) getNodeForLVMVolumeGroupNodeStatus(ctx context.Context, object client.Object) []reconcile.Request {
 	node := &v1.Node{}
 	node.SetName(object.GetName())
 

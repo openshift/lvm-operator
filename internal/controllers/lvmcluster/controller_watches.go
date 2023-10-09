@@ -40,7 +40,7 @@ import (
 )
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMCluster{}).
 		Owns(&appsv1.DaemonSet{}).
@@ -76,7 +76,7 @@ func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // the namespaced LVMCluster needs to "own" a cluster-scoped resource, in which case owner references are invalid).
 // This should generally only be used for cluster-scoped resources. Also it should be noted that deletion logic must
 // be handled manually as garbage collection is not handled automatically like for owner references.
-func (r *LVMClusterReconciler) getManagedLabelObjsForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *Reconciler) getManagedLabelObjsForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {
 	foundLVMClusterList := &lvmv1alpha1.LVMClusterList{}
 	listOps := &client.ListOptions{
 		Namespace: obj.GetNamespace(),
@@ -106,7 +106,7 @@ func (r *LVMClusterReconciler) getManagedLabelObjsForReconcile(ctx context.Conte
 // this means that as if the obj name fits to a given node on the cluster and that node is part of the node selector,
 // then the lvm cluster will get updated as well. Should only be used in conjunction with LVMVolumeGroupNodeStatus
 // as other objects do not use the node name as resource name.
-func (r *LVMClusterReconciler) getLVMClusterObjsByNameFittingNodeSelector(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *Reconciler) getLVMClusterObjsByNameFittingNodeSelector(ctx context.Context, obj client.Object) []reconcile.Request {
 	foundLVMClusterList := &lvmv1alpha1.LVMClusterList{}
 	listOps := &client.ListOptions{
 		Namespace: obj.GetNamespace(),

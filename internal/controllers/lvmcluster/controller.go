@@ -56,8 +56,8 @@ const (
 	lvmClusterFinalizer = "lvmcluster.topolvm.io"
 )
 
-// LVMClusterReconciler reconciles a LVMCluster object
-type LVMClusterReconciler struct {
+// Reconciler reconciles a LVMCluster object
+type Reconciler struct {
 	client.Client
 	record.EventRecorder
 	ClusterType        cluster.Type
@@ -76,31 +76,31 @@ type LVMClusterReconciler struct {
 	LogPassthroughOptions *logpassthrough.Options
 }
 
-func (r *LVMClusterReconciler) GetNamespace() string {
+func (r *Reconciler) GetNamespace() string {
 	return r.Namespace
 }
 
-func (r *LVMClusterReconciler) GetImageName() string {
+func (r *Reconciler) GetImageName() string {
 	return r.ImageName
 }
 
-func (r *LVMClusterReconciler) GetClient() client.Client {
+func (r *Reconciler) GetClient() client.Client {
 	return r.Client
 }
 
-func (r *LVMClusterReconciler) SnapshotsEnabled() bool {
+func (r *Reconciler) SnapshotsEnabled() bool {
 	return r.EnableSnapshotting
 }
 
-func (r *LVMClusterReconciler) GetVGManagerCommand() []string {
+func (r *Reconciler) GetVGManagerCommand() []string {
 	return r.VGManagerCommand
 }
 
-func (r *LVMClusterReconciler) GetTopoLVMLeaderElectionPassthrough() configv1.LeaderElection {
+func (r *Reconciler) GetTopoLVMLeaderElectionPassthrough() configv1.LeaderElection {
 	return r.TopoLVMLeaderElectionPassthrough
 }
 
-func (r *LVMClusterReconciler) GetLogPassthroughOptions() *logpassthrough.Options {
+func (r *Reconciler) GetLogPassthroughOptions() *logpassthrough.Options {
 	return r.LogPassthroughOptions
 }
 
@@ -125,7 +125,7 @@ func (r *LVMClusterReconciler) GetLogPassthroughOptions() *logpassthrough.Option
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
-func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("reconciling")
 
@@ -164,7 +164,7 @@ func (r *LVMClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
-func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
+func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// The resource was deleted
@@ -246,7 +246,7 @@ func (r *LVMClusterReconciler) reconcile(ctx context.Context, instance *lvmv1alp
 	return ctrl.Result{}, nil
 }
 
-func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx)
 
 	vgNodeMap := make(map[string][]lvmv1alpha1.NodeStatus)
@@ -317,7 +317,7 @@ func (r *LVMClusterReconciler) updateLVMClusterStatus(ctx context.Context, insta
 	return nil
 }
 
-func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
+func (r *Reconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
 	logger := log.FromContext(ctx)
 	var vgCount int
 
@@ -361,7 +361,7 @@ func (r *LVMClusterReconciler) getExpectedVGCount(ctx context.Context, instance 
 }
 
 // getRunningPodImage gets the operator image and set it in reconciler struct
-func (r *LVMClusterReconciler) setRunningPodImage(ctx context.Context) error {
+func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 
 	if r.ImageName == "" {
 		// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
@@ -388,7 +388,7 @@ func (r *LVMClusterReconciler) setRunningPodImage(ctx context.Context) error {
 	return nil
 }
 
-func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context) (bool, error) {
+func (r *Reconciler) logicalVolumesExist(ctx context.Context) (bool, error) {
 	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
 	if err := r.Client.List(ctx, logicalVolumeList); err != nil {
 		return false, fmt.Errorf("failed to get TopoLVM LogicalVolume list: %w", err)
@@ -399,7 +399,7 @@ func (r *LVMClusterReconciler) logicalVolumesExist(ctx context.Context) (bool, e
 	return false, nil
 }
 
-func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		resourceDeletionList := []resource.Manager{
 			resource.TopoLVMStorageClass(),
@@ -436,11 +436,11 @@ func (r *LVMClusterReconciler) processDelete(ctx context.Context, instance *lvmv
 	return nil
 }
 
-func (r *LVMClusterReconciler) WarningEvent(_ context.Context, obj client.Object, reason EventReasonError, err error) {
+func (r *Reconciler) WarningEvent(_ context.Context, obj client.Object, reason EventReasonError, err error) {
 	r.Event(obj, corev1.EventTypeWarning, string(reason), err.Error())
 }
 
-func (r *LVMClusterReconciler) NormalEvent(ctx context.Context, obj client.Object, reason EventReasonInfo, message string) {
+func (r *Reconciler) NormalEvent(ctx context.Context, obj client.Object, reason EventReasonInfo, message string) {
 	if !log.FromContext(ctx).V(1).Enabled() {
 		return
 	}

@@ -15,16 +15,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// PersistentVolumeReconciler reconciles a PersistentVolume object
-type PersistentVolumeReconciler struct {
+// Reconciler reconciles a PersistentVolume object
+type Reconciler struct {
 	client    client.Client
 	apiReader client.Reader
 	recorder  record.EventRecorder
 }
 
-// NewPersistentVolumeReconciler returns PersistentVolumeReconciler.
-func NewPersistentVolumeReconciler(client client.Client, apiReader client.Reader, eventRecorder record.EventRecorder) *PersistentVolumeReconciler {
-	return &PersistentVolumeReconciler{
+// NewReconciler returns Reconciler.
+func NewReconciler(client client.Client, apiReader client.Reader, eventRecorder record.EventRecorder) *Reconciler {
+	return &Reconciler{
 		client:    client,
 		apiReader: apiReader,
 		recorder:  eventRecorder,
@@ -35,7 +35,7 @@ func NewPersistentVolumeReconciler(client client.Client, apiReader client.Reader
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 // Reconcile PV
-func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.Log.WithName("pv-controller").WithValues("Request.Name", req.Name, "Request.Namespace", req.Namespace)
 
 	pv := &corev1.PersistentVolume{}
@@ -63,7 +63,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.Funcs{
 		CreateFunc:  func(event.CreateEvent) bool { return true },
 		DeleteFunc:  func(event.DeleteEvent) bool { return false },

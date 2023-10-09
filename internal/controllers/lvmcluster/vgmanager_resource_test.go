@@ -41,7 +41,7 @@ const (
 	testNamespace = "default"
 )
 
-func newFakeLVMClusterReconciler(t *testing.T, objs ...client.Object) *LVMClusterReconciler {
+func newFakeReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	scheme, err := lvmv1alpha1.SchemeBuilder.Build()
 	assert.NilError(t, err, "creating scheme")
 
@@ -57,7 +57,7 @@ func newFakeLVMClusterReconciler(t *testing.T, objs ...client.Object) *LVMCluste
 	err = snapapi.AddToScheme(scheme)
 	assert.NilError(t, err, "adding snapshot api to scheme")
 
-	return &LVMClusterReconciler{
+	return &Reconciler{
 		Client:                fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build(),
 		Namespace:             "default",
 		LogPassthroughOptions: logpassthrough.NewOptions(),
@@ -94,7 +94,7 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 			},
 			Spec: testCase.lvmclusterSpec,
 		}
-		r := newFakeLVMClusterReconciler(t, lvmcluster)
+		r := newFakeReconciler(t, lvmcluster)
 		var unit = resource.VGManager()
 		err := unit.EnsureCreated(r, log.IntoContext(context.Background(), testr.New(t)), lvmcluster)
 		assert.NilError(t, err, "running EnsureCreated")

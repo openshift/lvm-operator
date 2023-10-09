@@ -31,7 +31,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 		}
 	}
 
-	r := &VGReconciler{}
+	r := &Reconciler{}
 
 	filters := filter.DefaultFilters(nil, nil, nil)
 	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
