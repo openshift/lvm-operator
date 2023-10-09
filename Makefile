@@ -40,8 +40,7 @@ OPERATOR_VERSION ?= 0.0.1
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
-# TODO: Upgrades > 1.25.3 will lead to createdAt being included in the CSV which currently breaks our change detection. Thus we need to stick to this version until we have a fix.
-OPERATOR_SDK_VERSION ?= 1.25.3
+OPERATOR_SDK_VERSION ?= 1.32.0
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -254,6 +253,12 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 		--patch '[{"op": "replace", "path": "/spec/replaces", "value": "$(REPLACES)"}]'
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(OPERATOR_VERSION) $(BUNDLE_METADATA_OPTS) \
 		--extra-service-accounts topolvm-node,vg-manager,topolvm-controller
+	# now we remove the createdAt annotation as otherwise our change detection will say that a the bundle changed during verification
+ifeq ($(UNAME), Darwin)
+		sed -i '' -e '/createdAt/d' ./bundle/manifests/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
+else
+		sed -i '/createdAt/d' ./bundle/manifests/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
+endif
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
