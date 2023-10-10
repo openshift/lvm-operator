@@ -110,6 +110,53 @@ Here are some tutorials on remotely connecting to a running binary:
 - [Visual Studio Code](https://github.com/golang/vscode-go/blob/master/docs/debugging.md#connect-to-headless-delve-with-target-specified-at-server-start-up)
 - [Goland](https://www.jetbrains.com/help/go/attach-to-running-go-processes-with-debugger.html#step-3-create-the-remote-run-debug-configuration-on-the-client-computer)
 
+### Executing Performance Tests against LVMS
+
+1. set up a running OpenShift cluster and install LVMS either via CSV or locally as described above.
+2. login via username & password, ideally kubeadmin, and get the token via `oc whoami -t` to later inject into the test suite. OIDC logins dont use tokens and cannot be used.
+2. download go and install it on your machine (https://golang.org/doc/install) if not already done
+3. use `go run ./test/performance --help` to see the available options for performance testing.
+
+Mainly we differentiate between 2 kinds of performance tests: Load/Stress Testing, and Idle testing.
+This is important to differentiate because for most installations on edge, LVMS will not be actively working all the time.
+This is because after volume groups and thin pools are created, they will not be touched frequently.
+Thus we need to test the performance of LVMS in an idle state (when volumes are created already) and in a load/stress state (when volumes are created and deleted frequently).
+
+Note that to properly get information on LVMS performance, we require the Openshift cluster to be running with monitoring enabled.
+We query a prometheus route for the commonly installed prometheus-k8s instance in Openshift and use it to aggregate performance metrics in quantiles.
+To actually access prometheus, we need to supply the performance test suite a token with the `-t` flag.
+
+#### Stress Testing
+
+For Stress testing, one should create a new LVMCluster and corresponding StorageClass in advance, e.g.:
+```shell
+oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage
+```
+
+One can run Stress Tests by running the performance tests like so:
+```shell
+go run ./test/performance -t $(oc whoami -t) -s lvms-vg1 -i 64
+```
+
+where `-s` is used to pass the generated storage class and `-i` represents the PVC/Pod combination amount to be used for stress testing.
+A higher iteration count will lead to longer stress testing times but also more accurate results.
+
+#### Idle Testing
+
+One can run Idle Tests by slightly adjusting the test execution:
+```shell
+go run ./test/performance -t $(oc whoami -t) --run-stress false --long-term-observation-window=5m
+```
+
+This will run the test suite for 5 minutes and observe the performance of LVMS in an idle state.
+Due to `--run-stress=false` no PVCs will be created and deleted, but the test suite will still observe the performance of LVMS in an idle state from the prometheus instance.
+Ideally the system should run for long periods of time in advance and then have a long observation window for most accurate quantile reports.
+
+#### Performance Test report
+
+The test report will be generated in the working directory of the performance tests and will be a `.toml` file with broken down metrics on Pod and Container level.
+We include 90/95/99 Quantiles for Memory and CPU as our main metrics. Other metrics are not included in the tool and have to be manually fetched via prometheus.
+
 ## Commits Per Pull Request
 
 Pull requests should always represent a complete logical change. Where possible, pull requests should be composed of multiple commits that each make small but meaningful changes. Striking a balance between minimal commits and logically complete changes is an art as much as a science, but when it is possible and reasonable, divide your pull request into more commits.

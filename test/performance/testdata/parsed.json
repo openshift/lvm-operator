@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "container": "vg-manager",
+          "pod": "vg-manager-x8r2r"
+        },
+        "value": [
+          1697017273.082,
+          "0.008179542666666668"
+        ]
+      },
+      {
+        "metric": {
+          "container": "csi-provisioner",
+          "pod": "topolvm-controller-5dd6c8bd59-dlzfw"
+        },
+        "value": [
+          1697017273.082,
+          "0.0015656359999999992"
+        ]
+      }
+    ]
+  }
+}

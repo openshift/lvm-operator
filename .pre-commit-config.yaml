@@ -25,6 +25,7 @@ repos:
         exclude: ^test/e2e/testdata
       - id: check-json
       - id: detect-private-key
+        exclude: ^vendor
       - id: end-of-file-fixer
         exclude: ^vendor
       - id: no-commit-to-branch
