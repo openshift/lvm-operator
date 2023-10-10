@@ -48,6 +48,8 @@ const (
 	lvRemoveCmd   = "/usr/sbin/lvremove"
 	lvChangeCmd   = "/usr/sbin/lvchange"
 	lvmDevicesCmd = "/usr/sbin/lvmdevices"
+
+	lvmsTag = "@lvms"
 )
 
 // VGReport represents the output of the `vgs --reportformat json` command
@@ -88,6 +90,7 @@ type LogicalVolume struct {
 type LVM interface {
 	CreateVG(vg VolumeGroup) error
 	ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error)
+	AddTagToVG(vgName string) error
 	DeleteVG(vg VolumeGroup) error
 	GetVG(name string) (VolumeGroup, error)
 
@@ -153,7 +156,7 @@ type PhysicalVolume struct {
 	DevSize string `json:"dev_size"`
 }
 
-// Create creates a new volume group
+// CreateVG creates a new volume group
 func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 	if vg.Name == "" {
 		return fmt.Errorf("failed to create volume group. Volume group name is empty")
@@ -163,7 +166,7 @@ func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 		return fmt.Errorf("failed to create volume group. Physical volume list is empty")
 	}
 
-	args := []string{vg.Name}
+	args := []string{vg.Name, "--addtag", lvmsTag}
 
 	for _, pv := range vg.PVs {
 		args = append(args, pv.PvName)
@@ -200,6 +203,22 @@ func (hlvm *HostLVM) ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error)
 	}
 
 	return vg, nil
+}
+
+// AddTagToVG adds a lvms tag to the volume group
+func (hlvm *HostLVM) AddTagToVG(vgName string) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to add tag to the volume group. Volume group name is empty")
+	}
+
+	args := []string{vgName, "--addtag", lvmsTag}
+
+	_, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to add tag to the volume group %q. %v", vgName, err)
+	}
+
+	return nil
 }
 
 // Delete deletes a volume group and the physical volumes associated with it
@@ -251,7 +270,7 @@ func (hlvm *HostLVM) GetVG(name string) (VolumeGroup, error) {
 	res := new(VGReport)
 
 	args := []string{
-		"vgs", "--units", "g", "--reportformat", "json",
+		"vgs", lvmsTag, "--units", "g", "--reportformat", "json",
 	}
 	if err := hlvm.execute(res, args...); err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to list volume groups. %v", err)
@@ -319,7 +338,7 @@ func (hlvm *HostLVM) ListPVs(vgName string) ([]PhysicalVolume, error) {
 func (hlvm *HostLVM) ListVGs() ([]VolumeGroup, error) {
 	res := new(VGReport)
 
-	if err := hlvm.execute(res, "vgs", "--reportformat", "json"); err != nil {
+	if err := hlvm.execute(res, "vgs", lvmsTag, "--reportformat", "json"); err != nil {
 		return nil, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 

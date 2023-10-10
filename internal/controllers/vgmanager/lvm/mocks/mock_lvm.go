@@ -20,6 +20,48 @@ func (_m *MockLVM) EXPECT() *MockLVM_Expecter {
 	return &MockLVM_Expecter{mock: &_m.Mock}
 }
 
+// AddTagToVG provides a mock function with given fields: vgName
+func (_m *MockLVM) AddTagToVG(vgName string) error {
+	ret := _m.Called(vgName)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(vgName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_AddTagToVG_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddTagToVG'
+type MockLVM_AddTagToVG_Call struct {
+	*mock.Call
+}
+
+// AddTagToVG is a helper method to define mock.On call
+//   - vgName string
+func (_e *MockLVM_Expecter) AddTagToVG(vgName interface{}) *MockLVM_AddTagToVG_Call {
+	return &MockLVM_AddTagToVG_Call{Call: _e.mock.On("AddTagToVG", vgName)}
+}
+
+func (_c *MockLVM_AddTagToVG_Call) Run(run func(vgName string)) *MockLVM_AddTagToVG_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_AddTagToVG_Call) Return(_a0 error) *MockLVM_AddTagToVG_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_AddTagToVG_Call) RunAndReturn(run func(string) error) *MockLVM_AddTagToVG_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateLV provides a mock function with given fields: lvName, vgName, sizePercent
 func (_m *MockLVM) CreateLV(lvName string, vgName string, sizePercent int) error {
 	ret := _m.Called(lvName, vgName, sizePercent)
