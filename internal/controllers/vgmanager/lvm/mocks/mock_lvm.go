@@ -20,6 +20,49 @@ func (_m *MockLVM) EXPECT() *MockLVM_Expecter {
 	return &MockLVM_Expecter{mock: &_m.Mock}
 }
 
+// ActivateLV provides a mock function with given fields: lvName, vgName
+func (_m *MockLVM) ActivateLV(lvName string, vgName string) error {
+	ret := _m.Called(lvName, vgName)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(lvName, vgName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_ActivateLV_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ActivateLV'
+type MockLVM_ActivateLV_Call struct {
+	*mock.Call
+}
+
+// ActivateLV is a helper method to define mock.On call
+//   - lvName string
+//   - vgName string
+func (_e *MockLVM_Expecter) ActivateLV(lvName interface{}, vgName interface{}) *MockLVM_ActivateLV_Call {
+	return &MockLVM_ActivateLV_Call{Call: _e.mock.On("ActivateLV", lvName, vgName)}
+}
+
+func (_c *MockLVM_ActivateLV_Call) Run(run func(lvName string, vgName string)) *MockLVM_ActivateLV_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_ActivateLV_Call) Return(_a0 error) *MockLVM_ActivateLV_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_ActivateLV_Call) RunAndReturn(run func(string, string) error) *MockLVM_ActivateLV_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AddTagToVG provides a mock function with given fields: vgName
 func (_m *MockLVM) AddTagToVG(vgName string) error {
 	ret := _m.Called(vgName)

@@ -102,6 +102,7 @@ type LVM interface {
 	LVExists(lvName, vgName string) (bool, error)
 	CreateLV(lvName, vgName string, sizePercent int) error
 	ExtendLV(lvName, vgName string, sizePercent int) error
+	ActivateLV(lvName, vgName string) error
 	DeleteLV(lvName, vgName string) error
 }
 
@@ -447,6 +448,19 @@ func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 	if _, err := hlvm.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...); err != nil {
 		return fmt.Errorf("failed to extend logical volume %q in the volume group %q using command '%s': %w",
 			lvName, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
+	}
+
+	return nil
+}
+
+// ActivateLV activates the logical volume
+func (hlvm *HostLVM) ActivateLV(lvName, vgName string) error {
+	lv := fmt.Sprintf("%s/%s", vgName, lvName)
+
+	// deactivate logical volume
+	_, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-ay", lv)
+	if err != nil {
+		return fmt.Errorf("failed to activate thin pool %q in volume group %q. %w", lvName, vgName, err)
 	}
 
 	return nil

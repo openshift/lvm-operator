@@ -243,7 +243,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		thinPool = lvm.LogicalVolume{
 			Name:            vg.Spec.ThinPoolConfig.Name,
 			VgName:          vg.GetName(),
-			LvAttr:          "twi-a-tz--",
+			LvAttr:          "twi---tz--",
 			LvSize:          "1.0G",
 			MetadataPercent: "10.0",
 		}
@@ -256,6 +256,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 			Lv: []lvm.LogicalVolume{thinPool},
 		}}}, nil).Once()
 		instances.LVM.EXPECT().ListVGs().Return([]lvm.VolumeGroup{createdVG}, nil).Twice()
+		instances.LVM.EXPECT().ActivateLV(thinPool.Name, vg.GetName()).Return(nil).Once()
 	})
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
@@ -284,7 +285,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	})
 
 	var oldReadyGeneration int64
-	By("verifiyng the VGStatus is now ready", func() {
+	By("verifying the VGStatus is now ready", func() {
 		checkDistributedEvent(corev1.EventTypeNormal, "all the available devices are attached to the volume group")
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
@@ -326,6 +327,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		instances.LVM.EXPECT().ListLVs(vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 			Lv: []lvm.LogicalVolume{thinPool},
 		}}}, nil).Once()
+		instances.LVM.EXPECT().ActivateLV(thinPool.Name, createdVG.Name).Return(nil).Once()
 	})
 
 	By("triggering the verification reconcile that should confirm the ready state", func() {
