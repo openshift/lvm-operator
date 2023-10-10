@@ -1,8 +1,8 @@
 # approval == this is a good idea /approve
 approvers:
   - suleymanakbas91
-  - brandisher
   - jeff-roche
+  - jakobmoellerdev
 # review == this code is good /lgtm
 reviewers:
   - suleymanakbas91
