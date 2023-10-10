@@ -482,8 +482,12 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 			}
 
 			if lvAttr.State != StateActive {
-				return fmt.Errorf("found inactive logical volume, maybe external repairs are necessary/already happening or there is another"+
-					"entity conflicting with vg-manager, cannot proceed until volume is activated again: lv_attr: %s", lvAttr)
+				//If inactive, try activating it
+				err := r.LVM.ActivateLV(lv.Name, volumeGroup.Name)
+				if err != nil {
+					return fmt.Errorf("could not activate the inactive logical volume, maybe external repairs are necessary/already happening or there is another"+
+						"entity conflicting with vg-manager, cannot proceed until volume is activated again: lv_attr: %s", lvAttr)
+				}
 			}
 			metadataPercentage, err := strconv.ParseFloat(lv.MetadataPercent, 32)
 			if err != nil {
