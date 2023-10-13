@@ -399,3 +399,19 @@ cluster-deploy:
 	IMAGE_REGISTRY=image-registry.openshift-image-registry.svc:5000 \
 	REGISTRY_NAMESPACE=openshift-storage \
 	$(MAKE) deploy
+
+# Security Analysis
+SEVERITY_THRESHOLD ?= medium
+SNYK_ORG ?= 81de31f3-6dff-46ff-af37-664e272a9fe3
+
+.PHONY: vuln-scan-code
+vuln-scan-code:
+	snyk code test --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+
+.PHONY: vuln-scan-deps
+vuln-scan-deps:
+	snyk test --all-projects --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+
+.PHONY: vuln-scan-container
+vuln-scan-container:
+	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
