@@ -151,25 +151,6 @@ func (r *Reconciler) reconcile(
 		}
 	}
 
-	// Read the lvmd config file
-	lvmdConfig, err := r.LVMD.Load()
-	if err != nil {
-		err = fmt.Errorf("failed to read the lvmd config file: %w", err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
-			logger.Error(err, "failed to set status to failed")
-		}
-		return ctrl.Result{}, err
-	}
-
-	lvmdConfigWasMissing := false
-	if lvmdConfig == nil {
-		lvmdConfigWasMissing = true
-		lvmdConfig = &lvmd.Config{
-			SocketName: constants.DefaultLVMdSocket,
-		}
-	}
-	existingLvmdConfig := *lvmdConfig
-
 	blockDevices, err := r.LSBLK.ListBlockDevices()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
@@ -204,9 +185,8 @@ func (r *Reconciler) reconcile(
 	vgExistsInLVM := false
 	for _, vg := range vgs {
 		if volumeGroup.Name == vg.Name {
-			if len(vg.PVs) > 0 {
-				vgExistsInLVM = true
-			}
+			vgExistsInLVM = true
+			break
 		}
 	}
 
@@ -237,6 +217,11 @@ func (r *Reconciler) reconcile(
 
 		msg := "all the available devices are attached to the volume group"
 		logger.Info(msg)
+
+		if err := r.applyLVMDConfig(ctx, volumeGroup, devices); err != nil {
+			return reconcileAgain, err
+		}
+
 		if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, devices); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
 		} else if updated {
@@ -285,6 +270,42 @@ func (r *Reconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	if err := r.applyLVMDConfig(ctx, volumeGroup, devices); err != nil {
+		return reconcileAgain, err
+	}
+
+	if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, devices); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
+	} else if updated {
+		msg := "all the available devices are attached to the volume group"
+		r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
+	}
+
+	return reconcileAgain, nil
+}
+
+func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices) error {
+	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
+
+	// Read the lvmd config file
+	lvmdConfig, err := r.LVMD.Load()
+	if err != nil {
+		err = fmt.Errorf("failed to read the lvmd config file: %w", err)
+		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
+			logger.Error(err, "failed to set status to failed")
+		}
+		return err
+	}
+
+	lvmdConfigWasMissing := false
+	if lvmdConfig == nil {
+		lvmdConfigWasMissing = true
+		lvmdConfig = &lvmd.Config{
+			SocketName: constants.DefaultLVMdSocket,
+		}
+	}
+	existingLvmdConfig := *lvmdConfig
+
 	// Add the volume group to device classes inside lvmd config if not exists
 	found := false
 	for _, deviceClass := range lvmdConfig.DeviceClasses {
@@ -323,21 +344,14 @@ func (r *Reconciler) reconcile(
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
 			}
-			return ctrl.Result{}, err
+			return err
 		}
 		msg := "updated lvmd config with new deviceClasses"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
 	}
 
-	if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, devices); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
-	} else if updated {
-		msg := "all the available devices are attached to the volume group"
-		r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
-	}
-
-	return reconcileAgain, nil
+	return nil
 }
 
 func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
