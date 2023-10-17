@@ -164,7 +164,7 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-generated.sh
 
 test: manifests generate envtest godeps-update ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v "e2e"`
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
 ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
 endif
@@ -311,6 +311,16 @@ DISK_INSTALL ?= false
 e2e: ginkgo ## Build and run e2e tests.
 	cd test/e2e && $(GINKGO) build
 	cd test/e2e && ./e2e.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) --disk-install=$(DISK_INSTALL) -ginkgo.v
+
+performance-stress-test: ## Build and run stress tests. Requires a fully setup LVMS installation. if you receive an error during running because of a missing token it might be because you have not logged in via token authentication but OIDC. you need a token login to run the performance test.
+	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage
+	go run ./test/performance -t $(oc whoami -t) -s lvms-vg1 -i 64
+	oc delete -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage --cascade=foreground --wait
+
+performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS installation. if you receive an error during running because of a missing token it might be because you have not logged in via token authentication but OIDC. you need a token login to run the performance test.
+	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage
+	go run ./test/performance -t $(oc whoami -t) --run-stress false --long-term-observation-window=30m
+	oc delete -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage --cascade=foreground --wait
 
 ##@ Tools
 
