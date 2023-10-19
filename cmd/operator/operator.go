@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
 	"github.com/spf13/cobra"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -161,7 +162,13 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			Port: 9443,
 		}},
 		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{operatorNamespace: {}},
+			ByObject: map[client.Object]cache.ByObject{
+				&lvmv1alpha1.LVMCluster{}:               {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+				&lvmv1alpha1.LVMVolumeGroup{}:           {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{}: {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+				&appsv1.Deployment{}:                    {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+				&appsv1.DaemonSet{}:                     {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+			},
 		},
 		HealthProbeBindAddress:              opts.healthProbeAddr,
 		LeaderElectionResourceLockInterface: le.Lock,
