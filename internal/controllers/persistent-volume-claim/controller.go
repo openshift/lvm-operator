@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/pkg/errors"
@@ -111,12 +112,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Publish an event if the requested storage is greater than the available capacity
 	if !found {
-		r.Recorder.Event(pvc, "Warning", "NotEnoughCapacity",
-			fmt.Sprintf("Requested storage (%s) is greater than available capacity on any node (%s).", requestedStorage.String(), strings.Join(nodeMessage, ",")))
-		logger.Info("Event published for the PVC", "PVC", req.NamespacedName)
+		msg := fmt.Sprintf("Requested storage (%s) is greater than available capacity on any node (%s).", requestedStorage.String(), strings.Join(nodeMessage, ","))
+		r.Recorder.Event(pvc, "Warning", "NotEnoughCapacity", msg)
+		logger.V(7).Info(msg)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
