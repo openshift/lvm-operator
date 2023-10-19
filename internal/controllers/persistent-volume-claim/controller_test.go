@@ -30,6 +30,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 		objs                     []client.Object
 		wantErr                  bool
 		expectNoStorageAvailable bool
+		expectRequeue            bool
 	}{
 		{
 			name: "testing set deletionTimestamp",
@@ -107,6 +108,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			expectNoStorageAvailable: true,
+			expectRequeue:            true,
 		},
 		{
 			name: "testing PVC requesting more storage than capacity in the node",
@@ -134,6 +136,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			expectNoStorageAvailable: true,
+			expectRequeue:            true,
 		},
 		{
 			name: "testing PVC requesting less storage than capacity in the node",
@@ -161,6 +164,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			expectNoStorageAvailable: false,
+			expectRequeue:            true,
 		},
 		{
 			name: "testing PVC requesting less storage than capacity in one node, having another node without annotation",
@@ -191,6 +195,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			expectNoStorageAvailable: false,
+			expectRequeue:            true,
 		},
 	}
 	for _, tt := range tests {
@@ -205,8 +210,12 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				t.Errorf("Reconcile() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, controllerruntime.Result{}) {
+			if !tt.expectRequeue && !reflect.DeepEqual(got, controllerruntime.Result{}) {
 				t.Errorf("Reconcile() got non default Result")
+				return
+			}
+			if tt.expectRequeue && !reflect.DeepEqual(got, controllerruntime.Result{RequeueAfter: 15 * time.Second}) {
+				t.Errorf("Reconcile() got an unexpected Result")
 				return
 			}
 
