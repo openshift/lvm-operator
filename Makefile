@@ -161,6 +161,7 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
 	hack/verify-deps.sh
 	hack/verify-bundle.sh
+	hack/verify-catalog.sh
 	hack/verify-generated.sh
 
 test: manifests generate envtest godeps-update ## Run tests.
@@ -285,12 +286,14 @@ ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+.PHONY: catalog-render
+catalog-render: opm ## Render the catalog based on the given bundle
+	$(OPM) render $(BUNDLE_IMG) -oyaml > ./catalog/lvms-operator/operator.yaml
+	$(OPM) validate ./catalog
+
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool $(IMAGE_BUILD_CMD) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+catalog-build: opm catalog-render ## Build a catalog image.
+	$(IMAGE_BUILD_CMD) build -f catalog.Dockerfile -t $(CATALOG_IMG) .
 
 # Push the catalog image.
 .PHONY: catalog-push
@@ -363,7 +366,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.30.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
