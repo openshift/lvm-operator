@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -109,6 +110,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		nodeMessage = append(nodeMessage, fmt.Sprintf("node %s has %s free storage", node.Name, prettyByteSize(capacityQuantity.Value())))
 	}
+
+	// sort the message alphabetically so we always publish the same event
+	sort.Strings(nodeMessage)
 
 	// Publish an event if the requested storage is greater than the available capacity
 	if !found {
