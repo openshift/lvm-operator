@@ -1,0 +1,6 @@
+---
+schema: olm.channel
+package: lvms-operator
+name: alpha
+entries:
+  - name: lvms-operator.v0.0.1
