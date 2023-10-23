@@ -18,6 +18,7 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -32,7 +33,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -123,7 +124,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			if err := r.Create(ctx, nodeStatus); err != nil {
 				return ctrl.Result{}, fmt.Errorf("could not create previously non-existing LVMVolumeGroupNodeStatus: %w", err)
 			}
@@ -330,27 +331,39 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
 	}
 
+	if err := r.updateLVMDConfigAfterReconcile(ctx, volumeGroup, &existingLvmdConfig, lvmdConfig, lvmdConfigWasMissing); err != nil {
+		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, devices, err); err != nil {
+			logger.Error(err, "failed to set status to failed")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (r *Reconciler) updateLVMDConfigAfterReconcile(
+	ctx context.Context,
+	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
+	oldCFG, newCFG *lvmd.Config,
+	wasMissing bool,
+) error {
+	logger := log.FromContext(ctx)
 	// Apply and save lvmd config
-	if !cmp.Equal(existingLvmdConfig, lvmdConfig) {
-		if lvmdConfigWasMissing {
+	if !cmp.Equal(oldCFG, newCFG) {
+		if wasMissing {
 			// The lvmdconfig file does not exist and will be created.
 			msg := "lvmd config file doesn't exist, will attempt to create a fresh config"
 			logger.Info(msg)
 			r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigMissing, msg)
 		}
 
-		if err := r.LVMD.Save(lvmdConfig); err != nil {
-			err := fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, devices, err); err != nil {
-				logger.Error(err, "failed to set status to failed")
-			}
-			return err
+		if err := r.LVMD.Save(newCFG); err != nil {
+			return fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 		}
 		msg := "updated lvmd config with new deviceClasses"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
 	}
-
 	return nil
 }
 
@@ -384,7 +397,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	// Check if volume group exists
 	vg, err := r.LVM.GetVG(volumeGroup.Name)
 	if err != nil {
-		if err != lvm.ErrVolumeGroupNotFound {
+		if !errors.Is(err, lvm.ErrVolumeGroupNotFound) {
 			return fmt.Errorf("failed to get volume group %s, %w", volumeGroup.GetName(), err)
 		}
 		logger.Info("volume group not found, assuming it was already deleted and continuing")
@@ -496,7 +509,7 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 			}
 
 			if lvAttr.State != StateActive {
-				//If inactive, try activating it
+				// If inactive, try activating it
 				err := r.LVM.ActivateLV(lv.Name, volumeGroup.Name)
 				if err != nil {
 					return fmt.Errorf("could not activate the inactive logical volume, maybe external repairs are necessary/already happening or there is another"+
@@ -522,6 +535,9 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 }
 
 func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config *lvmv1alpha1.ThinPoolConfig) error {
+	if config == nil {
+		return fmt.Errorf("thin pool config is nil and cannot be added to volume group")
+	}
 	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
 
 	resp, err := r.LVM.ListLVs(vgName)
@@ -559,19 +575,37 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 }
 
 func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
-	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
-
-	vg, err := r.LVM.GetVG(vgName)
-	if err != nil {
-		if err != lvm.ErrVolumeGroupNotFound {
-			return fmt.Errorf("failed to get volume group. %q, %v", vgName, err)
-		}
-		return nil
+	logger := log.FromContext(ctx).WithValues("VGName", vgName)
+	logger = logger.WithValues("ThinPool", config.Name)
+	if lvSize == "" {
+		return fmt.Errorf("lvSize is empty and cannot be used for extension")
+	}
+	if len(lvSize) < 2 {
+		return fmt.Errorf("lvSize is too short (maybe missing unit) and cannot be used for extension")
 	}
 
 	thinPoolSize, err := strconv.ParseFloat(lvSize[:len(lvSize)-1], 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse lvSize. %v", err)
+	}
+
+	vg, err := r.LVM.GetVG(vgName)
+	if err != nil {
+		return fmt.Errorf("failed to get volume group. %q, %v", vgName, err)
+	}
+	if vg.VgSize == "" {
+		return fmt.Errorf("VgSize is empty and cannot be used for extension")
+	}
+	if len(vg.VgSize) < 2 {
+		return fmt.Errorf("VgSize is too short (maybe missing unit) and cannot be used for extension")
+	}
+
+	if vgUnit, lvUnit := vg.VgSize[len(vg.VgSize)-1], lvSize[len(lvSize)-1]; vgUnit != lvUnit {
+		return fmt.Errorf("VgSize (%s) and lvSize (%s), units do not match and cannot be used for extension",
+			string(vgUnit), string(lvUnit))
+	} else if string(vgUnit) != "g" {
+		return fmt.Errorf("VgSize (%s) and lvSize (%s), units are not in floating point based gibibytes and cannot be used for extension",
+			string(vgUnit), string(lvUnit))
 	}
 
 	vgSize, err := strconv.ParseFloat(vg.VgSize[:len(vg.VgSize)-1], 64)
@@ -608,13 +642,14 @@ func (r *Reconciler) matchesThisNode(ctx context.Context, selector *corev1.NodeS
 }
 
 // WarningEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
-func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonError, err error) {
+func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonError, errMsg error) {
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 	nodeStatus.SetName(r.NodeName)
 	nodeStatus.SetNamespace(r.Namespace)
 	// even if the get does not succeed we can still issue an event, just without UUID / resourceVersion
-	_ = r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)
-	r.Event(nodeStatus, corev1.EventTypeWarning, string(reason), err.Error())
+	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err == nil {
+		r.Event(nodeStatus, corev1.EventTypeWarning, string(reason), errMsg.Error())
+	}
 	for _, ref := range obj.GetOwnerReferences() {
 		owner := &v1.PartialObjectMetadata{}
 		owner.SetName(ref.Name)
@@ -623,10 +658,10 @@ func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolum
 		owner.SetGroupVersionKind(schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind))
 		r.Event(owner, corev1.EventTypeWarning, string(reason),
 			fmt.Errorf("error on node %s in volume group %s: %w",
-				client.ObjectKeyFromObject(nodeStatus), client.ObjectKeyFromObject(obj), err).Error())
+				client.ObjectKeyFromObject(nodeStatus), client.ObjectKeyFromObject(obj), errMsg).Error())
 	}
 	r.Event(obj, corev1.EventTypeWarning, string(reason),
-		fmt.Errorf("error on node %s: %w", client.ObjectKeyFromObject(nodeStatus), err).Error())
+		fmt.Errorf("error on node %s: %w", client.ObjectKeyFromObject(nodeStatus), errMsg).Error())
 }
 
 // NormalEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
@@ -638,8 +673,9 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolume
 	nodeStatus.SetName(r.NodeName)
 	nodeStatus.SetNamespace(r.Namespace)
 	// even if the get does not succeed we can still issue an event, just without UUID / resourceVersion
-	_ = r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)
-	r.Event(nodeStatus, corev1.EventTypeNormal, string(reason), message)
+	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err == nil {
+		r.Event(nodeStatus, corev1.EventTypeNormal, string(reason), message)
+	}
 	for _, ref := range obj.GetOwnerReferences() {
 		owner := &v1.PartialObjectMetadata{}
 		owner.SetName(ref.Name)

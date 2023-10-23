@@ -440,7 +440,7 @@ func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
 	return nil
 }
 
-// ExtendLV extends the logical volume
+// ExtendLV extends the logical volume, sizePercent has to be calculated based on virtual gibibytes.
 func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 
 	args := []string{"-l", fmt.Sprintf("%d%%Vg", sizePercent), fmt.Sprintf("%s/%s", vgName, lvName)}

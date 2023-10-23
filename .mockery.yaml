@@ -10,6 +10,9 @@ packages:
   github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm:
     interfaces:
       LVM:
+  github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd:
+    interfaces:
+      Configurator:
   github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs:
     interfaces:
       Wipefs:

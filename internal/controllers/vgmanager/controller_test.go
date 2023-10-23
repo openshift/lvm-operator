@@ -2,6 +2,7 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,8 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	lvmmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm/mocks"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
+	lvmdmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd/mocks"
+	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
@@ -29,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -42,8 +46,36 @@ func TestVGManager(t *testing.T) {
 var _ = Describe("vgmanager controller", func() {
 	Context("verifying standard behavior with node selector", func() {
 		It("should be reconciled successfully with a mocked block device", testMockedBlockDeviceOnHost)
+		Context("edge cases during reconciliation", func() {
+			It("should fail on error while fetching LVMVolumeGroup", testErrorOnGetLVMVolumeGroup)
+			It("should correctly handle node selector", testNodeSelector)
+			It("should handle LVMD edge cases correctly", testLVMD)
+			It("should handle thin pool creation correctly", testThinPoolCreation)
+			It("should handle thin pool extension cases correctly", testThinPoolExtension)
+		})
+		Context("event tests", func() {
+			It("should correctly emit events", testEvents)
+		})
 	})
 })
+
+func init() {
+	if err := lvmv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		panic(err)
+	}
+	if err := topolvmv1.AddToScheme(scheme.Scheme); err != nil {
+		panic(err)
+	}
+	if err := snapapi.AddToScheme(scheme.Scheme); err != nil {
+		panic(err)
+	}
+	if err := secv1.Install(scheme.Scheme); err != nil {
+		panic(err)
+	}
+	if err := configv1.Install(scheme.Scheme); err != nil {
+		panic(err)
+	}
+}
 
 type testInstances struct {
 	LVM   *lvmmocks.MockLVM
@@ -79,11 +111,6 @@ func setupInstances() testInstances {
 		hostnameLabelKey: hostname,
 	}}}
 
-	Expect(lvmv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(topolvmv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(snapapi.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(secv1.Install(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(configv1.Install(scheme.Scheme)).NotTo(HaveOccurred())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
 		WithObjects(node, namespace).
 		Build()
@@ -345,4 +372,300 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		}))
 		Expect(oldReadyGeneration).To(Equal(nodeStatus.GetGeneration()))
 	})
+
+	By("triggering the delete of the VolumeGroup", func() {
+		Expect(instances.client.Delete(ctx, vg)).To(Succeed())
+		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
+		Expect(vg.Finalizers).ToNot(BeEmpty())
+		Expect(vg.DeletionTimestamp).ToNot(BeNil())
+		instances.LVM.EXPECT().GetVG(createdVG.Name).Return(createdVG, nil).Once()
+		instances.LVM.EXPECT().LVExists(thinPool.Name, createdVG.Name).Return(true, nil).Once()
+		instances.LVM.EXPECT().DeleteLV(thinPool.Name, createdVG.Name).Return(nil).Once()
+		instances.LVM.EXPECT().DeleteVG(createdVG).Return(nil).Once()
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).ToNot(Succeed())
+		lvmdConfig, err := instances.LVMD.Load()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lvmdConfig).To(BeNil())
+	})
+}
+
+func testNodeSelector(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
+	volumeGroup.SetName("vg1")
+	volumeGroup.SetNamespace("openshift-storage")
+	volumeGroup.Spec.NodeSelector = &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+		MatchExpressions: []corev1.NodeSelectorRequirement{{
+			Key:      "kubernetes.io/hostname",
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   []string{"test-node"},
+		}},
+	}}}
+
+	invalidVolumeGroup := volumeGroup.DeepCopy()
+	invalidVolumeGroup.SetName("vg2")
+	invalidVolumeGroup.Spec.NodeSelector = &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+		MatchExpressions: []corev1.NodeSelectorRequirement{{
+			Key:      "kubernetes.io/hostname",
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   []string{"test-node-not-existing"},
+		}},
+	}}}
+
+	matchingNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node", Labels: map[string]string{
+		"kubernetes.io/hostname": "test-node",
+	}}}
+	notMatchingNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-2", Labels: map[string]string{
+		"kubernetes.io/hostname": "test-node-2",
+	}}}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
+		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
+		Build()
+	r := &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	By("first verifying correct node resolution")
+	res, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
+	Expect(err).ToNot(HaveOccurred(), "should not error on valid node selector")
+	Expect(res).To(Equal(reconcile.Result{}))
+
+	By("then verifying correct node resolution with invalid node selector (skipping reconcile)")
+	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(invalidVolumeGroup)})
+	Expect(err).ToNot(HaveOccurred(), "should not error on invalid node selector, but filter out")
+	Expect(res).To(Equal(reconcile.Result{}))
+
+	By("then verifying incorrect node resolution because nodestatus cannot be created")
+	funcs := interceptor.Funcs{Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+		if obj.GetName() == "test-node" {
+			return fmt.Errorf("mock creation failure for LVMVolumeGroupNodeStatus")
+		}
+		return client.Create(ctx, obj, opts...)
+	}}
+	fakeClient = fake.NewClientBuilder().WithScheme(scheme.Scheme).
+		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
+		WithInterceptorFuncs(funcs).
+		Build()
+	r = &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	By("verifying incorrect node resolution because nodestatus cannot be created")
+	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
+	Expect(err).To(HaveOccurred(), "should error on valid node selector due to failure of nodestatus creation")
+	Expect(res).To(Equal(reconcile.Result{}))
+
+	fakeClient = fake.NewClientBuilder().WithScheme(scheme.Scheme).
+		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
+		Build()
+	r = &Reconciler{Client: fakeClient, Scheme: scheme.Scheme}
+	By("Verifying node match error if NodeName is not set")
+	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
+	Expect(err).To(HaveOccurred(), "should error during node match resolution")
+	Expect(res).To(Equal(reconcile.Result{}))
+
+	By("then verifying incorrect node resolution because nodestatus cannot be created")
+	funcs = interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		if key.Name == matchingNode.Name {
+			if nodeStatus, ok := obj.(*lvmv1alpha1.LVMVolumeGroupNodeStatus); ok {
+				return fmt.Errorf("mock get failure for LVMVolumeGroupNodeStatus %s", nodeStatus.GetName())
+			}
+		}
+		return client.Get(ctx, key, obj, opts...)
+	}}
+	fakeClient = fake.NewClientBuilder().WithScheme(scheme.Scheme).
+		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
+		WithInterceptorFuncs(funcs).
+		Build()
+	r = &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	By("verifying incorrect node resolution because nodestatus cannot be fetched from cluster")
+	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
+	Expect(err).To(HaveOccurred(), "should error on valid node selector due to failure of nodestatus fetch")
+	Expect(res).To(Equal(reconcile.Result{}))
+}
+
+func testErrorOnGetLVMVolumeGroup(ctx context.Context) {
+	funcs := interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		return fmt.Errorf("mock get failure for LVMVolumeGroup %s", key.Name)
+	}}
+	r := &Reconciler{Client: fake.NewClientBuilder().
+		WithInterceptorFuncs(funcs).
+		WithScheme(scheme.Scheme).Build(), Scheme: scheme.Scheme}
+	_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "openshift-storage"},
+	})})
+	Expect(err).To(HaveOccurred(), "should error if volume group cannot be fetched")
+}
+
+func testEvents(ctx context.Context) {
+	fakeRecorder := record.NewFakeRecorder(3)
+	fakeRecorder.IncludeObject = true
+
+	vg := &lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}
+	vg.SetOwnerReferences([]metav1.OwnerReference{{Name: "owner", Kind: "Owner", UID: "123", APIVersion: "v1alpha1"}})
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+
+	clnt := fake.NewClientBuilder().WithObjects(vg, nodeStatus).WithScheme(scheme.Scheme).Build()
+	r := &Reconciler{Client: clnt, Scheme: scheme.Scheme, EventRecorder: fakeRecorder, NodeName: nodeStatus.GetName()}
+
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	r.NormalEvent(ctx, vg, "normal_reason", "message")
+	Eventually(ctx, fakeRecorder.Events).Should(Receive(
+		Equal("Normal normal_reason message involvedObject{kind=LVMVolumeGroupNodeStatus,apiVersion=lvm.topolvm.io/v1alpha1}")))
+	Eventually(ctx, fakeRecorder.Events).Should(Receive(
+		Equal("Normal normal_reason update on node /test-node in volume group test/test: message involvedObject{kind=Owner,apiVersion=v1alpha1}")))
+	Eventually(ctx, fakeRecorder.Events).Should(Receive(
+		Equal("Normal normal_reason update on node /test-node: message involvedObject{kind=,apiVersion=}")))
+
+	r.WarningEvent(ctx, vg, "warning_reason", errors.New("test"))
+	Eventually(ctx, fakeRecorder.Events).Should(Receive(
+		Equal("Warning warning_reason test involvedObject{kind=LVMVolumeGroupNodeStatus,apiVersion=lvm.topolvm.io/v1alpha1}")))
+	Eventually(ctx, fakeRecorder.Events).Should(Receive(
+		Equal("Warning warning_reason error on node /test-node in volume group test/test: test involvedObject{kind=Owner,apiVersion=v1alpha1}")))
+	Eventually(ctx, fakeRecorder.Events).Should(Receive(
+		Equal("Warning warning_reason error on node /test-node: test involvedObject{kind=,apiVersion=}")))
+}
+
+func testLVMD(ctx context.Context) {
+	r := &Reconciler{Scheme: scheme.Scheme}
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	vg := &lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}
+	devices := &FilteredBlockDevices{}
+
+	r.Client = fake.NewClientBuilder().WithObjects(vg).WithScheme(scheme.Scheme).Build()
+	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
+	r.LVMD = mockLVMD
+	mockLVM := lvmmocks.NewMockLVM(GinkgoT())
+	r.LVM = mockLVM
+
+	mockLVMD.EXPECT().Load().Once().Return(nil, fmt.Errorf("mock load failure"))
+	mockLVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mock list failure"))
+	err := r.applyLVMDConfig(ctx, vg, devices)
+	Expect(err).To(HaveOccurred(), "should error if lvmd config cannot be loaded and/or status cannot be set")
+
+	mockLVMD.EXPECT().Load().Once().Return(&lvmd.Config{}, nil)
+	mockLVMD.EXPECT().Save(mock.Anything).Once().Return(fmt.Errorf("mock save failure"))
+	mockLVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mock list failure"))
+	err = r.applyLVMDConfig(ctx, vg, devices)
+	Expect(err).To(HaveOccurred(), "should error if lvmd config cannot be saved and/or status cannot be set")
+}
+
+func testThinPoolExtension(ctx context.Context) {
+	r := &Reconciler{Scheme: scheme.Scheme}
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+	mockLVM := lvmmocks.NewMockLVM(GinkgoT())
+	r.LVM = mockLVM
+
+	err := r.extendThinPool(ctx, "vg1", "", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if lvSize is empty")
+
+	err = r.extendThinPool(ctx, "vg1", "1", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if lvSize has no unit")
+
+	mockLVM.EXPECT().GetVG("vg1").Once().Return(lvm.VolumeGroup{}, fmt.Errorf("mocked error"))
+	err = r.extendThinPool(ctx, "vg1", "26.96g", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if GetVG fails")
+
+	err = r.extendThinPool(ctx, "vg1", "26.96gxxx", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if lvSize is malformatted")
+
+	lvmVG := lvm.VolumeGroup{Name: "vg1"}
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if vgSize is empty")
+
+	lvmVG.VgSize = "1"
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if vgSize has no unit")
+
+	lvmVG.VgSize = "1m"
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if vg unit does not match lv unit")
+
+	lvmVG.VgSize = "1m"
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	err = r.extendThinPool(ctx, "vg1", "2m", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if unit is not gibibytes")
+
+	lvmVG.VgSize = "1123xxg"
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if vgSize is malformatted")
+
+	lvmVG.VgSize = "3g"
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	err = r.extendThinPool(ctx, "vg1", "3g", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).ToNot(HaveOccurred(), "should fast skip if no expansion is needed")
+
+	lvmVG.VgSize = "5g"
+	thinPool := &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1", SizePercent: 90}
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().ExtendLV(thinPool.Name, "vg1", thinPool.SizePercent).
+		Once().Return(fmt.Errorf("failed to extend lv"))
+	err = r.extendThinPool(ctx, "vg1", "3g", thinPool)
+	Expect(err).To(HaveOccurred(), "should fail if lvm extension fails")
+
+	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().ExtendLV(thinPool.Name, "vg1", thinPool.SizePercent).
+		Once().Return(nil)
+	err = r.extendThinPool(ctx, "vg1", "3g", thinPool)
+	Expect(err).ToNot(HaveOccurred(), "succeed if lvm extension succeeds")
+}
+
+func testThinPoolCreation(ctx context.Context) {
+	r := &Reconciler{Scheme: scheme.Scheme}
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+	mockLVM := lvmmocks.NewMockLVM(GinkgoT())
+	r.LVM = mockLVM
+
+	err := r.addThinPoolToVG(ctx, "vg1", nil)
+	Expect(err).To(HaveOccurred(), "should error if thin pool config is nil")
+
+	mockLVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("report error"))
+	err = r.addThinPoolToVG(ctx, "vg1", &lvmv1alpha1.ThinPoolConfig{})
+	Expect(err).To(HaveOccurred(), "should error if list lvs report fails")
+
+	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "blub"}},
+	}}}, nil)
+	err = r.addThinPoolToVG(ctx, "vg1", &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1"})
+	Expect(err).To(HaveOccurred(), "should error if thin pool attributes cannot be parsed")
+
+	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "rwi---tz--"}},
+	}}}, nil)
+	err = r.addThinPoolToVG(ctx, "vg1", &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1"})
+	Expect(err).To(HaveOccurred(), "should error if volume that is not thin pool already exists")
+
+	thinPool := &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1", SizePercent: 90}
+
+	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		Lv: []lvm.LogicalVolume{},
+	}}}, nil)
+	mockLVM.EXPECT().CreateLV(thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(fmt.Errorf("mocked error"))
+	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
+	Expect(err).To(HaveOccurred(), "should create thin pool if it does not exist, but should fail if that does not work")
+
+	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		Lv: []lvm.LogicalVolume{},
+	}}}, nil)
+	mockLVM.EXPECT().CreateLV(thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(nil)
+	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
+	Expect(err).ToNot(HaveOccurred(), "should create thin pool if it does not exist")
+
+	lvmVG := lvm.VolumeGroup{Name: "vg1", VgSize: "5g"}
+	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "twi---tz--", LvSize: "3g"}},
+	}}}, nil)
+	mockLVM.EXPECT().GetVG("vg1").Once().Return(lvmVG, nil)
+	mockLVM.EXPECT().ExtendLV(thinPool.Name, "vg1", thinPool.SizePercent).
+		Once().Return(nil)
+	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
+	Expect(err).ToNot(HaveOccurred(), "should not error if thin pool already exists, extension should work")
 }
