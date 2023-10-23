@@ -20,19 +20,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	osexec "os/exec"
 	"strings"
 
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
 )
 
-type lvmError string
-
-func (s lvmError) Error() string { return string(s) }
-
 var (
-	ErrVolumeGroupNotFound = lvmError("volume group not found")
+	ErrVolumeGroupNotFound = fmt.Errorf("volume group not found")
 )
+
+type ExitError interface {
+	ExitCode() int
+	error
+}
 
 const (
 	DefaultChunkSize = "128"
@@ -160,11 +160,11 @@ type PhysicalVolume struct {
 // CreateVG creates a new volume group
 func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 	if vg.Name == "" {
-		return fmt.Errorf("failed to create volume group. Volume group name is empty")
+		return fmt.Errorf("failed to create volume group: volume group name is empty")
 	}
 
 	if len(vg.PVs) == 0 {
-		return fmt.Errorf("failed to create volume group. Physical volume list is empty")
+		return fmt.Errorf("failed to create volume group: physical volume list is empty")
 	}
 
 	args := []string{vg.Name, "--addtag", lvmsTag}
@@ -184,11 +184,11 @@ func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 // ExtendVG Extend extends the volume group only if new physical volumes are available
 func (hlvm *HostLVM) ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error) {
 	if vg.Name == "" {
-		return VolumeGroup{}, fmt.Errorf("failed to extend volume group. Volume group name is empty")
+		return VolumeGroup{}, fmt.Errorf("failed to extend volume group: volume group name is empty")
 	}
 
 	if len(pvs) == 0 {
-		return VolumeGroup{}, fmt.Errorf("failed to extend volume group. Physical volume list is empty")
+		return VolumeGroup{}, fmt.Errorf("failed to extend volume group: physical volume list is empty")
 	}
 
 	args := []string{vg.Name}
@@ -239,7 +239,7 @@ func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
 	}
 
 	// Remove physical volumes
-	pvArgs := []string{}
+	var pvArgs []string
 	for _, pv := range vg.PVs {
 		pvArgs = append(pvArgs, pv.PvName)
 	}
@@ -249,9 +249,9 @@ func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
 	}
 
 	for _, pv := range vg.PVs {
-		_, err = hlvm.ExecuteCommandWithOutput(lvmDevicesCmd, "--delpvid", pv.UUID)
+		_, err = hlvm.ExecuteCommandWithOutputAsHost(lvmDevicesCmd, "--delpvid", pv.UUID)
 		if err != nil {
-			var exitError *osexec.ExitError
+			var exitError ExitError
 			if errors.As(err, &exitError) {
 				switch exitError.ExitCode() {
 				// Exit Code 5 On lvmdevices --delpvid means that the PV with that UUID no longer exists
@@ -364,6 +364,10 @@ func (hlvm *HostLVM) ListVGs() ([]VolumeGroup, error) {
 
 // ListLogicalVolumes returns list of logical volumes for a volume group
 func (hlvm *HostLVM) ListLVsByName(vgName string) ([]string, error) {
+	if vgName == "" {
+		return nil, fmt.Errorf("failed to list lvs by volume group: volume group name is empty")
+	}
+
 	res, err := hlvm.ListLVs(vgName)
 	if err != nil {
 		return []string{}, err
@@ -409,6 +413,12 @@ func (hlvm *HostLVM) LVExists(lvName, vgName string) (bool, error) {
 
 // DeleteLV deactivates the logical volume and deletes it
 func (hlvm *HostLVM) DeleteLV(lvName, vgName string) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to delete logical volume in volume group: volume group name is empty")
+	}
+	if lvName == "" {
+		return fmt.Errorf("failed to delete logical volume in volume group: logical volume name is empty")
+	}
 	lv := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// deactivate logical volume
@@ -428,6 +438,15 @@ func (hlvm *HostLVM) DeleteLV(lvName, vgName string) error {
 
 // CreateLV creates the logical volume
 func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to create logical volume in volume group: volume group name is empty")
+	}
+	if lvName == "" {
+		return fmt.Errorf("failed to create logical volume in volume group: logical volume name is empty")
+	}
+	if sizePercent <= 0 {
+		return fmt.Errorf("failed to create logical volume in volume group: size percent should be greater than 0")
+	}
 
 	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent),
 		"-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
@@ -442,6 +461,15 @@ func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
 
 // ExtendLV extends the logical volume
 func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to extend logical volume in volume group: volume group name is empty")
+	}
+	if lvName == "" {
+		return fmt.Errorf("failed to extend logical volume in volume group: logical volume name is empty")
+	}
+	if sizePercent <= 0 {
+		return fmt.Errorf("failed to extend logical volume in volume group: size percent should be greater than 0")
+	}
 
 	args := []string{"-l", fmt.Sprintf("%d%%Vg", sizePercent), fmt.Sprintf("%s/%s", vgName, lvName)}
 
@@ -455,6 +483,13 @@ func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 
 // ActivateLV activates the logical volume
 func (hlvm *HostLVM) ActivateLV(lvName, vgName string) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to activate logical volume in volume group: volume group name is empty")
+	}
+	if lvName == "" {
+		return fmt.Errorf("failed to activate logical volume in volume group: logical volume name is empty")
+	}
+
 	lv := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// deactivate logical volume
