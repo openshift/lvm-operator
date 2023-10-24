@@ -164,7 +164,7 @@ func (r *Reconciler) reconcile(
 	if wiped {
 		blockDevices, err = r.LSBLK.ListBlockDevices()
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to list block devices after wiping devices: %w", err)
 		}
 	}
 
