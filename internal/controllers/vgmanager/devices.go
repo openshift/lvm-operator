@@ -231,13 +231,16 @@ func hasExactDisk(blockDevices []lsblk.BlockDevice, deviceName string) (lsblk.Bl
 	return lsblk.BlockDevice{}, false
 }
 
+// evalSymlinks redefined to be able to override in tests
+var evalSymlinks = filepath.EvalSymlinks
+
 // getValidDevice will do various checks on a device path to make sure it is a valid device
 //
 //	An error will be returned if the device is invalid
 //	No error and an empty BlockDevice object will be returned if this device should be skipped (ex: duplicate device)
 func getValidDevice(devicePath string, blockDevices []lsblk.BlockDevice, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (lsblk.BlockDevice, error) {
 	// Make sure the symlink exists
-	diskName, err := filepath.EvalSymlinks(devicePath)
+	diskName, err := evalSymlinks(devicePath)
 	if err != nil {
 		return lsblk.BlockDevice{}, fmt.Errorf("unable to find symlink for disk path %s: %v", devicePath, err)
 	}

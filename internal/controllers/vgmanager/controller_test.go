@@ -24,12 +24,14 @@ import (
 	lvmmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm/mocks"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	lvmdmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd/mocks"
+	wipefsmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs/mocks"
 	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -47,6 +49,9 @@ var _ = Describe("vgmanager controller", func() {
 	Context("verifying standard behavior with node selector", func() {
 		It("should be reconciled successfully with a mocked block device", testMockedBlockDeviceOnHost)
 		Context("edge cases during reconciliation", func() {
+			Context("failure in LVM or LSBLK", func() {
+				It("reconcile failure because of external errors", testReconcileFailure)
+			})
 			It("should fail on error while fetching LVMVolumeGroup", testErrorOnGetLVMVolumeGroup)
 			It("should correctly handle node selector", testNodeSelector)
 			It("should handle LVMD edge cases correctly", testLVMD)
@@ -78,9 +83,10 @@ func init() {
 }
 
 type testInstances struct {
-	LVM   *lvmmocks.MockLVM
-	LSBLK *lsblkmocks.MockLSBLK
-	LVMD  lvmd.Configurator
+	LVM    *lvmmocks.MockLVM
+	LSBLK  *lsblkmocks.MockLSBLK
+	LVMD   lvmd.Configurator
+	Wipefs *wipefsmocks.MockWipefs
 
 	host      string
 	namespace *corev1.Namespace
@@ -101,6 +107,7 @@ func setupInstances() testInstances {
 
 	mockLSBLK := lsblkmocks.NewMockLSBLK(t)
 	mockLVM := lvmmocks.NewMockLVM(t)
+	mockWipefs := wipefsmocks.NewMockWipefs(t)
 	testLVMD := lvmd.NewFileConfigurator(filepath.Join(t.TempDir(), "lvmd.yaml"))
 
 	hostname := "test-host.vgmanager.test.io"
@@ -121,6 +128,7 @@ func setupInstances() testInstances {
 		LVM:       mockLVM,
 		LSBLK:     mockLSBLK,
 		LVMD:      testLVMD,
+		Wipefs:    mockWipefs,
 		namespace: namespace,
 		node:      node,
 		host:      hostname,
@@ -140,6 +148,7 @@ func setupInstances() testInstances {
 			LVMD:          testLVMD,
 			LVM:           mockLVM,
 			LSBLK:         mockLSBLK,
+			Wipefs:        mockWipefs,
 			NodeName:      node.GetName(),
 			Namespace:     namespace.GetName(),
 			Filters:       filter.DefaultFilters,
@@ -668,4 +677,151 @@ func testThinPoolCreation(ctx context.Context) {
 		Once().Return(nil)
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should not error if thin pool already exists, extension should work")
+}
+
+func testReconcileFailure(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	By("injecting mocked LVM and LSBLK")
+	instances := setupInstances()
+	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
+	instances.LVMD = mockLVMD
+
+	vg := &lvmv1alpha1.LVMVolumeGroup{}
+	By("creating the LVMVolumeGroup with the mocked device", func() {
+		vg.SetName("vg1")
+		vg.SetNamespace(instances.namespace.GetName())
+		vg.Spec.NodeSelector = instances.nodeSelector.DeepCopy()
+		vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{"/dev/sda"}}
+		vg.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(true)
+		vg.Spec.ThinPoolConfig = &lvmv1alpha1.ThinPoolConfig{
+			Name:               "thin-pool-1",
+			SizePercent:        90,
+			OverprovisionRatio: 10,
+		}
+		Expect(instances.client.Create(ctx, vg)).To(Succeed())
+		// First reconcile adds finalizer
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("triggering listblockdevices failure", func() {
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(nil, fmt.Errorf("mocked error"))
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to list block devices"))
+	})
+
+	By("triggering wipefs failure", func() {
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
+		}, nil)
+		instances.Wipefs.EXPECT().Wipe("/dev/sda").Once().Return(fmt.Errorf("mocked error"))
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to wipe devices"))
+	})
+
+	By("triggering lsblk failure after wipefs", func() {
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
+		}, nil)
+		instances.Wipefs.EXPECT().Wipe("/dev/sda").Once().Return(nil)
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(nil, fmt.Errorf("mocked error"))
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to list block devices after wiping devices"))
+	})
+
+	By("triggering failure on fetching new devices to add to volume group", func() {
+		blockDevices := []lsblk.BlockDevice{
+			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
+		}
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(blockDevices, nil)
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("unable to validate device"))
+	})
+
+	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
+	vg.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(false)
+	Expect(instances.client.Update(ctx, vg)).To(Succeed())
+
+	By("triggering failure because vg is not found even though there are no devices to be added", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
+		}, nil)
+		instances.LVM.EXPECT().ListVGs().Twice().Return(nil, nil)
+		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+
+		Expect(err.Error()).To(ContainSubstring("the volume group vg1 does not exist and there were no available devices to create it"))
+	})
+
+	By("triggering failure because vg is not found and the status update fails as well", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
+		}, nil)
+		instances.LVM.EXPECT().ListVGs().Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mocked error"))
+		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("the volume group vg1 does not exist and there were no available devices to create it"))
+	})
+
+	By("triggering failure because vg is found but thin-pool validation failed", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
+		}, nil)
+		vgs := []lvm.VolumeGroup{
+			{Name: "vg1", VgSize: "1g"},
+		}
+		instances.LVM.EXPECT().ListVGs().Twice().Return(vgs, nil)
+		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("mocked error"))
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+	})
+
+	By("triggering failure because vg is found but thin-pool validation failed and the status update as well", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
+		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
+		}, nil)
+		vgs := []lvm.VolumeGroup{
+			{Name: "vg1", VgSize: "1g"},
+		}
+		instances.LVM.EXPECT().ListVGs().Once().Return(vgs, nil)
+		instances.LVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mocked error"))
+		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("mocked error"))
+		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		Expect(err).To(HaveOccurred())
+	})
 }
