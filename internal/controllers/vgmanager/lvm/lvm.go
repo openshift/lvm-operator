@@ -459,7 +459,7 @@ func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
 	return nil
 }
 
-// ExtendLV extends the logical volume
+// ExtendLV extends the logical volume, sizePercent has to be calculated based on virtual gibibytes.
 func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to extend logical volume in volume group: volume group name is empty")
