@@ -2,15 +2,17 @@ package cluster
 
 import (
 	"context"
+	"fmt"
+	"testing"
+	"time"
+
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/library-go/pkg/config/leaderelection"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
-	"time"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func Test_nodeLookupSNOLeaderElection_Resolve(t *testing.T) {
@@ -28,9 +30,10 @@ func Test_nodeLookupSNOLeaderElection_Resolve(t *testing.T) {
 
 	tests := []struct {
 		name      string
+		clientErr error
 		nodes     []client.Object
 		resolveFn func(a *assert.Assertions, le configv1.LeaderElection) bool
-		errorFn   func(a *assert.Assertions, err error) bool
+		errorFn   assert.ErrorAssertionFunc
 	}{
 		{
 			name: "LeaderElection Test Multi-Master",
@@ -48,9 +51,7 @@ func Test_nodeLookupSNOLeaderElection_Resolve(t *testing.T) {
 				},
 			},
 			resolveFn: MultiNodeAssertion,
-			errorFn: func(a *assert.Assertions, err error) bool {
-				return a.NoError(err)
-			},
+			errorFn:   assert.NoError,
 		},
 		{
 			name: "LeaderElection Test SNO",
@@ -60,9 +61,20 @@ func Test_nodeLookupSNOLeaderElection_Resolve(t *testing.T) {
 				},
 			},
 			resolveFn: SNOAssertion,
-			errorFn: func(a *assert.Assertions, err error) bool {
-				return a.NoError(err)
+			errorFn:   assert.NoError,
+		},
+		{
+			name: "LeaderElection Test SNO",
+			nodes: []client.Object{
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: "master1", Labels: map[string]string{ControlPlaneIDLabel: ""}},
+				},
 			},
+			resolveFn: func(a *assert.Assertions, le configv1.LeaderElection) bool {
+				return true
+			},
+			errorFn:   assert.Error,
+			clientErr: fmt.Errorf("im random"),
 		},
 		{
 			name: "LeaderElection Test SNO (added workers)",
@@ -74,24 +86,30 @@ func Test_nodeLookupSNOLeaderElection_Resolve(t *testing.T) {
 				},
 			},
 			resolveFn: SNOAssertion,
-			errorFn: func(a *assert.Assertions, err error) bool {
-				return a.NoError(err)
-			},
+			errorFn:   assert.NoError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clnt := fake.NewClientBuilder().WithObjects(tt.nodes...).Build()
-			le := &nodeLookupSNOLeaderElection{
-				snoCheck: NewMasterSNOCheck(clnt),
-				defaultElectionConfig: leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{},
-					"test", "test-leader-id"),
+			clnt := fake.NewClientBuilder().WithObjects(tt.nodes...).
+				WithInterceptorFuncs(interceptor.Funcs{
+					List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						if tt.clientErr != nil {
+							return tt.clientErr
+						}
+						return client.List(ctx, list, opts...)
+					},
+				}).
+				Build()
+			le, err := NewLeaderElectionResolver(NewMasterSNOCheck(clnt), true, "test")
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 			got, err := le.Resolve(context.Background())
 			assertions := assert.New(t)
 
-			if !tt.errorFn(assertions, err) {
+			if !tt.errorFn(t, err) {
 				return
 			}
 			if !tt.resolveFn(assertions, got) {

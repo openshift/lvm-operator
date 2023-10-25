@@ -192,7 +192,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create LVMCluster controller: %w", err)
 	}
 
-	if !snoCheck.IsSNO(cmd.Context()) {
+	if isSNO, err := snoCheck.IsSNO(cmd.Context()); err != nil {
+		return fmt.Errorf("unable to determine if cluster is SNO: %w", err)
+	} else if !isSNO {
 		opts.SetupLog.Info("starting node-removal controller to observe node removal in MultiNode")
 		if err = (&removal.Reconciler{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
 			return fmt.Errorf("unable to create NodeRemovalController controller: %w", err)

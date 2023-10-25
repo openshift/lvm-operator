@@ -2,9 +2,10 @@ package cluster
 
 import (
 	"context"
+
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/library-go/pkg/config/leaderelection"
-	log "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ControlPlaneIDLabel identifies a control plane node by the given label,
@@ -40,7 +41,9 @@ type nodeLookupSNOLeaderElection struct {
 
 func (le *nodeLookupSNOLeaderElection) Resolve(ctx context.Context) (configv1.LeaderElection, error) {
 	logger := log.FromContext(ctx)
-	if !le.snoCheck.IsSNO(ctx) {
+	if isSNO, err := le.snoCheck.IsSNO(ctx); err != nil {
+		return configv1.LeaderElection{}, err
+	} else if !isSNO {
 		logger.Info("Using default Multi-Node leader election settings optimized for high-availability")
 		return le.defaultElectionConfig, nil
 	}
