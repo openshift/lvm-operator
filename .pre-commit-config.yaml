@@ -9,7 +9,7 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: check-added-large-files
       - id: fix-byte-order-marker
@@ -50,7 +50,7 @@ repos:
         exclude: ^vendor/
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.54.2
+    rev: v1.55.1
     hooks:
       - id: golangci-lint
         entry: golangci-lint run --fix
@@ -61,7 +61,7 @@ repos:
         language: golang
         require_serial: true
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.5
+    rev: v2.2.6
     hooks:
       - id: codespell
         args: [
