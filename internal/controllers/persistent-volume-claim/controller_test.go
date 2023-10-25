@@ -9,6 +9,10 @@ import (
 
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	persistentvolumeclaim "github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -21,6 +25,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+func TestPersistentVolumeClaimReconciler_SetupWithManager(t *testing.T) {
+	mgr, err := controllerruntime.NewManager(&rest.Config{}, controllerruntime.Options{})
+	assert.NoError(t, err)
+	fakeclient := fake.NewClientBuilder().Build()
+	r := persistentvolumeclaim.NewReconciler(fakeclient, record.NewFakeRecorder(1))
+	assert.NoError(t, r.SetupWithManager(mgr))
+
+	predicates := r.Predicates()
+	assert.True(t, predicates.CreateFunc(event.CreateEvent{}))
+	assert.True(t, predicates.UpdateFunc(event.UpdateEvent{}))
+	assert.False(t, predicates.Delete(event.DeleteEvent{}))
+	assert.False(t, predicates.Generic(event.GenericEvent{}))
+}
+
 func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 	defaultNamespace := "openshift-storage"
 
@@ -28,10 +46,28 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 		name                     string
 		req                      controllerruntime.Request
 		objs                     []client.Object
+		clientGetErr             error
+		clientListErr            error
 		wantErr                  bool
 		expectNoStorageAvailable bool
 		expectRequeue            bool
 	}{
+		{
+			name: "test persistent volume claim not found (deleted after triggering reconcile)",
+			req: controllerruntime.Request{NamespacedName: types.NamespacedName{
+				Namespace: defaultNamespace,
+				Name:      "test-pvc",
+			}},
+		},
+		{
+			name: "test persistent volume claim get error",
+			req: controllerruntime.Request{NamespacedName: types.NamespacedName{
+				Namespace: defaultNamespace,
+				Name:      "test-pvc",
+			}},
+			clientGetErr: assert.AnError,
+			wantErr:      true,
+		},
 		{
 			name: "testing set deletionTimestamp",
 			req: controllerruntime.Request{NamespacedName: types.NamespacedName{
@@ -89,6 +125,26 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "testing pending PVC node list fails",
+			req: controllerruntime.Request{NamespacedName: types.NamespacedName{
+				Namespace: defaultNamespace,
+				Name:      "test-pending-PVC",
+			}},
+			objs: []client.Object{
+				&v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
+					},
+					Status: v1.PersistentVolumeClaimStatus{
+						Phase: v1.ClaimPending,
+					},
+				},
+			},
+			clientListErr: assert.AnError,
+			wantErr:       true,
 		},
 		{
 			name: "testing pending PVC is processed",
@@ -201,10 +257,22 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := record.NewFakeRecorder(1)
-			r := &persistentvolumeclaim.Reconciler{
-				Client:   fake.NewClientBuilder().WithObjects(tt.objs...).Build(),
-				Recorder: recorder,
-			}
+			r := persistentvolumeclaim.NewReconciler(
+				fake.NewClientBuilder().WithObjects(tt.objs...).
+					WithInterceptorFuncs(interceptor.Funcs{
+						Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+							if tt.clientGetErr != nil {
+								return tt.clientGetErr
+							}
+							return client.Get(ctx, key, obj, opts...)
+						}, List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+							if tt.clientListErr != nil {
+								return tt.clientListErr
+							}
+							return client.List(ctx, list, opts...)
+						}}).Build(),
+				recorder,
+			)
 			got, err := r.Reconcile(context.Background(), tt.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Reconcile() error = %v, wantErr %v", err, tt.wantErr)

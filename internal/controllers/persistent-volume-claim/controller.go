@@ -126,16 +126,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	pred := predicate.Funcs{
+	return ctrl.NewControllerManagedBy(mgr).
+		WithEventFilter(r.Predicates()).
+		For(&corev1.PersistentVolumeClaim{}).
+		Complete(r)
+}
+
+func (r *Reconciler) Predicates() predicate.Funcs {
+	return predicate.Funcs{
 		CreateFunc:  func(event.CreateEvent) bool { return true },
 		DeleteFunc:  func(event.DeleteEvent) bool { return false },
 		UpdateFunc:  func(event.UpdateEvent) bool { return true },
 		GenericFunc: func(event.GenericEvent) bool { return false },
 	}
-	return ctrl.NewControllerManagedBy(mgr).
-		WithEventFilter(pred).
-		For(&corev1.PersistentVolumeClaim{}).
-		Complete(r)
 }
 
 func prettyByteSize(b int64) string {
