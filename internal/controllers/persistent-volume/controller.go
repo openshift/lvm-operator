@@ -17,17 +17,15 @@ import (
 
 // Reconciler reconciles a PersistentVolume object
 type Reconciler struct {
-	client    client.Client
-	apiReader client.Reader
-	recorder  record.EventRecorder
+	client   client.Client
+	recorder record.EventRecorder
 }
 
 // NewReconciler returns Reconciler.
-func NewReconciler(client client.Client, apiReader client.Reader, eventRecorder record.EventRecorder) *Reconciler {
+func NewReconciler(client client.Client, eventRecorder record.EventRecorder) *Reconciler {
 	return &Reconciler{
-		client:    client,
-		apiReader: apiReader,
-		recorder:  eventRecorder,
+		client:   client,
+		recorder: eventRecorder,
 	}
 }
 
@@ -64,14 +62,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	pred := predicate.Funcs{
+	return ctrl.NewControllerManagedBy(mgr).
+		WithEventFilter(r.Predicates()).
+		For(&corev1.PersistentVolume{}).
+		Complete(r)
+}
+
+func (r *Reconciler) Predicates() predicate.Funcs {
+	return predicate.Funcs{
 		CreateFunc:  func(event.CreateEvent) bool { return true },
 		DeleteFunc:  func(event.DeleteEvent) bool { return false },
 		UpdateFunc:  func(event.UpdateEvent) bool { return true },
 		GenericFunc: func(event.GenericEvent) bool { return false },
 	}
-	return ctrl.NewControllerManagedBy(mgr).
-		WithEventFilter(pred).
-		For(&corev1.PersistentVolume{}).
-		Complete(r)
 }
