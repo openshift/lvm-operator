@@ -1,4 +1,4 @@
-package vgmanager
+package tagging_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	lvmmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm/mocks"
+	"github.com/openshift/lvm-operator/internal/tagging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -176,7 +177,7 @@ func TestAddTagToVGs(t *testing.T) {
 				mockLVM.EXPECT().AddTagToVG(mock.Anything).Return(nil).Times(tc.addTagCount)
 			}
 			mockLVM.EXPECT().ListVGs().Return(tc.volumeGroups, nil).Once()
-			err := addTagToVGs(context.Background(), c, mockLVM, nodeName, namespace)
+			err := tagging.AddTagToVGs(context.Background(), c, mockLVM, nodeName, namespace)
 			assert.NoError(t, err)
 		})
 	}
