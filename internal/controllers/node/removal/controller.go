@@ -17,11 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const cleanupFinalizer = "lvm.topolvm.io/node-removal-hook"
-const fieldOwner = "lvms"
+const CleanupFinalizer = "lvm.topolvm.io/node-removal-hook"
+const FieldOwner = "lvms"
 
 type Reconciler struct {
 	client.Client
+}
+
+func NewReconciler(client client.Client) *Reconciler {
+	return &Reconciler{
+		Client: client,
+	}
 }
 
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;patch;update;watch
@@ -46,8 +52,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	if node.DeletionTimestamp.IsZero() {
 		// Add a finalizer in case the node is fresh or the controller newly deployed
-		if needsUpdate := controllerutil.AddFinalizer(node, cleanupFinalizer); needsUpdate {
-			if err := r.Update(ctx, node, client.FieldOwner(fieldOwner)); err != nil {
+		if needsUpdate := controllerutil.AddFinalizer(node, CleanupFinalizer); needsUpdate {
+			if err := r.Update(ctx, node, client.FieldOwner(FieldOwner)); err != nil {
 				return ctrl.Result{}, fmt.Errorf("node finalizer could not be updated: %w", err)
 			}
 		}
@@ -75,8 +81,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	logger.Info("every LVMVolumeGroupNodeStatus for node was removed, removing finalizer to allow node removal")
-	if needsUpdate := controllerutil.RemoveFinalizer(node, cleanupFinalizer); needsUpdate {
-		if err := r.Update(ctx, node, client.FieldOwner(fieldOwner)); err != nil {
+	if needsUpdate := controllerutil.RemoveFinalizer(node, CleanupFinalizer); needsUpdate {
+		if err := r.Update(ctx, node, client.FieldOwner(FieldOwner)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("node finalizer could not be removed: %w", err)
 		}
 	}
@@ -87,14 +93,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).For(&v1.Node{}).Watches(&lvmv1alpha1.LVMVolumeGroupNodeStatus{},
-		handler.EnqueueRequestsFromMapFunc(r.getNodeForLVMVolumeGroupNodeStatus)).Complete(r)
+		handler.EnqueueRequestsFromMapFunc(r.GetNodeForLVMVolumeGroupNodeStatus)).Complete(r)
 }
 
-func (r *Reconciler) getNodeForLVMVolumeGroupNodeStatus(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *Reconciler) GetNodeForLVMVolumeGroupNodeStatus(ctx context.Context, object client.Object) []reconcile.Request {
 	node := &v1.Node{}
 	node.SetName(object.GetName())
 
-	err := r.Client.Get(ctx, client.ObjectKeyFromObject(node), node)
+	err := r.Get(ctx, client.ObjectKeyFromObject(node), node)
 	if errors.IsNotFound(err) {
 		return []reconcile.Request{}
 	}
