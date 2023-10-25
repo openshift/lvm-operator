@@ -45,12 +45,12 @@ OPERATOR_SDK_VERSION ?= 1.32.0
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
 TOPOLVM_CSI_IMAGE ?= quay.io/lvms_dev/topolvm:latest
-RBAC_PROXY_IMAGE ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
-CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.2
-CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0
-CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.8.0
-CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.6.0
-CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.1.0
+RBAC_PROXY_IMAGE ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
+CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.7.0
+CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.4.1
+CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.9.0
+CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
+CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
 
 define MANAGER_ENV_VARS
 OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE)
@@ -333,7 +333,7 @@ controller-gen: ## Download controller-gen locally if necessary.
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.2.1)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
@@ -345,11 +345,11 @@ jsonnet: ## Download jsonnet locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo and gomega locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.12.0)
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.13.0)
 
 MOCKERY = $(shell pwd)/bin/mockery
 mockery: ## Download mockery and add locally if necessary
-	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.33.2)
+	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.36.0)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
