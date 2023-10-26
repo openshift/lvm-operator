@@ -419,11 +419,11 @@ SNYK_ORG ?= 81de31f3-6dff-46ff-af37-664e272a9fe3
 
 .PHONY: vuln-scan-code
 vuln-scan-code:
-	snyk code test --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+	snyk code test --project-name=lvms --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG) --report
 
 .PHONY: vuln-scan-deps
 vuln-scan-deps:
-	snyk test --all-projects --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+	snyk test --project-name=lvms --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG) --report
 
 .PHONY: vuln-scan-container
 vuln-scan-container:
