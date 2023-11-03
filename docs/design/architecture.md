@@ -14,7 +14,6 @@ The following table provides a view of the containers in these components:
 |                      |            | [liveness-probe](https://github.com/kubernetes-csi/livenessprobe#liveness-probe)                    |
 |                      |            | [csi-snapshotter](https://github.com/kubernetes-csi/external-snapshotter#csi-snapshotter)           |
 | TopoLVM Node         | DaemonSet  | [topolvm-node](https://github.com/topolvm/topolvm/blob/main/docs/topolvm-node.md)                   |
-|                      |            | [lvmd](https://github.com/topolvm/topolvm/blob/main/docs/lvmd.md)                                   |
 |                      |            | [csi-registrar](https://github.com/kubernetes-csi/node-driver-registrar#node-driver-registrar)      |
 |                      |            | [liveness-probe](https://github.com/kubernetes-csi/livenessprobe#liveness-probe)                    |
 |                      |            | [kube-rbac-proxy](https://github.com/brancz/kube-rbac-proxy#kube-rbac-proxy)                        |

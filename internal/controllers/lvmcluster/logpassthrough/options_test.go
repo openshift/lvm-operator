@@ -27,7 +27,6 @@ func TestCSISideCarOptions_BindFlags(t *testing.T) {
 				"--vgmanager-v=4",
 				"--vgmanager-vmodule=bla=4",
 				"--vgmanager-zap-log-level=debug",
-				"--lvmd-loglevel=debug",
 			},
 			func(a *assert.Assertions, o *Options) {
 				a.Equal(o.CSISideCar.VModule, "bla=1")
@@ -54,10 +53,7 @@ func TestCSISideCarOptions_BindFlags(t *testing.T) {
 				a.Equal(o.VGManager.ZapLogLevel, "debug")
 				a.Contains(o.VGManager.AsArgs(), "--v=4")
 				a.Contains(o.VGManager.AsArgs(), "--vmodule=bla=4")
-				a.Contains(o.TopoLVMNode.AsArgs(), "--zap-log-level=debug")
-
-				a.Equal(o.LVMD.LogLevel, "debug")
-				a.Contains(o.LVMD.AsArgs(), "--loglevel=debug")
+				a.Contains(o.VGManager.AsArgs(), "--zap-log-level=debug")
 			},
 		},
 	}

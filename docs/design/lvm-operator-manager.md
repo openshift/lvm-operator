@@ -37,7 +37,7 @@ The `topolvmController` reconcile unit is responsible for deploying a single ins
 
 ### Topolvm Node and lvmd
 
-The `topolvmNode` reconcile unit is responsible for deploying and managing the TopoLVM Node plugin and lvmd daemon set. It scales the DaemonSet based on the node selector specified in the devicesClasses field in the `LVMCluster` CR. During initialization, an init container polls for the availability of the lvmd configuration file before starting the `lvmd` and `topolvm-node` containers.
+The `topolvmNode` reconcile unit is responsible for deploying and managing the TopoLVM Node daemon set. It scales the DaemonSet based on the node selector specified in the devicesClasses field in the `LVMCluster` CR. During initialization, an init container polls for the availability of the lvmd configuration file before starting the `topolvm-node` container.
 
 ### TopoLVM Scheduler
 
@@ -57,7 +57,7 @@ The `lvmVG` reconcile unit is responsible for deploying and managing the LVMVolu
 
 ## Openshift Security Context Constraints (SCCs)
 
-The Operator requires elevated permissions to interact with the host's LVM commands, which are executed through `nsenter`. When deployed on an OpenShift cluster, all the necessary Security Context Constraints (SCCs) are created by the `openshiftSccs` reconcile unit. This ensures that the `vg-manager`, `topolvm-node`, and `lvmd` containers have the required permissions to function properly.
+The Operator requires elevated permissions to interact with the host's LVM commands, which are executed through `nsenter`. When deployed on an OpenShift cluster, all the necessary Security Context Constraints (SCCs) are created by the `openshiftSccs` reconcile unit. This ensures that the `vg-manager` and `topolvm-node` containers have the required permissions to function properly.
 
 ## Implementation Notes
 

@@ -16,7 +16,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	lsblkmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk/mocks"
@@ -306,7 +305,6 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		lvmdConfig, err := instances.LVMD.Load()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(lvmdConfig).ToNot(BeNil())
-		Expect(lvmdConfig.SocketName).To(Equal(constants.DefaultLVMdSocket))
 		Expect(lvmdConfig.DeviceClasses).ToNot(BeNil())
 		Expect(lvmdConfig.DeviceClasses).To(HaveLen(1))
 		Expect(lvmdConfig.DeviceClasses).To(ContainElement(&lvmd.DeviceClass{

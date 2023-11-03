@@ -61,7 +61,6 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 		r.GetNamespace(),
 		r.GetImageName(),
 		r.GetLogPassthroughOptions().TopoLVMNode.AsArgs(),
-		r.GetLogPassthroughOptions().LVMD.AsArgs(),
 		r.GetLogPassthroughOptions().CSISideCar.AsArgs(),
 	)
 
@@ -122,11 +121,10 @@ func (n topolvmNode) EnsureDeleted(_ Reconciler, _ context.Context, _ *lvmv1alph
 	return nil
 }
 
-func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string, args, lvmdArgs, csiArgs []string) *appsv1.DaemonSet {
+func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string, args, csiArgs []string) *appsv1.DaemonSet {
 
 	hostPathDirectory := corev1.HostPathDirectory
 	hostPathDirectoryOrCreateType := corev1.HostPathDirectoryOrCreate
-	storageMedium := corev1.StorageMediumMemory
 
 	volumes := []corev1.Volume{
 		{Name: "registration-dir",
@@ -154,9 +152,6 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: filepath.Dir(lvmd.DefaultFileConfigPath),
 					Type: &hostPathDirectory}}},
-		{Name: "lvmd-socket-dir",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: storageMedium}}},
 		{Name: "metrics-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -168,7 +163,6 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 
 	initContainers := []corev1.Container{*getNodeInitContainer(initImage)}
 	containers := []corev1.Container{
-		*getLvmdContainer(lvmdArgs),
 		*getNodeContainer(args),
 		*getRBACProxyContainer(),
 		*getCsiRegistrarContainer(csiArgs),
@@ -253,47 +247,11 @@ func getNodeInitContainer(initImage string) *corev1.Container {
 	return fileChecker
 }
 
-func getLvmdContainer(args []string) *corev1.Container {
-	command := []string{
-		"/lvmd",
-		fmt.Sprintf("--config=%s", lvmd.DefaultFileConfigPath),
-		"--container=true",
-	}
-
-	command = append(command, args...)
-
-	resourceRequirements := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(constants.TopolvmdCPURequest),
-			corev1.ResourceMemory: resource.MustParse(constants.TopolvmdMemRequest),
-		},
-	}
-
-	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(constants.DefaultLVMdSocket)},
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
-	}
-
-	privilege := true
-	runUser := int64(0)
-	lvmd := &corev1.Container{
-		Name:  "lvmd",
-		Image: TopolvmCsiImage,
-		SecurityContext: &corev1.SecurityContext{
-			Privileged: &privilege,
-			RunAsUser:  &runUser,
-		},
-		Command:      command,
-		Resources:    resourceRequirements,
-		VolumeMounts: volumeMounts,
-	}
-	return lvmd
-}
-
 func getNodeContainer(args []string) *corev1.Container {
 	command := []string{
 		"/topolvm-node",
-		fmt.Sprintf("--lvmd-socket=%s", constants.DefaultLVMdSocket),
+		"--embed-lvmd",
+		fmt.Sprintf("--config=%s", lvmd.DefaultFileConfigPath),
 	}
 
 	command = append(command, args...)
@@ -309,7 +267,7 @@ func getNodeContainer(args []string) *corev1.Container {
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
-		{Name: "lvmd-socket-dir", MountPath: filepath.Dir(constants.DefaultLVMdSocket)},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
 		{Name: "pod-volumes-dir",
 			MountPath:        fmt.Sprintf("%spods", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
 			MountPropagation: &mountPropagationMode},

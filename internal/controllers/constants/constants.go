@@ -52,11 +52,8 @@ const (
 	VgManagerCPURequest = "2m"
 
 	// topoLVM Node resource requests
-	TopolvmNodeMemRequest = "25Mi"
-	TopolvmNodeCPURequest = "1m"
-
-	TopolvmdMemRequest = "30Mi"
-	TopolvmdCPURequest = "2m"
+	TopolvmNodeMemRequest = "35Mi"
+	TopolvmNodeCPURequest = "3m"
 
 	CSIRegistrarMemRequest = "15Mi"
 	CSIRegistrarCPURequest = "1m"
@@ -74,9 +71,8 @@ const (
 	NodeContainerName               = "topolvm-node"
 	TopolvmNodeContainerHealthzName = "healthz"
 
-	DefaultCSISocket  = "/run/topolvm/csi-topolvm.sock"
-	DefaultLVMdSocket = "/run/lvmd/lvmd.sock"
-	DeviceClassKey    = "topolvm.io/device-class"
+	DefaultCSISocket = "/run/topolvm/csi-topolvm.sock"
+	DeviceClassKey   = "topolvm.io/device-class"
 
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
