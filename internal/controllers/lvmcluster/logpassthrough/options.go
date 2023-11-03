@@ -22,7 +22,6 @@ type Options struct {
 	TopoLVMController *TopoLVMControllerOptions
 	TopoLVMNode       *TopoLVMNodeOptions
 	VGManager         *VGmanagerOptions
-	LVMD              *LVMDOptions
 }
 
 // NewOptions creates a new option set and binds it's values against a given flagset.
@@ -32,7 +31,6 @@ func NewOptions() *Options {
 		TopoLVMController: &TopoLVMControllerOptions{},
 		TopoLVMNode:       &TopoLVMNodeOptions{},
 		VGManager:         &VGmanagerOptions{},
-		LVMD:              &LVMDOptions{},
 	}
 	return opts
 }
@@ -42,7 +40,6 @@ func (o *Options) BindFlags(fs *pflag.FlagSet) {
 	o.TopoLVMController.BindFlags(fs)
 	o.TopoLVMNode.BindFlags(fs)
 	o.VGManager.BindFlags(fs)
-	o.LVMD.BindFlags(fs)
 }
 
 // ZapOptions contains a list of all passed options from zap-logging
@@ -87,25 +84,6 @@ func (o *KlogOptions) AsArgs() []string {
 func (o *KlogOptions) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.V, "v", "", "number for the log level verbosity")
 	fs.StringVar(&o.VModule, "vmodule", "", "comma-separated list of pattern=N settings for file-filtered logging")
-}
-
-// LVMDOptions contains options that will be passed to the legacy logging library of lvmd
-// see https://github.com/cybozu-go/well/blob/main/log.go#L15 as lvmd uses a legacy log kit
-type LVMDOptions struct {
-	// LogLevel is the LVMD Log level [critical,error,warning,info,debug]
-	LogLevel string
-}
-
-func (o *LVMDOptions) AsArgs() []string {
-	var args []string
-	if len(o.LogLevel) > 0 {
-		args = append(args, fmt.Sprintf("--%s=%s", "loglevel", o.LogLevel))
-	}
-	return args
-}
-
-func (o *LVMDOptions) BindFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.LogLevel, "lvmd-loglevel", "", "Log level [critical,error,warning,info,debug]")
 }
 
 type CSISideCarOptions struct {

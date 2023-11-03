@@ -25,7 +25,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
@@ -301,9 +300,7 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 	lvmdConfigWasMissing := false
 	if lvmdConfig == nil {
 		lvmdConfigWasMissing = true
-		lvmdConfig = &lvmd.Config{
-			SocketName: constants.DefaultLVMdSocket,
-		}
+		lvmdConfig = &lvmd.Config{}
 	}
 	existingLvmdConfig := *lvmdConfig
 
