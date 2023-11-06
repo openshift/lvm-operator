@@ -173,6 +173,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		HealthProbeBindAddress:              opts.healthProbeAddr,
 		LeaderElectionResourceLockInterface: le.Lock,
 		LeaderElection:                      !leaderElectionConfig.Disable,
+		LeaderElectionReleaseOnCancel:       true,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
