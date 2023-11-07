@@ -46,6 +46,7 @@ end
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
     * [Missing native LVM RAID Configuration support](#missing-native-lvm-raid-configuration-support)
     * [Snapshotting and Cloning in Multi-Node Topologies](#snapshotting-and-cloning-in-multi-node-topologies)
+    * [Validation of `LVMCluster` CRs outside the `openshift-storage` namespace](#validation-of-lvmcluster-crs-outside-the-openshift-storage-namespace)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -401,6 +402,16 @@ With these prerequisites it can be guaranteed that all follow-up `VolumeSnapshot
 The easiest way to achieve this is to use precreated `PersistentVolumeClaims` and non-ephemeral `StatefulSet` for your workload.
 
 _NOTE: All of the above also applies for cloning the `PersistentVolumeClaims` directly by using the original `PersistentVolumeClaims` as data source instead of using a Snapshot._
+
+### Validation of `LVMCluster` CRs outside the `openshift-storage` namespace
+
+When creating an `LVMCluster` CR outside the `openshift-storage` namespace by installing it via `ClusterServiceVersion`, the Operator will not be able to validate the CR.
+This is because the `ValidatingWebhookConfiguration` is restricted to the `openshift-storage` namespace and does not have access to the `LVMCluster` CRs in other namespaces.
+Thus, the Operator will not be able to prevent the creation of invalid `LVMCluster` CRs outside the `openshift-storage` namespace.
+However, it will also not pick it up and simply ignore it.
+
+This is because Operator Lifecycle Manager (OLM) does not allow the creation of `ClusterServiceVersion` with installMode `OwnNamespace` while also not restricting the webhook configuration.
+Validation in the `openshift-storage` namespace is processed normally.
 
 ## Troubleshooting
 
