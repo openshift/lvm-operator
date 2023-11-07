@@ -170,10 +170,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				&appsv1.DaemonSet{}:                     {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 			},
 		},
-		HealthProbeBindAddress:              opts.healthProbeAddr,
-		LeaderElectionResourceLockInterface: le.Lock,
-		LeaderElection:                      !leaderElectionConfig.Disable,
-		LeaderElectionReleaseOnCancel:       true,
+		HealthProbeBindAddress:        opts.healthProbeAddr,
+		RetryPeriod:                   &le.RetryPeriod,
+		LeaseDuration:                 &le.LeaseDuration,
+		RenewDeadline:                 &le.RenewDeadline,
+		LeaderElectionNamespace:       operatorNamespace,
+		LeaderElectionID:              leaderElectionConfig.Name,
+		LeaderElection:                !leaderElectionConfig.Disable,
+		LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
