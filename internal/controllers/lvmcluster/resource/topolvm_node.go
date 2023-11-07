@@ -25,7 +25,6 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
-	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -59,7 +58,6 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 	// get desired daemonSet spec
 	dsTemplate := getNodeDaemonSet(lvmCluster,
 		r.GetNamespace(),
-		r.GetImageName(),
 		r.GetLogPassthroughOptions().TopoLVMNode.AsArgs(),
 		r.GetLogPassthroughOptions().CSISideCar.AsArgs(),
 	)
@@ -83,13 +81,10 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 			return nil
 		}
 		// if update, update only mutable fields
-		// For topolvm Node, we have containers, initcontainers, node selector and toleration terms
+		// For topolvm Node, we have containers, node selector and toleration terms
 
 		// containers
 		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
-
-		// initcontainers
-		ds.Spec.Template.Spec.InitContainers = dsTemplate.Spec.Template.Spec.InitContainers
 
 		// tolerations
 		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
@@ -121,7 +116,7 @@ func (n topolvmNode) EnsureDeleted(_ Reconciler, _ context.Context, _ *lvmv1alph
 	return nil
 }
 
-func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, initImage string, args, csiArgs []string) *appsv1.DaemonSet {
+func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, args, csiArgs []string) *appsv1.DaemonSet {
 
 	hostPathDirectory := corev1.HostPathDirectory
 	hostPathDirectoryOrCreateType := corev1.HostPathDirectoryOrCreate
@@ -149,9 +144,12 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 					Type: &hostPathDirectoryOrCreateType}}},
 		{Name: "lvmd-config-dir",
 			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: filepath.Dir(lvmd.DefaultFileConfigPath),
-					Type: &hostPathDirectory}}},
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constants.LVMDConfigMapName,
+					},
+				},
+			}},
 		{Name: "metrics-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -161,7 +159,6 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 			}},
 	}
 
-	initContainers := []corev1.Container{*getNodeInitContainer(initImage)}
 	containers := []corev1.Container{
 		*getNodeContainer(args),
 		*getRBACProxyContainer(),
@@ -204,7 +201,6 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: constants.TopolvmNodeServiceAccount,
-					InitContainers:     initContainers,
 					Containers:         containers,
 					Volumes:            volumes,
 					HostPID:            true,
@@ -220,38 +216,11 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 	return nodeDaemonSet
 }
 
-func getNodeInitContainer(initImage string) *corev1.Container {
-	command := []string{
-		"/usr/bin/bash",
-		"-c",
-		fmt.Sprintf("until [ -f %s ]; do echo waiting for lvmd config file; sleep 5; done", lvmd.DefaultFileConfigPath),
-	}
-
-	volumeMounts := []corev1.VolumeMount{
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
-	}
-
-	fileChecker := &corev1.Container{
-		Name:         "file-checker",
-		Image:        initImage,
-		Command:      command,
-		VolumeMounts: volumeMounts,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse(constants.FileCheckerCPURequest),
-				corev1.ResourceMemory: resource.MustParse(constants.FileCheckerMemRequest),
-			},
-		},
-	}
-
-	return fileChecker
-}
-
 func getNodeContainer(args []string) *corev1.Container {
 	command := []string{
 		"/topolvm-node",
 		"--embed-lvmd",
-		fmt.Sprintf("--config=%s", lvmd.DefaultFileConfigPath),
+		fmt.Sprintf("--config=%s", constants.LVMDDefaultFileConfigPath),
 	}
 
 	command = append(command, args...)
@@ -267,7 +236,7 @@ func getNodeContainer(args []string) *corev1.Container {
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
-		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
+		{Name: "lvmd-config-dir", MountPath: constants.LVMDDefaultConfigDir},
 		{Name: "pod-volumes-dir",
 			MountPath:        fmt.Sprintf("%spods", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
 			MountPropagation: &mountPropagationMode},

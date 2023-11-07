@@ -853,6 +853,18 @@ spec:
           - create
           - patch
           - update
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         serviceAccountName: vg-manager
     strategy: deployment
   installModes:
