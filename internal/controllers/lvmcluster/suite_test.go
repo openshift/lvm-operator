@@ -142,15 +142,8 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&removal.Reconciler{
-		Client: k8sManager.GetClient(),
-	}).SetupWithManager(k8sManager)
+	err = removal.NewReconciler(k8sManager.GetClient(), testLvmClusterNamespace).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
-
-	err = k8sManager.GetFieldIndexer().IndexField(ctx, &lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
-		return []string{object.GetName()}
-	})
-	Expect(err).ToNot(HaveOccurred(), "unable to create name index on LVMVolumeGroupNodeStatus")
 
 	go func() {
 		defer GinkgoRecover()

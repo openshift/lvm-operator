@@ -125,7 +125,7 @@ var _ = Describe("LVMCluster controller", func() {
 		SetDefaultEventuallyTimeout(timeout)
 		SetDefaultEventuallyPollingInterval(interval)
 
-		It("should reconcile LVMCluster CR creation, ", func(ctx context.Context) {
+		It("should reconcile LVMCluster CR creation", func(ctx context.Context) {
 			By("verifying CR status on reconciliation")
 			// create node as it should be present
 			Expect(k8sClient.Create(ctx, nodeIn)).Should(Succeed())
@@ -139,6 +139,10 @@ var _ = Describe("LVMCluster controller", func() {
 			// create lvmVolumeGroupNodeStatus as it should be created by vgmanager and
 			// lvmcluster controller expecting this to be present to set the status properly
 			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
+			By("verifying NodeStatus is created")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Succeed())
 
 			By("verifying LVMCluster .Status.Ready is true")
 			Eventually(func() bool {
@@ -192,12 +196,15 @@ var _ = Describe("LVMCluster controller", func() {
 	})
 
 	Context("Reconciliation on deleting the LVMCluster CR", func() {
-		It("should reconcile LVMCluster CR deletion ", func(ctx context.Context) {
+		It("should reconcile LVMCluster CR deletion", func(ctx context.Context) {
 
 			// delete lvmVolumeGroupNodeStatus as it should be deleted by vgmanager
 			// and if it is present lvmcluster reconciler takes it as vg is present on node
 			// we will now remove the node which will cause the LVM cluster status to also lose that vg
 			By("confirming absence of lvm cluster CR and deletion of operator created resources")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
 			// deletion of LVMCluster CR and thus also the NodeStatus through the removal controller
 			Eventually(func(ctx context.Context) error {

@@ -14,47 +14,49 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestNodeRemovalController_SetupWithManager(t *testing.T) {
-	mgr, err := controllerruntime.NewManager(&rest.Config{}, controllerruntime.Options{})
+	sch := runtime.NewScheme()
+	assert.NoError(t, lvmv1alpha1.AddToScheme(sch))
+	mgr, err := controllerruntime.NewManager(&rest.Config{}, controllerruntime.Options{Scheme: sch})
 	assert.NoError(t, err)
-	fakeclient := fake.NewClientBuilder().Build()
-	r := removal.NewReconciler(fakeclient)
+	fakeclient := fake.NewClientBuilder().WithScheme(sch).Build()
+	r := removal.NewReconciler(fakeclient, "test")
 	assert.NoError(t, r.SetupWithManager(mgr))
 }
 
 func TestNodeRemovalController_GetNodeForLVMVolumeGroupNodeStatus(t *testing.T) {
 	tests := []struct {
-		name       string
-		statusName string
-		objs       []client.Object
-		get        error
-		expect     []reconcile.Request
+		name     string
+		nodeName string
+		objs     []client.Object
+		get      error
+		expect   []reconcile.Request
 	}{
 		{
-			name:       "test node not found",
-			statusName: "test-node",
-			get:        errors.NewNotFound(schema.GroupResource{Group: "", Resource: "nodes"}, "test-node"),
+			name:     "test node not found",
+			nodeName: "test-node",
+			get:      errors.NewNotFound(schema.GroupResource{Group: "", Resource: "LVMVolumeGroupNodeStatus"}, "test-node"),
 		},
 		{
-			name:       "test node not fetch error",
-			statusName: "test-node",
-			get:        assert.AnError,
+			name:     "test node not fetch error",
+			nodeName: "test-node",
+			get:      assert.AnError,
 		},
 		{
-			name:       "test node found",
-			statusName: "test-node",
+			name:     "test node has status",
+			nodeName: "test-node",
 			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}},
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: "test-node", Namespace: "test"}},
 			},
-			expect: []reconcile.Request{{NamespacedName: types.NamespacedName{Name: "test-node"}}},
+			expect: []reconcile.Request{{NamespacedName: types.NamespacedName{Name: "test-node", Namespace: "test"}}},
 		},
 	}
 
@@ -72,9 +74,9 @@ func TestNodeRemovalController_GetNodeForLVMVolumeGroupNodeStatus(t *testing.T) 
 					return client.Get(ctx, key, obj, opts...)
 				},
 			}).Build()
-			r := removal.NewReconciler(clnt)
-			requests := r.GetNodeForLVMVolumeGroupNodeStatus(context.Background(),
-				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: tt.statusName}})
+			r := removal.NewReconciler(clnt, "test")
+			requests := r.GetNodeStatusFromNode(context.Background(),
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: tt.nodeName}})
 			assert.ElementsMatch(t, tt.expect, requests)
 		})
 	}
@@ -82,106 +84,58 @@ func TestNodeRemovalController_GetNodeForLVMVolumeGroupNodeStatus(t *testing.T) 
 
 func TestNodeRemovalController_Reconcile(t *testing.T) {
 	defaultRequest := controllerruntime.Request{NamespacedName: types.NamespacedName{
-		Name: "test-node",
+		Name:      "test-node",
+		Namespace: "test",
 	}}
+	defaultMeta := metav1.ObjectMeta{Name: defaultRequest.Name, Namespace: defaultRequest.Namespace}
 
 	tests := []struct {
-		name      string
-		req       controllerruntime.Request
-		objs      []client.Object
-		get       error
-		update    error
-		list      error
-		delete    error
-		assertErr assert.ErrorAssertionFunc
+		name                        string
+		req                         controllerruntime.Request
+		objs                        []client.Object
+		getNode                     error
+		getLVMVolumeGroupNodeStatus error
+		delete                      error
+		assertErr                   assert.ErrorAssertionFunc
 	}{
 		{
-			name:      "test node not found (deleted after triggering reconcile)",
-			req:       defaultRequest,
-			get:       errors.NewNotFound(schema.GroupResource{Group: "", Resource: "nodes"}, "test-node"),
-			assertErr: assert.NoError,
+			name:                        "test node status not found (deleted after triggering reconcile)",
+			req:                         defaultRequest,
+			getLVMVolumeGroupNodeStatus: errors.NewNotFound(schema.GroupResource{Group: "", Resource: "nodes"}, "test-node"),
+			assertErr:                   assert.NoError,
 		},
 		{
-			name:      "test node not fetch error",
-			req:       defaultRequest,
-			get:       assert.AnError,
+			name: "test node fetch error",
+			req:  defaultRequest,
+			objs: []client.Object{
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: defaultMeta},
+			},
+			getNode:   assert.AnError,
 			assertErr: assert.Error,
 		},
 		{
-			name: "test node not deleting but needs finalizer update",
+			name: "test node gone but status still present so status deleted",
 			req:  defaultRequest,
 			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name}},
-			},
-			assertErr: assert.NoError,
-		},
-		{
-			name: "test node not deleting but needs finalizer update which fails",
-			req:  defaultRequest,
-			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name}},
-			},
-			update:    assert.AnError,
-			assertErr: assert.Error,
-		},
-		{
-			name: "test node with finalizer gets deleted and status list fails",
-			req:  defaultRequest,
-			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name,
-					Finalizers:        []string{removal.CleanupFinalizer},
-					DeletionTimestamp: ptr.To(metav1.Now()),
-				}},
-			},
-			list:      assert.AnError,
-			assertErr: assert.Error,
-		},
-		{
-			name: "test node with finalizer gets deleted and status list returns no nodestatus",
-			req:  defaultRequest,
-			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name,
-					Finalizers:        []string{removal.CleanupFinalizer},
-					DeletionTimestamp: ptr.To(metav1.Now()),
-				}},
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: defaultMeta},
 			},
 			assertErr: assert.NoError,
 		},
 		{
-			name: "test node with finalizer gets deleted and status list returns node status but delete fails",
+			name: "test node gone but status still present so status deleted but fails",
 			req:  defaultRequest,
 			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name,
-					Finalizers:        []string{removal.CleanupFinalizer},
-					DeletionTimestamp: ptr.To(metav1.Now()),
-				}},
-				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name}},
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: defaultMeta},
 			},
 			delete:    assert.AnError,
 			assertErr: assert.Error,
 		},
 		{
-			name: "test node with finalizer gets deleted and status list returns node status but finalizer removal fails",
+			name: "test node present and status present results in no-op",
 			req:  defaultRequest,
 			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name,
-					Finalizers:        []string{removal.CleanupFinalizer},
-					DeletionTimestamp: ptr.To(metav1.Now()),
-				}},
-				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name}},
-			},
-			update:    assert.AnError,
-			assertErr: assert.Error,
-		},
-		{
-			name: "test node with finalizer gets deleted and status list returns node status which gets deleted",
-			req:  defaultRequest,
-			objs: []client.Object{
-				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name,
-					Finalizers:        []string{removal.CleanupFinalizer},
-					DeletionTimestamp: ptr.To(metav1.Now()),
-				}},
-				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: defaultRequest.Name}},
+				&lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: defaultMeta},
+				&v1.Node{ObjectMeta: defaultMeta},
 			},
 			assertErr: assert.NoError,
 		},
@@ -199,28 +153,26 @@ func TestNodeRemovalController_Reconcile(t *testing.T) {
 				}).
 				WithInterceptorFuncs(interceptor.Funcs{
 					Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						if tt.get != nil {
-							return tt.get
+						gvk, _ := apiutil.GVKForObject(obj, newScheme)
+						switch gvk.Kind {
+						case "Node":
+							if tt.getNode != nil {
+								return tt.getNode
+							}
+						case "LVMVolumeGroupNodeStatus":
+							if tt.getLVMVolumeGroupNodeStatus != nil {
+								return tt.getLVMVolumeGroupNodeStatus
+							}
 						}
 						return client.Get(ctx, key, obj, opts...)
-					}, Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-						if tt.update != nil {
-							return tt.update
-						}
-						return client.Update(ctx, obj, opts...)
 					}, Delete: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
 						if tt.delete != nil {
 							return tt.delete
 						}
 						return client.Delete(ctx, obj, opts...)
-					}, List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-						if tt.list != nil {
-							return tt.list
-						}
-						return client.List(ctx, list, opts...)
 					}}).
 				Build()
-			r := removal.NewReconciler(clnt)
+			r := removal.NewReconciler(clnt, defaultMeta.Namespace)
 
 			_, err := r.Reconcile(context.Background(), tt.req)
 			if tt.assertErr == nil {

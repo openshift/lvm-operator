@@ -197,19 +197,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create LVMCluster controller: %w", err)
 	}
 
-	if isSNO, err := snoCheck.IsSNO(cmd.Context()); err != nil {
-		return fmt.Errorf("unable to determine if cluster is SNO: %w", err)
-	} else if !isSNO {
-		opts.SetupLog.Info("starting node-removal controller to observe node removal in MultiNode")
-		if err = (&removal.Reconciler{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
-			return fmt.Errorf("unable to create NodeRemovalController controller: %w", err)
-		}
-	}
-
-	if err = mgr.GetFieldIndexer().IndexField(context.Background(), &lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
-		return []string{object.GetName()}
-	}); err != nil {
-		return fmt.Errorf("unable to create name index on LVMVolumeGroupNodeStatus: %w", err)
+	opts.SetupLog.Info("starting node-removal controller")
+	if err = removal.NewReconciler(mgr.GetClient(), operatorNamespace).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create NodeRemovalController controller: %w", err)
 	}
 
 	if err = (&lvmv1alpha1.LVMCluster{}).SetupWebhookWithManager(mgr); err != nil {

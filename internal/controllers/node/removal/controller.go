@@ -5,86 +5,58 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const CleanupFinalizer = "lvm.topolvm.io/node-removal-hook"
-const FieldOwner = "lvms"
-
 type Reconciler struct {
 	client.Client
+	Namespace string
 }
 
-func NewReconciler(client client.Client) *Reconciler {
+func NewReconciler(client client.Client, namespace string) *Reconciler {
 	return &Reconciler{
-		Client: client,
+		Client:    client,
+		Namespace: namespace,
 	}
 }
 
-//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;patch;update;watch
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
 
-// Reconcile takes care of watching a node, adding a finalizer, and reacting to a removal request by deleting
-// the unwanted LVMVolumeGroupNodeStatus that was associated with the node, before removing the finalizer.
+// Reconcile takes care of watching a LVMVolumeGroupNodeStatus, and reacting to a node removal request by deleting
+// the unwanted LVMVolumeGroupNodeStatus that was associated with the node.
 // It does nothing on active Nodes. If it can be assumed that there will always be only one node (SNO),
 // this controller should not be started.
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	node := &v1.Node{}
-	if err := r.Get(ctx, req.NamespacedName, node); err != nil {
-		// we'll ignore not-found errors, since they can't be fixed by an immediate
-		// requeue (we'll need to wait for a new notification), and we can get them
-		// on deleted requests.
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	if err := r.Get(ctx, req.NamespacedName, nodeStatus); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	logger.Info("verifying if node status is orphaned", "node", nodeStatus.GetName())
 
-	if node.DeletionTimestamp.IsZero() {
-		// Add a finalizer in case the node is fresh or the controller newly deployed
-		if needsUpdate := controllerutil.AddFinalizer(node, CleanupFinalizer); needsUpdate {
-			if err := r.Update(ctx, node, client.FieldOwner(FieldOwner)); err != nil {
-				return ctrl.Result{}, fmt.Errorf("node finalizer could not be updated: %w", err)
-			}
+	node := &v1.Node{}
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), node)
+
+	if errors.IsNotFound(err) {
+		logger.Info("node not found, removing LVMVolumeGroupNodeStatus", "node", nodeStatus.GetName())
+		if err := r.Delete(ctx, nodeStatus); err != nil {
+			return ctrl.Result{}, fmt.Errorf("error deleting LVMVolumeGroupNodeStatus for Node %s: %w", nodeStatus.GetName(), err)
 		}
-		// nothing to do here, the node exists and is happy,
-		// maybe there is a NodeVolumeGroupStatus but we don't care
 		return ctrl.Result{}, nil
 	}
 
-	logger.Info("node getting deleted, removing leftover LVMVolumeGroupNodeStatus")
-
-	vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
-	if err := r.Client.List(ctx, vgNodeStatusList, client.MatchingFields{"metadata.name": node.GetName()}); err != nil {
-		return ctrl.Result{}, fmt.Errorf("error retrieving fitting LVMVolumeGroupNodeStatus for Node %s: %w", node.GetName(), err)
-	}
-
-	if len(vgNodeStatusList.Items) == 0 {
-		logger.Info("LVMVolumeGroupNodeStatus already deleted")
-		return ctrl.Result{}, nil
-	}
-
-	for i := range vgNodeStatusList.Items {
-		if err := r.Client.Delete(ctx, &vgNodeStatusList.Items[i]); err != nil {
-			return ctrl.Result{}, fmt.Errorf("could not cleanup LVMVolumeGroupNodeStatus for Node %s: %w", node.GetName(), err)
-		}
-	}
-
-	logger.Info("every LVMVolumeGroupNodeStatus for node was removed, removing finalizer to allow node removal")
-	if needsUpdate := controllerutil.RemoveFinalizer(node, CleanupFinalizer); needsUpdate {
-		if err := r.Update(ctx, node, client.FieldOwner(FieldOwner)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("node finalizer could not be removed: %w", err)
-		}
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error retrieving fitting LVMVolumeGroupNodeStatus for Node %s: %w", nodeStatus.GetName(), err)
 	}
 
 	return ctrl.Result{}, nil
@@ -92,23 +64,28 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&v1.Node{}).Watches(&lvmv1alpha1.LVMVolumeGroupNodeStatus{},
-		handler.EnqueueRequestsFromMapFunc(r.GetNodeForLVMVolumeGroupNodeStatus)).Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).For(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}).Watches(&v1.Node{},
+		handler.EnqueueRequestsFromMapFunc(r.GetNodeStatusFromNode)).Complete(r)
 }
 
-func (r *Reconciler) GetNodeForLVMVolumeGroupNodeStatus(ctx context.Context, object client.Object) []reconcile.Request {
-	node := &v1.Node{}
-	node.SetName(object.GetName())
+// GetNodeStatusFromNode can be used to derive a reconcile.Request from a Node for a NodeStatus.
+// It does this by translating the type and injecting the namespace.
+// Thus, whenever a node is updated, also the nodestatus will be checked.
+// This makes sure that our removal controller is able to successfully reconcile on all node removals.
+func (r *Reconciler) GetNodeStatusFromNode(ctx context.Context, object client.Object) []reconcile.Request {
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(object.GetName())
+	nodeStatus.SetNamespace(r.Namespace)
+	nodeStatusKey := client.ObjectKeyFromObject(nodeStatus)
 
-	err := r.Get(ctx, client.ObjectKeyFromObject(node), node)
+	err := r.Get(ctx, nodeStatusKey, nodeStatus)
 	if errors.IsNotFound(err) {
 		return []reconcile.Request{}
 	}
-
 	if err != nil {
-		log.FromContext(ctx).Error(err, "could not get Node for LVMVolumeGroupNodeStatus", "LVMVolumeGroupNodeStatus", object.GetName())
+		log.FromContext(ctx).Error(err, "could not getNode LVMVolumeGroupNodeStatus after Node was updated", "LVMVolumeGroupNodeStatus", object.GetName())
 		return []reconcile.Request{}
 	}
 
-	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: node.GetName()}}}
+	return []reconcile.Request{{NamespacedName: nodeStatusKey}}
 }
