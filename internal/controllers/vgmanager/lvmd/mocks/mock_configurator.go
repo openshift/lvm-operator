@@ -3,6 +3,8 @@
 package lvmd
 
 import (
+	context "context"
+
 	cmd "github.com/topolvm/topolvm/pkg/lvmd/cmd"
 
 	mock "github.com/stretchr/testify/mock"
@@ -21,13 +23,13 @@ func (_m *MockConfigurator) EXPECT() *MockConfigurator_Expecter {
 	return &MockConfigurator_Expecter{mock: &_m.Mock}
 }
 
-// Delete provides a mock function with given fields:
-func (_m *MockConfigurator) Delete() error {
-	ret := _m.Called()
+// Delete provides a mock function with given fields: ctx
+func (_m *MockConfigurator) Delete(ctx context.Context) error {
+	ret := _m.Called(ctx)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -41,13 +43,14 @@ type MockConfigurator_Delete_Call struct {
 }
 
 // Delete is a helper method to define mock.On call
-func (_e *MockConfigurator_Expecter) Delete() *MockConfigurator_Delete_Call {
-	return &MockConfigurator_Delete_Call{Call: _e.mock.On("Delete")}
+//   - ctx context.Context
+func (_e *MockConfigurator_Expecter) Delete(ctx interface{}) *MockConfigurator_Delete_Call {
+	return &MockConfigurator_Delete_Call{Call: _e.mock.On("Delete", ctx)}
 }
 
-func (_c *MockConfigurator_Delete_Call) Run(run func()) *MockConfigurator_Delete_Call {
+func (_c *MockConfigurator_Delete_Call) Run(run func(ctx context.Context)) *MockConfigurator_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -57,30 +60,30 @@ func (_c *MockConfigurator_Delete_Call) Return(_a0 error) *MockConfigurator_Dele
 	return _c
 }
 
-func (_c *MockConfigurator_Delete_Call) RunAndReturn(run func() error) *MockConfigurator_Delete_Call {
+func (_c *MockConfigurator_Delete_Call) RunAndReturn(run func(context.Context) error) *MockConfigurator_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Load provides a mock function with given fields:
-func (_m *MockConfigurator) Load() (*cmd.Config, error) {
-	ret := _m.Called()
+// Load provides a mock function with given fields: ctx
+func (_m *MockConfigurator) Load(ctx context.Context) (*cmd.Config, error) {
+	ret := _m.Called(ctx)
 
 	var r0 *cmd.Config
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*cmd.Config, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (*cmd.Config, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() *cmd.Config); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) *cmd.Config); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*cmd.Config)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -94,13 +97,14 @@ type MockConfigurator_Load_Call struct {
 }
 
 // Load is a helper method to define mock.On call
-func (_e *MockConfigurator_Expecter) Load() *MockConfigurator_Load_Call {
-	return &MockConfigurator_Load_Call{Call: _e.mock.On("Load")}
+//   - ctx context.Context
+func (_e *MockConfigurator_Expecter) Load(ctx interface{}) *MockConfigurator_Load_Call {
+	return &MockConfigurator_Load_Call{Call: _e.mock.On("Load", ctx)}
 }
 
-func (_c *MockConfigurator_Load_Call) Run(run func()) *MockConfigurator_Load_Call {
+func (_c *MockConfigurator_Load_Call) Run(run func(ctx context.Context)) *MockConfigurator_Load_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -110,18 +114,18 @@ func (_c *MockConfigurator_Load_Call) Return(_a0 *cmd.Config, _a1 error) *MockCo
 	return _c
 }
 
-func (_c *MockConfigurator_Load_Call) RunAndReturn(run func() (*cmd.Config, error)) *MockConfigurator_Load_Call {
+func (_c *MockConfigurator_Load_Call) RunAndReturn(run func(context.Context) (*cmd.Config, error)) *MockConfigurator_Load_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Save provides a mock function with given fields: config
-func (_m *MockConfigurator) Save(config *cmd.Config) error {
-	ret := _m.Called(config)
+// Save provides a mock function with given fields: ctx, config
+func (_m *MockConfigurator) Save(ctx context.Context, config *cmd.Config) error {
+	ret := _m.Called(ctx, config)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*cmd.Config) error); ok {
-		r0 = rf(config)
+	if rf, ok := ret.Get(0).(func(context.Context, *cmd.Config) error); ok {
+		r0 = rf(ctx, config)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -135,14 +139,15 @@ type MockConfigurator_Save_Call struct {
 }
 
 // Save is a helper method to define mock.On call
+//   - ctx context.Context
 //   - config *cmd.Config
-func (_e *MockConfigurator_Expecter) Save(config interface{}) *MockConfigurator_Save_Call {
-	return &MockConfigurator_Save_Call{Call: _e.mock.On("Save", config)}
+func (_e *MockConfigurator_Expecter) Save(ctx interface{}, config interface{}) *MockConfigurator_Save_Call {
+	return &MockConfigurator_Save_Call{Call: _e.mock.On("Save", ctx, config)}
 }
 
-func (_c *MockConfigurator_Save_Call) Run(run func(config *cmd.Config)) *MockConfigurator_Save_Call {
+func (_c *MockConfigurator_Save_Call) Run(run func(ctx context.Context, config *cmd.Config)) *MockConfigurator_Save_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*cmd.Config))
+		run(args[0].(context.Context), args[1].(*cmd.Config))
 	})
 	return _c
 }
@@ -152,7 +157,7 @@ func (_c *MockConfigurator_Save_Call) Return(_a0 error) *MockConfigurator_Save_C
 	return _c
 }
 
-func (_c *MockConfigurator_Save_Call) RunAndReturn(run func(*cmd.Config) error) *MockConfigurator_Save_Call {
+func (_c *MockConfigurator_Save_Call) RunAndReturn(run func(context.Context, *cmd.Config) error) *MockConfigurator_Save_Call {
 	_c.Call.Return(run)
 	return _c
 }

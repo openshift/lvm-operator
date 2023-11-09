@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
@@ -84,14 +85,18 @@ func NewCmd(opts *Options) *cobra.Command {
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	lvm := lvm.NewDefaultHostLVM()
 	nodeName := os.Getenv("NODE_NAME")
-	namespace := os.Getenv("POD_NAMESPACE")
+
+	operatorNamespace, err := cluster.GetOperatorNamespace()
+	if err != nil {
+		return fmt.Errorf("unable to get operatorNamespace: %w", err)
+	}
 
 	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: opts.Scheme})
 	if err != nil {
 		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
 	}
 
-	if err := tagging.AddTagToVGs(cmd.Context(), setupClient, lvm, nodeName, namespace); err != nil {
+	if err := tagging.AddTagToVGs(cmd.Context(), setupClient, lvm, nodeName, operatorNamespace); err != nil {
 		opts.SetupLog.Error(err, "failed to tag existing volume groups")
 	}
 
@@ -109,7 +114,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LeaderElection:         false,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
-				os.Getenv("POD_NAMESPACE"): {},
+				operatorNamespace: {},
 			},
 		},
 	})
@@ -120,14 +125,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if err = (&vgmanager.Reconciler{
 		Client:        mgr.GetClient(),
 		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.DefaultConfigurator(),
+		LVMD:          lvmd.NewFileConfigurator(mgr.GetClient(), operatorNamespace),
 		Scheme:        mgr.GetScheme(),
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
 		Wipefs:        wipefs.NewDefaultHostWipefs(),
 		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
 		LVM:           lvm,
 		NodeName:      nodeName,
-		Namespace:     namespace,
+		Namespace:     operatorNamespace,
 		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
