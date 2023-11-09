@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/labels"
 	"k8s.io/apimachinery/pkg/api/errors"

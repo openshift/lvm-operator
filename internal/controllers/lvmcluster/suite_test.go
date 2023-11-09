@@ -37,7 +37,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
