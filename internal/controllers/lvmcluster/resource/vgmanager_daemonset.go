@@ -83,6 +83,9 @@ var (
 				Path: fmt.Sprintf("%splugins_registry/", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
 				Type: &HostPathDirectoryOrCreate}},
 	}
+	RegistrationVolMount = corev1.VolumeMount{
+		Name: RegistrationVolName, MountPath: constants.DefaultPluginRegistrationPath,
+	}
 )
 
 var (
@@ -202,7 +205,7 @@ var (
 )
 
 // newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command, args, csiArgs []string) appsv1.DaemonSet {
+func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command, args []string) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{
@@ -217,6 +220,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		MetricsCertsDirVol,
 	}
 	volumeMounts := []corev1.VolumeMount{
+		RegistrationVolMount,
 		NodePluginVolMount,
 		CSIPluginVolMount,
 		PodVolMount,
@@ -296,7 +300,6 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 			},
 		},
-		*getCsiRegistrarContainer(csiArgs),
 	}
 	annotations := map[string]string{
 		constants.WorkloadPartitioningManagementAnnotation: constants.ManagementAnnotationVal,
@@ -336,42 +339,6 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 	// set nodeSelector
 	setDaemonsetNodeSelector(nodeSelector, &ds)
 	return ds
-}
-
-func getCsiRegistrarContainer(additionalArgs []string) *corev1.Container {
-	args := []string{
-		fmt.Sprintf("--csi-address=%s", constants.DefaultCSISocket),
-		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.io/node/csi-topolvm.sock", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
-	}
-	args = append(args, additionalArgs...)
-
-	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
-		{Name: "registration-dir", MountPath: "/registration"},
-	}
-
-	preStopCmd := []string{
-		"/bin/sh",
-		"-c",
-		"rm -rf /registration/topolvm.io /registration/topolvm.io-reg.sock",
-	}
-
-	requirements := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(constants.CSIRegistrarCPURequest),
-			corev1.ResourceMemory: resource.MustParse(constants.CSIRegistrarMemRequest),
-		},
-	}
-
-	csiRegistrar := &corev1.Container{
-		Name:         "csi-registrar",
-		Image:        CsiRegistrarImage,
-		Args:         args,
-		Lifecycle:    &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: preStopCmd}}},
-		VolumeMounts: volumeMounts,
-		Resources:    requirements,
-	}
-	return csiRegistrar
 }
 
 func getAbsoluteKubeletPath(name string) string {

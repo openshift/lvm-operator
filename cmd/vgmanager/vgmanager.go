@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
+	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/tagging"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
@@ -58,6 +60,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -184,6 +187,13 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		identityServer := driver.NewIdentityServer(checker.Ready)
 		csi.RegisterIdentityServer(grpcServer, identityServer)
 
+		registrationServer := internalCSI.NewRegistrationServer(
+			constants.TopolvmCSIDriverName, registrationPath(), []string{"1.0.0"})
+		registerapi.RegisterRegistrationServer(grpcServer, registrationServer)
+		if err = mgr.Add(runners.NewGRPCRunner(grpcServer, pluginRegistrationSocketPath(), false)); err != nil {
+			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
+		}
+
 		nodeServer, err := driver.NewNodeServer(nodeName, vgclnt, lvclnt, mgr) // adjusted signature
 		if err != nil {
 			return fmt.Errorf("could not setup topolvm node server: %w", err)
@@ -191,8 +201,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		csi.RegisterNodeServer(grpcServer, nodeServer)
 		err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
 		if err != nil {
-			return err
+			return fmt.Errorf("could not add grpc runner for node server: %w", err)
 		}
+
 		if err := mgr.AddReadyzCheck("readyz", func(req *http.Request) error {
 			// replicates behavior of https://github.com/kubernetes-csi/livenessprobe/blob/master/cmd/livenessprobe/main.go#L61-L93
 			probe, err := identityServer.Probe(ctx, &csi.ProbeRequest{})
@@ -281,4 +292,19 @@ func ErrorLoggingInterceptor(ctx context.Context, req interface{}, info *grpc.Un
 		ctrl.Log.Error(err, "error on grpc call", "method", info.FullMethod)
 	}
 	return resp, err
+}
+
+func registrationPath() string {
+	return fmt.Sprintf("%splugins/%s/node/csi-topolvm.sock", getAbsoluteKubeletPath(constants.CSIKubeletRootDir), constants.TopolvmCSIDriverName)
+}
+
+func pluginRegistrationSocketPath() string {
+	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.TopolvmCSIDriverName)
+}
+func getAbsoluteKubeletPath(name string) string {
+	if strings.HasSuffix(name, "/") {
+		return name
+	} else {
+		return name + "/"
+	}
 }

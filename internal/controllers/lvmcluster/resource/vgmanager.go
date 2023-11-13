@@ -53,7 +53,6 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 		r.GetImageName(),
 		r.GetVGManagerCommand(),
 		r.GetLogPassthroughOptions().VGManager.AsArgs(),
-		r.GetLogPassthroughOptions().CSISideCar.AsArgs(),
 	)
 
 	// create desired daemonset or update mutable fields on existing one

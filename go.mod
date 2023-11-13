@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/aws/aws-sdk-go v1.47.2
-	github.com/container-storage-interface/spec v1.6.0
+	github.com/container-storage-interface/spec v1.8.0
 	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.6.0
@@ -30,6 +30,7 @@ require (
 	k8s.io/client-go v0.28.3
 	k8s.io/component-helpers v0.28.3
 	k8s.io/klog/v2 v2.110.1
+	k8s.io/kubelet v0.28.3
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.16.3
 	sigs.k8s.io/yaml v1.4.0
