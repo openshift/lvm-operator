@@ -17,6 +17,10 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
+	"path/filepath"
+	"strings"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
@@ -24,45 +28,99 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 )
 
 var (
-	hostContainerPropagation  = corev1.MountPropagationHostToContainer
-	directoryHostPath         = corev1.HostPathDirectory
-	HostPathDirectoryOrCreate = corev1.HostPathDirectoryOrCreate
+	hostContainerPropagation      = corev1.MountPropagationHostToContainer
+	directoryHostPath             = corev1.HostPathDirectory
+	HostPathDirectoryOrCreate     = corev1.HostPathDirectoryOrCreate
+	mountPropagationBidirectional = corev1.MountPropagationBidirectional
 
-	LVMdVolName         = "lvmd-conf"
-	UdevVolName         = "run-udev"
-	DevDirVolName       = "device-dir"
-	SysVolName          = "sys"
-	MetricsCertsVolName = "metrics-cert"
-
-	LVMdDir             = "/etc/topolvm"
 	devDirPath          = "/dev"
 	udevPath            = "/run/udev"
 	sysPath             = "/sys"
 	metricsCertsDirPath = "/tmp/k8s-metrics-server/serving-certs"
+)
 
-	// LVMDConfVol is the corev1.Volume definition for the directory on host ("/etc/topolvm") for storing
-	// the lvmd.conf file
-	LVMDConfVol = corev1.Volume{
-		Name: LVMdVolName,
+var (
+	CSIPluginVolName = "csi-plugin-dir"
+	CSIPluginVol     = corev1.Volume{
+		Name: CSIPluginVolName,
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
-				Path: LVMdDir,
-				Type: &HostPathDirectoryOrCreate,
+				Path: fmt.Sprintf("%splugins/kubernetes.io/csi", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+				Type: &HostPathDirectoryOrCreate}},
+	}
+	CSIPluginVolMount = corev1.VolumeMount{
+		Name:             CSIPluginVolName,
+		MountPath:        fmt.Sprintf("%splugins/kubernetes.io/csi", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+		MountPropagation: &mountPropagationBidirectional,
+	}
+)
+
+var (
+	NodePluginVolName = "node-plugin-dir"
+	NodePluginVol     = corev1.Volume{
+		Name: NodePluginVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: fmt.Sprintf("%splugins/topolvm.io/node", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+				Type: &HostPathDirectoryOrCreate}},
+	}
+	NodePluginVolMount = corev1.VolumeMount{
+		Name: NodePluginVolName, MountPath: filepath.Dir(constants.DefaultCSISocket),
+	}
+)
+
+var (
+	RegistrationVolName = "registration-dir"
+	RegistrationVol     = corev1.Volume{
+		Name: RegistrationVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: fmt.Sprintf("%splugins_registry/", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+				Type: &HostPathDirectoryOrCreate}},
+	}
+)
+
+var (
+	PodVolName = "pod-volumes-dir"
+	PodVol     = corev1.Volume{
+		Name: PodVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: fmt.Sprintf("%spods/", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+				Type: &HostPathDirectoryOrCreate}},
+	}
+	PodVolMount = corev1.VolumeMount{
+		Name:             PodVolName,
+		MountPath:        fmt.Sprintf("%spods", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+		MountPropagation: &mountPropagationBidirectional,
+	}
+)
+
+var (
+	LVMDConfMapVolName = "lvmd-config"
+	LVMDConfMapVol     = corev1.Volume{
+		Name: LVMDConfMapVolName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				Optional: ptr.To(true),
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: constants.LVMDConfigMapName,
+				},
 			},
 		},
 	}
-
-	// LVMDConfVolMount is the corresponding mount for LVMDConfVol
-	LVMDConfVolMount = corev1.VolumeMount{
-		Name:             LVMdVolName,
-		MountPath:        LVMdDir,
-		MountPropagation: &hostContainerPropagation,
+	LVMDConfMapVolMount = corev1.VolumeMount{
+		Name: LVMDConfMapVolName, MountPath: constants.LVMDDefaultConfigDir,
 	}
+)
 
+var (
+	DevDirVolName = "device-dir"
 	// DevHostDirVol  is the corev1.Volume definition for the "/dev" bind mount used to
 	// list block devices.
 	// DevMount is the corresponding mount
@@ -82,7 +140,10 @@ var (
 		MountPath:        devDirPath,
 		MountPropagation: &hostContainerPropagation,
 	}
+)
 
+var (
+	UdevVolName = "run-udev"
 	// UDevHostDirVol is the corev1.Volume definition for the
 	// "/run/udev" host bind-mount. This helps lsblk give more accurate output.
 	// UDevMount is the corresponding mount
@@ -92,14 +153,16 @@ var (
 			HostPath: &corev1.HostPathVolumeSource{Path: udevPath},
 		},
 	}
-
 	// UDevHostDirVolMount is the corresponding mount for UDevHostDirVol
 	UDevHostDirVolMount = corev1.VolumeMount{
 		Name:             UdevVolName,
 		MountPath:        udevPath,
 		MountPropagation: &hostContainerPropagation,
 	}
+)
 
+var (
+	SysVolName = "sys"
 	// SysHostDirVol is the corev1.Volume definition for the
 	// "/sys" host bind-mount. This helps discover information about blockd devices
 	SysHostDirVol = corev1.Volume{
@@ -115,7 +178,10 @@ var (
 		MountPath:        sysPath,
 		MountPropagation: &hostContainerPropagation,
 	}
+)
 
+var (
+	MetricsCertsVolName = "metrics-cert"
 	// MetricsCertsDirVol is the corev1.Volume definition for the
 	// certs to be used in metrics endpoint.
 	MetricsCertsDirVol = corev1.Volume{
@@ -127,7 +193,6 @@ var (
 			},
 		},
 	}
-
 	// MetricsCertsDirVolMount is the corresponding mount for MetricsCertsDirVol
 	MetricsCertsDirVolMount = corev1.VolumeMount{
 		Name:      MetricsCertsVolName,
@@ -137,11 +202,30 @@ var (
 )
 
 // newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command, args []string) appsv1.DaemonSet {
+func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command, args, csiArgs []string) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
-	volumes := []corev1.Volume{LVMDConfVol, DevHostDirVol, UDevHostDirVol, SysHostDirVol, MetricsCertsDirVol}
-	volumeMounts := []corev1.VolumeMount{LVMDConfVolMount, DevHostDirVolMount, UDevHostDirVolMount, SysHostDirVolMount, MetricsCertsDirVolMount}
+	volumes := []corev1.Volume{
+		RegistrationVol,
+		NodePluginVol,
+		CSIPluginVol,
+		PodVol,
+		LVMDConfMapVol,
+		DevHostDirVol,
+		UDevHostDirVol,
+		SysHostDirVol,
+		MetricsCertsDirVol,
+	}
+	volumeMounts := []corev1.VolumeMount{
+		NodePluginVolMount,
+		CSIPluginVolMount,
+		PodVolMount,
+		LVMDConfMapVolMount,
+		DevHostDirVolMount,
+		UDevHostDirVolMount,
+		SysHostDirVolMount,
+		MetricsCertsDirVolMount,
+	}
 
 	if len(command) == 0 {
 		command = []string{"/lvms", "vgmanager"}
@@ -164,6 +248,25 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				Privileged: ptr.To(true),
 				RunAsUser:  ptr.To(int64(0)),
 			},
+			Ports: []corev1.ContainerPort{{Name: constants.TopolvmNodeContainerHealthzName,
+				ContainerPort: 8081,
+				Protocol:      corev1.ProtocolTCP}},
+			LivenessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
+						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
+				FailureThreshold:    3,
+				InitialDelaySeconds: 2,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10},
+			ReadinessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{Path: "/readyz",
+						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
+				FailureThreshold:    3,
+				InitialDelaySeconds: 2,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10},
 			VolumeMounts: volumeMounts,
 			Resources:    resourceRequirements,
 			Env: []corev1.EnvVar{
@@ -193,6 +296,8 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 			},
 		},
+		*getCsiRegistrarContainer(csiArgs),
+		*getNodeLivenessProbeContainer(),
 	}
 	annotations := map[string]string{
 		constants.WorkloadPartitioningManagementAnnotation: constants.ManagementAnnotationVal,
@@ -232,4 +337,74 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 	// set nodeSelector
 	setDaemonsetNodeSelector(nodeSelector, &ds)
 	return ds
+}
+
+func getCsiRegistrarContainer(additionalArgs []string) *corev1.Container {
+	args := []string{
+		fmt.Sprintf("--csi-address=%s", constants.DefaultCSISocket),
+		fmt.Sprintf("--kubelet-registration-path=%splugins/topolvm.io/node/csi-topolvm.sock", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+	}
+	args = append(args, additionalArgs...)
+
+	volumeMounts := []corev1.VolumeMount{
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
+		{Name: "registration-dir", MountPath: "/registration"},
+	}
+
+	preStopCmd := []string{
+		"/bin/sh",
+		"-c",
+		"rm -rf /registration/topolvm.io /registration/topolvm.io-reg.sock",
+	}
+
+	requirements := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(constants.CSIRegistrarCPURequest),
+			corev1.ResourceMemory: resource.MustParse(constants.CSIRegistrarMemRequest),
+		},
+	}
+
+	csiRegistrar := &corev1.Container{
+		Name:         "csi-registrar",
+		Image:        CsiRegistrarImage,
+		Args:         args,
+		Lifecycle:    &corev1.Lifecycle{PreStop: &corev1.LifecycleHandler{Exec: &corev1.ExecAction{Command: preStopCmd}}},
+		VolumeMounts: volumeMounts,
+		Resources:    requirements,
+	}
+	return csiRegistrar
+}
+
+func getNodeLivenessProbeContainer() *corev1.Container {
+	resourceRequirements := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(constants.LivenessProbeCPURequest),
+			corev1.ResourceMemory: resource.MustParse(constants.LivenessProbeMemRequest),
+		},
+	}
+
+	args := []string{
+		fmt.Sprintf("--csi-address=%s", constants.DefaultCSISocket),
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
+	}
+
+	liveness := &corev1.Container{
+		Name:         "liveness-probe",
+		Image:        CsiLivenessProbeImage,
+		Args:         args,
+		VolumeMounts: volumeMounts,
+		Resources:    resourceRequirements,
+	}
+	return liveness
+}
+
+func getAbsoluteKubeletPath(name string) string {
+	if strings.HasSuffix(name, "/") {
+		return name
+	} else {
+		return name + "/"
+	}
 }

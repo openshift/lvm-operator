@@ -106,12 +106,6 @@ func validateCSIDriver(ctx context.Context) bool {
 	}, timeout, interval).WithContext(ctx).Should(Succeed())
 }
 
-// function to validate TopoLVM node.
-func validateTopolvmNode(ctx context.Context) bool {
-	By("validating the TopoLVM Node DaemonSet")
-	return validateDaemonSet(ctx, types.NamespacedName{Name: topolvmNodeDaemonSetName, Namespace: installNamespace})
-}
-
 // function to validate vg manager resource.
 func validateVGManager(ctx context.Context) bool {
 	GinkgoHelper()
