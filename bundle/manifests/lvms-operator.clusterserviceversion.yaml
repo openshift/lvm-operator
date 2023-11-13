@@ -320,8 +320,6 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: lvms-operator
-      - rules:
         - apiGroups:
           - ""
           resources:
@@ -524,8 +522,20 @@ spec:
           verbs:
           - update
           - patch
-        serviceAccountName: topolvm-controller
+        serviceAccountName: lvms-operator
       - rules:
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
         - apiGroups:
           - ""
           resources:
@@ -557,40 +567,6 @@ spec:
           - get
           - list
           - watch
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
-        serviceAccountName: topolvm-node
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - nodes
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
         serviceAccountName: vg-manager
       deployments:
       - label:
@@ -619,16 +595,8 @@ spec:
                 - /lvms
                 - operator
                 env:
-                - name: TOPOLVM_CSI_IMAGE
-                  value: quay.io/lvms_dev/topolvm:latest
-                - name: RBAC_PROXY_IMAGE
-                  value: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
-                - name: CSI_LIVENESSPROBE_IMAGE
-                  value: k8s.gcr.io/sig-storage/livenessprobe:v2.9.0
                 - name: CSI_PROVISIONER_IMAGE
                   value: k8s.gcr.io/sig-storage/csi-provisioner:v3.4.1
-                - name: CSI_REGISTRAR_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.7.0
                 - name: CSI_RESIZER_IMAGE
                   value: k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
                 - name: CSI_SNAPSHOTTER_IMAGE
@@ -661,8 +629,8 @@ spec:
                   periodSeconds: 10
                 resources:
                   requests:
-                    cpu: 3m
-                    memory: 30Mi
+                    cpu: 5m
+                    memory: 75Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                 volumeMounts:
@@ -672,6 +640,54 @@ spec:
                 - mountPath: /tmp/k8s-metrics-server/serving-certs
                   name: metrics-cert
                   readOnly: true
+                - mountPath: /run/topolvm
+                  name: socket-dir
+              - args:
+                - --csi-address=/run/topolvm/csi-topolvm.sock
+                - --enable-capacity
+                - --capacity-ownerref-level=2
+                - --capacity-poll-interval=30s
+                - --feature-gates=Topology=true
+                env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                image: k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0
+                name: csi-provisioner
+                resources:
+                  requests:
+                    cpu: 2m
+                    memory: 50Mi
+                volumeMounts:
+                - mountPath: /run/topolvm
+                  name: socket-dir
+              - args:
+                - --csi-address=/run/topolvm/csi-topolvm.sock
+                image: k8s.gcr.io/sig-storage/csi-resizer:v1.6.0
+                name: csi-resizer
+                resources:
+                  requests:
+                    cpu: 1m
+                    memory: 35Mi
+                volumeMounts:
+                - mountPath: /run/topolvm
+                  name: socket-dir
+              - args:
+                - --csi-address=/run/topolvm/csi-topolvm.sock
+                image: k8s.gcr.io/sig-storage/livenessprobe:v2.8.0
+                name: liveness-probe
+                resources:
+                  requests:
+                    cpu: 1m
+                    memory: 15Mi
+                volumeMounts:
+                - mountPath: /run/topolvm
+                  name: socket-dir
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator
@@ -685,6 +701,8 @@ spec:
                 secret:
                   defaultMode: 420
                   secretName: lvms-operator-metrics-cert
+              - emptyDir: {}
+                name: socket-dir
       permissions:
       - rules:
         - apiGroups:
@@ -718,8 +736,6 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: lvms-operator
-      - rules:
         - apiGroups:
           - coordination.k8s.io
           resources:
@@ -787,7 +803,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: topolvm-controller
+        serviceAccountName: lvms-operator
       - rules:
         - apiGroups:
           - lvm.topolvm.io

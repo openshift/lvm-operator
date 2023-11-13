@@ -63,8 +63,8 @@ spec:
           periodSeconds: 10
         resources:
           requests:
-            cpu: 3m
-            memory: 30Mi
+            cpu: 5m
+            memory: 75Mi
         env:
         - name: POD_NAMESPACE
           valueFrom:
@@ -74,5 +74,57 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        volumeMounts:
+          - mountPath: /run/topolvm
+            name: "socket-dir"
+      - name: csi-provisioner
+        image: "k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0"
+        args:
+          - --csi-address=/run/topolvm/csi-topolvm.sock
+          - --enable-capacity
+          - --capacity-ownerref-level=2
+          - --capacity-poll-interval=30s
+          - --feature-gates=Topology=true
+        env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+        volumeMounts:
+          - mountPath: /run/topolvm
+            name: "socket-dir"
+        resources:
+          requests:
+            cpu: 2m
+            memory: 50Mi
+      - name: csi-resizer
+        image: "k8s.gcr.io/sig-storage/csi-resizer:v1.6.0"
+        args:
+          - --csi-address=/run/topolvm/csi-topolvm.sock
+        volumeMounts:
+          - mountPath: /run/topolvm
+            name: "socket-dir"
+        resources:
+          requests:
+            cpu: 1m
+            memory: 35Mi
+      - name: liveness-probe
+        image: "k8s.gcr.io/sig-storage/livenessprobe:v2.8.0"
+        args:
+          - --csi-address=/run/topolvm/csi-topolvm.sock
+        volumeMounts:
+          - mountPath: /run/topolvm
+            name: "socket-dir"
+        resources:
+          requests:
+            cpu: 1m
+            memory: 15Mi
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
       serviceAccountName: lvms-operator
       terminationGracePeriodSeconds: 10

@@ -275,6 +275,14 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 			Resources:    resourceRequirements,
 			Env: []corev1.EnvVar{
 				{
+					Name:  "GOMEMLIMIT",
+					Value: fmt.Sprintf("%sB", constants.VgManagerMemRequest),
+				},
+				{
+					Name:  "GOGC",
+					Value: "75",
+				},
+				{
 					Name: "NODE_NAME",
 					ValueFrom: &corev1.EnvVarSource{
 						FieldRef: &corev1.ObjectFieldSelector{
