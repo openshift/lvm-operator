@@ -104,7 +104,7 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 			}
 		}
 
-		var filterErrs []error
+		filterErrs := make([]error, 0, len(filters))
 		for name, filterFunc := range filters {
 			if err := filterFunc(device); err != nil {
 				logger.WithValues("device.KName", device.KName, "filter.Name", name).

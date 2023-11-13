@@ -44,8 +44,6 @@ import (
 	"github.com/topolvm/topolvm/lvmd/proto"
 	"github.com/topolvm/topolvm/runners"
 	"google.golang.org/grpc"
-	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 
@@ -157,7 +155,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		}
 	} else {
 		topoClient := topolvmClient.NewWrappedClient(mgr.GetClient())
-		topoReader := topolvmClient.NewWrappedReader(mgr.GetAPIReader(), mgr.GetClient().Scheme())
 		command.Containerized = true
 		dcm := topoLVMD.NewDeviceClassManager(lvmdConfig.DeviceClasses)
 		ocm := topoLVMD.NewLvcreateOptionClassManager(lvmdConfig.LvcreateOptionClasses)
@@ -170,8 +167,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		}
 
 		// Add health checker to manager
-		checkFn := checkFreeBytes(vgclnt, topoReader)
-		checker := runners.NewChecker(checkFn, 10*time.Second) // adjusted signature
+		checker := runners.NewChecker(checkFreeBytes(vgclnt), 10*time.Second) // adjusted signature
 		if err := mgr.Add(checker); err != nil {
 			return fmt.Errorf("could not add free bytes heealth check: %w", err)
 		}
@@ -272,17 +268,14 @@ func loadConfFile(ctx context.Context, config *lvmd.Config, cfgFilePath string) 
 	)
 	return nil
 }
-func checkFreeBytes(clnt proto.VGServiceClient, r client.Reader) func() error {
+func checkFreeBytes(clnt proto.VGServiceClient) func() error {
 	return func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := clnt.GetFreeBytes(ctx, &proto.GetFreeBytesRequest{DeviceClass: topolvm.DefaultDeviceClassName}); err != nil {
-			return err
-		}
+		_, err := clnt.GetFreeBytes(ctx, &proto.GetFreeBytesRequest{DeviceClass: topolvm.DefaultDeviceClassName})
 
-		var drv storagev1.CSIDriver
-		return r.Get(ctx, types.NamespacedName{Name: topolvm.GetPluginName()}, &drv)
+		return err
 	}
 }
 

@@ -87,9 +87,8 @@ func (lsblk *HostLSBLK) ListBlockDevices() ([]BlockDevice, error) {
 		return []BlockDevice{}, err
 	}
 
-	err = json.Unmarshal([]byte(output), &blockDeviceMap)
-	if err != nil {
-		return []BlockDevice{}, err
+	if err = json.NewDecoder(strings.NewReader(output)).Decode(&blockDeviceMap); err != nil {
+		return nil, err
 	}
 
 	return blockDeviceMap["blockdevices"], nil
@@ -110,8 +109,7 @@ func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 		return true, err
 	}
 
-	err = json.Unmarshal([]byte(output), &loopDeviceMap)
-	if err != nil {
+	if err = json.NewDecoder(strings.NewReader(output)).Decode(&loopDeviceMap); err != nil {
 		return false, err
 	}
 
@@ -130,6 +128,7 @@ func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 // HostPID should be set to true inside the POD spec to get details of host's mount points inside `proc/1/mountinfo`.
 func (lsblk *HostLSBLK) HasBindMounts(b BlockDevice) (bool, string, error) {
 	file, err := os.Open(lsblk.mountInfo)
+	defer file.Close() // nolint:golint,staticcheck
 	if err != nil {
 		return false, "", fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
 	}
