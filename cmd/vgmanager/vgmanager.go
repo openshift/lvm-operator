@@ -172,9 +172,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		if err := mgr.Add(checker); err != nil {
 			return fmt.Errorf("could not add free bytes heealth check: %w", err)
 		}
-		if err := mgr.AddReadyzCheck("readyz", func(req *http.Request) error { return checkFn() }); err != nil {
-			return fmt.Errorf("unable to set up ready check: %w", err)
-		}
 
 		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, topoClient, nodeName)); err != nil { // adjusted signature
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
@@ -184,7 +181,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return err
 		}
 		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor))
-		csi.RegisterIdentityServer(grpcServer, driver.NewIdentityServer(checker.Ready))
+		identityServer := driver.NewIdentityServer(checker.Ready)
+		csi.RegisterIdentityServer(grpcServer, identityServer)
+
 		nodeServer, err := driver.NewNodeServer(nodeName, vgclnt, lvclnt, mgr) // adjusted signature
 		if err != nil {
 			return fmt.Errorf("could not setup topolvm node server: %w", err)
@@ -193,6 +192,19 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
 		if err != nil {
 			return err
+		}
+		if err := mgr.AddReadyzCheck("readyz", func(req *http.Request) error {
+			// replicates behavior of https://github.com/kubernetes-csi/livenessprobe/blob/master/cmd/livenessprobe/main.go#L61-L93
+			probe, err := identityServer.Probe(ctx, &csi.ProbeRequest{})
+			if !probe.Ready.GetValue() {
+				return fmt.Errorf("CSI Driver responded but is not ready")
+			}
+			if err != nil {
+				return fmt.Errorf("CSI Identity Server health check failed: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("unable to set up ready check: %w", err)
 		}
 	}
 

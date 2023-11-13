@@ -297,7 +297,6 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 			},
 		},
 		*getCsiRegistrarContainer(csiArgs),
-		*getNodeLivenessProbeContainer(),
 	}
 	annotations := map[string]string{
 		constants.WorkloadPartitioningManagementAnnotation: constants.ManagementAnnotationVal,
@@ -373,32 +372,6 @@ func getCsiRegistrarContainer(additionalArgs []string) *corev1.Container {
 		Resources:    requirements,
 	}
 	return csiRegistrar
-}
-
-func getNodeLivenessProbeContainer() *corev1.Container {
-	resourceRequirements := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(constants.LivenessProbeCPURequest),
-			corev1.ResourceMemory: resource.MustParse(constants.LivenessProbeMemRequest),
-		},
-	}
-
-	args := []string{
-		fmt.Sprintf("--csi-address=%s", constants.DefaultCSISocket),
-	}
-
-	volumeMounts := []corev1.VolumeMount{
-		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
-	}
-
-	liveness := &corev1.Container{
-		Name:         "liveness-probe",
-		Image:        CsiLivenessProbeImage,
-		Args:         args,
-		VolumeMounts: volumeMounts,
-		Resources:    resourceRequirements,
-	}
-	return liveness
 }
 
 func getAbsoluteKubeletPath(name string) string {
