@@ -91,7 +91,6 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 	excludedByKName := make(map[string]FilteredBlockDevice)
 
 	for _, device := range devices {
-		logger := logger.WithValues("device.KName", device.KName)
 		// check for partitions recursively
 		if device.HasChildren() {
 			filteredChildDevices := r.filterDevices(ctx, device.Children, filters)
@@ -107,9 +106,9 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 
 		var filterErrs []error
 		for name, filterFunc := range filters {
-			logger := logger.WithValues("filter.Name", name)
 			if err := filterFunc(device); err != nil {
-				logger.V(3).Info("excluded", "reason", err)
+				logger.WithValues("device.KName", device.KName, "filter.Name", name).
+					V(3).Info("excluded", "reason", err)
 				filterErrs = append(filterErrs, err)
 			}
 		}
