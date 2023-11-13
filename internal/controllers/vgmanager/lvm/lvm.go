@@ -350,13 +350,20 @@ func (hlvm *HostLVM) ListVGs() ([]VolumeGroup, error) {
 		}
 	}
 
+	pvs, err := hlvm.ListPVs("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list physical volumes: %w", err)
+	}
+
 	// Get Physical Volumes associated with the Volume Group
 	for i, vg := range vgList {
-		pvs, err := hlvm.ListPVs(vg.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list physical volumes for volume group %q. %v", vg.Name, err)
+		var vgPvs []PhysicalVolume
+		for _, pv := range pvs {
+			if vg.Name == pv.VgName {
+				vgPvs = append(vgPvs, pv)
+			}
 		}
-		vgList[i].PVs = pvs
+		vgList[i].PVs = vgPvs
 	}
 
 	return vgList, nil
@@ -507,7 +514,7 @@ func (hlvm *HostLVM) execute(v interface{}, args ...string) error {
 		return fmt.Errorf("failed to execute command. %v", err)
 	}
 
-	err = json.Unmarshal([]byte(output), &v)
+	err = json.NewDecoder(strings.NewReader(output)).Decode(&v)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal response. %v", err)
 	}
