@@ -36,7 +36,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20231103101024-846fbca061aa
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20231113080707-35d0ebeab62b
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect

@@ -68,20 +68,12 @@ update-mgr-env: ## Feed environment variables to the manager ConfigMap.
 	@echo "$$MANAGER_ENV_VARS" > config/manager/manager.env
 	cp config/default/manager_custom_env.yaml.in config/default/manager_custom_env.yaml
 ifeq ($(UNAME), Darwin)
-	sed -i '' 's|TOPOLVM_CSI_IMAGE_VAL|$(TOPOLVM_CSI_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|RBAC_PROXY_IMAGE_VAL|$(RBAC_PROXY_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_LIVENESSPROBE_IMAGE_VAL|$(CSI_LIVENESSPROBE_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_REGISTRAR_IMAGE_VAL|$(CSI_REGISTRAR_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' config/default/manager_custom_env.yaml
 else
-	sed 's|TOPOLVM_CSI_IMAGE_VAL|$(TOPOLVM_CSI_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|RBAC_PROXY_IMAGE_VAL|$(RBAC_PROXY_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_LIVENESSPROBE_IMAGE_VAL|$(CSI_LIVENESSPROBE_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_REGISTRAR_IMAGE_VAL|$(CSI_REGISTRAR_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 endif
 

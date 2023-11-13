@@ -1,6 +1,7 @@
 package lsblk
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -127,13 +128,15 @@ func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 // HasBindMounts checks for bind mounts and returns mount point for a device by parsing `proc/1/mountinfo`.
 // HostPID should be set to true inside the POD spec to get details of host's mount points inside `proc/1/mountinfo`.
 func (lsblk *HostLSBLK) HasBindMounts(b BlockDevice) (bool, string, error) {
-	data, err := os.ReadFile(lsblk.mountInfo)
+	file, err := os.Open(lsblk.mountInfo)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
 	}
 
-	mountString := string(data)
-	for _, mountInfo := range strings.Split(mountString, "\n") {
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		mountInfo := scanner.Text()
 		if strings.Contains(mountInfo, b.KName) {
 			mountInfoList := strings.Split(mountInfo, " ")
 			if len(mountInfoList) >= 10 {

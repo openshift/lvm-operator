@@ -3,7 +3,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
 # Build the manager binary
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15 as builder
+FROM golang:1.21 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
