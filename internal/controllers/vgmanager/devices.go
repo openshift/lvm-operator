@@ -109,7 +109,7 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 		for name, filterFunc := range filters {
 			logger := logger.WithValues("filter.Name", name)
 			if err := filterFunc(device); err != nil {
-				logger.Info("excluded", "reason", err)
+				logger.V(3).Info("excluded", "reason", err)
 				filterErrs = append(filterErrs, err)
 			}
 		}
