@@ -2,6 +2,7 @@ package lsblk
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -132,17 +133,17 @@ func (lsblk *HostLSBLK) HasBindMounts(b BlockDevice) (bool, string, error) {
 	if err != nil {
 		return false, "", fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
 	}
-
+	term := []byte(b.KName)
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
-		mountInfo := scanner.Text()
-		if strings.Contains(mountInfo, b.KName) {
-			mountInfoList := strings.Split(mountInfo, " ")
+		mountInfo := scanner.Bytes()
+		if bytes.Contains(mountInfo, term) {
+			mountInfoList := bytes.Fields(mountInfo)
 			if len(mountInfoList) >= 10 {
 				// device source is 4th field for bind mounts and 10th for regular mounts
-				if mountInfoList[3] == fmt.Sprintf("/%s", filepath.Base(b.KName)) || mountInfoList[9] == b.KName {
-					return true, mountInfoList[4], nil
+				if bytes.Equal(mountInfoList[3], []byte(fmt.Sprintf("/%s", filepath.Base(b.KName)))) || bytes.Equal(mountInfoList[9], term) {
+					return true, string(mountInfoList[4]), nil
 				}
 			}
 		}
