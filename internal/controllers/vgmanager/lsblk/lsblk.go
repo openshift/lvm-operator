@@ -24,19 +24,18 @@ const (
 // BlockDevice is the block device as output by lsblk.
 // All the fields are lsblk columns.
 type BlockDevice struct {
-	Name       string        `json:"name"`
-	KName      string        `json:"kname"`
-	Type       string        `json:"type"`
-	Model      string        `json:"model,omitempty"`
-	Vendor     string        `json:"vendor,omitempty"`
-	State      string        `json:"state,omitempty"`
-	FSType     string        `json:"fstype"`
-	Size       string        `json:"size"`
-	Children   []BlockDevice `json:"children,omitempty"`
-	Rotational bool          `json:"rota"`
-	ReadOnly   bool          `json:"ro,omitempty"`
-	Serial     string        `json:"serial,omitempty"`
-	PartLabel  string        `json:"partLabel,omitempty"`
+	Name      string        `json:"name"`
+	KName     string        `json:"kname"`
+	Type      string        `json:"type"`
+	Model     string        `json:"model,omitempty"`
+	Vendor    string        `json:"vendor,omitempty"`
+	State     string        `json:"state,omitempty"`
+	FSType    string        `json:"fstype"`
+	Size      string        `json:"size"`
+	Children  []BlockDevice `json:"children,omitempty"`
+	ReadOnly  bool          `json:"ro,omitempty"`
+	Serial    string        `json:"serial,omitempty"`
+	PartLabel string        `json:"partLabel,omitempty"`
 
 	// DevicePath is the path given by user
 	DevicePath string

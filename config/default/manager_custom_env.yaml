@@ -12,7 +12,7 @@ spec:
       - name: manager
         env:
         - name: TOPOLVM_CSI_IMAGE
-          value: quay.io/lvms_dev/topolvm:latest
+          value: quay.io/jmoller/topolvm:devel
         - name: RBAC_PROXY_IMAGE
           value: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
         - name: CSI_LIVENESSPROBE_IMAGE

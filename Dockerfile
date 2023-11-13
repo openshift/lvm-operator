@@ -3,7 +3,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
 # Build the manager binary
-FROM golang:1.21 as builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -24,12 +24,9 @@ COPY internal/ internal/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
+FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.15:base-rhel9
 
-# Update the image to get the latest CVE updates
-RUN microdnf update -y && \
-    microdnf install -y util-linux && \
-    microdnf clean all
+RUN yum install -y util-linux e2fsprogs xfsprogs glibc && yum clean all && rm -rf /var/cache/yum
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .

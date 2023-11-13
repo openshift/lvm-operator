@@ -60,7 +60,6 @@ func VerifyLVMSSetup(ctx context.Context, cluster *v1alpha1.LVMCluster) {
 	validateTopolvmController(ctx)
 	validateVGManager(ctx)
 	validateLVMVolumeGroup(ctx)
-	validateTopolvmNode(ctx)
 	validateStorageClass(ctx)
 	validateVolumeSnapshotClass(ctx)
 }

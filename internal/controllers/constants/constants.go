@@ -68,8 +68,9 @@ const (
 	NodeContainerName               = "topolvm-node"
 	TopolvmNodeContainerHealthzName = "healthz"
 
-	DefaultCSISocket = "/run/topolvm/csi-topolvm.sock"
-	DeviceClassKey   = "topolvm.io/device-class"
+	DefaultCSISocket              = "/run/topolvm/csi-topolvm.sock"
+	DeviceClassKey                = "topolvm.io/device-class"
+	DefaultPluginRegistrationPath = "/registration"
 
 	LVMDConfigMapName         = "lvmd-config"
 	LVMDDefaultConfigDir      = "/etc/topolvm"
