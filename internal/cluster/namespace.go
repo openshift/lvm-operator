@@ -5,11 +5,11 @@ import (
 	"os"
 )
 
-const OperatorNamespaceEnvVar = "POD_NAMESPACE"
+const OperatorNamespaceEnvVar = "NAMESPACE"
 
 // GetOperatorNamespace returns the Namespace the operator should be watching for changes
 func GetOperatorNamespace() (string, error) {
-	// The env variable POD_NAMESPACE which specifies the Namespace the pod is running in
+	// The env variable NAMESPACE which specifies the Namespace the pod is running in
 	// and hence will watch.
 
 	ns, found := os.LookupEnv(OperatorNamespaceEnvVar)

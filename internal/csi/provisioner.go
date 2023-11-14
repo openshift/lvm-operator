@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller"
@@ -48,14 +49,19 @@ type Provisioner struct {
 	options ProvisionerOptions
 }
 
-var _ manager.Runnable = &Provisioner{}
+func (p *Provisioner) NeedLeaderElection() bool {
+	return true
+}
 
-func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) (*Provisioner, error) {
+var _ manager.Runnable = &Provisioner{}
+var _ manager.LeaderElectionRunnable = &Provisioner{}
+
+func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisioner {
 	return &Provisioner{
 		config:  mgr.GetConfig(),
 		client:  mgr.GetHTTPClient(),
 		options: options,
-	}, nil
+	}
 }
 
 func (p *Provisioner) Start(ctx context.Context) error {
@@ -128,9 +134,9 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	if namespace == "" {
 		return fmt.Errorf("need NAMESPACE env variable for CSIStorageCapacity objects")
 	}
-	podName := os.Getenv("POD_NAME")
+	podName := os.Getenv("NAME")
 	if podName == "" {
-		return fmt.Errorf("need POD_NAME env variable to determine CSIStorageCapacity owner")
+		return fmt.Errorf("need NAME env variable to determine CSIStorageCapacity owner")
 	}
 	controllerRef, err := owner.Lookup(p.config, namespace, podName,
 		schema.GroupVersionKind{
@@ -230,30 +236,22 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		libmetrics.PersistentVolumeDeleteDurationSeconds,
 	}...)
 
-	run := func(ctx context.Context) {
-		factory.Start(ctx.Done())
-		if factoryForNamespace != nil {
-			// Starting is enough, the capacity controller will
-			// wait for sync.
-			factoryForNamespace.Start(ctx.Done())
+	factory.Start(ctx.Done())
+	// Starting is enough, the capacity controller will
+	// wait for sync.
+	factoryForNamespace.Start(ctx.Done())
+	cacheSyncResult := factory.WaitForCacheSync(ctx.Done())
+	for _, v := range cacheSyncResult {
+		if !v {
+			klog.Fatalf("Failed to sync Informers!")
 		}
-		cacheSyncResult := factory.WaitForCacheSync(ctx.Done())
-		for _, v := range cacheSyncResult {
-			if !v {
-				klog.Fatalf("Failed to sync Informers!")
-			}
-		}
-
-		if capacityController != nil {
-			go capacityController.Run(ctx, 1)
-		}
-		if csiClaimController != nil {
-			go csiClaimController.Run(ctx, 1)
-		}
-		provisionController.Run(ctx)
 	}
 
-	run(ctx)
+	go capacityController.Run(ctx, 1)
+	go csiClaimController.Run(ctx, 1)
+	provisionController.Run(ctx)
+
+	ctrl.Log.Info("provisioner finished shutdown")
 
 	return nil
 }

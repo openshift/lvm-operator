@@ -362,7 +362,7 @@ func (r *Reconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alph
 func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 
 	if r.ImageName == "" {
-		// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
+		// 'NAME' and 'NAMESPACE' are set in env of lvm-operator when running as a container
 		podName := os.Getenv(resource.PodNameEnv)
 		if podName == "" {
 			return fmt.Errorf("failed to get pod name env variable, %s env variable is not set", resource.PodNameEnv)
