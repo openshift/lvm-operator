@@ -8,10 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var (
@@ -144,30 +142,27 @@ type BlockDeviceInfo struct {
 	IsUsableLoopDev bool
 }
 
-func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error) {
-	wg := sync.WaitGroup{}
-	isUsableLoopDev := make(chan bool, len(bs))
-	defer close(isUsableLoopDev)
-
-	for i := range bs {
-		i := i
-		if bs[i].Type == "loop" {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				fromLSBLK, err := lsblk.IsUsableLoopDev(bs[i])
-				if err != nil {
-					ctrl.Log.Error(err, "failed to check if loop device is usable", "device", bs[i].Name)
-				}
-				isUsableLoopDev <- fromLSBLK
-			}()
-		} else {
-			isUsableLoopDev <- false
+func flattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
+	flattened := make(map[string]BlockDevice, len(bs))
+	for _, b := range bs {
+		flattened[b.KName] = b
+		if b.HasChildren() {
+			for k, v := range flattenedBlockDevices(b.Children) {
+				flattened[k] = v
+			}
 		}
 	}
+	return flattened
+}
 
-	hasBindMounts := make(chan bool, len(bs))
-	defer close(hasBindMounts)
+func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error) {
+	flattenedMap := flattenedBlockDevices(bs)
+	flattened := make([]BlockDevice, len(flattenedMap))
+	i := 0
+	for _, v := range flattenedMap {
+		flattened[i] = v
+		i++
+	}
 
 	file, err := os.Open(lsblk.mountInfo)
 	defer file.Close() // nolint:golint,staticcheck
@@ -176,34 +171,34 @@ func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, er
 	}
 	scanner := bufio.NewScanner(file)
 
+	blockDeviceInfos := make(BlockDeviceInfos)
 	for scanner.Scan() {
 		mountInfo := scanner.Bytes()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			hasBindMountsFromMountInfo := false
-			for _, bd := range bs {
+		mountInfoList := bytes.Fields(mountInfo)
+		if len(mountInfoList) >= 10 {
+			for _, bd := range flattened {
 				if bytes.Contains(mountInfo, []byte(bd.KName)) {
-					mountInfoList := bytes.Fields(mountInfo)
-					if len(mountInfoList) >= 10 {
-						// device source is 4th field for bind mounts and 10th for regular mounts
-						if bytes.Equal(mountInfoList[3], []byte(fmt.Sprintf("/%s", filepath.Base(bd.KName)))) || bytes.Equal(mountInfoList[9], []byte(bd.KName)) {
-							hasBindMountsFromMountInfo = true
-							break
+					// dev source is 4th field for bind mounts and 10th for regular mounts
+					if bytes.Equal(mountInfoList[3], []byte(fmt.Sprintf("/%s", filepath.Base(bd.KName)))) || bytes.Equal(mountInfoList[9], []byte(bd.KName)) {
+						blockDeviceInfos[bd.KName] = BlockDeviceInfo{
+							HasBindMounts: true,
 						}
+						break
 					}
 				}
 			}
-			hasBindMounts <- hasBindMountsFromMountInfo
-		}()
+		}
+	}
+	if scanner.Err() != nil {
+		return nil, fmt.Errorf("failed to mountinfo %s: %v", lsblk.mountInfo, scanner.Err())
 	}
 
-	wg.Wait()
 	bindMountMap := make(BlockDeviceInfos)
-	for i := range bs {
-		bindMountMap[bs[i].KName] = BlockDeviceInfo{
-			HasBindMounts:   <-hasBindMounts,
-			IsUsableLoopDev: <-isUsableLoopDev,
+	for _, dev := range flattened {
+		if dev.Type == "loop" {
+			info := bindMountMap[dev.KName]
+			info.IsUsableLoopDev, _ = lsblk.IsUsableLoopDev(dev)
+			bindMountMap[dev.KName] = info
 		}
 	}
 
