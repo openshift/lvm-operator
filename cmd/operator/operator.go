@@ -192,6 +192,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LeaderElectionID:              leaderElectionConfig.Name,
 		LeaderElection:                !leaderElectionConfig.Disable,
 		LeaderElectionReleaseOnCancel: true,
+		PprofBindAddress:              ":9098",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
