@@ -2,8 +2,10 @@ package lsblk
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -162,7 +164,11 @@ func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
 	}
-	scanner := bufio.NewScanner(file)
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read mount file %s: %v", lsblk.mountInfo, err)
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 
 	blockDeviceInfos := make(BlockDeviceInfos)
 	for scanner.Scan() {

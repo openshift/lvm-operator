@@ -212,7 +212,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		controller.FailedProvisionThreshold(3),
 		controller.FailedDeleteThreshold(3),
 		controller.RateLimiter(rateLimiter),
-		controller.Threadiness(3),
+		controller.Threadiness(1),
 		controller.CreateProvisionedPVLimiter(workqueue.DefaultControllerRateLimiter()),
 		controller.ClaimsInformer(claimInformer),
 		controller.NodesLister(nodeLister),

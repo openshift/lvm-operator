@@ -187,7 +187,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LeaderElection:                !leaderElectionConfig.Disable,
 		LeaderElectionReleaseOnCancel: true,
 		GracefulShutdownTimeout:       ptr.To(time.Duration(-1)),
-		PprofBindAddress:              ":9098",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -248,7 +247,8 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	grpcServer := grpc.NewServer()
-	csi.RegisterIdentityServer(grpcServer, driver.NewIdentityServer(checker.Ready))
+	identityServer := driver.NewIdentityServer(checker.Ready)
+	csi.RegisterIdentityServer(grpcServer, identityServer)
 	controllerSever, err := driver.NewControllerServer(mgr)
 	if err != nil {
 		return err
@@ -274,7 +274,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		return fmt.Errorf("unable to set up ready check: %w", err)
+		// replicates behavior of https://github.com/kubernetes-csi/livenessprobe/blob/master/cmd/livenessprobe/main.go#L61-L93
+		probe, err := identityServer.Probe(ctx, &csi.ProbeRequest{})
+		if !probe.Ready.GetValue() {
+			return fmt.Errorf("CSI Driver responded but is not ready")
+		}
+		if err != nil {
+			return fmt.Errorf("CSI Identity Server health check failed: %w", err)
+		}
+		return nil
 	}
 
 	c := make(chan os.Signal, 2)
