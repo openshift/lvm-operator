@@ -88,17 +88,6 @@ spec:
           requests:
             cpu: 1m
             memory: 35Mi
-      - name: liveness-probe
-        image: "k8s.gcr.io/sig-storage/livenessprobe:v2.8.0"
-        args:
-          - --csi-address=/run/topolvm/csi-topolvm.sock
-        volumeMounts:
-          - mountPath: /run/topolvm
-            name: "socket-dir"
-        resources:
-          requests:
-            cpu: 1m
-            memory: 15Mi
       volumes:
         - name: socket-dir
           emptyDir: {}

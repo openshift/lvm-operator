@@ -601,11 +601,11 @@ spec:
                   value: k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
                 - name: CSI_SNAPSHOTTER_IMAGE
                   value: k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
-                - name: POD_NAMESPACE
+                - name: NAMESPACE
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                - name: POD_NAME
+                - name: NAME
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
@@ -644,30 +644,6 @@ spec:
                   name: socket-dir
               - args:
                 - --csi-address=/run/topolvm/csi-topolvm.sock
-                - --enable-capacity
-                - --capacity-ownerref-level=2
-                - --capacity-poll-interval=30s
-                - --feature-gates=Topology=true
-                env:
-                - name: NAMESPACE
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.namespace
-                - name: POD_NAME
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.name
-                image: k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0
-                name: csi-provisioner
-                resources:
-                  requests:
-                    cpu: 2m
-                    memory: 50Mi
-                volumeMounts:
-                - mountPath: /run/topolvm
-                  name: socket-dir
-              - args:
-                - --csi-address=/run/topolvm/csi-topolvm.sock
                 image: k8s.gcr.io/sig-storage/csi-resizer:v1.6.0
                 name: csi-resizer
                 resources:
@@ -677,21 +653,10 @@ spec:
                 volumeMounts:
                 - mountPath: /run/topolvm
                   name: socket-dir
-              - args:
-                - --csi-address=/run/topolvm/csi-topolvm.sock
-                image: k8s.gcr.io/sig-storage/livenessprobe:v2.8.0
-                name: liveness-probe
-                resources:
-                  requests:
-                    cpu: 1m
-                    memory: 15Mi
-                volumeMounts:
-                - mountPath: /run/topolvm
-                  name: socket-dir
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator
-              terminationGracePeriodSeconds: 10
+              terminationGracePeriodSeconds: 60
               volumes:
               - name: cert
                 secret:
