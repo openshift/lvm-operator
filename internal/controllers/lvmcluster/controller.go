@@ -200,7 +200,6 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 
 	resources := []resource.Manager{
 		resource.CSIDriver(),
-		resource.TopoLVMController(),
 		resource.VGManager(),
 		resource.LVMVGs(),
 		resource.TopoLVMStorageClass(),
@@ -403,7 +402,6 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 		resourceDeletionList := []resource.Manager{
 			resource.TopoLVMStorageClass(),
 			resource.LVMVGs(),
-			resource.TopoLVMController(),
 			resource.CSIDriver(),
 			resource.VGManager(),
 		}
