@@ -11,8 +11,6 @@ spec:
       containers:
       - name: manager
         env:
-        - name: CSI_PROVISIONER_IMAGE
-          value: CSI_PROVISIONER_IMAGE_VAL
         - name: CSI_RESIZER_IMAGE
           value: CSI_RESIZER_IMAGE_VAL
         - name: CSI_SNAPSHOTTER_IMAGE

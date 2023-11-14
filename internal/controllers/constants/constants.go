@@ -21,51 +21,11 @@ const (
 
 	VGManagerServiceAccount = "vg-manager"
 
-	TopolvmControllerServiceAccount = "topolvm-controller"
-
-	// CSI Controller container and deployment names
-	TopolvmControllerDeploymentName = "topolvm-controller"
-	CsiResizerContainerName         = "csi-resizer"
-	CsiProvisionerContainerName     = "csi-provisioner"
-	CsiSnapshotterContainerName     = "csi-snapshotter"
-	CsiLivenessProbeContainerName   = "liveness-probe"
-
-	// CSI Controller health endpoints
-	TopolvmControllerContainerHealthzName   = "healthz"
-	TopolvmControllerContainerLivenessPort  = int32(9808)
-	TopolvmControllerContainerReadinessPort = int32(8080)
-
-	// CSI Controller resource requests
-	TopolvmControllerMemRequest = "45Mi"
-	TopolvmControllerCPURequest = "2m"
-
-	TopolvmCsiProvisionerMemRequest = "50Mi"
-	TopolvmCsiProvisionerCPURequest = "2m"
-
-	TopolvmCsiResizerMemRequest = "35Mi"
-	TopolvmCsiResizerCPURequest = "1m"
-
-	TopolvmCsiSnapshotterMemRequest = "35Mi"
-	TopolvmCsiSnapshotterCPURequest = "1m"
-
 	VgManagerMemRequest = "45Mi"
 	VgManagerCPURequest = "2m"
 
-	// topoLVM Node resource requests
-	TopolvmNodeMemRequest = "35Mi"
-	TopolvmNodeCPURequest = "3m"
-
-	CSIRegistrarMemRequest = "15Mi"
-	CSIRegistrarCPURequest = "1m"
-
-	LivenessProbeMemRequest = "15Mi"
-	LivenessProbeCPURequest = "1m"
-
 	// topoLVM Node
-	TopolvmNodeServiceAccount       = "topolvm-node"
-	TopolvmNodeDaemonsetName        = "topolvm-node"
 	CSIKubeletRootDir               = "/var/lib/kubelet/"
-	NodeContainerName               = "topolvm-node"
 	TopolvmNodeContainerHealthzName = "healthz"
 
 	DefaultCSISocket              = "/run/topolvm/csi-topolvm.sock"
@@ -97,12 +57,9 @@ const (
 	// AppKubernetesComponentLabel is the Kubernetes recommended component label
 	AppKubernetesComponentLabel = "app.kubernetes.io/component"
 
-	TopolvmControllerLabelVal = "topolvm-controller"
-	TopolvmNodeLabelVal       = "topolvm-node"
-	VGManagerLabelVal         = "vg-manager"
-	ManagedByLabelVal         = "lvms-operator"
-	PartOfLabelVal            = "lvms-provisioner"
-	CsiDriverNameVal          = "topolvm-csi-driver"
+	VGManagerLabelVal = "vg-manager"
+	ManagedByLabelVal = "lvms-operator"
+	PartOfLabelVal    = "lvms-provisioner"
 
 	StorageClassPrefix        = "lvms-"
 	VolumeSnapshotClassPrefix = "lvms-"
