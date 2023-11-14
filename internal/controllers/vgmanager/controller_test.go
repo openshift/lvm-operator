@@ -238,8 +238,14 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 
 	By("triggering the second reconciliation after the initial setup", func() {
 		instances.LVM.EXPECT().ListVGs().Return(nil, nil).Twice()
+		instances.LVM.EXPECT().ListPVs("").Return(nil, nil).Twice()
 		instances.LSBLK.EXPECT().ListBlockDevices().Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
-		instances.LSBLK.EXPECT().HasBindMounts(blockDevice).Return(false, "", nil).Once()
+		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Return(lsblk.BlockDeviceInfos{
+			blockDevice.KName: {
+				HasBindMounts:   false,
+				IsUsableLoopDev: false,
+			},
+		}, nil).Times(3)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -256,7 +262,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	// Requeue effects
 	instances.LVM.EXPECT().ListVGs().Return(nil, nil).Twice()
 	instances.LSBLK.EXPECT().ListBlockDevices().Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
-	instances.LSBLK.EXPECT().HasBindMounts(blockDevice).Return(false, "", nil).Once()
+	instances.LVM.EXPECT().ListPVs("").Return(nil, nil).Once()
 
 	// addDevicesToVG
 	var lvmPV lvm.PhysicalVolume
@@ -550,7 +556,7 @@ func testLVMD(ctx context.Context) {
 	ctx = log.IntoContext(ctx, logger)
 
 	vg := &lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}
-	devices := &FilteredBlockDevices{}
+	devices := FilteredBlockDevices{}
 
 	r.Client = fake.NewClientBuilder().WithObjects(vg).WithScheme(scheme.Scheme).Build()
 	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
@@ -768,7 +774,13 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
 		instances.LVM.EXPECT().ListVGs().Twice().Return(nil, nil)
-		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		instances.LVM.EXPECT().ListPVs("").Times(4).Return(nil, nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
+			"/dev/sda": {
+				HasBindMounts:   false,
+				IsUsableLoopDev: false,
+			},
+		}, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 
@@ -787,7 +799,12 @@ func testReconcileFailure(ctx context.Context) {
 		}, nil)
 		instances.LVM.EXPECT().ListVGs().Once().Return(nil, nil)
 		instances.LVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mocked error"))
-		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
+			"/dev/sda": {
+				HasBindMounts:   false,
+				IsUsableLoopDev: false,
+			},
+		}, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("the volume group vg1 does not exist and there were no available devices to create it"))
@@ -807,7 +824,12 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "vg1", VgSize: "1g"},
 		}
 		instances.LVM.EXPECT().ListVGs().Twice().Return(vgs, nil)
-		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
+			"/dev/sda": {
+				HasBindMounts:   false,
+				IsUsableLoopDev: false,
+			},
+		}, nil)
 		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
@@ -828,7 +850,12 @@ func testReconcileFailure(ctx context.Context) {
 		}
 		instances.LVM.EXPECT().ListVGs().Once().Return(vgs, nil)
 		instances.LVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mocked error"))
-		instances.LSBLK.EXPECT().HasBindMounts(mock.Anything).Once().Return(false, "", nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
+			"/dev/sda": {
+				HasBindMounts:   false,
+				IsUsableLoopDev: false,
+			},
+		}, nil)
 		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())

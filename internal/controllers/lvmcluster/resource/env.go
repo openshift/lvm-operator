@@ -49,9 +49,6 @@ var defaultEnvVars = []corev1.EnvVar{
 var (
 	defaultValMap = map[string]string{
 		"OPERATOR_NAMESPACE":      "openshift-storage",
-		"TOPOLVM_CSI_IMAGE":       "quay.io/lvms_dev/topolvm:latest",
-		"RBAC_PROXY_IMAGE":        "gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1",
-		"CSI_REGISTRAR_IMAGE":     "k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.2",
 		"CSI_PROVISIONER_IMAGE":   "k8s.gcr.io/sig-storage/csi-provisioner:v3.3.0",
 		"CSI_LIVENESSPROBE_IMAGE": "k8s.gcr.io/sig-storage/livenessprobe:v2.8.0",
 		"CSI_RESIZER_IMAGE":       "k8s.gcr.io/sig-storage/csi-resizer:v1.6.0",

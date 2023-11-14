@@ -20,61 +20,56 @@ func (_m *MockLSBLK) EXPECT() *MockLSBLK_Expecter {
 	return &MockLSBLK_Expecter{mock: &_m.Mock}
 }
 
-// HasBindMounts provides a mock function with given fields: b
-func (_m *MockLSBLK) HasBindMounts(b lsblk.BlockDevice) (bool, string, error) {
-	ret := _m.Called(b)
+// BlockDeviceInfos provides a mock function with given fields: bs
+func (_m *MockLSBLK) BlockDeviceInfos(bs []lsblk.BlockDevice) (lsblk.BlockDeviceInfos, error) {
+	ret := _m.Called(bs)
 
-	var r0 bool
-	var r1 string
-	var r2 error
-	if rf, ok := ret.Get(0).(func(lsblk.BlockDevice) (bool, string, error)); ok {
-		return rf(b)
+	var r0 lsblk.BlockDeviceInfos
+	var r1 error
+	if rf, ok := ret.Get(0).(func([]lsblk.BlockDevice) (lsblk.BlockDeviceInfos, error)); ok {
+		return rf(bs)
 	}
-	if rf, ok := ret.Get(0).(func(lsblk.BlockDevice) bool); ok {
-		r0 = rf(b)
+	if rf, ok := ret.Get(0).(func([]lsblk.BlockDevice) lsblk.BlockDeviceInfos); ok {
+		r0 = rf(bs)
 	} else {
-		r0 = ret.Get(0).(bool)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(lsblk.BlockDeviceInfos)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func(lsblk.BlockDevice) string); ok {
-		r1 = rf(b)
+	if rf, ok := ret.Get(1).(func([]lsblk.BlockDevice) error); ok {
+		r1 = rf(bs)
 	} else {
-		r1 = ret.Get(1).(string)
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(lsblk.BlockDevice) error); ok {
-		r2 = rf(b)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
-// MockLSBLK_HasBindMounts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasBindMounts'
-type MockLSBLK_HasBindMounts_Call struct {
+// MockLSBLK_BlockDeviceInfos_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockDeviceInfos'
+type MockLSBLK_BlockDeviceInfos_Call struct {
 	*mock.Call
 }
 
-// HasBindMounts is a helper method to define mock.On call
-//   - b lsblk.BlockDevice
-func (_e *MockLSBLK_Expecter) HasBindMounts(b interface{}) *MockLSBLK_HasBindMounts_Call {
-	return &MockLSBLK_HasBindMounts_Call{Call: _e.mock.On("HasBindMounts", b)}
+// BlockDeviceInfos is a helper method to define mock.On call
+//   - bs []lsblk.BlockDevice
+func (_e *MockLSBLK_Expecter) BlockDeviceInfos(bs interface{}) *MockLSBLK_BlockDeviceInfos_Call {
+	return &MockLSBLK_BlockDeviceInfos_Call{Call: _e.mock.On("BlockDeviceInfos", bs)}
 }
 
-func (_c *MockLSBLK_HasBindMounts_Call) Run(run func(b lsblk.BlockDevice)) *MockLSBLK_HasBindMounts_Call {
+func (_c *MockLSBLK_BlockDeviceInfos_Call) Run(run func(bs []lsblk.BlockDevice)) *MockLSBLK_BlockDeviceInfos_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(lsblk.BlockDevice))
+		run(args[0].([]lsblk.BlockDevice))
 	})
 	return _c
 }
 
-func (_c *MockLSBLK_HasBindMounts_Call) Return(_a0 bool, _a1 string, _a2 error) *MockLSBLK_HasBindMounts_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *MockLSBLK_BlockDeviceInfos_Call) Return(_a0 lsblk.BlockDeviceInfos, _a1 error) *MockLSBLK_BlockDeviceInfos_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockLSBLK_HasBindMounts_Call) RunAndReturn(run func(lsblk.BlockDevice) (bool, string, error)) *MockLSBLK_HasBindMounts_Call {
+func (_c *MockLSBLK_BlockDeviceInfos_Call) RunAndReturn(run func([]lsblk.BlockDevice) (lsblk.BlockDeviceInfos, error)) *MockLSBLK_BlockDeviceInfos_Call {
 	_c.Call.Return(run)
 	return _c
 }

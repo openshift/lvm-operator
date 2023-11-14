@@ -125,7 +125,7 @@ type Reconciler struct {
 	dmsetup.Dmsetup
 	NodeName  string
 	Namespace string
-	Filters   func(*lvmv1alpha1.LVMVolumeGroup, lvm.LVM, lsblk.LSBLK) filter.Filters
+	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
 	Shutdown  context.CancelFunc
 }
 
@@ -208,7 +208,17 @@ func (r *Reconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
 	}
 
-	devices := r.filterDevices(ctx, newDevices, r.Filters(volumeGroup, r.LVM, r.LSBLK))
+	pvs, err := r.LVM.ListPVs("")
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("physical volumes could not be fetched: %w", err)
+	}
+
+	bdi, err := r.LSBLK.BlockDeviceInfos(newDevices)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get block device infos: %w", err)
+	}
+
+	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
 
 	vgs, err := r.LVM.ListVGs()
 	if err != nil {
@@ -317,14 +327,14 @@ func (r *Reconciler) reconcile(
 	return reconcileAgain, nil
 }
 
-func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices) error {
+func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, devices FilteredBlockDevices) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	// Read the lvmd config file
 	lvmdConfig, err := r.LVMD.Load(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to read the lvmd config file: %w", err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
+		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, devices, err); err != nil {
 			logger.Error(err, "failed to set status to failed")
 		}
 		return err
@@ -447,7 +457,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			if thinPoolExists {
 				if err := r.LVM.DeleteLV(thinPoolName, volumeGroup.Name); err != nil {
 					err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
-					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
+					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, FilteredBlockDevices{}, err); err != nil {
 						logger.Error(err, "failed to set status to failed")
 					}
 					return err
@@ -460,7 +470,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 
 		if err = r.LVM.DeleteVG(vg); err != nil {
 			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, FilteredBlockDevices{}, err); err != nil {
 				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
 			}
 			return err

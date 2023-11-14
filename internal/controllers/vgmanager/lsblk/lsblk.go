@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var (
@@ -21,6 +23,17 @@ var (
 const (
 	// mount string to find if a path is part of kubernetes
 	pluginString = "plugins/kubernetes.io"
+)
+
+const (
+	// DeviceTypeLoop is the device type for loop devices in lsblk output
+	DeviceTypeLoop = "loop"
+
+	// DeviceTypeROM is the device type for ROM devices in lsblk output
+	DeviceTypeROM = "rom"
+
+	// DeviceTypeLVM is the device type for lvm devices in lsblk output
+	DeviceTypeLVM = "lvm"
 )
 
 // BlockDevice is the block device as output by lsblk.
@@ -46,7 +59,7 @@ type BlockDevice struct {
 type LSBLK interface {
 	ListBlockDevices() ([]BlockDevice, error)
 	IsUsableLoopDev(b BlockDevice) (bool, error)
-	HasBindMounts(b BlockDevice) (bool, string, error)
+	BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error)
 }
 
 type HostLSBLK struct {
@@ -124,29 +137,75 @@ func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 	return true, nil
 }
 
-// HasBindMounts checks for bind mounts and returns mount point for a device by parsing `proc/1/mountinfo`.
-// HostPID should be set to true inside the POD spec to get details of host's mount points inside `proc/1/mountinfo`.
-func (lsblk *HostLSBLK) HasBindMounts(b BlockDevice) (bool, string, error) {
+type BlockDeviceInfos map[string]BlockDeviceInfo
+
+type BlockDeviceInfo struct {
+	HasBindMounts   bool
+	IsUsableLoopDev bool
+}
+
+func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error) {
+	wg := sync.WaitGroup{}
+	isUsableLoopDev := make(chan bool, len(bs))
+	defer close(isUsableLoopDev)
+
+	for i := range bs {
+		i := i
+		if bs[i].Type == "loop" {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				fromLSBLK, err := lsblk.IsUsableLoopDev(bs[i])
+				if err != nil {
+					ctrl.Log.Error(err, "failed to check if loop device is usable", "device", bs[i].Name)
+				}
+				isUsableLoopDev <- fromLSBLK
+			}()
+		} else {
+			isUsableLoopDev <- false
+		}
+	}
+
+	hasBindMounts := make(chan bool, len(bs))
+	defer close(hasBindMounts)
+
 	file, err := os.Open(lsblk.mountInfo)
 	defer file.Close() // nolint:golint,staticcheck
 	if err != nil {
-		return false, "", fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
+		return nil, fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
 	}
-	term := []byte(b.KName)
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
 		mountInfo := scanner.Bytes()
-		if bytes.Contains(mountInfo, term) {
-			mountInfoList := bytes.Fields(mountInfo)
-			if len(mountInfoList) >= 10 {
-				// device source is 4th field for bind mounts and 10th for regular mounts
-				if bytes.Equal(mountInfoList[3], []byte(fmt.Sprintf("/%s", filepath.Base(b.KName)))) || bytes.Equal(mountInfoList[9], term) {
-					return true, string(mountInfoList[4]), nil
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			hasBindMountsFromMountInfo := false
+			for _, bd := range bs {
+				if bytes.Contains(mountInfo, []byte(bd.KName)) {
+					mountInfoList := bytes.Fields(mountInfo)
+					if len(mountInfoList) >= 10 {
+						// device source is 4th field for bind mounts and 10th for regular mounts
+						if bytes.Equal(mountInfoList[3], []byte(fmt.Sprintf("/%s", filepath.Base(bd.KName)))) || bytes.Equal(mountInfoList[9], []byte(bd.KName)) {
+							hasBindMountsFromMountInfo = true
+							break
+						}
+					}
 				}
 			}
+			hasBindMounts <- hasBindMountsFromMountInfo
+		}()
+	}
+
+	wg.Wait()
+	bindMountMap := make(BlockDeviceInfos)
+	for i := range bs {
+		bindMountMap[bs[i].KName] = BlockDeviceInfo{
+			HasBindMounts:   <-hasBindMounts,
+			IsUsableLoopDev: <-isUsableLoopDev,
 		}
 	}
 
-	return false, "", nil
+	return bindMountMap, nil
 }
