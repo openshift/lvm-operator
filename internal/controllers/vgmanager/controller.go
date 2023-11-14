@@ -52,7 +52,7 @@ import (
 
 const (
 	ControllerName            = "vg-manager"
-	reconcileInterval         = 20 * time.Second
+	reconcileInterval         = 30 * time.Second
 	metadataWarningPercentage = 95
 
 	// NodeCleanupFinalizer should be set on a LVMVolumeGroup for every Node matching that LVMVolumeGroup.

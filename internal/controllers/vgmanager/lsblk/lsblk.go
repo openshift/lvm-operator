@@ -2,7 +2,6 @@ package lsblk
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -157,12 +156,6 @@ func flattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
 
 func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error) {
 	flattenedMap := flattenedBlockDevices(bs)
-	flattened := make([]BlockDevice, len(flattenedMap))
-	i := 0
-	for _, v := range flattenedMap {
-		flattened[i] = v
-		i++
-	}
 
 	file, err := os.Open(lsblk.mountInfo)
 	defer file.Close() // nolint:golint,staticcheck
@@ -173,13 +166,16 @@ func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, er
 
 	blockDeviceInfos := make(BlockDeviceInfos)
 	for scanner.Scan() {
-		mountInfo := scanner.Bytes()
-		mountInfoList := bytes.Fields(mountInfo)
+		mountInfo := scanner.Text()
+		mountInfoList := strings.Fields(mountInfo)
 		if len(mountInfoList) >= 10 {
-			for _, bd := range flattened {
-				if bytes.Contains(mountInfo, []byte(bd.KName)) {
+			for _, bd := range flattenedMap {
+				if blockDeviceInfos[bd.KName].HasBindMounts {
+					continue
+				}
+				if strings.Contains(mountInfo, bd.KName) {
 					// dev source is 4th field for bind mounts and 10th for regular mounts
-					if bytes.Equal(mountInfoList[3], []byte(fmt.Sprintf("/%s", filepath.Base(bd.KName)))) || bytes.Equal(mountInfoList[9], []byte(bd.KName)) {
+					if mountInfoList[3] == fmt.Sprintf("/%s", filepath.Base(bd.KName)) || mountInfoList[9] == bd.KName {
 						blockDeviceInfos[bd.KName] = BlockDeviceInfo{
 							HasBindMounts: true,
 						}
@@ -193,14 +189,13 @@ func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, er
 		return nil, fmt.Errorf("failed to mountinfo %s: %v", lsblk.mountInfo, scanner.Err())
 	}
 
-	bindMountMap := make(BlockDeviceInfos)
-	for _, dev := range flattened {
+	for _, dev := range flattenedMap {
 		if dev.Type == "loop" {
-			info := bindMountMap[dev.KName]
+			info := blockDeviceInfos[dev.KName]
 			info.IsUsableLoopDev, _ = lsblk.IsUsableLoopDev(dev)
-			bindMountMap[dev.KName] = info
+			blockDeviceInfos[dev.KName] = info
 		}
 	}
 
-	return bindMountMap, nil
+	return blockDeviceInfos, nil
 }
