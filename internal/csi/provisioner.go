@@ -11,7 +11,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
-	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/kubernetes-csi/external-provisioner/pkg/capacity"
 	"github.com/kubernetes-csi/external-provisioner/pkg/capacity/topology"
 	provisionctrl "github.com/kubernetes-csi/external-provisioner/pkg/controller"
@@ -41,7 +40,7 @@ const (
 type ProvisionerOptions struct {
 	DriverName          string
 	CSIEndpoint         string
-	CSIOperationTimeout time.Duration // 10*time.Second
+	CSIOperationTimeout time.Duration
 }
 
 type Provisioner struct {
@@ -78,17 +77,12 @@ func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisione
 
 func (p *Provisioner) Start(ctx context.Context) error {
 	logger := log.FromContext(ctx)
-	metricsManager := metrics.NewCSIMetricsManagerWithOptions("", /* DriverName */
-		// Will be provided via default gatherer.
-		metrics.WithProcessStartTime(false),
-		metrics.WithSubsystem(metrics.SubsystemSidecar),
-	)
 
 	onLostConnection := func() bool {
-		logger.Info("lost connection to csi driver, not attempting to reconnect due to in tree provisioning...")
-		return false
+		logger.Info("lost connection to csi driver, attempting to reconnect due to in tree provisioning...")
+		return true
 	}
-	grpcClient, err := connection.Connect(p.options.CSIEndpoint, metricsManager,
+	grpcClient, err := connection.Connect(p.options.CSIEndpoint, nil,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
 	defer grpcClient.Close() //nolint:errcheck,staticcheck

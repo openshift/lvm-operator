@@ -12,6 +12,7 @@ require (
 	github.com/kubernetes-csi/external-provisioner v1.6.1-0.20231109010946-e7c0bcc89c20
 	github.com/kubernetes-csi/external-resizer v1.9.2
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
+	github.com/kubernetes-csi/external-snapshotter/v6 v6.3.2
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
 	github.com/openshift/api v0.0.0-20231102215821-c90b4c82852e
@@ -63,7 +64,7 @@ require (
 	github.com/cybozu-go/well v1.10.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
+	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
