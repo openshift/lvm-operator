@@ -257,7 +257,17 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		CSIEndpoint:         constants.DefaultCSISocket,
 		CSIOperationTimeout: 10 * time.Second,
 	})); err != nil {
-		return err
+		return fmt.Errorf("unable to create CSI Provisioner: %w", err)
+	}
+
+	if enableSnapshotting {
+		if err := mgr.Add(internalCSI.NewSnapshotter(mgr, internalCSI.SnapshotterOptions{
+			DriverName:          constants.TopolvmCSIDriverName,
+			CSIEndpoint:         constants.DefaultCSISocket,
+			CSIOperationTimeout: 10 * time.Second,
+		})); err != nil {
+			return fmt.Errorf("unable to create CSI Snapshotter: %w", err)
+		}
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

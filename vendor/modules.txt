@@ -97,7 +97,7 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
-# github.com/evanphx/json-patch v5.6.0+incompatible
+# github.com/evanphx/json-patch v5.7.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
 # github.com/evanphx/json-patch/v5 v5.6.0
@@ -258,6 +258,20 @@ github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned
 github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned/scheme
 github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned/typed/volumegroupsnapshot/v1alpha1
 github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned/typed/volumesnapshot/v1
+github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions
+github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions/internalinterfaces
+github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions/volumegroupsnapshot
+github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions/volumegroupsnapshot/v1alpha1
+github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions/volumesnapshot
+github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions/volumesnapshot/v1
+github.com/kubernetes-csi/external-snapshotter/client/v6/listers/volumegroupsnapshot/v1alpha1
+github.com/kubernetes-csi/external-snapshotter/client/v6/listers/volumesnapshot/v1
+# github.com/kubernetes-csi/external-snapshotter/v6 v6.3.2
+## explicit; go 1.20
+github.com/kubernetes-csi/external-snapshotter/v6/pkg/group_snapshotter
+github.com/kubernetes-csi/external-snapshotter/v6/pkg/sidecar-controller
+github.com/kubernetes-csi/external-snapshotter/v6/pkg/snapshotter
+github.com/kubernetes-csi/external-snapshotter/v6/pkg/utils
 # github.com/magiconair/properties v1.8.5
 ## explicit; go 1.13
 github.com/magiconair/properties
