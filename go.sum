@@ -267,6 +267,8 @@ github.com/kubernetes-csi/csi-lib-utils v0.16.0/go.mod h1:fp1Oik+45tP2o4X9SD/SBW
 github.com/kubernetes-csi/csi-test/v5 v5.0.0 h1:GJ0M+ppcKgWhafXH3B2Ssfw1Egzly9GlMx3JOQApekM=
 github.com/kubernetes-csi/external-provisioner v1.6.1-0.20231109010946-e7c0bcc89c20 h1:ZEASkJH9zU6MRcDEkahTuGhbN9eETrwmqrPzPqXOr+I=
 github.com/kubernetes-csi/external-provisioner v1.6.1-0.20231109010946-e7c0bcc89c20/go.mod h1:P44Onaq580ZzbkGDgnxIjvm5/P8dYPunqca7199+5WQ=
+github.com/kubernetes-csi/external-resizer v1.9.2 h1:fCXCF9XBw+zG6bblcV1GJkYMe09mN4h5p/oDxujbuy4=
+github.com/kubernetes-csi/external-resizer v1.9.2/go.mod h1:AsXE1vxO6SrYM6kpSeg/95jDLORhDdDCiWCSsxqQulo=
 github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0 h1:qS4r4ljINLWKJ9m9Ge3Q3sGZ/eIoDVDT2RhAdQFHb1k=
 github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0/go.mod h1:oGXx2XTEzs9ikW2V6IC1dD8trgjRsS/Mvc2JRiC618Y=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
