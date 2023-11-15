@@ -78,7 +78,7 @@ spec:
           - mountPath: /run/topolvm
             name: "socket-dir"
       - name: csi-resizer
-        image: "k8s.gcr.io/sig-storage/csi-resizer:v1.6.0"
+        image: csi-resizer:latest
         args:
           - --csi-address=/run/topolvm/csi-topolvm.sock
         volumeMounts:

@@ -9,4 +9,7 @@ images:
 - name: controller
   newName: quay.io/lvms_dev/lvms-operator
   newTag: latest
+- name: csi-resizer
+  newName: k8s.gcr.io/sig-storage/csi-resizer
+  newTag: v1.7.0
 namePrefix: lvms-

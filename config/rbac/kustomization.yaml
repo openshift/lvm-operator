@@ -9,10 +9,6 @@ resources:
 - role_binding.yaml
 - leader_election_role.yaml
 - leader_election_role_binding.yaml
-# topolvm-controller rbac
-- topolvm_controller_service_account.yaml
-- topolvm_controller_role.yaml
-- topolvm_controller_role_bindings.yaml
 # lvm-node metric rbac
 - lvms_node_role_n_rolebindings.yaml
 # Comment the following 4 lines if you want to disable
