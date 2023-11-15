@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,9 +35,8 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/spf13/cobra"
-	"github.com/topolvm/topolvm/controllers"
+	topolvmcontrollers "github.com/topolvm/topolvm/controllers"
 	"github.com/topolvm/topolvm/driver"
-	"github.com/topolvm/topolvm/runners"
 	"google.golang.org/grpc"
 	"k8s.io/utils/ptr"
 
@@ -187,6 +187,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LeaderElection:                !leaderElectionConfig.Disable,
 		LeaderElectionReleaseOnCancel: true,
 		GracefulShutdownTimeout:       ptr.To(time.Duration(-1)),
+		PprofBindAddress:              ":9099",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -226,34 +227,30 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	// register TopoLVM controllers
-	nodecontroller := controllers.NewNodeReconciler(mgr.GetClient(), false)
-	if err := nodecontroller.SetupWithManager(mgr); err != nil {
+	topolvmNodeController := topolvmcontrollers.NewNodeReconciler(mgr.GetClient(), false)
+	if err := topolvmNodeController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create TopoLVM Node controller: %w", err)
 	}
 
-	pvccontroller := controllers.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader())
-	if err := pvccontroller.SetupWithManager(mgr); err != nil {
+	topolvmPVCController := topolvmcontrollers.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader())
+	if err := topolvmPVCController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create TopoLVM PVC controller: %w", err)
 	}
 
-	// Add TopoLVM gRPC server to manager.
-	// Add health checker to manager
-	check := func() error {
-		return nil
-	}
-	checker := runners.NewChecker(check, 1*time.Minute)
-	if err := mgr.Add(checker); err != nil {
-		return err
-	}
-
 	grpcServer := grpc.NewServer()
-	identityServer := driver.NewIdentityServer(checker.Ready)
+	identityServer := driver.NewIdentityServer(func() (bool, error) {
+		return true, nil
+	})
 	csi.RegisterIdentityServer(grpcServer, identityServer)
 	controllerSever, err := driver.NewControllerServer(mgr)
 	if err != nil {
 		return err
 	}
 	csi.RegisterControllerServer(grpcServer, controllerSever)
+
+	if err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false)); err != nil {
+		return err
+	}
 
 	if err := mgr.Add(internalCSI.NewProvisioner(mgr, internalCSI.ProvisionerOptions{
 		DriverName:          constants.TopolvmCSIDriverName,
@@ -263,19 +260,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return err
 	}
 
-	// gRPC service itself should run even when the manager is *not* a leader
-	// because CSI sidecar containers choose a leader.
-	err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, true))
-	if err != nil {
-		return err
-	}
-
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", func(req *http.Request) error {
 		// replicates behavior of https://github.com/kubernetes-csi/livenessprobe/blob/master/cmd/livenessprobe/main.go#L61-L93
-		probe, err := identityServer.Probe(ctx, &csi.ProbeRequest{})
+		probe, err := identityServer.Probe(req.Context(), &csi.ProbeRequest{})
 		if !probe.Ready.GetValue() {
 			return fmt.Errorf("CSI Driver responded but is not ready")
 		}
@@ -283,6 +273,8 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("CSI Identity Server health check failed: %w", err)
 		}
 		return nil
+	}); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	c := make(chan os.Signal, 2)
