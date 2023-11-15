@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	PodNameEnv   = "POD_NAME"
+	PodNameEnv   = "NAME"
 	NameSpaceEnv = "NAMESPACE"
 )
 

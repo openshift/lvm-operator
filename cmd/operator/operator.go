@@ -32,11 +32,13 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/node/removal"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
+	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm/controllers"
 	"github.com/topolvm/topolvm/driver"
 	"github.com/topolvm/topolvm/runners"
 	"google.golang.org/grpc"
+	"k8s.io/utils/ptr"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -55,8 +57,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/openshift/library-go/pkg/config/leaderelection"
-
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	//+kubebuilder:scaffold:imports
@@ -144,12 +144,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to resolve leader election config: %w", err)
 	}
 
-	le, err := leaderelection.ToLeaderElectionWithLease(
-		ctrl.GetConfigOrDie(), leaderElectionConfig, "lvms", "")
-	if err != nil {
-		return fmt.Errorf("unable to setup leader election with lease configuration: %w", err)
-	}
-
 	clusterType, err := cluster.NewTypeResolver(setupClient).GetType(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to determine cluster type: %w", err)
@@ -185,14 +179,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			},
 		},
 		HealthProbeBindAddress:        opts.healthProbeAddr,
-		RetryPeriod:                   &le.RetryPeriod,
-		LeaseDuration:                 &le.LeaseDuration,
-		RenewDeadline:                 &le.RenewDeadline,
+		RetryPeriod:                   &leaderElectionConfig.RetryPeriod.Duration,
+		LeaseDuration:                 &leaderElectionConfig.LeaseDuration.Duration,
+		RenewDeadline:                 &leaderElectionConfig.RenewDeadline.Duration,
 		LeaderElectionNamespace:       operatorNamespace,
 		LeaderElectionID:              leaderElectionConfig.Name,
 		LeaderElection:                !leaderElectionConfig.Disable,
 		LeaderElectionReleaseOnCancel: true,
-		PprofBindAddress:              ":9098",
+		GracefulShutdownTimeout:       ptr.To(time.Duration(-1)),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -253,16 +247,25 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	grpcServer := grpc.NewServer()
-	csi.RegisterIdentityServer(grpcServer, driver.NewIdentityServer(checker.Ready))
+	identityServer := driver.NewIdentityServer(checker.Ready)
+	csi.RegisterIdentityServer(grpcServer, identityServer)
 	controllerSever, err := driver.NewControllerServer(mgr)
 	if err != nil {
 		return err
 	}
 	csi.RegisterControllerServer(grpcServer, controllerSever)
 
+	if err := mgr.Add(internalCSI.NewProvisioner(mgr, internalCSI.ProvisionerOptions{
+		DriverName:          constants.TopolvmCSIDriverName,
+		CSIEndpoint:         constants.DefaultCSISocket,
+		CSIOperationTimeout: 10 * time.Second,
+	})); err != nil {
+		return err
+	}
+
 	// gRPC service itself should run even when the manager is *not* a leader
 	// because CSI sidecar containers choose a leader.
-	err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
+	err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, true))
 	if err != nil {
 		return err
 	}
@@ -271,7 +274,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		return fmt.Errorf("unable to set up ready check: %w", err)
+		// replicates behavior of https://github.com/kubernetes-csi/livenessprobe/blob/master/cmd/livenessprobe/main.go#L61-L93
+		probe, err := identityServer.Probe(ctx, &csi.ProbeRequest{})
+		if !probe.Ready.GetValue() {
+			return fmt.Errorf("CSI Driver responded but is not ready")
+		}
+		if err != nil {
+			return fmt.Errorf("CSI Identity Server health check failed: %w", err)
+		}
+		return nil
 	}
 
 	c := make(chan os.Signal, 2)

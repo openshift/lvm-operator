@@ -291,7 +291,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 					},
 				},
 				{
-					Name: "POD_NAMESPACE",
+					Name: "NAMESPACE",
 					ValueFrom: &corev1.EnvVarSource{
 						FieldRef: &corev1.ObjectFieldSelector{
 							FieldPath: "metadata.namespace",
@@ -299,7 +299,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 					},
 				},
 				{
-					Name: "POD_NAME",
+					Name: "NAME",
 					ValueFrom: &corev1.EnvVarSource{
 						FieldRef: &corev1.ObjectFieldSelector{
 							FieldPath: "metadata.name",

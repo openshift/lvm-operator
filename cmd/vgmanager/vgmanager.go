@@ -142,7 +142,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				operatorNamespace: {},
 			},
 		},
-		PprofBindAddress: ":9099",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -168,7 +167,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		}
 
 		// Add health checker to manager
-		checker := runners.NewChecker(checkFreeBytes(vgclnt), 10*time.Second) // adjusted signature
+		checker := runners.NewChecker(checkFreeBytes(vgclnt), 120*time.Second) // adjusted signature
 		if err := mgr.Add(checker); err != nil {
 			return fmt.Errorf("could not add free bytes heealth check: %w", err)
 		}
