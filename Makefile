@@ -44,12 +44,10 @@ OPERATOR_SDK_VERSION ?= 1.32.0
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
-CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
 CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
 
 define MANAGER_ENV_VARS
 OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE)
-CSI_RESIZER_IMAGE=$(CSI_RESIZER_IMAGE)
 CSI_SNAPSHOTTER_IMAGE=$(CSI_SNAPSHOTTER_IMAGE)
 endef
 export MANAGER_ENV_VARS
@@ -58,10 +56,8 @@ update-mgr-env: ## Feed environment variables to the manager ConfigMap.
 	@echo "$$MANAGER_ENV_VARS" > config/manager/manager.env
 	cp config/default/manager_custom_env.yaml.in config/default/manager_custom_env.yaml
 ifeq ($(UNAME), Darwin)
-	sed -i '' 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' config/default/manager_custom_env.yaml
 	sed -i '' 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' config/default/manager_custom_env.yaml
 else
-	sed 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 	sed 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
 endif
 
@@ -225,7 +221,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set image csi-resizer=${CSI_RESIZER_IMAGE} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/manifests/bases && \
 		rm -rf kustomization.yaml && \
 		$(KUSTOMIZE) create --resources $(BUNDLE_PACKAGE).clusterserviceversion.yaml && \

@@ -9,9 +9,6 @@ import (
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
-// Command line flags
-var ()
-
 // registrationServer is a sample plugin to work with plugin watcher
 type registrationServer struct {
 	driverName string

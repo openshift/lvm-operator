@@ -260,6 +260,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return err
 	}
 
+	if err := mgr.Add(internalCSI.NewResizer(mgr, internalCSI.ProvisionerOptions{
+		DriverName:          constants.TopolvmCSIDriverName,
+		CSIEndpoint:         constants.DefaultCSISocket,
+		CSIOperationTimeout: 10 * time.Second,
+	})); err != nil {
+		return err
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}

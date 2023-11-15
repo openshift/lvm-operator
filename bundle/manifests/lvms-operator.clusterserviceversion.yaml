@@ -506,8 +506,6 @@ spec:
                 - /lvms
                 - operator
                 env:
-                - name: CSI_RESIZER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
                 - name: CSI_SNAPSHOTTER_IMAGE
                   value: k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
                 - name: NAMESPACE
@@ -549,17 +547,6 @@ spec:
                 - mountPath: /tmp/k8s-metrics-server/serving-certs
                   name: metrics-cert
                   readOnly: true
-                - mountPath: /run/topolvm
-                  name: socket-dir
-              - args:
-                - --csi-address=/run/topolvm/csi-topolvm.sock
-                image: k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
-                name: csi-resizer
-                resources:
-                  requests:
-                    cpu: 1m
-                    memory: 35Mi
-                volumeMounts:
                 - mountPath: /run/topolvm
                   name: socket-dir
               securityContext:

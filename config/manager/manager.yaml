@@ -77,17 +77,6 @@ spec:
         volumeMounts:
           - mountPath: /run/topolvm
             name: "socket-dir"
-      - name: csi-resizer
-        image: csi-resizer:latest
-        args:
-          - --csi-address=/run/topolvm/csi-topolvm.sock
-        volumeMounts:
-          - mountPath: /run/topolvm
-            name: "socket-dir"
-        resources:
-          requests:
-            cpu: 1m
-            memory: 35Mi
       volumes:
         - name: socket-dir
           emptyDir: {}
