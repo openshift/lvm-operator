@@ -2,18 +2,19 @@ package csi
 
 import (
 	"context"
-	"github.com/kubernetes-csi/csi-lib-utils/metrics"
+	"net/http"
+	"time"
+
 	"github.com/kubernetes-csi/external-resizer/pkg/controller"
 	"github.com/kubernetes-csi/external-resizer/pkg/csi"
 	"github.com/kubernetes-csi/external-resizer/pkg/resizer"
+
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
-	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"time"
 )
 
 const (
@@ -52,9 +53,7 @@ func NewResizer(mgr manager.Manager, options ProvisionerOptions) *Resizer {
 }
 
 func (r *Resizer) Start(ctx context.Context) error {
-	metricsManager := metrics.NewCSIMetricsManagerWithOptions("" /* DriverName */)
-
-	csiClient, err := csi.New(r.options.CSIEndpoint, r.options.CSIOperationTimeout, metricsManager)
+	csiClient, err := csi.New(r.options.CSIEndpoint, r.options.CSIOperationTimeout, nil)
 	if err != nil {
 		return err
 	}
