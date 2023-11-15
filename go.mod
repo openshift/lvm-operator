@@ -43,6 +43,8 @@ require (
 
 replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20231113080707-35d0ebeab62b
 
+replace sigs.k8s.io/sig-storage-lib-external-provisioner/v9 => github.com/jakobmoellerdev/sig-storage-lib-external-provisioner/v9 v9.0.0-20231115120534-bcfb1e03588e
+
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect

@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/kubernetes-csi/external-provisioner/pkg/capacity"
 	"github.com/kubernetes-csi/external-provisioner/pkg/capacity/topology"
@@ -25,8 +27,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/klog/v2"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller"
@@ -53,6 +54,17 @@ func (p *Provisioner) NeedLeaderElection() bool {
 	return true
 }
 
+func init() {
+	ctrlRuntimeMetrics.Registry.MustRegister([]prometheus.Collector{
+		libmetrics.PersistentVolumeClaimProvisionTotal,
+		libmetrics.PersistentVolumeClaimProvisionFailedTotal,
+		libmetrics.PersistentVolumeClaimProvisionDurationSeconds,
+		libmetrics.PersistentVolumeDeleteTotal,
+		libmetrics.PersistentVolumeDeleteFailedTotal,
+		libmetrics.PersistentVolumeDeleteDurationSeconds,
+	}...)
+}
+
 var _ manager.Runnable = &Provisioner{}
 var _ manager.LeaderElectionRunnable = &Provisioner{}
 
@@ -65,13 +77,21 @@ func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisione
 }
 
 func (p *Provisioner) Start(ctx context.Context) error {
+	logger := log.FromContext(ctx)
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("", /* DriverName */
 		// Will be provided via default gatherer.
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar),
 	)
 
-	grpcClient, err := provisionctrl.Connect(p.options.CSIEndpoint, metricsManager)
+	onLostConnection := func() bool {
+		logger.Info("lost connection to csi driver, not attempting to reconnect due to in tree provisioning...")
+		return false
+	}
+	grpcClient, err := connection.Connect(p.options.CSIEndpoint, metricsManager,
+		connection.OnConnectionLoss(onLostConnection),
+		connection.WithTimeout(p.options.CSIOperationTimeout))
+	defer grpcClient.Close() //nolint:errcheck,staticcheck
 	if err != nil {
 		return err
 	}
@@ -147,7 +167,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("look up owner(s) of pod failed: %w", err)
 	}
-	klog.Infof("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name)
+	logger.Info(fmt.Sprintf("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name))
 	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
 
 	topologyInformer := topology.NewNodeTopology(
@@ -209,8 +229,8 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		p.options.DriverName,
 		provisioner,
 		controller.LeaderElection(false), // Always disable leader election in provisioner lib. Leader election should be done here in the CSI provisioner level instead.
-		controller.FailedProvisionThreshold(3),
-		controller.FailedDeleteThreshold(3),
+		controller.FailedProvisionThreshold(0),
+		controller.FailedDeleteThreshold(0),
 		controller.RateLimiter(rateLimiter),
 		controller.Threadiness(1),
 		controller.CreateProvisionedPVLimiter(workqueue.DefaultControllerRateLimiter()),
@@ -227,15 +247,6 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		controllerCapabilities,
 	)
 
-	ctrlRuntimeMetrics.Registry.MustRegister([]prometheus.Collector{
-		libmetrics.PersistentVolumeClaimProvisionTotal,
-		libmetrics.PersistentVolumeClaimProvisionFailedTotal,
-		libmetrics.PersistentVolumeClaimProvisionDurationSeconds,
-		libmetrics.PersistentVolumeDeleteTotal,
-		libmetrics.PersistentVolumeDeleteFailedTotal,
-		libmetrics.PersistentVolumeDeleteDurationSeconds,
-	}...)
-
 	factory.Start(ctx.Done())
 	// Starting is enough, the capacity controller will
 	// wait for sync.
@@ -243,15 +254,31 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	cacheSyncResult := factory.WaitForCacheSync(ctx.Done())
 	for _, v := range cacheSyncResult {
 		if !v {
-			klog.Fatalf("Failed to sync Informers!")
+			return fmt.Errorf("failed to sync Informers")
 		}
 	}
 
-	go capacityController.Run(ctx, 1)
-	go csiClaimController.Run(ctx, 1)
-	provisionController.Run(ctx)
+	var wg sync.WaitGroup
+	wg.Add(3)
 
-	ctrl.Log.Info("provisioner finished shutdown")
+	go func() {
+		defer wg.Done()
+		capacityController.Run(ctx, 1)
+		logger.Info("capacity controller finished shutdown")
+	}()
+	go func() {
+		defer wg.Done()
+		csiClaimController.Run(ctx, 1)
+		logger.Info("csi claim controller finished shutdown")
+	}()
+	go func() {
+		defer wg.Done()
+		provisionController.Run(ctx)
+		logger.Info("provisioner controller finished shutdown")
+	}()
+
+	wg.Wait()
+	logger.Info("provisioner finished shutdown")
 
 	return nil
 }

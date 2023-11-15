@@ -240,7 +240,6 @@ github.com/json-iterator/go
 ## explicit; go 1.18
 github.com/kubernetes-csi/csi-lib-utils/accessmodes
 github.com/kubernetes-csi/csi-lib-utils/connection
-github.com/kubernetes-csi/csi-lib-utils/leaderelection
 github.com/kubernetes-csi/csi-lib-utils/metrics
 github.com/kubernetes-csi/csi-lib-utils/protosanitizer
 github.com/kubernetes-csi/csi-lib-utils/rpc
@@ -1468,7 +1467,7 @@ sigs.k8s.io/gateway-api/pkg/client/listers/apis/v1beta1
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/sig-storage-lib-external-provisioner/v9 v9.1.0-rc.0
+# sigs.k8s.io/sig-storage-lib-external-provisioner/v9 v9.1.0-rc.0 => github.com/jakobmoellerdev/sig-storage-lib-external-provisioner/v9 v9.0.0-20231115120534-bcfb1e03588e
 ## explicit; go 1.19
 sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller
 sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller/metrics
@@ -1485,3 +1484,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 # github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20231113080707-35d0ebeab62b
+# sigs.k8s.io/sig-storage-lib-external-provisioner/v9 => github.com/jakobmoellerdev/sig-storage-lib-external-provisioner/v9 v9.0.0-20231115120534-bcfb1e03588e
