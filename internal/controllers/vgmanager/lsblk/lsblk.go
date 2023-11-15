@@ -1,13 +1,7 @@
 package lsblk
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
@@ -159,41 +153,41 @@ func flattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
 func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error) {
 	flattenedMap := flattenedBlockDevices(bs)
 
-	file, err := os.Open(lsblk.mountInfo)
-	defer file.Close() // nolint:golint,staticcheck
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
-	}
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read mount file %s: %v", lsblk.mountInfo, err)
-	}
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-
 	blockDeviceInfos := make(BlockDeviceInfos)
-	for scanner.Scan() {
-		mountInfo := scanner.Text()
-		mountInfoList := strings.Fields(mountInfo)
-		if len(mountInfoList) >= 10 {
-			for _, bd := range flattenedMap {
-				if blockDeviceInfos[bd.KName].HasBindMounts {
-					continue
-				}
-				if strings.Contains(mountInfo, bd.KName) {
-					// dev source is 4th field for bind mounts and 10th for regular mounts
-					if mountInfoList[3] == fmt.Sprintf("/%s", filepath.Base(bd.KName)) || mountInfoList[9] == bd.KName {
-						blockDeviceInfos[bd.KName] = BlockDeviceInfo{
-							HasBindMounts: true,
-						}
-						break
-					}
-				}
-			}
-		}
-	}
-	if scanner.Err() != nil {
-		return nil, fmt.Errorf("failed to mountinfo %s: %v", lsblk.mountInfo, scanner.Err())
-	}
+	// file, err := os.Open(lsblk.mountInfo)
+	// defer file.Close() // nolint:golint,staticcheck
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to read file %s: %v", lsblk.mountInfo, err)
+	// }
+	// data, err := io.ReadAll(file)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to read mount file %s: %v", lsblk.mountInfo, err)
+	// }
+	// scanner := bufio.NewScanner(bytes.NewReader(data))
+	//
+	// for scanner.Scan() {
+	// 	mountInfo := scanner.Text()
+	// 	mountInfoList := strings.Fields(mountInfo)
+	// 	if len(mountInfoList) >= 10 {
+	// 		for _, bd := range flattenedMap {
+	// 			if blockDeviceInfos[bd.KName].HasBindMounts {
+	// 				continue
+	// 			}
+	// 			if strings.Contains(mountInfo, bd.KName) {
+	// 				// dev source is 4th field for bind mounts and 10th for regular mounts
+	// 				if mountInfoList[3] == fmt.Sprintf("/%s", filepath.Base(bd.KName)) || mountInfoList[9] == bd.KName {
+	// 					blockDeviceInfos[bd.KName] = BlockDeviceInfo{
+	// 						HasBindMounts: true,
+	// 					}
+	// 					break
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// if scanner.Err() != nil {
+	// 	return nil, fmt.Errorf("failed to mountinfo %s: %v", lsblk.mountInfo, scanner.Err())
+	// }
 
 	for _, dev := range flattenedMap {
 		if dev.Type == "loop" {
