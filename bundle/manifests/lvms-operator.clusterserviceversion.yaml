@@ -506,6 +506,10 @@ spec:
                 - /lvms
                 - operator
                 env:
+                - name: GOGC
+                  value: "75"
+                - name: GOMEMLIMIT
+                  value: 50MiB
                 - name: NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -535,7 +539,7 @@ spec:
                 resources:
                   requests:
                     cpu: 5m
-                    memory: 75Mi
+                    memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                 volumeMounts:

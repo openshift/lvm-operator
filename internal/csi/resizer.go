@@ -22,7 +22,7 @@ const (
 	retryIntervalStart     = time.Second
 	retryIntervalMax       = 5 * time.Minute
 	handleVolumeInUseError = true
-	workers                = 10
+	workers                = 1
 )
 
 type ResizerOptions struct {

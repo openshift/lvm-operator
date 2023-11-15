@@ -64,8 +64,12 @@ spec:
         resources:
           requests:
             cpu: 5m
-            memory: 75Mi
+            memory: 50Mi
         env:
+        - name: GOGC
+          value: "75"
+        - name: GOMEMLIMIT
+          value: "50MiB"
         - name: NAMESPACE
           valueFrom:
             fieldRef:
