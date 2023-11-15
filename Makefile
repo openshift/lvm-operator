@@ -44,22 +44,6 @@ OPERATOR_SDK_VERSION ?= 1.32.0
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
-CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
-
-define MANAGER_ENV_VARS
-OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE)
-CSI_SNAPSHOTTER_IMAGE=$(CSI_SNAPSHOTTER_IMAGE)
-endef
-export MANAGER_ENV_VARS
-
-update-mgr-env: ## Feed environment variables to the manager ConfigMap.
-	@echo "$$MANAGER_ENV_VARS" > config/manager/manager.env
-	cp config/default/manager_custom_env.yaml.in config/default/manager_custom_env.yaml
-ifeq ($(UNAME), Darwin)
-	sed -i '' 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' config/default/manager_custom_env.yaml
-else
-	sed 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-endif
 
 ## Variables for the images
 
@@ -184,12 +168,12 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-deploy-debug: update-mgr-env manifests kustomize ## Deploy controller started through delve to the K8s cluster specified in ~/.kube/config. See CONTRIBUTING.md for more information
+deploy-debug: manifests kustomize ## Deploy controller started through delve to the K8s cluster specified in ~/.kube/config. See CONTRIBUTING.md for more information
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/debug | kubectl apply -f -
@@ -216,7 +200,7 @@ else
 endif
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle: manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
