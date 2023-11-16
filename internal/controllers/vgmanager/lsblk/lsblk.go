@@ -88,12 +88,15 @@ func (lsblk *HostLSBLK) ListBlockDevices() ([]BlockDevice, error) {
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "--paths", "-o", columns}
 
-	output, err := lsblk.ExecuteCommandWithOutput(lsblk.lsblk, args...)
+	output, err := lsblk.ExecuteCommandWithOutputAsHost(lsblk.lsblk, args...)
+	defer func() {
+		_ = output.Close()
+	}()
 	if err != nil {
 		return []BlockDevice{}, err
 	}
 
-	if err = json.NewDecoder(strings.NewReader(output)).Decode(&blockDeviceMap); err != nil {
+	if err = json.NewDecoder(output).Decode(&blockDeviceMap); err != nil {
 		return nil, err
 	}
 
@@ -110,12 +113,15 @@ func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 	}
 
 	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
-	output, err := lsblk.ExecuteCommandWithOutput(lsblk.losetup, args...)
+	output, err := lsblk.ExecuteCommandWithOutputAsHost(lsblk.losetup, args...)
+	defer func() {
+		_ = output.Close()
+	}()
 	if err != nil {
 		return true, err
 	}
 
-	if err = json.NewDecoder(strings.NewReader(output)).Decode(&loopDeviceMap); err != nil {
+	if err = json.NewDecoder(output).Decode(&loopDeviceMap); err != nil {
 		return false, err
 	}
 

@@ -237,7 +237,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create TopoLVM PVC controller: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.SharedWriteBuffer(true),
+		grpc.MaxConcurrentStreams(1),
+		grpc.NumStreamWorkers(1))
 	identityServer := driver.NewIdentityServer(func() (bool, error) {
 		return true, nil
 	})

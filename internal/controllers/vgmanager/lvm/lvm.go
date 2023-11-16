@@ -173,7 +173,8 @@ func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 		args = append(args, pv.PvName)
 	}
 
-	_, err := hlvm.ExecuteCommandWithOutputAsHost(vgCreateCmd, args...)
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgCreateCmd, args...)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to create volume group %q. %v", vg.Name, err)
 	}
@@ -194,7 +195,8 @@ func (hlvm *HostLVM) ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error)
 	args := []string{vg.Name}
 	args = append(args, pvs...)
 
-	_, err := hlvm.ExecuteCommandWithOutputAsHost(vgExtendCmd, args...)
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgExtendCmd, args...)
+	_ = out.Close()
 	if err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to extend volume group %q. %v", vg.Name, err)
 	}
@@ -214,7 +216,8 @@ func (hlvm *HostLVM) AddTagToVG(vgName string) error {
 
 	args := []string{vgName, "--addtag", lvmsTag}
 
-	_, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, args...)
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, args...)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to add tag to the volume group %q. %v", vgName, err)
 	}
@@ -226,14 +229,16 @@ func (hlvm *HostLVM) AddTagToVG(vgName string) error {
 func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
 	// Deactivate Volume Group
 	vgArgs := []string{"-an", vg.Name}
-	_, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, vgArgs...)
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, vgArgs...)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to remove volume group %q: %w", vg.Name, err)
 	}
 
 	// Remove Volume Group
 	vgArgs = []string{vg.Name}
-	_, err = hlvm.ExecuteCommandWithOutputAsHost(vgRemoveCmd, vgArgs...)
+	out, err = hlvm.ExecuteCommandWithOutputAsHost(vgRemoveCmd, vgArgs...)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to remove volume group %q: %w", vg.Name, err)
 	}
@@ -243,13 +248,15 @@ func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
 	for _, pv := range vg.PVs {
 		pvArgs = append(pvArgs, pv.PvName)
 	}
-	_, err = hlvm.ExecuteCommandWithOutputAsHost(pvRemoveCmd, pvArgs...)
+	out, err = hlvm.ExecuteCommandWithOutputAsHost(pvRemoveCmd, pvArgs...)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to remove physical volumes for the volume group %q: %w", vg.Name, err)
 	}
 
 	for _, pv := range vg.PVs {
-		_, err = hlvm.ExecuteCommandWithOutputAsHost(lvmDevicesCmd, "--delpvid", pv.UUID)
+		out, err := hlvm.ExecuteCommandWithOutputAsHost(lvmDevicesCmd, "--delpvid", pv.UUID)
+		_ = out.Close()
 		if err != nil {
 			var exitError ExitError
 			if errors.As(err, &exitError) {
@@ -429,13 +436,15 @@ func (hlvm *HostLVM) DeleteLV(lvName, vgName string) error {
 	lv := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// deactivate logical volume
-	_, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-an", lv)
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-an", lv)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to deactivate thin pool %q in volume group %q. %w", lvName, vgName, err)
 	}
 
 	// delete logical volume
-	_, err = hlvm.ExecuteCommandWithOutputAsHost(lvRemoveCmd, lv)
+	out, err = hlvm.ExecuteCommandWithOutputAsHost(lvRemoveCmd, lv)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to delete logical volume %q in volume group %q. %w", lvName, vgName, err)
 	}
@@ -458,7 +467,9 @@ func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
 	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent),
 		"-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
 
-	if _, err := hlvm.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...); err != nil {
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
+	_ = out.Close()
+	if err != nil {
 		return fmt.Errorf("failed to create logical volume %q in the volume group %q using command '%s': %w",
 			lvName, vgName, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
 	}
@@ -480,7 +491,9 @@ func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 
 	args := []string{"-l", fmt.Sprintf("%d%%Vg", sizePercent), fmt.Sprintf("%s/%s", vgName, lvName)}
 
-	if _, err := hlvm.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...); err != nil {
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...)
+	_ = out.Close()
+	if err != nil {
 		return fmt.Errorf("failed to extend logical volume %q in the volume group %q using command '%s': %w",
 			lvName, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
 	}
@@ -500,7 +513,8 @@ func (hlvm *HostLVM) ActivateLV(lvName, vgName string) error {
 	lv := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// deactivate logical volume
-	_, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-ay", lv)
+	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-ay", lv)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to activate thin pool %q in volume group %q. %w", lvName, vgName, err)
 	}
@@ -510,11 +524,14 @@ func (hlvm *HostLVM) ActivateLV(lvName, vgName string) error {
 
 func (hlvm *HostLVM) execute(v interface{}, args ...string) error {
 	output, err := hlvm.ExecuteCommandWithOutputAsHost(lvmCmd, args...)
+	defer func() {
+		_ = output.Close()
+	}()
 	if err != nil {
 		return fmt.Errorf("failed to execute command. %v", err)
 	}
 
-	err = json.NewDecoder(strings.NewReader(output)).Decode(&v)
+	err = json.NewDecoder(output).Decode(&v)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal response. %v", err)
 	}

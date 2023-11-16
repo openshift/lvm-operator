@@ -411,7 +411,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).ToNot(Succeed())
 		lvmdConfig, err := instances.LVMD.Load(ctx)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(lvmdConfig).To(BeNil())
+		Expect(lvmdConfig).To(Not(BeNil()), "cached lvmd config is still present")
 	})
 }
 

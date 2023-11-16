@@ -3,6 +3,8 @@ package vgmanager
 import (
 	"context"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/go-logr/logr/testr"
@@ -111,11 +113,11 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 
 	mockExecutorForLVSOutput := func(output string) lvmexec.Executor {
 		return &mockExec.MockExecutor{
-			MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (string, error) {
+			MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
 				if !slices.Equal(args, lvsCommandForVG1) {
-					return "", fmt.Errorf("invalid args %q", args)
+					return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args)
 				}
-				return output, nil
+				return io.NopCloser(strings.NewReader(output)), nil
 			},
 		}
 	}
