@@ -67,9 +67,11 @@ spec:
             memory: 50Mi
         env:
         - name: GOGC
-          value: "75"
+          value: "120"
         - name: GOMEMLIMIT
           value: "50MiB"
+        - name: GOMAXPROCS
+          value: "2"
         - name: NAMESPACE
           valueFrom:
             fieldRef:

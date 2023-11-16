@@ -284,7 +284,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 				{
 					Name:  "GOMAXPROCS",
-					Value: "1",
+					Value: "2",
 				},
 				{
 					Name: "NODE_NAME",

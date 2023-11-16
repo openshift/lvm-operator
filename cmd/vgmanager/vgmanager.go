@@ -139,7 +139,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				operatorNamespace: {},
 			},
 		},
-		PprofBindAddress: ":9099",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -171,7 +170,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		if err := os.MkdirAll(driver.DeviceDirectory, 0755); err != nil {
 			return err
 		}
-		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor))
+		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
+			grpc.SharedWriteBuffer(true),
+			grpc.MaxConcurrentStreams(1),
+			grpc.NumStreamWorkers(1))
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
 		})
