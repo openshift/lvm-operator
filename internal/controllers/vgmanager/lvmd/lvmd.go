@@ -24,14 +24,40 @@ type ThinPoolConfig = lvmd.ThinPoolConfig
 
 var TypeThin = lvmd.TypeThin
 
-func NewFileConfigurator(client client.Client, namespace string) FileConfig {
-	return FileConfig{Client: client, Namespace: namespace}
+func NewFileConfigurator(client client.Client, namespace string) *CachedFileConfig {
+	return &CachedFileConfig{
+		FileConfig: FileConfig{Client: client, Namespace: namespace},
+	}
 }
 
 type Configurator interface {
 	Load(ctx context.Context) (*Config, error)
 	Save(ctx context.Context, config *Config) error
 	Delete(ctx context.Context) error
+}
+
+type CachedFileConfig struct {
+	*Config
+	FileConfig
+}
+
+func (c *CachedFileConfig) Load(ctx context.Context) (*Config, error) {
+	if c.Config != nil {
+		return c.Config, nil
+	}
+	log.FromContext(ctx).Info("lvmd config not found in cache, loading from store")
+	conf, err := c.FileConfig.Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	c.Config = conf
+	return conf, nil
+}
+
+func (c *CachedFileConfig) Save(ctx context.Context, config *Config) error {
+	c.Config = config
+	log.FromContext(ctx).Info("saving lvmd config to cache and store")
+	return c.FileConfig.Save(ctx, config)
 }
 
 type FileConfig struct {

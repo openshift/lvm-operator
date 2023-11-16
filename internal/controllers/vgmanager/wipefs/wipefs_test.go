@@ -3,6 +3,8 @@ package wipefs
 import (
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	mockExec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
@@ -21,16 +23,16 @@ func TestWipe(t *testing.T) {
 	}
 
 	executor := &mockExec.MockExecutor{
-		MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (string, error) {
+		MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
 			if args[0] != "--all" || args[1] != "--force" {
-				return "", fmt.Errorf("invalid args %q", args[0:2])
+				return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0:2])
 			}
 			if args[2] == "/dev/loop1" {
-				return "", nil
+				return io.NopCloser(strings.NewReader("")), nil
 			} else if args[2] == "/dev/loop2" {
-				return "no such file or directory", errors.New("no such file or directory")
+				return io.NopCloser(strings.NewReader("no such file or directory")), errors.New("no such file or directory")
 			}
-			return "", fmt.Errorf("invalid args %q", args[2])
+			return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[2])
 		},
 	}
 

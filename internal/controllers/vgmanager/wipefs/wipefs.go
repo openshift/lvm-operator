@@ -38,7 +38,8 @@ func (wipefs *HostWipefs) Wipe(deviceName string) error {
 
 	args := []string{"--all", "--force"}
 	args = append(args, deviceName)
-	_, err := wipefs.ExecuteCommandWithOutputAsHost(wipefs.wipefs, args...)
+	out, err := wipefs.ExecuteCommandWithOutputAsHost(wipefs.wipefs, args...)
+	_ = out.Close()
 	if err != nil {
 		return fmt.Errorf("failed to wipe the device %q. %v", deviceName, err)
 	}

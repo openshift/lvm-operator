@@ -22,7 +22,7 @@ const (
 	VGManagerServiceAccount = "vg-manager"
 
 	VgManagerMemRequest = "45Mi"
-	VgManagerCPURequest = "2m"
+	VgManagerCPURequest = "5m"
 
 	// topoLVM Node
 	CSIKubeletRootDir               = "/var/lib/kubelet/"

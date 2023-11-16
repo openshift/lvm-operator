@@ -187,7 +187,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LeaderElection:                !leaderElectionConfig.Disable,
 		LeaderElectionReleaseOnCancel: true,
 		GracefulShutdownTimeout:       ptr.To(time.Duration(-1)),
-		PprofBindAddress:              ":9099",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)

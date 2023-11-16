@@ -24,7 +24,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/openshift/lvm-operator/internal/cluster"
@@ -39,9 +38,7 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/tagging"
 	"github.com/spf13/cobra"
-	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/driver"
-	"github.com/topolvm/topolvm/lvmd/proto"
 	"github.com/topolvm/topolvm/runners"
 	"google.golang.org/grpc"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -142,6 +139,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				operatorNamespace: {},
 			},
 		},
+		PprofBindAddress: ":9099",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -166,12 +164,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("unable to create LogicalVolumeReconciler: %w", err)
 		}
 
-		// Add health checker to manager
-		checker := runners.NewChecker(checkFreeBytes(vgclnt), 120*time.Second) // adjusted signature
-		if err := mgr.Add(checker); err != nil {
-			return fmt.Errorf("could not add free bytes heealth check: %w", err)
-		}
-
 		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, topoClient, nodeName)); err != nil { // adjusted signature
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
@@ -180,7 +172,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return err
 		}
 		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor))
-		identityServer := driver.NewIdentityServer(checker.Ready)
+		identityServer := driver.NewIdentityServer(func() (bool, error) {
+			return true, nil
+		})
 		csi.RegisterIdentityServer(grpcServer, identityServer)
 
 		registrationServer := internalCSI.NewRegistrationServer(
@@ -267,16 +261,6 @@ func loadConfFile(ctx context.Context, config *lvmd.Config, cfgFilePath string) 
 		"file_name", cfgFilePath,
 	)
 	return nil
-}
-func checkFreeBytes(clnt proto.VGServiceClient) func() error {
-	return func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		_, err := clnt.GetFreeBytes(ctx, &proto.GetFreeBytesRequest{DeviceClass: topolvm.DefaultDeviceClassName})
-
-		return err
-	}
 }
 
 func ErrorLoggingInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {

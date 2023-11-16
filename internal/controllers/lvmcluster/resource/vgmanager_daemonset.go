@@ -280,7 +280,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 				{
 					Name:  "GOGC",
-					Value: "75",
+					Value: "110",
 				},
 				{
 					Name: "NODE_NAME",
