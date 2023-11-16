@@ -260,7 +260,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
 						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
 				FailureThreshold:    3,
-				InitialDelaySeconds: 2,
+				InitialDelaySeconds: 1,
 				TimeoutSeconds:      1,
 				PeriodSeconds:       10},
 			ReadinessProbe: &corev1.Probe{
@@ -268,9 +268,9 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 					HTTPGet: &corev1.HTTPGetAction{Path: "/readyz",
 						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
 				FailureThreshold:    3,
-				InitialDelaySeconds: 2,
+				InitialDelaySeconds: 1,
 				TimeoutSeconds:      1,
-				PeriodSeconds:       10},
+				PeriodSeconds:       60},
 			VolumeMounts: volumeMounts,
 			Resources:    resourceRequirements,
 			Env: []corev1.EnvVar{
@@ -280,7 +280,11 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 				{
 					Name:  "GOGC",
-					Value: "110",
+					Value: "120",
+				},
+				{
+					Name:  "GOMAXPROCS",
+					Value: "1",
 				},
 				{
 					Name: "NODE_NAME",

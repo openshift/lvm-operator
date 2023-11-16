@@ -88,7 +88,7 @@ func (lsblk *HostLSBLK) ListBlockDevices() ([]BlockDevice, error) {
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "--paths", "-o", columns}
 
-	output, err := lsblk.ExecuteCommandWithOutput(lsblk.lsblk, args...)
+	output, err := lsblk.ExecuteCommandWithOutputAsHost(lsblk.lsblk, args...)
 	defer func() {
 		_ = output.Close()
 	}()
@@ -113,7 +113,7 @@ func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
 	}
 
 	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
-	output, err := lsblk.ExecuteCommandWithOutput(lsblk.losetup, args...)
+	output, err := lsblk.ExecuteCommandWithOutputAsHost(lsblk.losetup, args...)
 	defer func() {
 		_ = output.Close()
 	}()
