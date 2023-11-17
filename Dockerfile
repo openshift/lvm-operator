@@ -23,11 +23,13 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
+FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.15:base-rhel9 as baseocp
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.15:base-rhel9
+FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
 
-RUN if [ -x "$(command -v dnf)" ]; then dnf install -y util-linux e2fsprogs xfsprogs glibc && dnf clean all; fi
-RUN if [ -x "$(command -v microdnf)" ]; then microdnf install -y util-linux e2fsprogs xfsprogs glibc && microdnf clean all; fi
+COPY --from=baseocp /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo
+COPY --from=baseocp /etc/yum.repos.d/redhat.repo /etc/yum.repos.d/redhat.repo
+RUN microdnf update -y && microdnf install -y util-linux e2fsprogs xfsprogs glibc && microdnf clean all
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .
