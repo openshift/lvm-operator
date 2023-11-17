@@ -26,7 +26,8 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.15:base-rhel9
 
-RUN yum install -y util-linux e2fsprogs xfsprogs glibc && yum clean all && rm -rf /var/cache/yum
+RUN if [ -x "$(command -v dnf)" ]; then dnf install -y util-linux e2fsprogs xfsprogs glibc && dnf clean all; fi
+RUN if [ -x "$(command -v microdnf)" ]; then microdnf install -y util-linux e2fsprogs xfsprogs glibc && microdnf clean all; fi
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .
