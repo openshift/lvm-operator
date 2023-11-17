@@ -32,7 +32,13 @@ RUN curl https://mirror.stream.centos.org/9-stream/BaseOS/$(arch)/os/Packages/ce
     rpm -i centos-stream-repos-9.0-23.el9.noarch.rpm && \
     rm -f centos-stream-repos-9.0-23.el9.noarch.rpm
 
-RUN microdnf update -y && microdnf install -y util-linux e2fsprogs xfsprogs glibc && microdnf clean all
+RUN microdnf update -y && \
+    microdnf install --nodocs --noplugins -y \
+        util-linux \
+        e2fsprogs \
+        xfsprogs \
+        glibc && \
+    microdnf clean all
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .

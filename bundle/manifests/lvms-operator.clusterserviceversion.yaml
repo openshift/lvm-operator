@@ -507,9 +507,11 @@ spec:
                 - operator
                 env:
                 - name: GOGC
-                  value: "75"
+                  value: "120"
                 - name: GOMEMLIMIT
                   value: 50MiB
+                - name: GOMAXPROCS
+                  value: "2"
                 - name: NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -523,7 +525,7 @@ spec:
                   httpGet:
                     path: /healthz
                     port: 8081
-                  initialDelaySeconds: 15
+                  initialDelaySeconds: 10
                   periodSeconds: 20
                 name: manager
                 ports:
@@ -534,8 +536,8 @@ spec:
                   httpGet:
                     path: /readyz
                     port: 8081
-                  initialDelaySeconds: 5
-                  periodSeconds: 10
+                  initialDelaySeconds: 3
+                  periodSeconds: 30
                 resources:
                   requests:
                     cpu: 5m
