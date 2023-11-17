@@ -23,12 +23,15 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.15:base-rhel9 as baseocp
-# vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
+FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.3
 
-#COPY --from=baseocp /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo
-COPY --from=baseocp /etc/yum.repos.d/redhat.repo /etc/yum.repos.d/redhat.repo
+RUN curl https://mirror.stream.centos.org/9-stream/BaseOS/$(arch)/os/Packages/centos-gpg-keys-9.0-23.el9.noarch.rpm > centos-gpg-keys-9.0-23.el9.noarch.rpm && \
+    rpm -i centos-gpg-keys-9.0-23.el9.noarch.rpm && \
+    rm -f centos-gpg-keys-9.0-23.el9.noarch.rpm
+RUN curl https://mirror.stream.centos.org/9-stream/BaseOS/$(arch)/os/Packages/centos-stream-repos-9.0-23.el9.noarch.rpm > centos-stream-repos-9.0-23.el9.noarch.rpm && \
+    rpm -i centos-stream-repos-9.0-23.el9.noarch.rpm && \
+    rm -f centos-stream-repos-9.0-23.el9.noarch.rpm
+
 RUN microdnf update -y && microdnf install -y util-linux e2fsprogs xfsprogs glibc && microdnf clean all
 
 WORKDIR /
