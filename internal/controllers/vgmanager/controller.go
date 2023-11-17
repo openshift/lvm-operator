@@ -261,7 +261,7 @@ func (r *Reconciler) reconcile(
 		logger.Info(msg)
 
 		if err := r.applyLVMDConfig(ctx, volumeGroup, vgs, devices); err != nil {
-			return reconcileAgain, err
+			return ctrl.Result{}, err
 		}
 
 		if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
@@ -270,7 +270,7 @@ func (r *Reconciler) reconcile(
 			r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
 		}
 
-		return reconcileAgain, nil
+		return r.determineFinishedRequeue(volumeGroup), nil
 	} else {
 		if updated, err := r.setVolumeGroupProgressingStatus(ctx, volumeGroup, vgs, devices); err != nil {
 			logger.Error(err, "failed to set status to progressing")
@@ -330,6 +330,13 @@ func (r *Reconciler) reconcile(
 	}
 
 	return reconcileAgain, nil
+}
+
+func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup) ctrl.Result {
+	if volumeGroup.Spec.DeviceSelector == nil {
+		return reconcileAgain
+	}
+	return ctrl.Result{}
 }
 
 func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) error {
