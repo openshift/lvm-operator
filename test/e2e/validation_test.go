@@ -37,15 +37,13 @@ import (
 )
 
 const (
-	timeout                   = time.Minute * 2
-	interval                  = time.Millisecond * 300
-	lvmVolumeGroupName        = "vg1"
-	storageClassName          = "lvms-vg1"
-	volumeSnapshotClassName   = "lvms-vg1"
-	csiDriverName             = "topolvm.io"
-	topolvmNodeDaemonSetName  = "topolvm-node"
-	topolvmCtrlDeploymentName = "topolvm-controller"
-	vgManagerDaemonsetName    = "vg-manager"
+	timeout                 = time.Minute * 2
+	interval                = time.Millisecond * 300
+	lvmVolumeGroupName      = "vg1"
+	storageClassName        = "lvms-vg1"
+	volumeSnapshotClassName = "lvms-vg1"
+	csiDriverName           = "topolvm.io"
+	vgManagerDaemonsetName  = "vg-manager"
 )
 
 func validateLVMCluster(ctx context.Context, cluster *v1alpha1.LVMCluster) bool {
@@ -111,24 +109,6 @@ func validateVGManager(ctx context.Context) bool {
 	GinkgoHelper()
 	By("validating the vg-manager DaemonSet")
 	return validateDaemonSet(ctx, types.NamespacedName{Name: vgManagerDaemonsetName, Namespace: installNamespace})
-}
-
-// function to validate TopoLVM Deployment.
-func validateTopolvmController(ctx context.Context) bool {
-	GinkgoHelper()
-	By("validating the TopoLVM controller deployment")
-	name := types.NamespacedName{Name: topolvmCtrlDeploymentName, Namespace: installNamespace}
-	return Eventually(func(ctx context.Context) error {
-		deploy := &appsv1.Deployment{}
-		if err := crClient.Get(ctx, name, deploy); err != nil {
-			return err
-		}
-		isReady := deploy.Spec.Replicas != nil && *deploy.Spec.Replicas == deploy.Status.ReadyReplicas
-		if !isReady {
-			return fmt.Errorf("the Deployment %s is not considered ready", name)
-		}
-		return nil
-	}, timeout, interval).WithContext(ctx).Should(Succeed())
 }
 
 func validateDaemonSet(ctx context.Context, name types.NamespacedName) bool {

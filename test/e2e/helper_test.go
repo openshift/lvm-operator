@@ -57,7 +57,6 @@ func VerifyLVMSSetup(ctx context.Context, cluster *v1alpha1.LVMCluster) {
 	GinkgoHelper()
 	validateLVMCluster(ctx, cluster)
 	validateCSIDriver(ctx)
-	validateTopolvmController(ctx)
 	validateVGManager(ctx)
 	validateLVMVolumeGroup(ctx)
 	validateStorageClass(ctx)
