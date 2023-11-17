@@ -27,7 +27,7 @@ FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.15:base-rhel9 as
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
 
-COPY --from=baseocp /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo
+#COPY --from=baseocp /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo /etc/yum.repos.d/localdev-rhel-9-baseos-rpms.repo
 COPY --from=baseocp /etc/yum.repos.d/redhat.repo /etc/yum.repos.d/redhat.repo
 RUN microdnf update -y && microdnf install -y util-linux e2fsprogs xfsprogs glibc && microdnf clean all
 
