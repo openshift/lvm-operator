@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/topolvm/topolvm/lvmd"
@@ -112,6 +113,14 @@ func (c FileConfig) Save(ctx context.Context, config *Config) error {
 		cm.Data = map[string]string{"lvmd.yaml": string(out)}
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to apply ConfigMap %s: %w", cm.GetName(), err)
+	}
+
+	cm.Annotations = make(map[string]string)
+	cm.Annotations["timestamp"] = time.Now().String()
+	//dummy update to trigger shutdown for other vg-manager pods
+	err = c.Update(ctx, cm)
 	if err != nil {
 		return fmt.Errorf("failed to apply ConfigMap %s: %w", cm.GetName(), err)
 	}
