@@ -327,17 +327,17 @@ func (r *Reconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alph
 	}
 
 	for _, deviceClass := range instance.Spec.Storage.DeviceClasses {
-		for i := range nodeList.Items {
-			ignoreDueToNoSchedule := false
-			for _, taint := range nodeList.Items[i].Spec.Taints {
-				if taint.Effect == corev1.TaintEffectNoSchedule {
-					logger.V(1).Info("even though node selector matches, NoSchedule forces ignore of the Node",
-						"node", nodeList.Items[i].GetName())
-					ignoreDueToNoSchedule = true
+		for _, node := range nodeList.Items {
+			ignoreDueToTaint := false
+			for _, taint := range node.Spec.Taints {
+				if !corev1helper.TolerationsTolerateTaint(instance.Spec.Tolerations, &taint) {
+					logger.V(1).Info("node is ignored because of the taint",
+						"node", node.GetName(), "taint", taint)
+					ignoreDueToTaint = true
 					break
 				}
 			}
-			if ignoreDueToNoSchedule {
+			if ignoreDueToTaint {
 				continue
 			}
 
@@ -346,7 +346,7 @@ func (r *Reconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alph
 				continue
 			}
 
-			matches, err := corev1helper.MatchNodeSelectorTerms(&nodeList.Items[i], deviceClass.NodeSelector)
+			matches, err := corev1helper.MatchNodeSelectorTerms(&node, deviceClass.NodeSelector)
 			if err != nil {
 				return 0, fmt.Errorf("failed to match node selector: %w", err)
 			}
