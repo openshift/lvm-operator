@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
@@ -38,11 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -81,6 +84,16 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, builder.MatchEveryOwner, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(&corev1.ConfigMap{}, handler.Funcs{
+			UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+				oldCM := e.ObjectOld.(*corev1.ConfigMap)
+				newCM := e.ObjectNew.(*corev1.ConfigMap)
+				if oldCM != nil && newCM.GetName() == constants.LVMDConfigMapName && newCM.GetNamespace() == r.Namespace && (!cmp.Equal(oldCM.Data, newCM.Data) || !cmp.Equal(oldCM.Annotations, newCM.Annotations)) {
+					mgr.GetLogger().Info("shutting down to receive lvmd config updates")
+					r.Shutdown()
+				}
+			},
+		}).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.getObjsInNamespaceForReconcile)).
 		Complete(r)
 }
@@ -412,11 +425,10 @@ func (r *Reconciler) updateLVMDConfigAfterReconcile(
 		if err := r.LVMD.Save(ctx, newCFG); err != nil {
 			return fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 		}
-		msg := "updated lvmd config with new deviceClasses"
+		msg := "updated lvmd config with new deviceClasses, now restarting.."
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
 
-		logger.Info("TRIGGERING RESTART AFTER LVMD CONFIG REFRESH")
 		r.Shutdown()
 	}
 	return nil
