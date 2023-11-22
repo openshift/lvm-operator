@@ -91,6 +91,11 @@ func (c topolvmController) EnsureCreated(r Reconciler, ctx context.Context, lvmC
 		// labels, volumes, service account etc can remain unchanged
 		existingDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 
+		initMapIfNil(&existingDeployment.ObjectMeta.Annotations)
+		for key, value := range desiredDeployment.Annotations {
+			existingDeployment.ObjectMeta.Annotations[key] = value
+		}
+
 		return nil
 	})
 
