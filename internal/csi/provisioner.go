@@ -14,13 +14,16 @@ import (
 	"github.com/kubernetes-csi/external-provisioner/pkg/capacity"
 	"github.com/kubernetes-csi/external-provisioner/pkg/capacity/topology"
 	provisionctrl "github.com/kubernetes-csi/external-provisioner/pkg/controller"
+	"github.com/kubernetes-csi/external-provisioner/pkg/features"
 	"github.com/kubernetes-csi/external-provisioner/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned"
 	"github.com/prometheus/client_golang/prometheus"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -110,6 +113,12 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	translator := csitrans.New()
 	factory := informers.NewSharedInformerFactory(clientset, ResyncPeriodOfCsiNodeInformer)
 
+	featureMap := map[string]bool{string(features.Topology): true}
+	err = feature.DefaultMutableFeatureGate.SetFromMap(featureMap)
+	if err != nil {
+		return err
+	}
+
 	scLister := factory.Storage().V1().StorageClasses().Lister()
 	csiNodeLister := factory.Storage().V1().CSINodes().Lister()
 	nodeLister := factory.Core().V1().Nodes().Lister()
@@ -173,7 +182,6 @@ func (p *Provisioner) Start(ctx context.Context) error {
 			Name: "csitopology",
 		}),
 	)
-	go topologyInformer.RunWorker(ctx)
 
 	managedByID := "external-provisioner"
 
@@ -253,8 +261,13 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 
+	go func() {
+		defer wg.Done()
+		topologyInformer.RunWorker(ctx)
+		logger.Info("topology informer finished shutdown")
+	}()
 	go func() {
 		defer wg.Done()
 		capacityController.Run(ctx, 1)
