@@ -3,12 +3,11 @@ package lvmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/topolvm/topolvm/lvmd"
 	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
+
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,15 +88,6 @@ func (c FileConfig) Load(ctx context.Context) (*Config, error) {
 }
 
 func (c FileConfig) Save(ctx context.Context, config *Config) error {
-	logger := log.FromContext(ctx)
-	// TODO: removing the old config file is added for seamless upgrades from 4.14 to 4.15, and should be deleted in 4.16
-	// remove the old config file if it still exists
-	_, err := os.ReadFile(constants.LVMDDefaultFileConfigPath)
-	if err == nil {
-		if err = os.Remove(constants.LVMDDefaultFileConfigPath); err != nil {
-			logger.Info("failed to remove the old lvmd config file", "filePath", constants.LVMDDefaultFileConfigPath, "error", err)
-		}
-	}
 	out, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)
@@ -113,14 +103,6 @@ func (c FileConfig) Save(ctx context.Context, config *Config) error {
 		cm.Data = map[string]string{"lvmd.yaml": string(out)}
 		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to apply ConfigMap %s: %w", cm.GetName(), err)
-	}
-
-	cm.Annotations = make(map[string]string)
-	cm.Annotations["timestamp"] = time.Now().String()
-	//dummy update to trigger shutdown for other vg-manager pods
-	err = c.Update(ctx, cm)
 	if err != nil {
 		return fmt.Errorf("failed to apply ConfigMap %s: %w", cm.GetName(), err)
 	}

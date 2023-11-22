@@ -24,7 +24,10 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
@@ -38,18 +41,13 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/tagging"
 	"github.com/spf13/cobra"
-	"github.com/topolvm/topolvm/driver"
-	"github.com/topolvm/topolvm/runners"
-	"google.golang.org/grpc"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/yaml"
-
-	"github.com/container-storage-interface/spec/lib/go/csi"
-
 	topolvmClient "github.com/topolvm/topolvm/client"
 	"github.com/topolvm/topolvm/controllers"
+	"github.com/topolvm/topolvm/driver"
 	topoLVMD "github.com/topolvm/topolvm/lvmd"
 	"github.com/topolvm/topolvm/lvmd/command"
+	"github.com/topolvm/topolvm/runners"
+	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -61,9 +59,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -239,6 +239,57 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		cancel()
 		<-c
 		os.Exit(1) // second signal. Exit directly.
+	}()
+
+	// Create new watcher.
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("unable to set up file watcher: %w", err)
+	}
+	defer watcher.Close()
+
+	// Start listening for events.
+	go func() {
+		fileNotExist := false
+		for {
+			// check if file exists, otherwise the watcher errors
+			_, err := os.Lstat(constants.LVMDDefaultFileConfigPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					time.Sleep(100 * time.Millisecond)
+					fileNotExist = true
+				} else {
+					opts.SetupLog.Error(err, "unable to check if lvmd config file exists")
+				}
+			} else {
+				// This handles the first time the file is created through the configmap
+				if fileNotExist {
+					cancel()
+				}
+				err = watcher.Add(constants.LVMDDefaultFileConfigPath)
+				if err != nil {
+					opts.SetupLog.Error(err, "unable to add file path to watcher")
+				}
+				break
+			}
+		}
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Has(fsnotify.Write) || event.Has(fsnotify.Remove) || event.Has(fsnotify.Chmod) {
+					opts.SetupLog.Info("lvmd config file is modified", "eventName", event.Name)
+					cancel()
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				opts.SetupLog.Error(err, "file watcher error")
+			}
+		}
 	}()
 
 	opts.SetupLog.Info("starting manager")
