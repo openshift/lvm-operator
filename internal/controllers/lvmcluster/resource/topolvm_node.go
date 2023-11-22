@@ -94,6 +94,11 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 			setDaemonsetNodeSelector(dsTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, ds)
 		}
 
+		initMapIfNil(&ds.ObjectMeta.Annotations)
+		for key, value := range dsTemplate.Annotations {
+			ds.ObjectMeta.Annotations[key] = value
+		}
+
 		return nil
 	})
 
