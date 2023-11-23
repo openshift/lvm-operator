@@ -77,6 +77,11 @@ func (v vgManager) ensureCreated(r *LVMClusterReconciler, ctx context.Context, l
 			ds.Spec.Template.ObjectMeta.Labels[key] = value
 		}
 
+		initMapIfNil(&ds.ObjectMeta.Annotations)
+		for key, value := range dsTemplate.Annotations {
+			ds.ObjectMeta.Annotations[key] = value
+		}
+
 		// containers
 		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
 
