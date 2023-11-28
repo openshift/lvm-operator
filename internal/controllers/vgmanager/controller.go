@@ -68,6 +68,7 @@ const EventReasonErrorNoAvailableDevicesForVG EventReasonError = "NoAvailableDev
 const EventReasonErrorInconsistentLVs EventReasonError = "InconsistentLVs"
 const EventReasonErrorVGCreateOrExtendFailed EventReasonError = "VGCreateOrExtendFailed"
 const EventReasonErrorThinPoolCreateOrExtendFailed EventReasonError = "ThinPoolCreateOrExtendFailed"
+const EventReasonErrorDevicePathCheckFailed EventReasonError = "DevicePathCheckFailed"
 const EventReasonLVMDConfigMissing EventReasonInfo = "LVMDConfigMissing"
 const EventReasonLVMDConfigUpdated EventReasonInfo = "LVMDConfigUpdated"
 const EventReasonLVMDConfigDeleted EventReasonInfo = "LVMDConfigDeleted"
@@ -204,7 +205,12 @@ func (r *Reconciler) reconcile(
 	// devices that are already part of the volume group will not be returned
 	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, nodeStatus, volumeGroup)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
+		err := fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
+		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
+		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
+			logger.Error(err, "failed to set status to failed")
+		}
+		return ctrl.Result{}, err
 	}
 
 	devices := r.filterDevices(ctx, newDevices, r.Filters(volumeGroup, r.LVM, r.LSBLK))
