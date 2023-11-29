@@ -89,6 +89,8 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 		// tolerations
 		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
 
+		ds.Spec.Template.Spec.PriorityClassName = dsTemplate.Spec.Template.Spec.PriorityClassName
+
 		// nodeSelector if non-nil
 		if dsTemplate.Spec.Template.Spec.Affinity != nil {
 			setDaemonsetNodeSelector(dsTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, ds)
@@ -206,6 +208,7 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, args
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: constants.TopolvmNodeServiceAccount,
+					PriorityClassName:  constants.PriorityClassNameClusterCritical,
 					Containers:         containers,
 					Volumes:            volumes,
 					HostPID:            true,

@@ -672,6 +672,7 @@ spec:
                 - mountPath: /tmp/k8s-metrics-server/serving-certs
                   name: metrics-cert
                   readOnly: true
+              priorityClassName: openshift-user-critical
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator

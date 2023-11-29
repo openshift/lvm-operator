@@ -91,6 +91,8 @@ func (c topolvmController) EnsureCreated(r Reconciler, ctx context.Context, lvmC
 		// labels, volumes, service account etc can remain unchanged
 		existingDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 
+		existingDeployment.Spec.Template.Spec.PriorityClassName = desiredDeployment.Spec.Template.Spec.PriorityClassName
+
 		initMapIfNil(&existingDeployment.ObjectMeta.Annotations)
 		for key, value := range desiredDeployment.Annotations {
 			existingDeployment.ObjectMeta.Annotations[key] = value
@@ -161,6 +163,7 @@ func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLead
 				Spec: corev1.PodSpec{
 					Containers:         containers,
 					ServiceAccountName: constants.TopolvmControllerServiceAccount,
+					PriorityClassName:  constants.PriorityClassNameClusterCritical,
 					Volumes:            volumes,
 				},
 			},

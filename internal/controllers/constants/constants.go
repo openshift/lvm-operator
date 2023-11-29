@@ -106,4 +106,7 @@ const (
 	StorageClassPrefix        = "lvms-"
 	VolumeSnapshotClassPrefix = "lvms-"
 	SCCPrefix                 = "lvms-"
+
+	PriorityClassNameUserCritical    = "openshift-user-critical"
+	PriorityClassNameClusterCritical = "system-cluster-critical"
 )
