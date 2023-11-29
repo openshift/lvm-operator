@@ -218,8 +218,9 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 
 				Spec: corev1.PodSpec{
-					Volumes:    volumes,
-					Containers: containers,
+					PriorityClassName: constants.PriorityClassNameUserCritical,
+					Volumes:           volumes,
+					Containers:        containers,
 					// to read /proc/1/mountinfo
 					HostPID:            true,
 					Tolerations:        tolerations,

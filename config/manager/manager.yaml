@@ -37,6 +37,7 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+      priorityClassName: openshift-user-critical
       containers:
       - command:
         - /lvms
