@@ -119,6 +119,11 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 	existing.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 
+	initMapIfNil(&existing.ObjectMeta.Annotations)
+	for key, value := range desired.Annotations {
+		existing.ObjectMeta.Annotations[key] = value
+	}
+
 	return nil
 }
 
