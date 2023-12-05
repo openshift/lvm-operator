@@ -189,7 +189,7 @@ spec:
                               description: OverProvisionRatio is the factor by which
                                 additional storage can be provisioned compared to
                                 the available storage in the thin pool.
-                              minimum: 2
+                              minimum: 1
                               type: integer
                             sizePercent:
                               default: 90
