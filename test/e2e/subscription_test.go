@@ -50,10 +50,6 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 	// label required for monitoring this namespace
 	label["openshift.io/cluster-monitoring"] = "true"
 
-	annotations := make(map[string]string)
-	// annotation required for workload partitioning
-	annotations["workload.openshift.io/allowed"] = "management"
-
 	// Namespaces
 	co.namespaces = append(co.namespaces, k8sv1.Namespace{
 		TypeMeta: metav1.TypeMeta{
@@ -61,9 +57,8 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        installNamespace,
-			Annotations: annotations,
-			Labels:      label,
+			Name:   installNamespace,
+			Labels: label,
 		},
 	})
 

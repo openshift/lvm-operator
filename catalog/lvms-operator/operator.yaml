@@ -92,7 +92,6 @@ properties:
         "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
       operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
       repository: https://github.com/openshift/lvm-operator
-      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     apiServiceDefinitions: {}
     crdDescriptions:
       owned:

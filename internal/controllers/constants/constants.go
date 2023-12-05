@@ -78,13 +78,6 @@ const (
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
 
-	// annotations
-
-	// WorkloadPartitioningManagement contains the management workload annotation
-	WorkloadPartitioningManagementAnnotation = "target.workload.openshift.io/management"
-
-	ManagementAnnotationVal = `{"effect": "PreferredDuringScheduling"}`
-
 	// labels and values
 
 	// AppKubernetesPartOfLabel is the Kubernetes recommended part-of label

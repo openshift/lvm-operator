@@ -66,7 +66,6 @@ metadata:
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/openshift/lvm-operator
-    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
@@ -604,8 +603,6 @@ spec:
           strategy: {}
           template:
             metadata:
-              annotations:
-                target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
               labels:
                 app.kubernetes.io/component: lvms-operator
                 app.kubernetes.io/name: lvms-operator

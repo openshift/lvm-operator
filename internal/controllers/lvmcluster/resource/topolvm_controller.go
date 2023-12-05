@@ -138,16 +138,11 @@ func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLead
 		containers = append(containers, csiSnapshotterContainer(topoLVMLeaderElectionPassthrough, csiArgs))
 	}
 
-	annotations := map[string]string{
-		constants.WorkloadPartitioningManagementAnnotation: constants.ManagementAnnotationVal,
-	}
-
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        constants.TopolvmControllerDeploymentName,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels:      controllerLabels,
+			Name:      constants.TopolvmControllerDeploymentName,
+			Namespace: namespace,
+			Labels:    controllerLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,

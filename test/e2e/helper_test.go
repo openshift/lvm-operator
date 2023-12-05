@@ -164,15 +164,10 @@ func createNamespace(ctx context.Context, namespace string) {
 	label["pod-security.kubernetes.io/enforce"] = "privileged"
 	label["security.openshift.io/scc.podSecurityLabelSync"] = "false"
 
-	annotations := make(map[string]string)
-	// annotation required for workload partitioning
-	annotations["workload.openshift.io/allowed"] = "management"
-
 	ns := &k8sv1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        namespace,
-			Annotations: annotations,
-			Labels:      label,
+			Name:   namespace,
+			Labels: label,
 		},
 	}
 	CreateResource(ctx, ns)

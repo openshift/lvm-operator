@@ -14,8 +14,6 @@ oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  annotations:
-    workload.openshift.io/allowed: "management"
   labels:
     app.kubernetes.io/name: lvms-operator
     security.openshift.io/scc.podSecurityLabelSync: "false"
