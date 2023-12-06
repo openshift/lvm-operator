@@ -48,7 +48,7 @@ The LVMO will create a thin-pool LV in the volume group in order to create thinl
 
 +   // OverProvisionRatio represents the ratio of overprovision that can
 +   // be allowed on thin pools
-+   // +kubebuilder:validation:Minimum=2
++   // +kubebuilder:validation:Minimum=1
 +   OverprovisionRatio int `json:"overprovisionRatio,omitempty"`
 }
 

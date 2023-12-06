@@ -52,7 +52,7 @@ type ThinPoolConfig struct {
 
 	// OverProvisionRatio is the factor by which additional storage can be provisioned compared to
 	// the available storage in the thin pool.
-	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Required
 	// +required
 	OverprovisionRatio int `json:"overprovisionRatio"`
