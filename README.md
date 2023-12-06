@@ -42,6 +42,7 @@ end
 - [Cleanup](#cleanup)
 - [Metrics](#metrics)
 - [Known Limitations](#known-limitations)
+    * [Unsupported Device Types](#unsupported-device-types)
     * [Single LVMCluster support](#single-lvmcluster-support)
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
     * [Missing native LVM RAID Configuration support](#missing-native-lvm-raid-configuration-support)
@@ -360,6 +361,66 @@ $ oc patch namespace/openshift-storage -p '{"metadata": {"labels": {"openshift.i
 LVMS provides [TopoLVM metrics](https://github.com/topolvm/topolvm/blob/v0.21.0/docs/topolvm-node.md#prometheus-metrics) and `controller-runtime` metrics, which can be accessed via OpenShift Console.
 
 ## Known Limitations
+
+### Unsupported Device Types
+
+Here is a list of the types of devices that are excluded by LVMS. To get more information about the devices on your machine and to check if they fall under any of these filters, run:
+
+```bash
+$ lsblk --paths --json -o NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE
+```
+
+1. **Read-Only Devices:**
+    - *Condition:* Devices marked as `read-only` are unsupported.
+    - *Why:* LVMS requires the ability to write and modify data dynamically, which is not possible with devices set to read-only mode.
+    - *Filter:* `ro` is set to `true`.
+
+2. **Suspended Devices:**
+    - *Condition:* Devices in a `suspended` state are unsupported.
+    - *Why:* A suspended state implies that a device is temporarily inactive or halted, and attempting to incorporate such devices into LVMS can introduce complexities and potential issues.
+    - *Filter:* `state` is `suspended`.
+
+3. **Devices with Invalid Partition Labels:**
+    - *Condition:* Devices with partition labels such as `bios`, `boot`, or `reserved` are unsupported.
+    - *Why:* These labels indicate reserved or specialized functionality associated with specific system components. Attempting to use such devices within LVMS may lead to unintended consequences, as these labels may be reserved for system-related activities.
+    - *Filter:* `partlabel` has either `bios`, `boot`, or `reserved`.
+
+4. **Devices with Invalid Filesystem Signatures:**
+    - *Condition:* Devices with invalid filesystem signatures are unsupported. This includes:
+        - Devices with a filesystem type set to `LVM2_member` (only valid if no children).
+        - Devices with no free capacity as a physical volume.
+        - Devices already part of another volume group.
+    - *Why:* These conditions indicate that either this device is already used by another volume group or have no free capacity to be used within LVMS.
+    - *Filter:* `fstype` is not `null`, or `fstype` is set to `LVM2_member` and has children block devices, or `pvs --units g -v --reportformat json` returns `pv_free` for the block device set to `0G`.
+
+5. **Devices with Children:**
+    - *Condition:* Devices with children block devices are unsupported.
+    - *Why:* LVMS operates optimally with standalone block devices that are not part of a hierarchical structure. Devices with children can complicate volume management, potentially causing conflicts, errors, or difficulties in tracking and managing logical volumes.
+    - *Filter:* `children` has children block devices.
+
+6. **Devices with Bind Mounts:**
+    - *Condition:* Devices with bind mounts are unsupported.
+    - *Why:* Managing logical volumes becomes more complex when dealing with devices that have bind mounts, potentially causing conflicts or difficulties in maintaining the integrity of the logical volume setup.
+    - *Filter:* `cat /proc/1/mountinfo | grep <device-name>` returns mount points for the device in the 4th or 10th field.
+
+7. **ROM Devices:**
+    - *Condition:* Devices of type `rom` are unsupported.
+    - *Why:* Such devices are designed for static data storage and lack the necessary read-write capabilities essential for dynamic operations performed by LVMS.
+    - *Filter:* `type` is set to `rom`.
+
+8. **LVM Partitions:**
+    - *Condition:* Devices of type `LVM` partition are unsupported.
+    - *Why:* These partitions are already dedicated to LVM and are managed as part of an existing volume group.
+    - *Filter:* `type` is set to `lvm`.
+
+9. **Loop Devices:**
+    - *Condition:* Loop Devices must not be used if they are already in use by Kubernetes.
+    - *Why:* When loop devices are utilized by Kubernetes, they are likely configured for specific tasks or processes managed by the Kubernetes environment. Integrating loop devices that are already in use by Kubernetes into LVMS can lead to potential conflicts and interference with the Kubernetes system.
+    - *Filter:* `type` is set to `loop`, and `losetup <loop-device> -O BACK-FILE --json` returns a `back-file` which contains `plugins/kubernetes.io`.
+
+Devices meeting any of these conditions are filtered out for LVMS operations.
+
+_NOTE: It is strongly recommended to perform a thorough wipe of a device before using it within LVMS to proactively prevent unintended behaviors or potential issues._
 
 ### Single LVMCluster support
 
