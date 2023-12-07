@@ -94,6 +94,11 @@ func (n topolvmNode) ensureCreated(r *LVMClusterReconciler, ctx context.Context,
 			ds.ObjectMeta.Annotations[key] = value
 		}
 
+		initMapIfNil(&ds.Spec.Template.Annotations)
+		for key, value := range dsTemplate.Spec.Template.Annotations {
+			ds.Spec.Template.Annotations[key] = value
+		}
+
 		return nil
 	})
 
@@ -193,10 +198,9 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 	}
 	nodeDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        TopolvmNodeDaemonsetName,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels:      labels,
+			Name:      TopolvmNodeDaemonsetName,
+			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -205,8 +209,9 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, init
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   lvmCluster.Name,
-					Labels: labels,
+					Name:        lvmCluster.Name,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: TopolvmNodeServiceAccount,
