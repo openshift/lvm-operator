@@ -9,13 +9,6 @@ spec:
   endpoints:
   - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     path: /metrics
-    port: topolvm-metrics
-    scheme: https
-    tlsConfig:
-      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: topolvm-node-metrics.openshift-storage.svc
-  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    path: /metrics
     port: https
     scheme: https
     tlsConfig:
