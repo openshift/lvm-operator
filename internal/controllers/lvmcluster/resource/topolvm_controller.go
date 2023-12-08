@@ -98,6 +98,11 @@ func (c topolvmController) EnsureCreated(r Reconciler, ctx context.Context, lvmC
 			existingDeployment.ObjectMeta.Annotations[key] = value
 		}
 
+		initMapIfNil(&existingDeployment.Spec.Template.Annotations)
+		for key, value := range desiredDeployment.Spec.Template.Annotations {
+			existingDeployment.Spec.Template.Annotations[key] = value
+		}
+
 		return nil
 	})
 
@@ -144,10 +149,9 @@ func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLead
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        constants.TopolvmControllerDeploymentName,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels:      controllerLabels,
+			Name:      constants.TopolvmControllerDeploymentName,
+			Namespace: namespace,
+			Labels:    controllerLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -156,9 +160,10 @@ func getControllerDeployment(namespace string, enableSnapshots bool, topoLVMLead
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      constants.TopolvmControllerDeploymentName,
-					Namespace: namespace,
-					Labels:    controllerLabels,
+					Name:        constants.TopolvmControllerDeploymentName,
+					Namespace:   namespace,
+					Annotations: annotations,
+					Labels:      controllerLabels,
 				},
 				Spec: corev1.PodSpec{
 					Containers:         containers,
