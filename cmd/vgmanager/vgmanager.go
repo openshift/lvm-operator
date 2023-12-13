@@ -29,7 +29,6 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
-	"github.com/openshift/lvm-operator/internal/tagging"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +38,6 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -83,21 +81,9 @@ func NewCmd(opts *Options) *cobra.Command {
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
-	lvm := lvm.NewDefaultHostLVM()
-	nodeName := os.Getenv("NODE_NAME")
-
 	operatorNamespace, err := cluster.GetOperatorNamespace()
 	if err != nil {
 		return fmt.Errorf("unable to get operatorNamespace: %w", err)
-	}
-
-	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: opts.Scheme})
-	if err != nil {
-		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
-	}
-
-	if err := tagging.AddTagToVGs(cmd.Context(), setupClient, lvm, nodeName, operatorNamespace); err != nil {
-		opts.SetupLog.Error(err, "failed to tag existing volume groups")
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -130,8 +116,8 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
 		Wipefs:        wipefs.NewDefaultHostWipefs(),
 		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
-		LVM:           lvm,
-		NodeName:      nodeName,
+		LVM:           lvm.NewDefaultHostLVM(),
+		NodeName:      os.Getenv("NODE_NAME"),
 		Namespace:     operatorNamespace,
 		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
