@@ -23,6 +23,7 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
+	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -31,35 +32,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusProgressing,
 	}
 
 	// Set devices for the VGStatus.
-	if _, err := r.setDevices(status, devices); err != nil {
+	if _, err := r.setDevices(status, vgs, devices); err != nil {
 		return false, err
 	}
 
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusReady,
 	}
 
 	// Set devices for the VGStatus.
-	if _, err := r.setDevices(status, devices); err != nil {
+	if _, err := r.setDevices(status, vgs, devices); err != nil {
 		return false, err
 	}
 
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, devices *FilteredBlockDevices, err error) (bool, error) {
+func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices, err error) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusFailed,
@@ -68,7 +69,7 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 
 	// Set devices for the VGStatus.
 	// If there is backing volume group, then set as degraded
-	if devicesExist, err := r.setDevices(status, devices); err != nil {
+	if devicesExist, err := r.setDevices(status, vgs, devices); err != nil {
 		return false, fmt.Errorf("could not set devices in VGStatus: %w", err)
 	} else if devicesExist {
 		status.Status = lvmv1alpha1.VGStatusDegraded
@@ -163,12 +164,7 @@ func (r *Reconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha
 	return nil
 }
 
-func (r *Reconciler) setDevices(status *lvmv1alpha1.VGStatus, devices *FilteredBlockDevices) (bool, error) {
-	vgs, err := r.LVM.ListVGs()
-	if err != nil {
-		return false, fmt.Errorf("failed to list volume groups. %v", err)
-	}
-
+func (r *Reconciler) setDevices(status *lvmv1alpha1.VGStatus, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	devicesExist := false
 	for _, vg := range vgs {
 		if status.Name == vg.Name {
@@ -182,34 +178,32 @@ func (r *Reconciler) setDevices(status *lvmv1alpha1.VGStatus, devices *FilteredB
 		}
 	}
 
-	if devices != nil {
-		status.Excluded = []lvmv1alpha1.ExcludedDevice{}
-		for _, excluded := range devices.Excluded {
-			reasons := make([]string, len(excluded.FilterErrors))
+	status.Excluded = []lvmv1alpha1.ExcludedDevice{}
+	for _, excluded := range devices.Excluded {
+		reasons := make([]string, len(excluded.FilterErrors))
 
-			skip := false
-			for i, err := range excluded.FilterErrors {
-				// for already setup devices we ignore the filter result
-				if filter.IsExpectedDeviceErrorAfterSetup(err) {
-					skip = true
-					break
-				}
-				reasons[i] = err.Error()
+		skip := false
+		for i, err := range excluded.FilterErrors {
+			// for already setup devices we ignore the filter result
+			if filter.IsExpectedDeviceErrorAfterSetup(err) {
+				skip = true
+				break
 			}
-			if skip {
-				continue
-			}
-
-			sort.Strings(reasons)
-			status.Excluded = append(status.Excluded, lvmv1alpha1.ExcludedDevice{
-				Name:    excluded.Name,
-				Reasons: reasons,
-			})
+			reasons[i] = err.Error()
 		}
-		sort.Slice(status.Excluded, func(i, j int) bool {
-			return status.Excluded[i].Name < status.Excluded[j].Name
+		if skip {
+			continue
+		}
+
+		sort.Strings(reasons)
+		status.Excluded = append(status.Excluded, lvmv1alpha1.ExcludedDevice{
+			Name:    excluded.Name,
+			Reasons: reasons,
 		})
 	}
+	sort.Slice(status.Excluded, func(i, j int) bool {
+		return status.Excluded[i].Name < status.Excluded[j].Name
+	})
 
 	return devicesExist, nil
 }

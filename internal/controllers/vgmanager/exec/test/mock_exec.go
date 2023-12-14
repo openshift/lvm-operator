@@ -16,25 +16,30 @@ limitations under the License.
 
 package test
 
+import (
+	"io"
+	"strings"
+)
+
 type MockExecutor struct {
-	MockExecuteCommandWithOutput       func(command string, arg ...string) (string, error)
-	MockExecuteCommandWithOutputAsHost func(command string, arg ...string) (string, error)
+	MockExecuteCommandWithOutput       func(command string, arg ...string) (io.ReadCloser, error)
+	MockExecuteCommandWithOutputAsHost func(command string, arg ...string) (io.ReadCloser, error)
 }
 
 // ExecuteCommandWithOutput mocks ExecuteCommandWithOutput
-func (e *MockExecutor) ExecuteCommandWithOutput(command string, arg ...string) (string, error) {
+func (e *MockExecutor) ExecuteCommandWithOutput(command string, arg ...string) (io.ReadCloser, error) {
 	if e.MockExecuteCommandWithOutput != nil {
 		return e.MockExecuteCommandWithOutput(command, arg...)
 	}
 
-	return "", nil
+	return io.NopCloser(strings.NewReader("")), nil
 }
 
 // ExecuteCommandWithOutputAsHost mocks ExecuteCommandWithOutputAsHost
-func (e *MockExecutor) ExecuteCommandWithOutputAsHost(command string, arg ...string) (string, error) {
+func (e *MockExecutor) ExecuteCommandWithOutputAsHost(command string, arg ...string) (io.ReadCloser, error) {
 	if e.MockExecuteCommandWithOutputAsHost != nil {
 		return e.MockExecuteCommandWithOutputAsHost(command, arg...)
 	}
 
-	return "", nil
+	return io.NopCloser(strings.NewReader("")), nil
 }

@@ -29,15 +29,6 @@ import (
 const (
 	// StateSuspended is a possible value of BlockDevice.State
 	StateSuspended = "suspended"
-
-	// DeviceTypeLoop is the device type for loop devices in lsblk output
-	DeviceTypeLoop = "loop"
-
-	// DeviceTypeROM is the device type for ROM devices in lsblk output
-	DeviceTypeROM = "rom"
-
-	// DeviceTypeLVM is the device type for lvm devices in lsblk output
-	DeviceTypeLVM = "lvm"
 )
 
 const FSTypeLVM2Member = "LVM2_member"
@@ -64,7 +55,7 @@ var (
 	}
 )
 
-type Filter func(lsblk.BlockDevice) error
+type Filter func(lsblk.BlockDevice, []lvm.PhysicalVolume, lsblk.BlockDeviceInfos) error
 
 type Filters map[string]Filter
 
@@ -75,23 +66,23 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 	return errors.Is(err, ErrDeviceAlreadySetupCorrectly) || errors.Is(err, ErrLVMPartition)
 }
 
-func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup, lvmInstance lvm.LVM, lsblkInstance lsblk.LSBLK) Filters {
+func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
 	return Filters{
-		notReadOnly: func(dev lsblk.BlockDevice) error {
+		notReadOnly: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
 			if dev.ReadOnly {
 				return fmt.Errorf("%s cannot be read-only", dev.Name)
 			}
 			return nil
 		},
 
-		notSuspended: func(dev lsblk.BlockDevice) error {
+		notSuspended: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
 			if dev.State == StateSuspended {
 				return fmt.Errorf("%s cannot be in a %q state", dev.State, dev.Name)
 			}
 			return nil
 		},
 
-		noInvalidPartitionLabel: func(dev lsblk.BlockDevice) error {
+		noInvalidPartitionLabel: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
 			for _, invalidLabel := range invalidPartitionLabels {
 				if strings.Contains(strings.ToLower(dev.PartLabel), invalidLabel) {
 					return fmt.Errorf("%s has an invalid partition label %q", dev.Name, dev.PartLabel)
@@ -100,7 +91,7 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup, lvmInstance lvm.LVM, lsblkIn
 			return nil
 		},
 
-		onlyValidFilesystemSignatures: func(dev lsblk.BlockDevice) error {
+		onlyValidFilesystemSignatures: func(dev lsblk.BlockDevice, pvs []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
 			// if no fs type is set, it's always okay
 			if dev.FSType == "" {
 				return nil
@@ -109,11 +100,6 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup, lvmInstance lvm.LVM, lsblkIn
 			// if fstype is set to LVM2_member then it already was created as a PV
 			// this means that if the disk has no children, we can safely reuse it if it's a valid LVM PV.
 			if dev.FSType == FSTypeLVM2Member {
-				pvs, err := lvmInstance.ListPVs("")
-				if err != nil {
-					return fmt.Errorf("could not determine if %s has a valid filesystem signature. It is flagged as a LVM2_member but the physical volumes could not be verified: %w", dev.Name, err)
-				}
-
 				var foundPV *lvm.PhysicalVolume
 				for _, pv := range pvs {
 					if pv.PvName == dev.KName {
@@ -151,7 +137,7 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup, lvmInstance lvm.LVM, lsblkIn
 			return fmt.Errorf("%s has an invalid filesystem signature (%s) and cannot be used", dev.Name, dev.FSType)
 		},
 
-		noChildren: func(dev lsblk.BlockDevice) error {
+		noChildren: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
 			hasChildren := dev.HasChildren()
 			if hasChildren {
 				return fmt.Errorf("%s has children block devices and could not be considered", dev.Name)
@@ -159,31 +145,16 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup, lvmInstance lvm.LVM, lsblkIn
 			return nil
 		},
 
-		noBindMounts: func(dev lsblk.BlockDevice) error {
-			hasBindMounts, _, err := lsblkInstance.HasBindMounts(dev)
-			if err != nil {
-				return fmt.Errorf("could not determine if %s had bind mounts: %w", dev.Name, err)
-			}
-			if hasBindMounts {
-				return fmt.Errorf("%s has bind mounts and cannot be used", dev.Name)
-			}
-			return nil
-		},
-
-		usableDeviceType: func(dev lsblk.BlockDevice) error {
+		usableDeviceType: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, bdi lsblk.BlockDeviceInfos) error {
 			switch dev.Type {
-			case DeviceTypeLoop:
+			case lsblk.DeviceTypeLoop:
 				// check loop device isn't being used by kubernetes
-				usable, err := lsblkInstance.IsUsableLoopDev(dev)
-				if err != nil {
-					return fmt.Errorf("%s is a loopback device that could not be verified as usable: %w", dev.Name, err)
+				if !bdi[dev.KName].IsUsableLoopDev {
+					return fmt.Errorf("%s is an unusable loopback device", dev.Name)
 				}
-				if !usable {
-					return fmt.Errorf("%s is an unusable loopback device: %w", dev.Name, err)
-				}
-			case DeviceTypeROM:
+			case lsblk.DeviceTypeROM:
 				return fmt.Errorf("%s has a device type of %q which is unsupported", dev.Name, dev.Type)
-			case DeviceTypeLVM:
+			case lsblk.DeviceTypeLVM:
 				return ErrLVMPartition
 			}
 			return nil

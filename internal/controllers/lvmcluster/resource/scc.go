@@ -102,50 +102,8 @@ func (c openshiftSccs) EnsureDeleted(r Reconciler, ctx context.Context, _ *lvmv1
 
 func getAllSCCs(namespace string) []*secv1.SecurityContextConstraints {
 	return []*secv1.SecurityContextConstraints{
-		newTopolvmNodeScc(namespace),
 		newVGManagerScc(namespace),
 	}
-}
-
-func newTopolvmNodeScc(namespace string) *secv1.SecurityContextConstraints {
-	scc := &secv1.SecurityContextConstraints{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "security.openshift.io/v1",
-			Kind:       "SecurityContextConstraints",
-		},
-	}
-	scc.Name = constants.SCCPrefix + "topolvm-node"
-	scc.AllowPrivilegedContainer = true
-	scc.AllowHostNetwork = false
-	scc.AllowHostDirVolumePlugin = true
-	scc.AllowHostPorts = false
-	scc.AllowHostPID = true
-	scc.AllowHostIPC = false
-	scc.ReadOnlyRootFilesystem = false
-	scc.RequiredDropCapabilities = []corev1.Capability{}
-	scc.RunAsUser = secv1.RunAsUserStrategyOptions{
-		Type: secv1.RunAsUserStrategyRunAsAny,
-	}
-	scc.SELinuxContext = secv1.SELinuxContextStrategyOptions{
-		Type: secv1.SELinuxStrategyRunAsAny,
-	}
-	scc.FSGroup = secv1.FSGroupStrategyOptions{
-		Type: secv1.FSGroupStrategyRunAsAny,
-	}
-	scc.SupplementalGroups = secv1.SupplementalGroupsStrategyOptions{
-		Type: secv1.SupplementalGroupsStrategyRunAsAny,
-	}
-	scc.Volumes = []secv1.FSType{
-		secv1.FSTypeConfigMap,
-		secv1.FSTypeEmptyDir,
-		secv1.FSTypeHostPath,
-		secv1.FSTypeSecret,
-	}
-	scc.Users = []string{
-		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.TopolvmNodeServiceAccount),
-	}
-
-	return scc
 }
 
 func newVGManagerScc(namespace string) *secv1.SecurityContextConstraints {

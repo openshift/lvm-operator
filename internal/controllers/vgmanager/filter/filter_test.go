@@ -1,14 +1,12 @@
 package filter
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
-	lvmmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +20,7 @@ type advancedFilterTestCase struct {
 	label     string
 	device    lsblk.BlockDevice
 	assertErr assert.ErrorAssertionFunc
-	lvmExpect func(mockLVM *lvmmocks.MockLVM)
+	lvmExpect []lvm.PhysicalVolume
 }
 
 func TestNotReadOnly(t *testing.T) {
@@ -32,7 +30,7 @@ func TestNotReadOnly(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil, nil, nil)[notReadOnly](tc.device)
+			err := DefaultFilters(nil)[notReadOnly](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -50,7 +48,7 @@ func TestNotSuspended(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil, nil, nil)[notSuspended](tc.device)
+			err := DefaultFilters(nil)[notSuspended](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -68,7 +66,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil, nil, nil)[onlyValidFilesystemSignatures](tc.device)
+			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -85,7 +83,7 @@ func TestNoChildren(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil, nil, nil)[noChildren](tc.device)
+			err := DefaultFilters(nil)[noChildren](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -101,7 +99,7 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: lsblk.BlockDevice{Name: "dev2", Type: "disk"}, expectErr: false},
 	}
 	for _, tc := range testcases {
-		err := DefaultFilters(nil, nil, nil)[usableDeviceType](tc.device)
+		err := DefaultFilters(nil)[usableDeviceType](tc.device, nil, nil)
 		if tc.expectErr {
 			assert.Error(t, err)
 		} else {
@@ -125,7 +123,7 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil, nil, nil)[noInvalidPartitionLabel](tc.device)
+			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -149,27 +147,13 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			label:     "LVM2_Member without pvs",
 			device:    lsblk.BlockDevice{KName: "dev1", FSType: FSTypeLVM2Member},
 			assertErr: assert.NoError,
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return([]lvm.PhysicalVolume{}, nil).Once()
-			},
-		},
-		{
-			label:  "LVM2_Member pvs lookup failure",
-			device: lsblk.BlockDevice{KName: "dev1", FSType: FSTypeLVM2Member},
-			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorContains(t, err, "lagged as a LVM2_member but the physical volumes could not be verified")
-			},
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return(nil, errors.New("stub")).Once()
-			},
+			lvmExpect: []lvm.PhysicalVolume{},
 		},
 		{
 			label:     "LVM2_Member with non-matching pvs",
 			device:    lsblk.BlockDevice{KName: "dev1", FSType: FSTypeLVM2Member},
 			assertErr: assert.NoError,
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return([]lvm.PhysicalVolume{{PvName: "random"}}, nil).Once()
-			},
+			lvmExpect: []lvm.PhysicalVolume{{PvName: "random"}},
 		},
 		{
 			label:  "LVM2_Member with matching pvs,no children,mismatching vg",
@@ -177,9 +161,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorContains(t, err, "already part of another volume group")
 			},
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return([]lvm.PhysicalVolume{{PvName: "dev1", VgName: "random"}}, nil).Once()
-			},
+			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", VgName: "random"}},
 		},
 		{
 			label:  "LVM2_Member with matching pvs,no children,matching vg without free space",
@@ -187,9 +169,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorContains(t, err, "reported as having no free capacity as a physical volume")
 			},
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return([]lvm.PhysicalVolume{{PvName: "dev1", PvFree: "0G"}}, nil).Once()
-			},
+			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", PvFree: "0G"}},
 		},
 		{
 			label:  "LVM2_Member with matching pvs,children,mismatching vg",
@@ -197,9 +177,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorContains(t, err, "is already a LVM2_Member of another volume group (othervg) and cannot be used for the volume group vg1")
 			},
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return([]lvm.PhysicalVolume{{PvName: "dev1", VgName: "othervg"}}, nil).Once()
-			},
+			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", VgName: "othervg"}},
 		},
 		{
 			label:  "LVM2_Member that was already setup correctly",
@@ -207,22 +185,15 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, ErrDeviceAlreadySetupCorrectly)
 			},
-			lvmExpect: func(mockLVM *lvmmocks.MockLVM) {
-				mockLVM.EXPECT().ListPVs("").Return([]lvm.PhysicalVolume{{PvName: "dev1", VgName: "vg1"}}, nil).Once()
-			},
+			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", VgName: "vg1"}},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			mockLVM := lvmmocks.NewMockLVM(t)
-			if tc.lvmExpect != nil {
-				tc.lvmExpect(mockLVM)
-			}
-
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
 			vg.SetName("vg1")
 
-			err := DefaultFilters(vg, mockLVM, nil)[onlyValidFilesystemSignatures](tc.device)
+			err := DefaultFilters(vg)[onlyValidFilesystemSignatures](tc.device, tc.lvmExpect, nil)
 			tc.assertErr(t, err, fmt.Sprintf("onlyValidFilesystemSignatures(%v)", tc.device))
 		})
 	}

@@ -19,14 +19,26 @@ package operator
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/node/removal"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
+	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/spf13/cobra"
+	topolvmcontrollers "github.com/topolvm/topolvm/controllers"
+	"github.com/topolvm/topolvm/driver"
+	"google.golang.org/grpc"
+	"k8s.io/utils/ptr"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,8 +56,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/openshift/library-go/pkg/config/leaderelection"
-
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	//+kubebuilder:scaffold:imports
@@ -107,6 +117,9 @@ func NewCmd(opts *Options) *cobra.Command {
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
 	operatorNamespace, err := cluster.GetOperatorNamespace()
 	if err != nil {
 		return fmt.Errorf("unable to get operatorNamespace: %w", err)
@@ -125,25 +138,19 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to setup leader election: %w", err)
 	}
 
-	leaderElectionConfig, err := leaderElectionResolver.Resolve(cmd.Context())
+	leaderElectionConfig, err := leaderElectionResolver.Resolve(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to resolve leader election config: %w", err)
 	}
 
-	le, err := leaderelection.ToLeaderElectionWithLease(
-		ctrl.GetConfigOrDie(), leaderElectionConfig, "lvms", "")
-	if err != nil {
-		return fmt.Errorf("unable to setup leader election with lease configuration: %w", err)
-	}
-
-	clusterType, err := cluster.NewTypeResolver(setupClient).GetType(context.Background())
+	clusterType, err := cluster.NewTypeResolver(setupClient).GetType(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to determine cluster type: %w", err)
 	}
 
 	enableSnapshotting := true
 	vsc := &snapapi.VolumeSnapshotClassList{}
-	if err := setupClient.List(context.Background(), vsc, &client.ListOptions{Limit: 1}); err != nil {
+	if err := setupClient.List(ctx, vsc, &client.ListOptions{Limit: 1}); err != nil {
 		// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
 		if meta.IsNoMatchError(err) {
 			opts.SetupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
@@ -171,13 +178,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			},
 		},
 		HealthProbeBindAddress:        opts.healthProbeAddr,
-		RetryPeriod:                   &le.RetryPeriod,
-		LeaseDuration:                 &le.LeaseDuration,
-		RenewDeadline:                 &le.RenewDeadline,
+		RetryPeriod:                   &leaderElectionConfig.RetryPeriod.Duration,
+		LeaseDuration:                 &leaderElectionConfig.LeaseDuration.Duration,
+		RenewDeadline:                 &leaderElectionConfig.RenewDeadline.Duration,
 		LeaderElectionNamespace:       operatorNamespace,
 		LeaderElectionID:              leaderElectionConfig.Name,
 		LeaderElection:                !leaderElectionConfig.Disable,
 		LeaderElectionReleaseOnCancel: true,
+		GracefulShutdownTimeout:       ptr.To(time.Duration(-1)),
+		PprofBindAddress:              ":9099",
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -216,15 +225,76 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create PersistentVolumeClaim controller: %w", err)
 	}
 
+	// register TopoLVM controllers
+	topolvmNodeController := topolvmcontrollers.NewNodeReconciler(mgr.GetClient(), false)
+	if err := topolvmNodeController.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create TopoLVM Node controller: %w", err)
+	}
+
+	topolvmPVCController := topolvmcontrollers.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader())
+	if err := topolvmPVCController.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create TopoLVM PVC controller: %w", err)
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.SharedWriteBuffer(true),
+		grpc.MaxConcurrentStreams(1),
+		grpc.NumStreamWorkers(1))
+	identityServer := driver.NewIdentityServer(func() (bool, error) {
+		return true, nil
+	})
+	csi.RegisterIdentityServer(grpcServer, identityServer)
+	controllerSever, err := driver.NewControllerServer(mgr)
+	if err != nil {
+		return err
+	}
+	csi.RegisterControllerServer(grpcServer, controllerSever)
+
+	if err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false)); err != nil {
+		return err
+	}
+
+	if err := mgr.Add(internalCSI.NewProvisioner(mgr, internalCSI.ProvisionerOptions{
+		DriverName:          constants.TopolvmCSIDriverName,
+		CSIEndpoint:         constants.DefaultCSISocket,
+		CSIOperationTimeout: 10 * time.Second,
+	})); err != nil {
+		return fmt.Errorf("unable to create CSI Provisioner: %w", err)
+	}
+
+	if enableSnapshotting {
+		if err := mgr.Add(internalCSI.NewSnapshotter(mgr, internalCSI.SnapshotterOptions{
+			DriverName:          constants.TopolvmCSIDriverName,
+			CSIEndpoint:         constants.DefaultCSISocket,
+			CSIOperationTimeout: 10 * time.Second,
+		})); err != nil {
+			return fmt.Errorf("unable to create CSI Snapshotter: %w", err)
+		}
+	}
+
+	if err := mgr.Add(internalCSI.NewResizer(mgr, internalCSI.ProvisionerOptions{
+		DriverName:          constants.TopolvmCSIDriverName,
+		CSIEndpoint:         constants.DefaultCSISocket,
+		CSIOperationTimeout: 10 * time.Second,
+	})); err != nil {
+		return err
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		return fmt.Errorf("unable to set up ready check: %w", err)
-	}
+
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, []os.Signal{os.Interrupt, syscall.SIGTERM}...)
+	go func() {
+		<-c
+		cancel()
+		<-c
+		os.Exit(1) // second signal. Exit directly.
+	}()
 
 	opts.SetupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
 	}
 

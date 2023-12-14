@@ -1,9 +1,10 @@
 package dmsetup
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"strings"
+	"io"
 
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
 )
@@ -42,12 +43,17 @@ func (dmsetup *HostDmsetup) Remove(deviceName string) error {
 	args := []string{"remove"}
 	args = append(args, deviceName)
 	output, err := dmsetup.ExecuteCommandWithOutputAsHost(dmsetup.dmsetup, args...)
-	if err != nil {
-		if strings.Contains(output, "not found") {
-			return ErrReferenceNotFound
-		}
-		return fmt.Errorf("failed to remove the reference from device-mapper %q: %v", deviceName, err)
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	// if err != nil (ExitCode != 0), we can check the cmd output to verify if we have a non-found device
+	data, err := io.ReadAll(output)
+	if err != nil {
+		return fmt.Errorf("failed to read output from device-mapper %q: %w", deviceName, err)
+	}
+	if bytes.Contains(data, []byte("not found")) {
+		return ErrReferenceNotFound
+	}
+	return fmt.Errorf("failed to remove the reference from device-mapper %q: %w", deviceName, err)
 }

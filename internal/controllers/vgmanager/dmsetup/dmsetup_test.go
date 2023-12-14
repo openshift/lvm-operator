@@ -3,6 +3,8 @@ package dmsetup
 import (
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	mockExec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
@@ -21,16 +23,16 @@ func TestRemove(t *testing.T) {
 	}
 
 	executor := &mockExec.MockExecutor{
-		MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (string, error) {
+		MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
 			if args[0] != "remove" {
-				return "", fmt.Errorf("invalid args %q", args[0])
+				return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0])
 			}
 			if args[1] == "/dev/loop1" {
-				return "", nil
+				return io.NopCloser(strings.NewReader("")), nil
 			} else if args[1] == "/dev/loop2" {
-				return "device loop2 not found", errors.New("device loop2 not found")
+				return io.NopCloser(strings.NewReader("device loop2 not found")), errors.New("device loop2 not found")
 			}
-			return "", fmt.Errorf("invalid args %q", args[1])
+			return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[1])
 		},
 	}
 

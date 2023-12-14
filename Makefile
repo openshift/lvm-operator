@@ -44,46 +44,6 @@ OPERATOR_SDK_VERSION ?= 1.32.0
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
-TOPOLVM_CSI_IMAGE ?= quay.io/lvms_dev/topolvm:latest
-RBAC_PROXY_IMAGE ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
-CSI_REGISTRAR_IMAGE ?= k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.7.0
-CSI_PROVISIONER_IMAGE ?= k8s.gcr.io/sig-storage/csi-provisioner:v3.4.1
-CSI_LIVENESSPROBE_IMAGE ?= k8s.gcr.io/sig-storage/livenessprobe:v2.9.0
-CSI_RESIZER_IMAGE ?= k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
-CSI_SNAPSHOTTER_IMAGE ?= k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
-
-define MANAGER_ENV_VARS
-OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE)
-TOPOLVM_CSI_IMAGE=$(TOPOLVM_CSI_IMAGE)
-RBAC_PROXY_IMAGE=$(RBAC_PROXY_IMAGE)
-CSI_REGISTRAR_IMAGE=$(CSI_REGISTRAR_IMAGE)
-CSI_PROVISIONER_IMAGE=$(CSI_PROVISIONER_IMAGE)
-CSI_LIVENESSPROBE_IMAGE=$(CSI_LIVENESSPROBE_IMAGE)
-CSI_RESIZER_IMAGE=$(CSI_RESIZER_IMAGE)
-CSI_SNAPSHOTTER_IMAGE=$(CSI_SNAPSHOTTER_IMAGE)
-endef
-export MANAGER_ENV_VARS
-
-update-mgr-env: ## Feed environment variables to the manager ConfigMap.
-	@echo "$$MANAGER_ENV_VARS" > config/manager/manager.env
-	cp config/default/manager_custom_env.yaml.in config/default/manager_custom_env.yaml
-ifeq ($(UNAME), Darwin)
-	sed -i '' 's|TOPOLVM_CSI_IMAGE_VAL|$(TOPOLVM_CSI_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|RBAC_PROXY_IMAGE_VAL|$(RBAC_PROXY_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_LIVENESSPROBE_IMAGE_VAL|$(CSI_LIVENESSPROBE_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_REGISTRAR_IMAGE_VAL|$(CSI_REGISTRAR_IMAGE)|g' config/default/manager_custom_env.yaml
-	sed -i '' 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' config/default/manager_custom_env.yaml
-else
-	sed 's|TOPOLVM_CSI_IMAGE_VAL|$(TOPOLVM_CSI_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|RBAC_PROXY_IMAGE_VAL|$(RBAC_PROXY_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_LIVENESSPROBE_IMAGE_VAL|$(CSI_LIVENESSPROBE_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_PROVISIONER_IMAGE_VAL|$(CSI_PROVISIONER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_RESIZER_IMAGE_VAL|$(CSI_RESIZER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_REGISTRAR_IMAGE_VAL|$(CSI_REGISTRAR_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-	sed 's|CSI_SNAPSHOTTER_IMAGE_VAL|$(CSI_SNAPSHOTTER_IMAGE)|g' --in-place config/default/manager_custom_env.yaml
-endif
 
 ## Variables for the images
 
@@ -208,12 +168,12 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: update-mgr-env manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-deploy-debug: update-mgr-env manifests kustomize ## Deploy controller started through delve to the K8s cluster specified in ~/.kube/config. See CONTRIBUTING.md for more information
+deploy-debug: manifests kustomize ## Deploy controller started through delve to the K8s cluster specified in ~/.kube/config. See CONTRIBUTING.md for more information
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
 	$(KUSTOMIZE) build config/debug | kubectl apply -f -
@@ -240,7 +200,7 @@ else
 endif
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle: manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
