@@ -82,9 +82,20 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 			ds.Spec.Template.ObjectMeta.Labels[key] = value
 		}
 
+		initMapIfNil(&ds.ObjectMeta.Annotations)
+		for key, value := range dsTemplate.Annotations {
+			ds.ObjectMeta.Annotations[key] = value
+		}
+
+		initMapIfNil(&ds.Spec.Template.Annotations)
+		for key, value := range dsTemplate.Spec.Template.Annotations {
+			ds.Spec.Template.Annotations[key] = value
+		}
+
 		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
 		ds.Spec.Template.Spec.Volumes = dsTemplate.Spec.Template.Spec.Volumes
 		ds.Spec.Template.Spec.ServiceAccountName = dsTemplate.Spec.Template.Spec.ServiceAccountName
+		ds.Spec.Template.Spec.PriorityClassName = dsTemplate.Spec.Template.Spec.PriorityClassName
 		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
 
 		if dsTemplate.Spec.Template.Spec.Affinity != nil {

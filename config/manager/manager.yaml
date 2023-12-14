@@ -17,8 +17,6 @@ kind: Deployment
 metadata:
   name: operator
   namespace: system
-  annotations:
-    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
   labels:
     app.kubernetes.io/name: lvms-operator
 spec:
@@ -37,6 +35,7 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+      priorityClassName: openshift-user-critical
       containers:
       - command:
         - /lvms

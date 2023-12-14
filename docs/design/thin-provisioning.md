@@ -46,7 +46,7 @@ The LVMS will create a thin pool LV in the Volume Group in order to create thinl
 
     +   // OverProvisionRatio represents the ratio of overprovision that can
     +   // be allowed on thin pools
-    +   // +kubebuilder:validation:Minimum=2
+    +   // +kubebuilder:validation:Minimum=1
     +   OverprovisionRatio int `json:"overprovisionRatio,omitempty"`
     }
 
