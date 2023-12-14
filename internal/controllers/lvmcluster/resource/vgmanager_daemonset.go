@@ -324,21 +324,22 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 	}
 	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        VGManagerUnit,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels:      labels,
+			Name:      VGManagerUnit,
+			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 
 				Spec: corev1.PodSpec{
-					Volumes:    volumes,
-					Containers: containers,
+					PriorityClassName: constants.PriorityClassNameUserCritical,
+					Volumes:           volumes,
+					Containers:        containers,
 					// to read /proc/1/mountinfo
 					HostPID:            true,
 					Tolerations:        tolerations,

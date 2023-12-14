@@ -752,7 +752,15 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
 		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(blockDevices, nil)
+		instances.LVM.EXPECT().ListVGs().Once().Return(nil, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+		Expect(instances.client.Get(ctx, client.ObjectKey{
+			Namespace: instances.namespace.GetName(),
+			Name:      instances.node.GetName(),
+		}, nodeStatus)).To(Succeed())
+		Expect(nodeStatus.Spec.LVMVGStatus).To(HaveLen(1))
+		Expect(nodeStatus.Spec.LVMVGStatus[0].Status).To(Equal(lvmv1alpha1.VGStatusFailed))
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("unable to validate device"))
 	})
@@ -771,7 +779,6 @@ func testReconcileFailure(ctx context.Context) {
 		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
-		instances.LVM.EXPECT().ListVGs().Once().Return(nil, nil)
 		instances.LVM.EXPECT().ListPVs("").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
@@ -805,9 +812,10 @@ func testReconcileFailure(ctx context.Context) {
 				IsUsableLoopDev: false,
 			},
 		}, nil)
-		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("mocked error"))
+		expectedError := fmt.Errorf("mocked error")
+		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, expectedError)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(expectedError))
 	})
 }
 
