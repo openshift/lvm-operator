@@ -752,7 +752,15 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
 		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(blockDevices, nil)
+		instances.LVM.EXPECT().ListVGs().Once().Return(nil, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+		Expect(instances.client.Get(ctx, client.ObjectKey{
+			Namespace: instances.namespace.GetName(),
+			Name:      instances.node.GetName(),
+		}, nodeStatus)).To(Succeed())
+		Expect(nodeStatus.Spec.LVMVGStatus).To(HaveLen(1))
+		Expect(nodeStatus.Spec.LVMVGStatus[0].Status).To(Equal(lvmv1alpha1.VGStatusFailed))
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("unable to validate device"))
 	})
