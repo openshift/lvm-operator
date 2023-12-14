@@ -779,7 +779,6 @@ func testReconcileFailure(ctx context.Context) {
 		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
-		instances.LVM.EXPECT().ListVGs().Once().Return(nil, nil)
 		instances.LVM.EXPECT().ListPVs("").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
@@ -813,9 +812,10 @@ func testReconcileFailure(ctx context.Context) {
 				IsUsableLoopDev: false,
 			},
 		}, nil)
-		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("mocked error"))
+		expectedError := fmt.Errorf("mocked error")
+		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, expectedError)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(expectedError))
 	})
 }
 
