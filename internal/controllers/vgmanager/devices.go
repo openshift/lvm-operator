@@ -84,17 +84,16 @@ type FilteredBlockDevices struct {
 
 // filterDevices returns:
 // availableDevices: the list of blockdevices considered available
-func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters filter.Filters) *FilteredBlockDevices {
+func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDevice, pvs []lvm.PhysicalVolume, bdi lsblk.BlockDeviceInfos, filters filter.Filters) FilteredBlockDevices {
 	logger := log.FromContext(ctx)
 
 	var availableDevices []lsblk.BlockDevice
 	excludedByKName := make(map[string]FilteredBlockDevice)
 
 	for _, device := range devices {
-		logger := logger.WithValues("device.KName", device.KName)
 		// check for partitions recursively
 		if device.HasChildren() {
-			filteredChildDevices := r.filterDevices(ctx, device.Children, filters)
+			filteredChildDevices := r.filterDevices(ctx, device.Children, pvs, bdi, filters)
 			availableDevices = append(availableDevices, filteredChildDevices.Available...)
 			for _, excludedChildDevice := range filteredChildDevices.Excluded {
 				if excluded, ok := excludedByKName[excludedChildDevice.KName]; ok {
@@ -105,11 +104,11 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 			}
 		}
 
-		var filterErrs []error
+		filterErrs := make([]error, 0, len(filters))
 		for name, filterFunc := range filters {
-			logger := logger.WithValues("filter.Name", name)
-			if err := filterFunc(device); err != nil {
-				logger.Info("excluded", "reason", err)
+			if err := filterFunc(device, pvs, bdi); err != nil {
+				logger.WithValues("device.KName", device.KName, "filter.Name", name).
+					V(3).Info("excluded", "reason", err)
 				filterErrs = append(filterErrs, err)
 			}
 		}
@@ -131,7 +130,7 @@ func (r *Reconciler) filterDevices(ctx context.Context, devices []lsblk.BlockDev
 		excluded = append(excluded, device)
 	}
 
-	return &FilteredBlockDevices{
+	return FilteredBlockDevices{
 		Available: availableDevices,
 		Excluded:  excluded,
 	}

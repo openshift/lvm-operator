@@ -101,14 +101,6 @@ var _ = Describe("LVMCluster controller", func() {
 	vgManagerDaemonset := &appsv1.DaemonSet{}
 	vgManagerNamespacedName := types.NamespacedName{Name: resource.VGManagerUnit, Namespace: testLvmClusterNamespace}
 
-	// Topolvm Controller Deployment
-	controllerName := types.NamespacedName{Name: constants.TopolvmControllerDeploymentName, Namespace: testLvmClusterNamespace}
-	controllerOut := &appsv1.Deployment{}
-
-	// CSI Node resource
-	csiNodeName := types.NamespacedName{Namespace: testLvmClusterNamespace, Name: constants.TopolvmNodeDaemonsetName}
-	csiNodeOut := &appsv1.DaemonSet{}
-
 	lvmVolumeGroupName := types.NamespacedName{Namespace: testLvmClusterNamespace, Name: testDeviceClassName}
 	lvmVolumeGroupOut := &lvmv1alpha1.LVMVolumeGroup{}
 
@@ -170,16 +162,6 @@ var _ = Describe("LVMCluster controller", func() {
 				return k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
 			}).WithContext(ctx).Should(Succeed())
 
-			By("confirming presence of TopoLVM Controller Deployment")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, controllerName, controllerOut)
-			}).WithContext(ctx).Should(Succeed())
-
-			By("confirming the existence of CSI Node resource")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, csiNodeName, csiNodeOut)
-			}).WithContext(ctx).Should(Succeed())
-
 			By("confirming the existence of LVMVolumeGroup resource")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
@@ -229,26 +211,6 @@ var _ = Describe("LVMCluster controller", func() {
 			Expect(k8sClient.Delete(ctx, vgManagerDaemonset)).To(Succeed(), "simulated ownerref cleanup should succeed")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, vgManagerNamespacedName, vgManagerDaemonset)
-			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
-
-			// envtest does not support garbage collection, so we simulate the deletion
-			// see https://book.kubebuilder.io/reference/envtest.html?highlight=considerations#testing-considerations
-			By("confirming TopoLVM controller resource has owner reference of LVMCluster")
-			Expect(k8sClient.Get(ctx, controllerName, controllerOut)).Should(Succeed())
-			Expect(controllerOut.OwnerReferences).To(containLVMClusterOwnerRefField)
-			Expect(k8sClient.Delete(ctx, controllerOut)).To(Succeed(), "simulated ownerref cleanup should succeed")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, controllerName, controllerOut)
-			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
-
-			// envtest does not support garbage collection, so we simulate the deletion
-			// see https://book.kubebuilder.io/reference/envtest.html?highlight=considerations#testing-considerations
-			By("confirming TopoLVM Node DaemonSet has owner reference of LVMCluster")
-			Expect(k8sClient.Get(ctx, csiNodeName, csiNodeOut)).Should(Succeed())
-			Expect(csiNodeOut.OwnerReferences).To(containLVMClusterOwnerRefField)
-			Expect(k8sClient.Delete(ctx, csiNodeOut)).To(Succeed(), "simulated ownerref cleanup should succeed")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, csiNodeName, csiNodeOut)
 			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
 			By("confirming absence of LVMVolumeGroup Resource")

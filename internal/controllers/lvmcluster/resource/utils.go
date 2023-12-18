@@ -69,22 +69,3 @@ func verifyDaemonSetReadiness(ds *appsv1.DaemonSet) error {
 	}
 	return nil
 }
-
-func verifyDeploymentReadiness(dep *appsv1.Deployment) error {
-	if len(dep.Status.Conditions) == 0 {
-		return fmt.Errorf("the Deployment %s/%s is not ready as no condition was found", dep.Namespace, dep.Name)
-	}
-	for _, condition := range dep.Status.Conditions {
-		if condition.Type == appsv1.DeploymentAvailable && condition.Status == corev1.ConditionFalse {
-			return fmt.Errorf("the Deployment %s/%s has not reached minimum availability and is not ready: %v",
-				dep.Namespace, dep.Name, condition)
-		} else if condition.Type == appsv1.DeploymentProgressing && condition.Status == corev1.ConditionFalse {
-			return fmt.Errorf("the Deployment %s/%s has not progressed and is not ready: %v",
-				dep.Namespace, dep.Name, condition)
-		} else if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-			return fmt.Errorf("the Deployment %s/%s has a replica failure and is not ready: %v",
-				dep.Namespace, dep.Name, condition)
-		}
-	}
-	return nil
-}

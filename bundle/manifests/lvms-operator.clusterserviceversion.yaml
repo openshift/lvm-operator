@@ -118,12 +118,15 @@ spec:
           resources:
           - deployments
           verbs:
-          - create
-          - delete
           - get
           - list
-          - update
           - watch
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          verbs:
+          - get
         - apiGroups:
           - config.openshift.io
           resources:
@@ -131,13 +134,39 @@ spec:
           verbs:
           - get
         - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - ""
           resources:
           - events
           verbs:
           - create
+          - list
           - patch
           - update
+          - watch
         - apiGroups:
           - ""
           resources:
@@ -153,12 +182,15 @@ spec:
           verbs:
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - ""
           resources:
           - persistentvolumeclaims
           verbs:
+          - delete
           - get
           - list
           - update
@@ -166,10 +198,19 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - persistentvolumeclaims/status
+          verbs:
+          - patch
+        - apiGroups:
+          - ""
+          resources:
           - persistentvolumes
           verbs:
+          - create
+          - delete
           - get
           - list
+          - patch
           - update
           - watch
         - apiGroups:
@@ -177,6 +218,7 @@ spec:
           resources:
           - pods
           verbs:
+          - delete
           - get
           - list
           - watch
@@ -278,7 +320,32 @@ spec:
           - delete
           - get
           - list
+          - update
           - watch
+        - apiGroups:
+          - snapshot.storage.k8s.io
+          resources:
+          - volumesnapshotcontents
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - snapshot.storage.k8s.io
+          resources:
+          - volumesnapshotcontents/status
+          verbs:
+          - patch
+          - update
+        - apiGroups:
+          - snapshot.storage.k8s.io
+          resources:
+          - volumesnapshots
+          verbs:
+          - get
+          - list
         - apiGroups:
           - storage.k8s.io
           resources:
@@ -288,6 +355,27 @@ spec:
           - delete
           - get
           - list
+          - update
+          - watch
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - csinodes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - csistoragecapacities
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - storage.k8s.io
@@ -298,14 +386,39 @@ spec:
           - delete
           - get
           - list
+          - update
+          - watch
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - volumeattachments
+          verbs:
+          - get
+          - list
           - watch
         - apiGroups:
           - topolvm.io
           resources:
           - logicalvolumes
           verbs:
+          - create
+          - delete
           - get
           - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - topolvm.io
+          resources:
+          - logicalvolumes/status
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - authentication.k8s.io
@@ -322,209 +435,17 @@ spec:
         serviceAccountName: lvms-operator
       - rules:
         - apiGroups:
-          - ""
+          - authentication.k8s.io
           resources:
-          - nodes
+          - tokenreviews
           verbs:
-          - get
-          - list
-          - watch
-          - patch
-          - update
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - get
-          - list
-          - watch
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims
-          verbs:
-          - get
-          - list
-          - watch
-          - update
-          - delete
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - storageclasses
-          - csidrivers
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - topolvm.io
-          resources:
-          - logicalvolumes
-          - logicalvolumes/status
-          verbs:
-          - get
-          - list
-          - watch
           - create
-          - update
-          - patch
-          - delete
         - apiGroups:
-          - ""
+          - authorization.k8s.io
           resources:
-          - persistentvolumes
+          - subjectaccessreviews
           verbs:
-          - get
-          - list
-          - watch
           - create
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims
-          verbs:
-          - get
-          - list
-          - watch
-          - update
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - storageclasses
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - list
-          - watch
-          - create
-          - update
-          - patch
-        - apiGroups:
-          - snapshot.storage.k8s.io
-          resources:
-          - volumesnapshots
-          verbs:
-          - get
-          - list
-        - apiGroups:
-          - snapshot.storage.k8s.io
-          resources:
-          - volumesnapshotcontents
-          verbs:
-          - get
-          - list
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - csinodes
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - nodes
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - volumeattachments
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumes
-          verbs:
-          - get
-          - list
-          - watch
-          - patch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims/status
-          verbs:
-          - patch
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - list
-          - watch
-          - create
-          - update
-          - patch
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - watch
-          - list
-          - update
-          - create
-          - patch
-        - apiGroups:
-          - snapshot.storage.k8s.io
-          resources:
-          - volumesnapshotclasses
-          verbs:
-          - get
-          - watch
-          - list
-        - apiGroups:
-          - snapshot.storage.k8s.io
-          resources:
-          - volumesnapshotcontents
-          verbs:
-          - get
-          - watch
-          - list
-          - update
-          - patch
-        - apiGroups:
-          - snapshot.storage.k8s.io
-          resources:
-          - volumesnapshotcontents/status
-          verbs:
-          - update
-          - patch
-        serviceAccountName: topolvm-controller
-      - rules:
         - apiGroups:
           - ""
           resources:
@@ -556,40 +477,6 @@ spec:
           - get
           - list
           - watch
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
-        serviceAccountName: topolvm-node
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - nodes
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
         serviceAccountName: vg-manager
       deployments:
       - label:
@@ -618,25 +505,17 @@ spec:
                 - /lvms
                 - operator
                 env:
-                - name: TOPOLVM_CSI_IMAGE
-                  value: quay.io/lvms_dev/topolvm:latest
-                - name: RBAC_PROXY_IMAGE
-                  value: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
-                - name: CSI_LIVENESSPROBE_IMAGE
-                  value: k8s.gcr.io/sig-storage/livenessprobe:v2.9.0
-                - name: CSI_PROVISIONER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-provisioner:v3.4.1
-                - name: CSI_REGISTRAR_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.7.0
-                - name: CSI_RESIZER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-resizer:v1.7.0
-                - name: CSI_SNAPSHOTTER_IMAGE
-                  value: k8s.gcr.io/sig-storage/csi-snapshotter:v6.2.1
-                - name: POD_NAMESPACE
+                - name: GOGC
+                  value: "120"
+                - name: GOMEMLIMIT
+                  value: 50MiB
+                - name: GOMAXPROCS
+                  value: "2"
+                - name: NAMESPACE
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                - name: POD_NAME
+                - name: NAME
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
@@ -645,23 +524,17 @@ spec:
                   httpGet:
                     path: /healthz
                     port: 8081
-                  initialDelaySeconds: 15
+                  initialDelaySeconds: 10
                   periodSeconds: 20
                 name: manager
                 ports:
                 - containerPort: 9443
                   name: webhook-server
                   protocol: TCP
-                readinessProbe:
-                  httpGet:
-                    path: /readyz
-                    port: 8081
-                  initialDelaySeconds: 5
-                  periodSeconds: 10
                 resources:
                   requests:
-                    cpu: 3m
-                    memory: 30Mi
+                    cpu: 5m
+                    memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                 volumeMounts:
@@ -671,11 +544,13 @@ spec:
                 - mountPath: /tmp/k8s-metrics-server/serving-certs
                   name: metrics-cert
                   readOnly: true
+                - mountPath: /run/topolvm
+                  name: socket-dir
               priorityClassName: openshift-user-critical
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator
-              terminationGracePeriodSeconds: 10
+              terminationGracePeriodSeconds: 60
               volumes:
               - name: cert
                 secret:
@@ -685,6 +560,8 @@ spec:
                 secret:
                   defaultMode: 420
                   secretName: lvms-operator-metrics-cert
+              - emptyDir: {}
+                name: socket-dir
       permissions:
       - rules:
         - apiGroups:
@@ -719,75 +596,6 @@ spec:
           - create
           - patch
         serviceAccountName: lvms-operator
-      - rules:
-        - apiGroups:
-          - coordination.k8s.io
-          resources:
-          - leases
-          verbs:
-          - get
-          - watch
-          - list
-          - delete
-          - update
-          - create
-        - apiGroups:
-          - storage.k8s.io
-          resources:
-          - csistoragecapacities
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - get
-        - apiGroups:
-          - apps
-          resources:
-          - replicasets
-          verbs:
-          - get
-        - apiGroups:
-          - coordination.k8s.io
-          resources:
-          - leases
-          verbs:
-          - get
-          - watch
-          - list
-          - delete
-          - update
-          - create
-        - apiGroups:
-          - ""
-          - coordination.k8s.io
-          resources:
-          - configmaps
-          - leases
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        serviceAccountName: topolvm-controller
       - rules:
         - apiGroups:
           - lvm.topolvm.io

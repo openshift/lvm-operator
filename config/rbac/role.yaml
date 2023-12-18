@@ -21,12 +21,15 @@ rules:
   resources:
   - deployments
   verbs:
-  - create
-  - delete
   - get
   - list
-  - update
   - watch
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
 - apiGroups:
   - config.openshift.io
   resources:
@@ -34,13 +37,39 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ""
   resources:
   - events
   verbs:
   - create
+  - list
   - patch
   - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -56,12 +85,15 @@ rules:
   verbs:
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
   resources:
   - persistentvolumeclaims
   verbs:
+  - delete
   - get
   - list
   - update
@@ -69,10 +101,19 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims/status
+  verbs:
+  - patch
+- apiGroups:
+  - ""
+  resources:
   - persistentvolumes
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -80,6 +121,7 @@ rules:
   resources:
   - pods
   verbs:
+  - delete
   - get
   - list
   - watch
@@ -181,7 +223,32 @@ rules:
   - delete
   - get
   - list
+  - update
   - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - get
+  - list
 - apiGroups:
   - storage.k8s.io
   resources:
@@ -191,6 +258,27 @@ rules:
   - delete
   - get
   - list
+  - update
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csinodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csistoragecapacities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - storage.k8s.io
@@ -201,12 +289,37 @@ rules:
   - delete
   - get
   - list
+  - update
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - topolvm.io
   resources:
   - logicalvolumes
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - topolvm.io
+  resources:
+  - logicalvolumes/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch

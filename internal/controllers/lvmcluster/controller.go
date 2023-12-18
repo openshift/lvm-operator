@@ -54,6 +54,7 @@ const (
 	EventReasonResourceReconciliationSuccess     EventReasonInfo  = "ResourceReconciliationSuccess"
 
 	lvmClusterFinalizer = "lvmcluster.topolvm.io"
+	podNameEnv          = "NAME"
 )
 
 // Reconciler reconciles a LVMCluster object
@@ -106,6 +107,8 @@ func (r *Reconciler) GetLogPassthroughOptions() *logpassthrough.Options {
 
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmclusters/finalizers,verbs=update
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups,verbs=get;list;watch;create;update;patch;delete
@@ -116,9 +119,26 @@ func (r *Reconciler) GetLogPassthroughOptions() *logpassthrough.Options {
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
-//+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes/status,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;delete
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;patch;update
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;update;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=patch
+//+kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=csinodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=volumeattachments,verbs=get;list;watch
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=csistoragecapacities,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list
+//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotcontents,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotcontents/status,verbs=update;patch
+//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotcontents/status,verbs=update;patch
+//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -200,8 +220,6 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 
 	resources := []resource.Manager{
 		resource.CSIDriver(),
-		resource.TopoLVMController(),
-		resource.TopoLVMNode(),
 		resource.VGManager(),
 		resource.LVMVGs(),
 		resource.TopoLVMStorageClass(),
@@ -364,10 +382,10 @@ func (r *Reconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alph
 func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 
 	if r.ImageName == "" {
-		// 'POD_NAME' and 'POD_NAMESPACE' are set in env of lvm-operator when running as a container
-		podName := os.Getenv(resource.PodNameEnv)
+		// 'NAME' and 'NAMESPACE' are set in env of lvm-operator when running as a container
+		podName := os.Getenv(podNameEnv)
 		if podName == "" {
-			return fmt.Errorf("failed to get pod name env variable, %s env variable is not set", resource.PodNameEnv)
+			return fmt.Errorf("failed to get pod name env variable, %s env variable is not set", podNameEnv)
 		}
 
 		pod := &corev1.Pod{}
@@ -404,9 +422,7 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 		resourceDeletionList := []resource.Manager{
 			resource.TopoLVMStorageClass(),
 			resource.LVMVGs(),
-			resource.TopoLVMController(),
 			resource.CSIDriver(),
-			resource.TopoLVMNode(),
 			resource.VGManager(),
 		}
 

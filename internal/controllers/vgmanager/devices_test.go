@@ -33,7 +33,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 
 	r := &Reconciler{}
 
-	filters := filter.DefaultFilters(nil, nil, nil)
+	filters := filter.DefaultFilters(nil)
 	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
 	delete(filters, "noBindMounts")
 
@@ -587,7 +587,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 			}
-			devices := r.filterDevices(ctx, availableDevices, filters)
+			devices := r.filterDevices(ctx, availableDevices, nil, nil, filters)
 			if !tc.expectError {
 				assert.NoError(t, err)
 			} else {

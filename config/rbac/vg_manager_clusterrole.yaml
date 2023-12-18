@@ -12,15 +12,26 @@ rules:
   - get
   - list
   - watch
+  - update
+  - patch
 - apiGroups:
-    - authentication.k8s.io
+    - topolvm.io
   resources:
-    - tokenreviews
+    - logicalvolumes
+    - logicalvolumes/status
   verbs:
+    - get
+    - list
+    - watch
     - create
+    - update
+    - delete
+    - patch
 - apiGroups:
-    - authorization.k8s.io
+    - storage.k8s.io
   resources:
-    - subjectaccessreviews
+    - csidrivers
   verbs:
-    - create
+    - get
+    - list
+    - watch
