@@ -2,6 +2,9 @@
 BASE_COLLECTION_PATH="must-gather"
 mkdir -p ${BASE_COLLECTION_PATH}
 
+# Store PIDs of all the subprocesses
+pids=()
+
 # Command line argument
 SINCE_TIME=$1
 
@@ -11,9 +14,18 @@ start=$(date +%s)
 printf "collection started at: %s \n" "${START_TIME}" >>${BASE_COLLECTION_PATH}/gather-debug.log 2>&1
 
 # Call other gather scripts
-gather_node_info ${BASE_COLLECTION_PATH} "${SINCE_TIME}"
-gather_namespaced_resources ${BASE_COLLECTION_PATH} "${SINCE_TIME}"
-gather_clusterscoped_resources ${BASE_COLLECTION_PATH} "${SINCE_TIME}"
+gather_node_info ${BASE_COLLECTION_PATH} "${SINCE_TIME}" &
+pids+=($!)
+gather_namespaced_resources ${BASE_COLLECTION_PATH} "${SINCE_TIME}" &
+pids+=($!)
+gather_clusterscoped_resources ${BASE_COLLECTION_PATH} "${SINCE_TIME}" &
+pids+=($!)
+
+# Check if PID array has any values, if so, wait for them to finish
+if [ ${#pids[@]} -ne 0 ]; then
+    echo "Waiting on subprocesses to finish execution."
+    wait "${pids[@]}"
+fi
 
 # timestamp for ending of the script
 END_TIME=$(date +%r)
