@@ -2,6 +2,7 @@ package vgmanager
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/openshift/lvm-operator/api/v1alpha1"
@@ -172,6 +173,12 @@ func TestWipeDevices(t *testing.T) {
 	}
 	mockWipefs := wipefsmocks.NewMockWipefs(t)
 	mockDmsetup := dmsetupmocks.NewMockDmsetup(t)
+	evalSymlinks = func(path string) (string, error) {
+		return path, nil
+	}
+	defer func() {
+		evalSymlinks = filepath.EvalSymlinks
+	}()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Reconciler{Wipefs: mockWipefs, Dmsetup: mockDmsetup}

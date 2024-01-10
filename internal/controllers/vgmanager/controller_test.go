@@ -717,6 +717,12 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering wipefs failure", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
 		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
@@ -727,6 +733,12 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering lsblk failure after wipefs", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
 		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
@@ -738,6 +750,12 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering failure on fetching new devices to add to volume group", func() {
+		evalSymlinks = func(path string) (string, error) {
+			return path, nil
+		}
+		defer func() {
+			evalSymlinks = filepath.EvalSymlinks
+		}()
 		blockDevices := []lsblk.BlockDevice{
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
