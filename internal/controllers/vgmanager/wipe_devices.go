@@ -20,10 +20,14 @@ func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lv
 
 	wiped := false
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-		if isDeviceAlreadyPartOfVG(nodeStatus, path, volumeGroup) { // Do not only check the vg devices, but also node status device paths
+		diskName, err := evalSymlinks(path)
+		if err != nil {
+			return false, fmt.Errorf("unable to find symlink for disk path %s: %v", path, err)
+		}
+		if isDeviceAlreadyPartOfVG(nodeStatus, diskName, volumeGroup) {
 			continue
 		}
-		deviceWiped, err := r.wipeDevice(ctx, path, blockDevices)
+		deviceWiped, err := r.wipeDevice(ctx, diskName, blockDevices)
 		if err != nil {
 			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
 		}
@@ -32,10 +36,15 @@ func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lv
 		}
 	}
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
-		if isDeviceAlreadyPartOfVG(nodeStatus, path, volumeGroup) {
+		diskName, err := evalSymlinks(path)
+		if err != nil {
+			logger.Info(fmt.Sprintf("skipping wiping optional device %s as unable to find symlink: %v", path, err))
 			continue
 		}
-		deviceWiped, err := r.wipeDevice(ctx, path, blockDevices)
+		if isDeviceAlreadyPartOfVG(nodeStatus, diskName, volumeGroup) {
+			continue
+		}
+		deviceWiped, err := r.wipeDevice(ctx, diskName, blockDevices)
 		if err != nil {
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
 		}
