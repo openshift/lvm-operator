@@ -126,6 +126,11 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 		existing.ObjectMeta.Annotations[key] = value
 	}
 
+	initMapIfNil(&existing.Spec.Template.Annotations)
+	for key, value := range desired.Spec.Template.Annotations {
+		existing.Spec.Template.Annotations[key] = value
+	}
+
 	return nil
 }
 
@@ -163,10 +168,9 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        TopolvmControllerDeploymentName,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels:      labels,
+			Name:      TopolvmControllerDeploymentName,
+			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -175,9 +179,10 @@ func getControllerDeployment(lvmCluster *lvmv1alpha1.LVMCluster, namespace strin
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      TopolvmControllerDeploymentName,
-					Namespace: namespace,
-					Labels:    labels,
+					Name:        TopolvmControllerDeploymentName,
+					Namespace:   namespace,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
 					InitContainers:     initContainers,
