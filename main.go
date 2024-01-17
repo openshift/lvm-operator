@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	secv1client "github.com/openshift/client-go/security/clientset/versioned/typed/security/v1"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"

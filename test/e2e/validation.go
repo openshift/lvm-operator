@@ -22,7 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/gomega"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
