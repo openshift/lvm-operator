@@ -17,7 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	k8sv1 "k8s.io/api/core/v1"
 )
 

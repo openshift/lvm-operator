@@ -24,6 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -45,69 +46,69 @@ func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (l *LVMCluster) ValidateCreate() error {
+func (l *LVMCluster) ValidateCreate() (admission.Warnings, error) {
 	lvmclusterlog.Info("validate create", "name", l.Name)
 
 	err := l.verifySingleDefaultDeviceClass()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyPathsAreNotEmpty()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyAbsolutePath()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyNoDeviceOverlap()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyFstype()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
-	return nil
+	return admission.Warnings{}, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
+func (l *LVMCluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	lvmclusterlog.Info("validate update", "name", l.Name)
 
 	err := l.verifySingleDefaultDeviceClass()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyPathsAreNotEmpty()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyAbsolutePath()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyNoDeviceOverlap()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	err = l.verifyFstype()
 	if err != nil {
-		return err
+		return admission.Warnings{}, err
 	}
 
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
-		return fmt.Errorf("Failed to parse LVMCluster.")
+		return admission.Warnings{}, fmt.Errorf("Failed to parse LVMCluster.")
 	}
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -119,16 +120,16 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 
 		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && err != ErrDeviceClassNotFound) ||
 			(newThinPoolConfig == nil && oldThinPoolConfig != nil) {
-			return fmt.Errorf("ThinPoolConfig can not be changed")
+			return admission.Warnings{}, fmt.Errorf("ThinPoolConfig can not be changed")
 		}
 
 		if newThinPoolConfig != nil && oldThinPoolConfig != nil {
 			if newThinPoolConfig.Name != oldThinPoolConfig.Name {
-				return fmt.Errorf("ThinPoolConfig.Name can not be changed")
+				return admission.Warnings{}, fmt.Errorf("ThinPoolConfig.Name can not be changed")
 			} else if newThinPoolConfig.SizePercent != oldThinPoolConfig.SizePercent {
-				return fmt.Errorf("ThinPoolConfig.SizePercent can not be changed")
+				return admission.Warnings{}, fmt.Errorf("ThinPoolConfig.SizePercent can not be changed")
 			} else if newThinPoolConfig.OverprovisionRatio != oldThinPoolConfig.OverprovisionRatio {
-				return fmt.Errorf("ThinPoolConfig.OverprovisionRatio can not be changed")
+				return admission.Warnings{}, fmt.Errorf("ThinPoolConfig.OverprovisionRatio can not be changed")
 			}
 		}
 
@@ -146,28 +147,28 @@ func (l *LVMCluster) ValidateUpdate(old runtime.Object) error {
 
 		// Make sure a device path list was not added
 		if len(oldDevices) == 0 && len(newDevices) > 0 {
-			return fmt.Errorf("invalid: device paths can not be added after a device class has been initialized")
+			return admission.Warnings{}, fmt.Errorf("invalid: device paths can not be added after a device class has been initialized")
 		}
 
 		// Make sure an optionalPaths list was not added
 		if len(oldOptionalDevices) == 0 && len(newOptionalDevices) > 0 {
-			return fmt.Errorf("invalid: optional device paths can not be added after a device class has been initialized")
+			return admission.Warnings{}, fmt.Errorf("invalid: optional device paths can not be added after a device class has been initialized")
 		}
 
 		// Validate all the old paths still exist
 		err := validateDevicePathsStillExist(oldDevices, newDevices)
 		if err != nil {
-			return fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %v", err)
+			return admission.Warnings{}, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %v", err)
 		}
 
 		// Validate all the old optional paths still exist
 		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
 		if err != nil {
-			return fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %v", err)
+			return admission.Warnings{}, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %v", err)
 		}
 	}
 
-	return nil
+	return admission.Warnings{}, nil
 }
 
 func validateDevicePathsStillExist(old, new []string) error {
@@ -190,10 +191,10 @@ func validateDevicePathsStillExist(old, new []string) error {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (l *LVMCluster) ValidateDelete() error {
+func (l *LVMCluster) ValidateDelete() (admission.Warnings, error) {
 	lvmclusterlog.Info("validate delete", "name", l.Name)
 
-	return nil
+	return []string{}, nil
 }
 
 func (l *LVMCluster) verifySingleDefaultDeviceClass() error {

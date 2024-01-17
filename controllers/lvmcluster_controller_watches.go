@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // SetupWithManager sets up the controller with the Manager.
@@ -38,23 +37,23 @@ func (r *LVMClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}).
 		Watches(
-			&source.Kind{Type: &lvmv1alpha1.LVMVolumeGroupNodeStatus{}},
+			&lvmv1alpha1.LVMVolumeGroupNodeStatus{},
 			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
 		).
 		Watches(
-			&source.Kind{Type: &storagev1.StorageClass{}},
+			&storagev1.StorageClass{},
 			handler.EnqueueRequestsFromMapFunc(r.getLVMClusterObjsForReconcile),
 		).
 		Complete(r)
 }
 
-func (r *LVMClusterReconciler) getLVMClusterObjsForReconcile(obj client.Object) []reconcile.Request {
+func (r *LVMClusterReconciler) getLVMClusterObjsForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {
 	foundLVMClusterList := &lvmv1alpha1.LVMClusterList{}
 	listOps := &client.ListOptions{
 		Namespace: obj.GetNamespace(),
 	}
 
-	err := r.Client.List(context.TODO(), foundLVMClusterList, listOps)
+	err := r.Client.List(ctx, foundLVMClusterList, listOps)
 	if err != nil {
 		r.Log.Error(err, "getLVMClusterObjsForReconcile: Failed to get LVMCluster objs")
 		return []reconcile.Request{}
