@@ -93,11 +93,6 @@ func (c topolvmController) EnsureCreated(r Reconciler, ctx context.Context, lvmC
 
 		existingDeployment.Spec.Template.Spec.PriorityClassName = desiredDeployment.Spec.Template.Spec.PriorityClassName
 
-		initMapIfNil(&existingDeployment.ObjectMeta.Annotations)
-		for key, value := range desiredDeployment.Annotations {
-			existingDeployment.ObjectMeta.Annotations[key] = value
-		}
-
 		initMapIfNil(&existingDeployment.Spec.Template.Annotations)
 		for key, value := range desiredDeployment.Spec.Template.Annotations {
 			existingDeployment.Spec.Template.Annotations[key] = value
