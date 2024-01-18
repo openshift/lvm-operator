@@ -40,6 +40,8 @@ func (c openshiftSccs) getName() string {
 	return sccName
 }
 
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;delete;patch
+
 func (c openshiftSccs) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	if !IsOpenshift(r) {
 		r.Log.Info("not creating SCCs as this is not an Openshift cluster")

@@ -165,7 +165,10 @@ rules:
   - create
   - delete
   - get
+  - list
+  - patch
   - update
+  - watch
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:
@@ -175,6 +178,8 @@ rules:
   - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - storage.k8s.io
@@ -185,6 +190,8 @@ rules:
   - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - storage.k8s.io
@@ -195,6 +202,8 @@ rules:
   - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - topolvm.io
