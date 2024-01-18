@@ -49,6 +49,8 @@ func (c openshiftSccs) GetName() string {
 	return sccName
 }
 
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;delete;patch
+
 func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 	sccs := getAllSCCs(r.GetNamespace())
