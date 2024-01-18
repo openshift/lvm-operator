@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
@@ -525,6 +526,8 @@ func testEvents(ctx context.Context) {
 	vg := &lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}
 	vg.SetOwnerReferences([]metav1.OwnerReference{{Name: "owner", Kind: "Owner", UID: "123", APIVersion: "v1alpha1"}})
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+	gvk, _ := apiutil.GVKForObject(nodeStatus, scheme.Scheme)
+	nodeStatus.SetGroupVersionKind(gvk)
 
 	clnt := fake.NewClientBuilder().WithObjects(vg, nodeStatus).WithScheme(scheme.Scheme).Build()
 	r := &Reconciler{Client: clnt, Scheme: scheme.Scheme, EventRecorder: fakeRecorder, NodeName: nodeStatus.GetName()}
