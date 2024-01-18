@@ -114,24 +114,6 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return ctrl.Result{}, err
 	}
 
-	// Read the lvmd config file
-	lvmdConfig, err := loadLVMDConfig()
-	if err != nil {
-		r.Log.Error(err, "failed to read the lvmd config file")
-		if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, fmt.Sprintf("failed to read the lvmd config file: %v", err.Error())); statuserr != nil {
-			r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
-		}
-		return reconcileAgain, err
-	}
-	if lvmdConfig == nil {
-		// The lvmdconfig file does not exist and will be created.
-		r.Log.Info("lvmd config file doesn't exist, will create")
-		lvmdConfig = &lvmdCMD.Config{
-			SocketName: controllers.DefaultLVMdSocket,
-		}
-	}
-	existingLvmdConfig := *lvmdConfig
-
 	vgs, err := ListVolumeGroups(r.executor)
 	if err != nil {
 		return reconcileAgain, fmt.Errorf("failed to list volume groups. %v", err)
@@ -183,6 +165,11 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 
 		if devicesExist {
 			r.Log.Info("all the available devices are attached to the volume group", "VGName", volumeGroup.Name)
+
+			if err := r.applyLVMDConfig(ctx, volumeGroup); err != nil {
+				return reconcileAgain, err
+			}
+
 			if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
 				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 				return reconcileAgain, statuserr
@@ -220,6 +207,42 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		}
 	}
 
+	if err := r.applyLVMDConfig(ctx, volumeGroup); err != nil {
+		return reconcileAgain, err
+	}
+
+	if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
+		r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
+		return reconcileAgain, nil
+	}
+
+	// requeue faster if some devices are too recently observed to consume
+	requeueAfter := time.Minute * 1
+	if len(delayedDevices) > 0 {
+		requeueAfter = time.Second * 30
+	}
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+func (r *VGReconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
+	// Read the lvmd config file
+	lvmdConfig, err := loadLVMDConfig()
+	if err != nil {
+		r.Log.Error(err, "failed to read the lvmd config file")
+		if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, fmt.Sprintf("failed to read the lvmd config file: %v", err.Error())); statuserr != nil {
+			r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
+		}
+		return err
+	}
+	if lvmdConfig == nil {
+		// The lvmdconfig file does not exist and will be created.
+		r.Log.Info("lvmd config file doesn't exist, will create one")
+		lvmdConfig = &lvmdCMD.Config{
+			SocketName: controllers.DefaultLVMdSocket,
+		}
+	}
+	existingLvmdConfig := *lvmdConfig
+
 	// Add the volume group to device classes inside lvmd config if not exists
 	found := false
 	for _, deviceClass := range lvmdConfig.DeviceClasses {
@@ -252,22 +275,12 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 			if statuserr := r.setVolumeGroupFailedStatus(ctx, volumeGroup.Name, fmt.Sprintf("failed to update lvmd config file: %v", err.Error())); statuserr != nil {
 				r.Log.Error(statuserr, "failed to update status", "name", volumeGroup.Name)
 			}
-			return reconcileAgain, err
+			return err
 		}
 		r.Log.Info("updated lvmd config", "VGName", volumeGroup.Name)
 	}
 
-	if statuserr := r.setVolumeGroupReadyStatus(ctx, volumeGroup.Name); statuserr != nil {
-		r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
-		return reconcileAgain, nil
-	}
-
-	// requeue faster if some devices are too recently observed to consume
-	requeueAfter := time.Minute * 1
-	if len(delayedDevices) > 0 {
-		requeueAfter = time.Second * 30
-	}
-	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	return nil
 }
 
 func (r *VGReconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
