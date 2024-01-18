@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Red Hat Openshift Data Foundation.
+Copyright © 2023 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -118,11 +118,6 @@ func (c topolvmController) setTopolvmControllerDesiredState(existing, desired *a
 	// labels, volumes, service account etc can remain unchanged
 	existing.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 	existing.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
-
-	initMapIfNil(&existing.ObjectMeta.Annotations)
-	for key, value := range desired.Annotations {
-		existing.ObjectMeta.Annotations[key] = value
-	}
 
 	initMapIfNil(&existing.Spec.Template.Annotations)
 	for key, value := range desired.Spec.Template.Annotations {
