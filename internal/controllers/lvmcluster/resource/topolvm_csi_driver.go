@@ -48,7 +48,7 @@ func (c csiDriver) GetName() string {
 	return driverName
 }
 
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list;update;patch
 
 func (c csiDriver) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())

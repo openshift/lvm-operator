@@ -49,7 +49,7 @@ func (s topolvmVolumeSnapshotClass) GetName() string {
 	return vscName
 }
 
-//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;create;delete;watch;list
+//+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;create;delete;watch;list;update;patch
 
 func (s topolvmVolumeSnapshotClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())

@@ -42,6 +42,9 @@ rules:
   - get
   - list
   - watch
+  - create
+  - patch
+  - update
 - apiGroups:
   - topolvm.io
   resources:
