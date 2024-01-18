@@ -177,7 +177,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
 						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(100, resource.DecimalSI),
 							},
@@ -205,7 +205,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
 						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(10, resource.DecimalSI),
 							},
@@ -233,7 +233,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
 						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(10, resource.DecimalSI),
 							},

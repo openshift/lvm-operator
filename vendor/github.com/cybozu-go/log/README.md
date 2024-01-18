@@ -1,8 +1,7 @@
 [![GitHub release](https://img.shields.io/github/release/cybozu-go/log.svg?maxAge=60)][releases]
-[![GoDoc](https://godoc.org/github.com/cybozu-go/log?status.svg)][godoc]
-[![CircleCI](https://circleci.com/gh/cybozu-go/log.svg?style=svg)](https://circleci.com/gh/cybozu-go/log)
+[![CI](https://github.com/cybozu-go/log/actions/workflows/ci.yaml/badge.svg)](https://github.com/cybozu-go/log/actions/workflows/ci.yaml)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/cybozu-go/log)](https://pkg.go.dev/github.com/cybozu-go/log)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cybozu-go/log)](https://goreportcard.com/report/github.com/cybozu-go/log)
-[![License](https://img.shields.io/github/license/cybozu-go/log.svg?maxAge=2592000)](LICENSE)
 
 Logging framework for Go
 ========================
@@ -40,28 +39,17 @@ Features
 
     Only for non-Windows systems.
 
-Requirements
-------------
-
-Go 1.13 or greater is required.
-
 Usage
 -----
 
-Read [the documentation][godoc].
+Read [the documentation](https://pkg.go.dev/github.com/cybozu-go/log).
 
 Log structure
 -------------
 
 Read [SPEC.md](SPEC.md).
 
-License
--------
-
-[MIT](https://opensource.org/licenses/MIT)
-
 [releases]: https://github.com/cybozu-go/log/releases
 [logfmt]: https://brandur.org/logfmt
-[jsonl]: http://jsonlines.org/
+[jsonl]: https://jsonlines.org/
 [golog]: https://golang.org/pkg/log/
-[godoc]: https://godoc.org/github.com/cybozu-go/log

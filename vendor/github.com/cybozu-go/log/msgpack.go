@@ -60,7 +60,7 @@ func appendMsgpackString(b []byte, s string) ([]byte, error) {
 	case len(s) <= math.MaxUint16:
 		b = append(b, byte(mpStr16), 0, 0)
 		binary.BigEndian.PutUint16(b[len(b)-2:], uint16(len(s)))
-	case uint32(len(s)) <= math.MaxUint32:
+	case len(s) <= math.MaxUint32:
 		b = append(b, byte(mpStr32), 0, 0, 0, 0)
 		binary.BigEndian.PutUint32(b[len(b)-4:], uint32(len(s)))
 	}
@@ -75,7 +75,7 @@ func appendMsgpackArray(b []byte, length int) ([]byte, error) {
 		b = append(b, byte(mpArray16), 0, 0)
 		binary.BigEndian.PutUint16(b[len(b)-2:], uint16(length))
 		return b, nil
-	case uint32(length) <= math.MaxUint32:
+	case length <= math.MaxUint32:
 		b = append(b, byte(mpArray32), 0, 0, 0, 0)
 		binary.BigEndian.PutUint32(b[len(b)-4:], uint32(length))
 		return b, nil
@@ -111,7 +111,7 @@ func appendMsgpack(b []byte, v interface{}) ([]byte, error) {
 		case len(t) <= math.MaxUint16:
 			b = append(b, byte(mpBin16), 0, 0)
 			binary.BigEndian.PutUint16(b[len(b)-2:], uint16(len(t)))
-		case uint32(len(t)) <= math.MaxUint32:
+		case len(t) <= math.MaxUint32:
 			b = append(b, byte(mpBin32), 0, 0, 0, 0)
 			binary.BigEndian.PutUint32(b[len(b)-4:], uint32(len(t)))
 		}

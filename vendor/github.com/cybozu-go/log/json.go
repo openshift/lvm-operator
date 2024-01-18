@@ -4,16 +4,16 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 	"unicode/utf8"
 )
 
 // JSONFormat implements Formatter for JSON Lines.
 //
-// http://jsonlines.org/
+// https://jsonlines.org/
 type JSONFormat struct {
 	// Utsname can normally be left blank.
 	// If not empty, the string is used instead of the hostname.
@@ -182,22 +182,18 @@ func appendJSON(buf []byte, v interface{}) ([]byte, error) {
 		if cap(buf) < 256 {
 			return nil, ErrTooLarge
 		}
-		return strconv.AppendFloat(buf, float64(t), 'f', -1, 32), nil
+		return appendFloat(buf, float64(t), 32), nil
 	case float64:
 		if cap(buf) < 256 {
 			return nil, ErrTooLarge
 		}
-		return strconv.AppendFloat(buf, t, 'f', -1, 64), nil
+		return appendFloat(buf, t, 64), nil
 	case string:
-		if !utf8.ValidString(t) {
-			// the next line replaces invalid characters.
-			t = strings.ToValidUTF8(t, string(utf8.RuneError))
-		}
 		// escaped length = 2*len(t) + 2 double quotes
 		if cap(buf) < (len(t)*2 + 2) {
 			return nil, ErrTooLarge
 		}
-		return strconv.AppendQuote(buf, t), nil
+		return appendString(buf, t), nil
 	case json.Marshaler:
 		s, err := t.MarshalJSON()
 		if err != nil {
@@ -222,18 +218,14 @@ func appendJSON(buf []byte, v interface{}) ([]byte, error) {
 		if cap(buf) < (len(s)*2 + 2) {
 			return nil, ErrTooLarge
 		}
-		return strconv.AppendQuote(buf, string(s)), nil
+		return appendString(buf, string(s)), nil
 	case error:
 		s := t.Error()
-		if !utf8.ValidString(s) {
-			// the next line replaces invalid characters.
-			s = strings.ToValidUTF8(s, string(utf8.RuneError))
-		}
 		// escaped length = 2*len(s) + 2 double quotes
 		if cap(buf) < (len(s)*2 + 2) {
 			return nil, ErrTooLarge
 		}
-		return strconv.AppendQuote(buf, s), nil
+		return appendString(buf, s), nil
 	}
 
 	value := reflect.ValueOf(v)
@@ -247,14 +239,14 @@ func appendJSON(buf []byte, v interface{}) ([]byte, error) {
 		}
 		buf = append(buf, '{')
 		first := true
-		for _, k := range value.MapKeys() {
+		for iter := value.MapRange(); iter.Next(); {
 			if !first {
 				if cap(buf) < 1 {
 					return nil, ErrTooLarge
 				}
 				buf = append(buf, ',')
 			}
-			buf, err = appendJSON(buf, k.String())
+			buf, err = appendJSON(buf, iter.Key().String())
 			if err != nil {
 				return nil, err
 			}
@@ -262,7 +254,7 @@ func appendJSON(buf []byte, v interface{}) ([]byte, error) {
 				return nil, ErrTooLarge
 			}
 			buf = append(buf, ':')
-			buf, err = appendJSON(buf, value.MapIndex(k).Interface())
+			buf, err = appendJSON(buf, iter.Value().Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -302,4 +294,66 @@ func appendJSON(buf []byte, v interface{}) ([]byte, error) {
 
 	// other types are just formatted as a string with "%#v".
 	return appendJSON(buf, fmt.Sprintf("%#v", v))
+}
+
+func appendFloat(buf []byte, v float64, bitSize int) []byte {
+	if math.IsNaN(v) {
+		return append(buf, `"NaN"`...)
+	} else if math.IsInf(v, 1) {
+		return append(buf, `"+Inf"`...)
+	} else if math.IsInf(v, -1) {
+		return append(buf, `"-Inf"`...)
+	} else {
+		return strconv.AppendFloat(buf, v, 'f', -1, bitSize)
+	}
+}
+
+// Ref: encodeState#string in encoding/json.
+func appendString(buf []byte, s string) []byte {
+	buf = append(buf, '"')
+	start := 0
+	for i := 0; i < len(s); {
+		if b := s[i]; b < utf8.RuneSelf {
+			if ' ' <= b && b <= '~' && b != '"' && b != '\\' {
+				i++
+				continue
+			}
+			if start < i {
+				buf = append(buf, s[start:i]...)
+			}
+			switch b {
+			case '\\':
+				buf = append(buf, `\\`...)
+			case '"':
+				buf = append(buf, `\"`...)
+			case '\n':
+				buf = append(buf, `\n`...)
+			case '\r':
+				buf = append(buf, `\r`...)
+			case '\t':
+				buf = append(buf, `\t`...)
+			default:
+				const hex = "0123456789abcdef"
+				buf = append(buf, '\\', 'u', '0', '0', hex[b>>4], hex[b&0xF])
+			}
+			i++
+			start = i
+			continue
+		}
+		c, size := utf8.DecodeRuneInString(s[i:])
+		if c == utf8.RuneError && size == 1 {
+			if start < i {
+				buf = append(buf, s[start:i]...)
+			}
+			buf = append(buf, `\ufffd`...)
+			i += size
+			start = i
+			continue
+		}
+		i += size
+	}
+	if start < len(s) {
+		buf = append(buf, s[start:]...)
+	}
+	return append(buf, '"')
 }
