@@ -226,7 +226,10 @@ spec:
           - create
           - delete
           - get
+          - list
+          - patch
           - update
+          - watch
         - apiGroups:
           - snapshot.storage.k8s.io
           resources:
@@ -236,6 +239,8 @@ spec:
           - delete
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - storage.k8s.io
@@ -246,6 +251,8 @@ spec:
           - delete
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - storage.k8s.io
@@ -256,6 +263,8 @@ spec:
           - delete
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - topolvm.io
@@ -317,6 +326,9 @@ spec:
           - get
           - list
           - watch
+          - create
+          - patch
+          - update
         - apiGroups:
           - topolvm.io
           resources:
