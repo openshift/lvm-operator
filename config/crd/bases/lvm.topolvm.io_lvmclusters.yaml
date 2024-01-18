@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: lvmclusters.lvm.topolvm.io
 spec:
   group: lvm.topolvm.io
@@ -20,14 +20,19 @@ spec:
         description: LVMCluster is the Schema for the lvmclusters API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -53,24 +58,24 @@ spec:
                             match for a device to be included in the LVMCluster
                           properties:
                             forceWipeDevicesAndDestroyAllData:
-                              description: ForceWipeDevicesAndDestroyAllData runs
-                                wipefs to wipe the devices. This can lead to data
-                                lose. Enable this only when you know that the disk
+                              description: |-
+                                ForceWipeDevicesAndDestroyAllData runs wipefs to wipe the devices.
+                                This can lead to data lose. Enable this only when you know that the disk
                                 does not contain any important data.
                               type: boolean
                             optionalPaths:
-                              description: A list of device paths which could be chosen
-                                for creating Volume Group. For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
-                                We discourage using the device names as they can change
-                                over node restarts.
+                              description: |-
+                                A list of device paths which could be chosen for creating Volume Group.
+                                For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
+                                We discourage using the device names as they can change over node restarts.
                               items:
                                 type: string
                               type: array
                             paths:
-                              description: A list of device paths which would be chosen
-                                for creating Volume Group. For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
-                                We discourage using the device names as they can change
-                                over node restarts.
+                              description: |-
+                                A list of device paths which would be chosen for creating Volume Group.
+                                For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
+                                We discourage using the device names as they can change over node restarts.
                               items:
                                 type: string
                               type: array
@@ -85,9 +90,10 @@ spec:
                           - ""
                           type: string
                         name:
-                          description: 'Name of the class, the VG and possibly the
-                            storageclass. Validations to confirm that this field can
-                            be used as metadata.name field in storageclass ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209'
+                          description: |-
+                            Name of the class, the VG and possibly the storageclass.
+                            Validations to confirm that this field can be used as metadata.name field in storageclass
+                            ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209
                           maxLength: 245
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -100,39 +106,35 @@ spec:
                               description: Required. A list of node selector terms.
                                 The terms are ORed.
                               items:
-                                description: A null or empty node selector term matches
-                                  no objects. The requirements of them are ANDed.
-                                  The TopologySelectorTerm type implements a subset
-                                  of the NodeSelectorTerm.
+                                description: |-
+                                  A null or empty node selector term matches no objects. The requirements of
+                                  them are ANDed.
+                                  The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
                                 properties:
                                   matchExpressions:
                                     description: A list of node selector requirements
                                       by node's labels.
                                     items:
-                                      description: A node selector requirement is
-                                        a selector that contains values, a key, and
-                                        an operator that relates the key and values.
+                                      description: |-
+                                        A node selector requirement is a selector that contains values, a key, and an operator
+                                        that relates the key and values.
                                       properties:
                                         key:
                                           description: The label key that the selector
                                             applies to.
                                           type: string
                                         operator:
-                                          description: Represents a key's relationship
-                                            to a set of values. Valid operators are
-                                            In, NotIn, Exists, DoesNotExist. Gt, and
-                                            Lt.
+                                          description: |-
+                                            Represents a key's relationship to a set of values.
+                                            Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                           type: string
                                         values:
-                                          description: An array of string values.
-                                            If the operator is In or NotIn, the values
-                                            array must be non-empty. If the operator
-                                            is Exists or DoesNotExist, the values
-                                            array must be empty. If the operator is
-                                            Gt or Lt, the values array must have a
-                                            single element, which will be interpreted
-                                            as an integer. This array is replaced
-                                            during a strategic merge patch.
+                                          description: |-
+                                            An array of string values. If the operator is In or NotIn,
+                                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                            the values array must be empty. If the operator is Gt or Lt, the values
+                                            array must have a single element, which will be interpreted as an integer.
+                                            This array is replaced during a strategic merge patch.
                                           items:
                                             type: string
                                           type: array
@@ -145,30 +147,26 @@ spec:
                                     description: A list of node selector requirements
                                       by node's fields.
                                     items:
-                                      description: A node selector requirement is
-                                        a selector that contains values, a key, and
-                                        an operator that relates the key and values.
+                                      description: |-
+                                        A node selector requirement is a selector that contains values, a key, and an operator
+                                        that relates the key and values.
                                       properties:
                                         key:
                                           description: The label key that the selector
                                             applies to.
                                           type: string
                                         operator:
-                                          description: Represents a key's relationship
-                                            to a set of values. Valid operators are
-                                            In, NotIn, Exists, DoesNotExist. Gt, and
-                                            Lt.
+                                          description: |-
+                                            Represents a key's relationship to a set of values.
+                                            Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                           type: string
                                         values:
-                                          description: An array of string values.
-                                            If the operator is In or NotIn, the values
-                                            array must be non-empty. If the operator
-                                            is Exists or DoesNotExist, the values
-                                            array must be empty. If the operator is
-                                            Gt or Lt, the values array must have a
-                                            single element, which will be interpreted
-                                            as an integer. This array is replaced
-                                            during a strategic merge patch.
+                                          description: |-
+                                            An array of string values. If the operator is In or NotIn,
+                                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                            the values array must be empty. If the operator is Gt or Lt, the values
+                                            array must have a single element, which will be interpreted as an integer.
+                                            This array is replaced during a strategic merge patch.
                                           items:
                                             type: string
                                           type: array
@@ -192,16 +190,16 @@ spec:
                               description: Name of the thin pool to be created
                               type: string
                             overprovisionRatio:
-                              description: OverProvisionRatio is the factor by which
-                                additional storage can be provisioned compared to
+                              description: |-
+                                OverProvisionRatio is the factor by which additional storage can be provisioned compared to
                                 the available storage in the thin pool.
                               minimum: 1
                               type: integer
                             sizePercent:
                               default: 90
-                              description: SizePercent represents percentage of remaining
-                                space in the volume group that should be used for
-                                creating the thin pool.
+                              description: |-
+                                SizePercent represents percentage of remaining space in the volume group that should be used
+                                for creating the thin pool.
                               maximum: 90
                               minimum: 10
                               type: integer
@@ -217,40 +215,39 @@ spec:
               tolerations:
                 description: Tolerations to apply to nodes to act on
                 items:
-                  description: The pod this Toleration is attached to tolerates any
-                    taint that matches the triple <key,value,effect> using the matching
-                    operator <operator>.
+                  description: |-
+                    The pod this Toleration is attached to tolerates any taint that matches
+                    the triple <key,value,effect> using the matching operator <operator>.
                   properties:
                     effect:
-                      description: Effect indicates the taint effect to match. Empty
-                        means match all taint effects. When specified, allowed values
-                        are NoSchedule, PreferNoSchedule and NoExecute.
+                      description: |-
+                        Effect indicates the taint effect to match. Empty means match all taint effects.
+                        When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
                       type: string
                     key:
-                      description: Key is the taint key that the toleration applies
-                        to. Empty means match all taint keys. If the key is empty,
-                        operator must be Exists; this combination means to match all
-                        values and all keys.
+                      description: |-
+                        Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                        If the key is empty, operator must be Exists; this combination means to match all values and all keys.
                       type: string
                     operator:
-                      description: Operator represents a key's relationship to the
-                        value. Valid operators are Exists and Equal. Defaults to Equal.
-                        Exists is equivalent to wildcard for value, so that a pod
-                        can tolerate all taints of a particular category.
+                      description: |-
+                        Operator represents a key's relationship to the value.
+                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod can
+                        tolerate all taints of a particular category.
                       type: string
                     tolerationSeconds:
-                      description: TolerationSeconds represents the period of time
-                        the toleration (which must be of effect NoExecute, otherwise
-                        this field is ignored) tolerates the taint. By default, it
-                        is not set, which means tolerate the taint forever (do not
-                        evict). Zero and negative values will be treated as 0 (evict
-                        immediately) by the system.
+                      description: |-
+                        TolerationSeconds represents the period of time the toleration (which must be
+                        of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                        it is not set, which means tolerate the taint forever (do not evict). Zero and
+                        negative values will be treated as 0 (evict immediately) by the system.
                       format: int64
                       type: integer
                     value:
-                      description: Value is the taint value the toleration matches
-                        to. If the operator is Exists, the value should be empty,
-                        otherwise just a regular string.
+                      description: |-
+                        Value is the taint value the toleration matches to.
+                        If the operator is Exists, the value should be empty, otherwise just a regular string.
                       type: string
                   type: object
                 type: array
@@ -261,8 +258,9 @@ spec:
               conditions:
                 description: Conditions describes the state of the resource.
                 items:
-                  description: Condition represents the state of the operator's reconciliation
-                    functionality.
+                  description: |-
+                    Condition represents the state of the operator's
+                    reconciliation functionality.
                   properties:
                     lastHeartbeatTime:
                       format: date-time
@@ -308,8 +306,8 @@ spec:
                               type: string
                             type: array
                           excluded:
-                            description: Excluded contains the per node status of
-                              applied device exclusions that were picked up via selector,
+                            description: |-
+                              Excluded contains the per node status of applied device exclusions that were picked up via selector,
                               but were not used for other reasons.
                             items:
                               properties:

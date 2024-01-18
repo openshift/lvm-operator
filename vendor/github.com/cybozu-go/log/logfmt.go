@@ -228,14 +228,14 @@ func appendLogfmt(buf []byte, v interface{}) ([]byte, error) {
 		}
 		buf = append(buf, '{')
 		first := true
-		for _, k := range value.MapKeys() {
+		for iter := value.MapRange(); iter.Next(); {
 			if !first {
 				if cap(buf) < 1 {
 					return nil, ErrTooLarge
 				}
 				buf = append(buf, ' ')
 			}
-			key := k.String()
+			key := iter.Key().String()
 			if regexpValidKey.MatchString(key) {
 				if cap(buf) < len(key) {
 					return nil, ErrTooLarge
@@ -251,7 +251,7 @@ func appendLogfmt(buf []byte, v interface{}) ([]byte, error) {
 				return nil, ErrTooLarge
 			}
 			buf = append(buf, '=')
-			buf, err = appendLogfmt(buf, value.MapIndex(k).Interface())
+			buf, err = appendLogfmt(buf, iter.Value().Interface())
 			if err != nil {
 				return nil, ErrTooLarge
 			}

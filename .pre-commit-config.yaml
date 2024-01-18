@@ -22,7 +22,7 @@ repos:
       - id: mixed-line-ending
       - id: check-yaml
         args: [-m]
-        exclude: ^test/e2e/testdata
+        exclude: ^test/e2e/testdata|^vendor
       - id: check-json
       - id: detect-private-key
         exclude: ^vendor

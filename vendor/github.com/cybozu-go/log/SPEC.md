@@ -14,7 +14,7 @@ Standard keys
 
 These keys are defined as standard.
 
-| Key | Type | Mandatory | Descriptoin |
+| Key | Type | Mandatory | Description |
 | --- | ---- | --------- | ----------- |
 | topic | string | yes | Typically the program name. |
 | logged_at | string | yes | RFC3339 time in microsecond precision. |
@@ -84,4 +84,4 @@ where `$key` is the value of `key`.
 
 "json" is implemented by `JSONFormat`.
 
-`JSONFormat` conforms to [JSON Lines](http://jsonlines.org/).
+`JSONFormat` conforms to [JSON Lines](https://jsonlines.org/).

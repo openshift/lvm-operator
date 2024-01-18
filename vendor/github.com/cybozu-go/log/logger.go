@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,14 +12,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 var (
 	pool = &sync.Pool{
 		New: func() interface{} {
-			return make([]byte, 0, maxLogSize)
+			b := make([]byte, 0, maxLogSize)
+			return &b
 		},
 	}
 
@@ -50,12 +50,13 @@ type Logger struct {
 // NewLogger constructs a new Logger struct.
 //
 // Attributes are initialized as follows:
-//    Topic:        path.Base(os.Args[0])
-//    Threshold:    LvInfo
-//    Formatter:    PlainFormat
-//    Output:       os.Stderr
-//    Defaults:     nil
-//    ErrorHandler: os.Exit(5) on EPIPE.
+//
+//	Topic:        path.Base(os.Args[0])
+//	Threshold:    LvInfo
+//	Formatter:    PlainFormat
+//	Output:       os.Stderr
+//	Defaults:     nil
+//	ErrorHandler: os.Exit(5) on EPIPE.
 func NewLogger() *Logger {
 	l := &Logger{
 		output: os.Stderr,
@@ -119,11 +120,11 @@ func (l *Logger) Threshold() int {
 // Enabled returns true if the log for the given level will be logged.
 // This can be used to avoid futile computation for logs being ignored.
 //
-//    if log.Enabled(log.LvDebug) {
-//        log.Debug("message", map[string]interface{}{
-//            "debug info": "...",
-//        })
-//    }
+//	if log.Enabled(log.LvDebug) {
+//	    log.Debug("message", map[string]interface{}{
+//	        "debug info": "...",
+//	    })
+//	}
 func (l *Logger) Enabled(level int) bool {
 	return level <= l.Threshold()
 }
@@ -149,7 +150,7 @@ func (l *Logger) SetThresholdByName(n string) error {
 	case "debug":
 		level = LvDebug
 	default:
-		return fmt.Errorf("No such level: %s", n)
+		return fmt.Errorf("no such level: %s", n)
 	}
 	l.SetThreshold(level)
 	return nil
@@ -275,10 +276,10 @@ func (l *Logger) Log(severity int, msg string, fields map[string]interface{}) er
 
 	// format the message before acquiring mutex for better concurrency.
 	t := time.Now()
-	buf := pool.Get().([]byte)
+	buf := pool.Get().(*[]byte)
 	defer pool.Put(buf)
 
-	b, err := l.Formatter().Format(buf, l, t, severity, msg, fields)
+	b, err := l.Formatter().Format(*buf, l, t, severity, msg, fields)
 	if err != nil {
 		return err
 	}
@@ -298,7 +299,7 @@ func (l *Logger) Log(severity int, msg string, fields map[string]interface{}) er
 	if err == nil {
 		return nil
 	}
-	return errors.Wrap(err, "Logger.Log")
+	return fmt.Errorf("Logger.Log: %w", err)
 }
 
 // Critical outputs a critical log.
@@ -344,5 +345,5 @@ func (l *Logger) WriteThrough(data []byte) error {
 	if err == nil {
 		return nil
 	}
-	return errors.Wrap(err, "Logger.WriteThrough")
+	return fmt.Errorf("Logger.WriteThrough: %w", err)
 }

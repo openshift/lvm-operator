@@ -25,6 +25,7 @@ var (
 	}
 
 	versionMap = map[uint16]string{
+		//lint:ignore SA1019 this is harmless
 		tls.VersionSSL30: "SSL3.0",
 		tls.VersionTLS10: "TLS1.0",
 		tls.VersionTLS11: "TLS1.1",

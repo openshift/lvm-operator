@@ -165,7 +165,7 @@ func generatePVCSpec(mode k8sv1.PersistentVolumeMode) k8sv1.PersistentVolumeClai
 	return k8sv1.PersistentVolumeClaimSpec{
 		VolumeMode:  ptr.To(mode),
 		AccessModes: []k8sv1.PersistentVolumeAccessMode{k8sv1.ReadWriteOnce},
-		Resources: k8sv1.ResourceRequirements{Requests: map[k8sv1.ResourceName]resource.Quantity{
+		Resources: k8sv1.VolumeResourceRequirements{Requests: map[k8sv1.ResourceName]resource.Quantity{
 			k8sv1.ResourceStorage: resource.MustParse("1Gi"),
 		}},
 		StorageClassName: ptr.To(storageClassName),
