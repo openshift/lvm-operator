@@ -63,7 +63,9 @@ func (c csiDriver) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvm
 	if err != nil {
 		return fmt.Errorf("%s failed to reconcile: %w", c.GetName(), err)
 	}
-	logger.Info("CSIDriver applied to cluster", "operation", result, "name", csiDriverResource.Name)
+	if result != cutil.OperationResultNone {
+		logger.V(2).Info("CSIDriver applied to cluster", "operation", result, "name", csiDriverResource.Name)
+	}
 	return nil
 }
 

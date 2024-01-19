@@ -146,7 +146,7 @@ func (r *Reconciler) GetLogPassthroughOptions() *logpassthrough.Options {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("reconciling")
+	logger.V(2).Info("reconciling")
 
 	// Checks that only a single LVMCluster instance exists
 	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
@@ -304,7 +304,7 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 	instance.Status.State = lvmv1alpha1.LVMStatusProgressing
 	instance.Status.Ready = false
 
-	logger.Info("calculating readiness of LVMCluster", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
+	logger.V(2).Info("calculating readiness of LVMCluster", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
 
 	if isFailed {
 		instance.Status.State = lvmv1alpha1.LVMStatusFailed
@@ -330,7 +330,7 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 	if err = r.Client.Status().Update(ctx, instance); err != nil {
 		return fmt.Errorf("failed to update LVMCluster status: %w", err)
 	}
-	logger.Info("successfully updated the LVMCluster status")
+	logger.V(2).Info("successfully updated the LVMCluster status")
 	return nil
 }
 

@@ -135,7 +135,7 @@ func (r *Reconciler) getFinalizer() string {
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("reconciling")
+	logger.V(2).Info("reconciling")
 
 	// Check if this LVMVolumeGroup needs to be processed on this node
 	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
@@ -251,7 +251,7 @@ func (r *Reconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 
-		logger.Info("no new available devices discovered, verifying existing setup")
+		logger.V(2).Info("no new available devices discovered, verifying existing setup")
 
 		// since the last reconciliation there could have been corruption on the LVs, so we need to verify them again
 		if err := r.validateLVs(ctx, volumeGroup); err != nil {
@@ -263,9 +263,6 @@ func (r *Reconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 
-		msg := "all the available devices are attached to the volume group"
-		logger.Info(msg)
-
 		if err := r.applyLVMDConfig(ctx, volumeGroup, vgs, devices); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -273,6 +270,8 @@ func (r *Reconciler) reconcile(
 		if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
 		} else if updated {
+			msg := "all the available devices are attached to the volume group"
+			logger.Info(msg)
 			r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
 		}
 

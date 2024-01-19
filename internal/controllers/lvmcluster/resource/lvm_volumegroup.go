@@ -79,7 +79,9 @@ func (c lvmVG) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *lvmv
 			return fmt.Errorf("%s failed to reconcile: %w", c.GetName(), err)
 		}
 
-		logger.Info("LVMVolumeGroup applied to cluster", "operation", result, "name", volumeGroup.Name)
+		if result != cutil.OperationResultNone {
+			logger.V(2).Info("LVMVolumeGroup applied to cluster", "operation", result, "name", volumeGroup.Name)
+		}
 	}
 	return nil
 }

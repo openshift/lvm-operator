@@ -64,7 +64,9 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 		if err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", s.GetName(), err)
 		}
-		logger.Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
+		if result != cutil.OperationResultNone {
+			logger.V(2).Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
+		}
 	}
 	return nil
 }

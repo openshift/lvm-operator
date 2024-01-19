@@ -29,7 +29,7 @@ func NewRegistrationServer(driverName string, endpoint string, versions []string
 
 // GetInfo is the RPC invoked by plugin watcher
 func (e registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
-	klog.Infof("Received GetInfo call: %+v", req)
+	klog.V(2).Infof("Received GetInfo call: %+v", req)
 
 	return &registerapi.PluginInfo{
 		Type:              registerapi.CSIPlugin,
@@ -40,7 +40,7 @@ func (e registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRe
 }
 
 func (e registrationServer) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	klog.Infof("Received NotifyRegistrationStatus call: %+v", status)
+	klog.V(2).Infof("Received NotifyRegistrationStatus call: %+v", status)
 	if !status.PluginRegistered {
 		klog.Errorf("Registration process failed with error: %+v, restarting registration container.", status.Error)
 		os.Exit(1)
