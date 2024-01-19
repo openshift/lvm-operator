@@ -2,8 +2,6 @@ module github.com/openshift/lvm-operator
 
 go 1.21
 
-toolchain go1.21.0
-
 require (
 	github.com/aws/aws-sdk-go v1.49.23
 	github.com/container-storage-interface/spec v1.9.0
