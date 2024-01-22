@@ -32,6 +32,17 @@ metadata:
         }
     repository: https://github.com/openshift/lvm-operator
     operatorframework.io/suggested-namespace: openshift-storage
+    operatorframework.io/suggested-namespace-template: |-
+      {
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {
+          "name": "openshift-storage",
+          "annotations": {
+            "workload.openshift.io/allowed": "management"
+          }
+        }
+      }
     operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.openshift.io/valid-subscription: '["OpenShift Container Platform", "OpenShift Platform Plus"]'
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io", "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
