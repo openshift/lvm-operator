@@ -58,7 +58,7 @@ func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster 
 		err := r.Get(ctx, client.ObjectKeyFromObject(scc), &secv1.SecurityContextConstraints{})
 		if err == nil {
 			// Don't update the SCC
-			logger.Info("SecurityContextConstraint exists, skipping creation", "name", scc.Name)
+			logger.V(2).Info("SecurityContextConstraint exists, skipping creation", "name", scc.Name)
 			continue
 		}
 
@@ -71,7 +71,7 @@ func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster 
 			return fmt.Errorf("%s failed to reconcile: %w", c.GetName(), err)
 		}
 
-		logger.Info("SecurityContextConstraint created", "name", scc.Name)
+		logger.V(2).Info("SecurityContextConstraint created", "name", scc.Name)
 	}
 
 	return nil

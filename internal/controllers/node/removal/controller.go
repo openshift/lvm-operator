@@ -42,7 +42,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.Get(ctx, req.NamespacedName, nodeStatus); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	logger.Info("verifying if node status is orphaned", "node", nodeStatus.GetName())
+	logger.V(2).Info("verifying if node status is orphaned", "node", nodeStatus.GetName())
 
 	node := &v1.Node{}
 	err := r.Client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), node)

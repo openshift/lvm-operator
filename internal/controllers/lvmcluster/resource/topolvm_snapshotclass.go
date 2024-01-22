@@ -64,7 +64,9 @@ func (s topolvmVolumeSnapshotClass) EnsureCreated(r Reconciler, ctx context.Cont
 		if err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", s.GetName(), err)
 		}
-		logger.Info("VolumeSnapshotClass applied to cluster", "operation", result, "name", vsc.Name)
+		if result != cutil.OperationResultNone {
+			logger.V(2).Info("VolumeSnapshotClass applied to cluster", "operation", result, "name", vsc.Name)
+		}
 	}
 	return nil
 }
