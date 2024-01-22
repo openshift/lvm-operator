@@ -41,7 +41,7 @@ func (c csiDriver) getName() string {
 	return driverName
 }
 
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=csidrivers,verbs=get;create;delete;watch;list;update;patch
 
 func (c csiDriver) ensureCreated(r *LVMClusterReconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	csiDriverResource := getCSIDriverResource()
