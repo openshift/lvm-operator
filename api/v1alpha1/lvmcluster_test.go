@@ -80,6 +80,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 		duplicate := resource.DeepCopy()
 		duplicate.SetName(fmt.Sprintf("%s-dupe", duplicate.GetName()))
+		duplicate.SetResourceVersion("")
 
 		err := k8sClient.Create(ctx, duplicate)
 		Expect(err).To(HaveOccurred())
