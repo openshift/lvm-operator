@@ -502,7 +502,8 @@ spec:
           selector:
             matchLabels:
               app.kubernetes.io/name: lvms-operator
-          strategy: {}
+          strategy:
+            type: Recreate
           template:
             metadata:
               annotations:
@@ -515,7 +516,7 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --leader-elect
+                - --leader-elect=false
                 command:
                 - /lvms
                 - operator
