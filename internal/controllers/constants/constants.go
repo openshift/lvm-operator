@@ -61,9 +61,6 @@ const (
 	LivenessProbeMemRequest = "15Mi"
 	LivenessProbeCPURequest = "1m"
 
-	FileCheckerMemRequest = "10Mi"
-	FileCheckerCPURequest = "1m"
-
 	// topoLVM Node
 	TopolvmNodeServiceAccount       = "topolvm-node"
 	TopolvmNodeDaemonsetName        = "topolvm-node"

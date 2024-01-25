@@ -16,6 +16,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	lsblkmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk/mocks"
@@ -116,9 +117,21 @@ func setupInstances() testInstances {
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node", Labels: map[string]string{
 		hostnameLabelKey: hostname,
 	}}}
+	topolvmNodePod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "topolvm-node", Namespace: namespace.GetName(), Labels: map[string]string{
+			constants.AppKubernetesComponentLabel: constants.TopolvmNodeLabelVal,
+		}},
+		Spec: corev1.PodSpec{
+			NodeName: node.GetName(),
+		},
+	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
-		WithObjects(node, namespace).
+		WithObjects(node, namespace, topolvmNodePod).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+			pod := rawObj.(*corev1.Pod)
+			return []string{pod.Spec.NodeName}
+		}).
 		Build()
 	fakeRecorder := record.NewFakeRecorder(100)
 	fakeRecorder.IncludeObject = true

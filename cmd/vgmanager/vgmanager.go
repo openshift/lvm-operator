@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
@@ -36,6 +37,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,14 +86,18 @@ func NewCmd(opts *Options) *cobra.Command {
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	lvm := lvm.NewDefaultHostLVM()
 	nodeName := os.Getenv("NODE_NAME")
-	namespace := os.Getenv("POD_NAMESPACE")
+
+	operatorNamespace, err := cluster.GetOperatorNamespace()
+	if err != nil {
+		return fmt.Errorf("unable to get operatorNamespace: %w", err)
+	}
 
 	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: opts.Scheme})
 	if err != nil {
 		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
 	}
 
-	if err := tagging.AddTagToVGs(cmd.Context(), setupClient, lvm, nodeName, namespace); err != nil {
+	if err := tagging.AddTagToVGs(cmd.Context(), setupClient, lvm, nodeName, operatorNamespace); err != nil {
 		opts.SetupLog.Error(err, "failed to tag existing volume groups")
 	}
 
@@ -109,12 +115,19 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LeaderElection:         false,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
-				os.Getenv("POD_NAMESPACE"): {},
+				operatorNamespace: {},
 			},
 		},
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(cmd.Context(), &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		pod := rawObj.(*corev1.Pod)
+		return []string{pod.Spec.NodeName}
+	}); err != nil {
+		return err
 	}
 
 	if err = (&vgmanager.Reconciler{
@@ -127,7 +140,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
 		LVM:           lvm,
 		NodeName:      nodeName,
-		Namespace:     namespace,
+		Namespace:     operatorNamespace,
 		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)

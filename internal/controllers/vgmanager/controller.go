@@ -25,15 +25,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
+
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -363,9 +367,29 @@ func (r *Reconciler) updateLVMDConfigAfterReconcile(
 		if err := r.LVMD.Save(newCFG); err != nil {
 			return fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 		}
-		msg := "updated lvmd config with new deviceClasses"
+		msg := "updated lvmd config with new deviceClasses, restarting TopoLVM Node pods"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
+
+		nodePodList := &corev1.PodList{}
+		listOptions := &client.ListOptions{
+			Namespace:     r.Namespace,
+			LabelSelector: labels.SelectorFromSet(map[string]string{constants.AppKubernetesComponentLabel: constants.TopolvmNodeLabelVal}),
+			FieldSelector: fields.OneTermEqualSelector("spec.nodeName", r.NodeName),
+		}
+		err := r.List(ctx, nodePodList, listOptions)
+		if err != nil {
+			return fmt.Errorf("failed to list TopoLVM Node pods: %w", err)
+		}
+		if len(nodePodList.Items) < 1 {
+			return fmt.Errorf("could not find any TopoLVM Node pods on %s namespace and on %s node", r.Namespace, r.NodeName)
+		}
+		for _, pod := range nodePodList.Items {
+			err := r.Delete(ctx, &pod)
+			if err != nil {
+				return fmt.Errorf("failed to remove TopoLVM Node pod %s: %w", pod.Name, err)
+			}
+		}
 	}
 	return nil
 }

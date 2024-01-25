@@ -19,6 +19,14 @@ rules:
   - update
   - watch
 - apiGroups:
+    - ""
+  resources:
+    - pods
+  verbs:
+    - delete
+    - list
+    - watch
+- apiGroups:
   - lvm.topolvm.io
   resources:
   - lvmvolumegroups/finalizers
