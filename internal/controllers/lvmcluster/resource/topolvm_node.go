@@ -25,6 +25,7 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
+	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -156,12 +157,9 @@ func getNodeDaemonSet(lvmCluster *lvmv1alpha1.LVMCluster, namespace string, args
 					Type: &hostPathDirectoryOrCreateType}}},
 		{Name: "lvmd-config-dir",
 			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: constants.LVMDConfigMapName,
-					},
-				},
-			}},
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: filepath.Dir(lvmd.DefaultFileConfigPath),
+					Type: &hostPathDirectory}}},
 		{Name: "metrics-cert",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -233,7 +231,7 @@ func getNodeContainer(args []string) *corev1.Container {
 	command := []string{
 		"/topolvm-node",
 		"--embed-lvmd",
-		fmt.Sprintf("--config=%s", constants.LVMDDefaultFileConfigPath),
+		fmt.Sprintf("--config=%s", lvmd.DefaultFileConfigPath),
 	}
 
 	command = append(command, args...)
@@ -249,7 +247,7 @@ func getNodeContainer(args []string) *corev1.Container {
 
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "node-plugin-dir", MountPath: filepath.Dir(constants.DefaultCSISocket)},
-		{Name: "lvmd-config-dir", MountPath: constants.LVMDDefaultConfigDir},
+		{Name: "lvmd-config-dir", MountPath: filepath.Dir(lvmd.DefaultFileConfigPath)},
 		{Name: "pod-volumes-dir",
 			MountPath:        fmt.Sprintf("%spods", getAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
 			MountPropagation: &mountPropagationMode},

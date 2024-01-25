@@ -71,10 +71,6 @@ const (
 	DefaultCSISocket = "/run/topolvm/csi-topolvm.sock"
 	DeviceClassKey   = "topolvm.io/device-class"
 
-	LVMDConfigMapName         = "lvmd-config"
-	LVMDDefaultConfigDir      = "/etc/topolvm"
-	LVMDDefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
-
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
 

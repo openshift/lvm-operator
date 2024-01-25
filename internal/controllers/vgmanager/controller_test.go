@@ -16,6 +16,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	lsblkmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk/mocks"
@@ -24,15 +25,11 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	lvmdmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd/mocks"
 	wipefsmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs/mocks"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -111,6 +108,7 @@ func setupInstances() testInstances {
 	mockLSBLK := lsblkmocks.NewMockLSBLK(t)
 	mockLVM := lvmmocks.NewMockLVM(t)
 	mockWipefs := wipefsmocks.NewMockWipefs(t)
+	testLVMD := lvmd.NewFileConfigurator(filepath.Join(t.TempDir(), "lvmd.yaml"))
 
 	hostname := "test-host.vgmanager.test.io"
 	hostnameLabelKey := "kubernetes.io/hostname"
@@ -119,14 +117,24 @@ func setupInstances() testInstances {
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node", Labels: map[string]string{
 		hostnameLabelKey: hostname,
 	}}}
+	topolvmNodePod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "topolvm-node", Namespace: namespace.GetName(), Labels: map[string]string{
+			constants.AppKubernetesComponentLabel: constants.TopolvmNodeLabelVal,
+		}},
+		Spec: corev1.PodSpec{
+			NodeName: node.GetName(),
+		},
+	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
-		WithObjects(node, namespace).
+		WithObjects(node, namespace, topolvmNodePod).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+			pod := rawObj.(*corev1.Pod)
+			return []string{pod.Spec.NodeName}
+		}).
 		Build()
 	fakeRecorder := record.NewFakeRecorder(100)
 	fakeRecorder.IncludeObject = true
-
-	testLVMD := lvmd.NewFileConfigurator(fakeClient, namespace.GetName())
 
 	return testInstances{
 		LVM:       mockLVM,
@@ -307,7 +315,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	By("verifying the lvmd config generation", func() {
 		checkDistributedEvent(corev1.EventTypeNormal, "lvmd config file doesn't exist, will attempt to create a fresh config")
 		checkDistributedEvent(corev1.EventTypeNormal, "updated lvmd config with new deviceClasses")
-		lvmdConfig, err := instances.LVMD.Load(ctx)
+		lvmdConfig, err := instances.LVMD.Load()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(lvmdConfig).ToNot(BeNil())
 		Expect(lvmdConfig.DeviceClasses).ToNot(BeNil())
@@ -397,7 +405,7 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).ToNot(Succeed())
-		lvmdConfig, err := instances.LVMD.Load(ctx)
+		lvmdConfig, err := instances.LVMD.Load()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(lvmdConfig).To(BeNil())
 	})
@@ -552,13 +560,13 @@ func testLVMD(ctx context.Context) {
 	mockLVM := lvmmocks.NewMockLVM(GinkgoT())
 	r.LVM = mockLVM
 
-	mockLVMD.EXPECT().Load(ctx).Once().Return(nil, fmt.Errorf("mock load failure"))
+	mockLVMD.EXPECT().Load().Once().Return(nil, fmt.Errorf("mock load failure"))
 	mockLVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mock list failure"))
 	err := r.applyLVMDConfig(ctx, vg, devices)
 	Expect(err).To(HaveOccurred(), "should error if lvmd config cannot be loaded and/or status cannot be set")
 
-	mockLVMD.EXPECT().Load(ctx).Once().Return(&lvmd.Config{}, nil)
-	mockLVMD.EXPECT().Save(ctx, mock.Anything).Once().Return(fmt.Errorf("mock save failure"))
+	mockLVMD.EXPECT().Load().Once().Return(&lvmd.Config{}, nil)
+	mockLVMD.EXPECT().Save(mock.Anything).Once().Return(fmt.Errorf("mock save failure"))
 	mockLVM.EXPECT().ListVGs().Once().Return(nil, fmt.Errorf("mock list failure"))
 	err = r.applyLVMDConfig(ctx, vg, devices)
 	Expect(err).To(HaveOccurred(), "should error if lvmd config cannot be saved and/or status cannot be set")
@@ -853,53 +861,4 @@ func testReconcileFailure(ctx context.Context) {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 	})
-}
-
-func TestGetObjsInNamespaceForReconcile(t *testing.T) {
-	tests := []struct {
-		name   string
-		objs   []client.Object
-		list   error
-		expect []reconcile.Request
-	}{
-		{
-			name: "test lvmvolumegroup not fetch error",
-			list: assert.AnError,
-		},
-		{
-			name: "test lvmvolumegroup found in a different namespace",
-			objs: []client.Object{
-				&lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test-vg", Namespace: "not-test"}},
-			},
-		},
-		{
-			name: "test lvmvolumegroup found in the same namespace",
-			objs: []client.Object{
-				&lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test-vg", Namespace: "test"}},
-			},
-			expect: []reconcile.Request{{NamespacedName: types.NamespacedName{Name: "test-vg", Namespace: "test"}}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			newScheme := runtime.NewScheme()
-			assert.NoError(t, lvmv1alpha1.AddToScheme(newScheme))
-			assert.NoError(t, corev1.AddToScheme(newScheme))
-			clnt := fake.NewClientBuilder().WithObjects(tt.objs...).
-				WithScheme(newScheme).WithInterceptorFuncs(interceptor.Funcs{
-				List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-					if tt.list != nil {
-						return tt.list
-					}
-					return client.List(ctx, list, opts...)
-				},
-			}).Build()
-
-			r := &Reconciler{Client: clnt}
-			requests := r.getObjsInNamespaceForReconcile(context.Background(),
-				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-vg", Namespace: "test"}})
-			assert.ElementsMatch(t, tt.expect, requests)
-		})
-	}
 }

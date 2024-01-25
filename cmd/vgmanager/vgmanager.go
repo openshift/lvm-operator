@@ -37,6 +37,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -122,10 +123,17 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(cmd.Context(), &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		pod := rawObj.(*corev1.Pod)
+		return []string{pod.Spec.NodeName}
+	}); err != nil {
+		return err
+	}
+
 	if err = (&vgmanager.Reconciler{
 		Client:        mgr.GetClient(),
 		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.NewFileConfigurator(mgr.GetClient(), operatorNamespace),
+		LVMD:          lvmd.DefaultConfigurator(),
 		Scheme:        mgr.GetScheme(),
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
 		Wipefs:        wipefs.NewDefaultHostWipefs(),

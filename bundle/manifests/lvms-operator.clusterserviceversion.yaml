@@ -825,6 +825,14 @@ spec:
           - update
           - watch
         - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - delete
+          - list
+          - watch
+        - apiGroups:
           - lvm.topolvm.io
           resources:
           - lvmvolumegroups/finalizers
@@ -872,18 +880,6 @@ spec:
           - create
           - patch
           - update
-        - apiGroups:
-          - ""
-          resources:
-          - configmaps
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         serviceAccountName: vg-manager
     strategy: deployment
   installModes:

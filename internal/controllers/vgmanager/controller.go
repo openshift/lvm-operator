@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
@@ -35,6 +36,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,10 +47,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -83,36 +84,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, builder.MatchEveryOwner, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.getObjsInNamespaceForReconcile)).
 		Complete(r)
-}
-
-// getObjsInNamespaceForReconcile reconciles the object anytime the given object is in the same namespace
-// as the available LVMVolumeGroups.
-func (r *Reconciler) getObjsInNamespaceForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {
-	foundLVMVolumeGroupList := &lvmv1alpha1.LVMVolumeGroupList{}
-	listOps := &client.ListOptions{
-		Namespace: obj.GetNamespace(),
-	}
-
-	if err := r.List(ctx, foundLVMVolumeGroupList, listOps); err != nil {
-		log.FromContext(ctx).Error(err, "getObjsInNamespaceForReconcile: Failed to get LVMVolumeGroup objs")
-		return []reconcile.Request{}
-	}
-	if len(foundLVMVolumeGroupList.Items) < 1 {
-		return []reconcile.Request{}
-	}
-
-	var requests []reconcile.Request
-	for _, lvmVG := range foundLVMVolumeGroupList.Items {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      lvmVG.GetName(),
-				Namespace: lvmVG.GetNamespace(),
-			},
-		})
-	}
-	return requests
 }
 
 type Reconciler struct {
@@ -326,7 +298,7 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	// Read the lvmd config file
-	lvmdConfig, err := r.LVMD.Load(ctx)
+	lvmdConfig, err := r.LVMD.Load()
 	if err != nil {
 		err = fmt.Errorf("failed to read the lvmd config file: %w", err)
 		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, err); err != nil {
@@ -392,12 +364,32 @@ func (r *Reconciler) updateLVMDConfigAfterReconcile(
 			r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigMissing, msg)
 		}
 
-		if err := r.LVMD.Save(ctx, newCFG); err != nil {
+		if err := r.LVMD.Save(newCFG); err != nil {
 			return fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 		}
-		msg := "updated lvmd config with new deviceClasses"
+		msg := "updated lvmd config with new deviceClasses, restarting TopoLVM Node pods"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
+
+		nodePodList := &corev1.PodList{}
+		listOptions := &client.ListOptions{
+			Namespace:     r.Namespace,
+			LabelSelector: labels.SelectorFromSet(map[string]string{constants.AppKubernetesComponentLabel: constants.TopolvmNodeLabelVal}),
+			FieldSelector: fields.OneTermEqualSelector("spec.nodeName", r.NodeName),
+		}
+		err := r.List(ctx, nodePodList, listOptions)
+		if err != nil {
+			return fmt.Errorf("failed to list TopoLVM Node pods: %w", err)
+		}
+		if len(nodePodList.Items) < 1 {
+			return fmt.Errorf("could not find any TopoLVM Node pods on %s namespace and on %s node", r.Namespace, r.NodeName)
+		}
+		for _, pod := range nodePodList.Items {
+			err := r.Delete(ctx, &pod)
+			if err != nil {
+				return fmt.Errorf("failed to remove TopoLVM Node pod %s: %w", pod.Name, err)
+			}
+		}
 	}
 	return nil
 }
@@ -407,7 +399,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	logger.Info("deleting")
 
 	// Read the lvmd config file
-	lvmdConfig, err := r.LVMD.Load(ctx)
+	lvmdConfig, err := r.LVMD.Load()
 	if err != nil {
 		// Failed to read lvmdconfig file. Reconcile again
 		return fmt.Errorf("failed to read the lvmd config file: %w", err)
@@ -475,14 +467,14 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	// if there was no config file in the first place, nothing has to be removed.
 	if lvmdConfig != nil {
 		if len(lvmdConfig.DeviceClasses) > 0 {
-			if err = r.LVMD.Save(ctx, lvmdConfig); err != nil {
+			if err = r.LVMD.Save(lvmdConfig); err != nil {
 				return fmt.Errorf("failed to update lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
 			}
 			msg := "updated lvmd config after deviceClass was removed"
 			logger.Info(msg)
 			r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
 		} else {
-			if err = r.LVMD.Delete(ctx); err != nil {
+			if err = r.LVMD.Delete(); err != nil {
 				return fmt.Errorf("failed to delete lvmd.conf file for volume group %s: %w", volumeGroup.GetName(), err)
 			}
 			msg := "removed lvmd config after last deviceClass was removed"
