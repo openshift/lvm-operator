@@ -61,6 +61,9 @@ const (
 	LivenessProbeMemRequest = "15Mi"
 	LivenessProbeCPURequest = "1m"
 
+	FileCheckerMemRequest = "10Mi"
+	FileCheckerCPURequest = "1m"
+
 	// topoLVM Node
 	TopolvmNodeServiceAccount       = "topolvm-node"
 	TopolvmNodeDaemonsetName        = "topolvm-node"
@@ -70,10 +73,6 @@ const (
 
 	DefaultCSISocket = "/run/topolvm/csi-topolvm.sock"
 	DeviceClassKey   = "topolvm.io/device-class"
-
-	LVMDConfigMapName         = "lvmd-config"
-	LVMDDefaultConfigDir      = "/etc/topolvm"
-	LVMDDefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
 
 	// name of the lvm-operator container
 	LVMOperatorContainerName = "manager"
