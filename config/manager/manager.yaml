@@ -82,4 +82,4 @@ spec:
         - name: socket-dir
           emptyDir: {}
       serviceAccountName: lvms-operator
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 10

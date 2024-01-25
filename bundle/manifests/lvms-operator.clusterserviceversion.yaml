@@ -566,7 +566,7 @@ spec:
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator
-              terminationGracePeriodSeconds: 60
+              terminationGracePeriodSeconds: 10
               volumes:
               - name: cert
                 secret:
