@@ -19,7 +19,7 @@ metadata:
 spec:
   params:
   - name: dockerfile
-    value: Dockerfile
+    value: konflux.Dockerfile
   - name: git-url
     value: '{{source_url}}'
   - name: image-expires-after
