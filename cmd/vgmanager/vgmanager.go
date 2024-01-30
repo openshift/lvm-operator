@@ -38,7 +38,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
-	"github.com/openshift/lvm-operator/internal/tagging"
+	"github.com/openshift/lvm-operator/internal/migration/tagging"
 	"github.com/spf13/cobra"
 	topolvmClient "github.com/topolvm/topolvm/client"
 	"github.com/topolvm/topolvm/controllers"

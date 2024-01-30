@@ -33,6 +33,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
 	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
+	"github.com/openshift/lvm-operator/internal/migration/microlvms"
 	"github.com/spf13/cobra"
 	topolvmcontrollers "github.com/topolvm/topolvm/controllers"
 	"github.com/topolvm/topolvm/driver"
@@ -156,6 +157,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			opts.SetupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
 			enableSnapshotting = false
 		}
+	}
+
+	if err := microlvms.NewCleanup(setupClient, operatorNamespace).RemovePreMicroLVMSComponents(ctx); err != nil {
+		return fmt.Errorf("failed to run pre 4.16 MicroLVMS cleanup: %w", err)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{

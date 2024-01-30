@@ -7,7 +7,7 @@ import (
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	lvmmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm/mocks"
-	"github.com/openshift/lvm-operator/internal/tagging"
+	"github.com/openshift/lvm-operator/internal/migration/tagging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
