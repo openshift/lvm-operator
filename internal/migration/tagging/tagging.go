@@ -19,7 +19,7 @@ func AddTagToVGs(ctx context.Context, c client.Client, lvm lvm.LVM, nodeName str
 	logger := log.FromContext(ctx)
 
 	// now we get all untagged vgs on the node
-	vgs, err := lvm.ListVGs(false)
+	vgs, err := lvm.ListVGs(ctx, false)
 	if err != nil {
 		return fmt.Errorf("failed to list volume groups on node "+
 			"to determine if tag migration is necessary: %w", err)
@@ -49,7 +49,7 @@ func AddTagToVGs(ctx context.Context, c client.Client, lvm lvm.LVM, nodeName str
 				continue
 			}
 			logger.Info("tagging volume group managed by LVMS", "vg", vg.Name)
-			if err := lvm.AddTagToVG(vg.Name); err != nil {
+			if err := lvm.AddTagToVG(ctx, vg.Name); err != nil {
 				taggingErr = errors.Join(taggingErr, fmt.Errorf("failed to tag volume group %s: %w", vg.Name, err))
 				continue
 			}

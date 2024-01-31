@@ -3,6 +3,8 @@
 package lvm
 
 import (
+	context "context"
+
 	lvm "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -20,17 +22,17 @@ func (_m *MockLVM) EXPECT() *MockLVM_Expecter {
 	return &MockLVM_Expecter{mock: &_m.Mock}
 }
 
-// ActivateLV provides a mock function with given fields: lvName, vgName
-func (_m *MockLVM) ActivateLV(lvName string, vgName string) error {
-	ret := _m.Called(lvName, vgName)
+// ActivateLV provides a mock function with given fields: ctx, lvName, vgName
+func (_m *MockLVM) ActivateLV(ctx context.Context, lvName string, vgName string) error {
+	ret := _m.Called(ctx, lvName, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ActivateLV")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(lvName, vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, lvName, vgName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -44,15 +46,16 @@ type MockLVM_ActivateLV_Call struct {
 }
 
 // ActivateLV is a helper method to define mock.On call
+//   - ctx context.Context
 //   - lvName string
 //   - vgName string
-func (_e *MockLVM_Expecter) ActivateLV(lvName interface{}, vgName interface{}) *MockLVM_ActivateLV_Call {
-	return &MockLVM_ActivateLV_Call{Call: _e.mock.On("ActivateLV", lvName, vgName)}
+func (_e *MockLVM_Expecter) ActivateLV(ctx interface{}, lvName interface{}, vgName interface{}) *MockLVM_ActivateLV_Call {
+	return &MockLVM_ActivateLV_Call{Call: _e.mock.On("ActivateLV", ctx, lvName, vgName)}
 }
 
-func (_c *MockLVM_ActivateLV_Call) Run(run func(lvName string, vgName string)) *MockLVM_ActivateLV_Call {
+func (_c *MockLVM_ActivateLV_Call) Run(run func(ctx context.Context, lvName string, vgName string)) *MockLVM_ActivateLV_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -62,22 +65,22 @@ func (_c *MockLVM_ActivateLV_Call) Return(_a0 error) *MockLVM_ActivateLV_Call {
 	return _c
 }
 
-func (_c *MockLVM_ActivateLV_Call) RunAndReturn(run func(string, string) error) *MockLVM_ActivateLV_Call {
+func (_c *MockLVM_ActivateLV_Call) RunAndReturn(run func(context.Context, string, string) error) *MockLVM_ActivateLV_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// AddTagToVG provides a mock function with given fields: vgName
-func (_m *MockLVM) AddTagToVG(vgName string) error {
-	ret := _m.Called(vgName)
+// AddTagToVG provides a mock function with given fields: ctx, vgName
+func (_m *MockLVM) AddTagToVG(ctx context.Context, vgName string) error {
+	ret := _m.Called(ctx, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AddTagToVG")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, vgName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -91,14 +94,15 @@ type MockLVM_AddTagToVG_Call struct {
 }
 
 // AddTagToVG is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vgName string
-func (_e *MockLVM_Expecter) AddTagToVG(vgName interface{}) *MockLVM_AddTagToVG_Call {
-	return &MockLVM_AddTagToVG_Call{Call: _e.mock.On("AddTagToVG", vgName)}
+func (_e *MockLVM_Expecter) AddTagToVG(ctx interface{}, vgName interface{}) *MockLVM_AddTagToVG_Call {
+	return &MockLVM_AddTagToVG_Call{Call: _e.mock.On("AddTagToVG", ctx, vgName)}
 }
 
-func (_c *MockLVM_AddTagToVG_Call) Run(run func(vgName string)) *MockLVM_AddTagToVG_Call {
+func (_c *MockLVM_AddTagToVG_Call) Run(run func(ctx context.Context, vgName string)) *MockLVM_AddTagToVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -108,22 +112,22 @@ func (_c *MockLVM_AddTagToVG_Call) Return(_a0 error) *MockLVM_AddTagToVG_Call {
 	return _c
 }
 
-func (_c *MockLVM_AddTagToVG_Call) RunAndReturn(run func(string) error) *MockLVM_AddTagToVG_Call {
+func (_c *MockLVM_AddTagToVG_Call) RunAndReturn(run func(context.Context, string) error) *MockLVM_AddTagToVG_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CreateLV provides a mock function with given fields: lvName, vgName, sizePercent
-func (_m *MockLVM) CreateLV(lvName string, vgName string, sizePercent int) error {
-	ret := _m.Called(lvName, vgName, sizePercent)
+// CreateLV provides a mock function with given fields: ctx, lvName, vgName, sizePercent
+func (_m *MockLVM) CreateLV(ctx context.Context, lvName string, vgName string, sizePercent int) error {
+	ret := _m.Called(ctx, lvName, vgName, sizePercent)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateLV")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, int) error); ok {
-		r0 = rf(lvName, vgName, sizePercent)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int) error); ok {
+		r0 = rf(ctx, lvName, vgName, sizePercent)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -137,16 +141,17 @@ type MockLVM_CreateLV_Call struct {
 }
 
 // CreateLV is a helper method to define mock.On call
+//   - ctx context.Context
 //   - lvName string
 //   - vgName string
 //   - sizePercent int
-func (_e *MockLVM_Expecter) CreateLV(lvName interface{}, vgName interface{}, sizePercent interface{}) *MockLVM_CreateLV_Call {
-	return &MockLVM_CreateLV_Call{Call: _e.mock.On("CreateLV", lvName, vgName, sizePercent)}
+func (_e *MockLVM_Expecter) CreateLV(ctx interface{}, lvName interface{}, vgName interface{}, sizePercent interface{}) *MockLVM_CreateLV_Call {
+	return &MockLVM_CreateLV_Call{Call: _e.mock.On("CreateLV", ctx, lvName, vgName, sizePercent)}
 }
 
-func (_c *MockLVM_CreateLV_Call) Run(run func(lvName string, vgName string, sizePercent int)) *MockLVM_CreateLV_Call {
+func (_c *MockLVM_CreateLV_Call) Run(run func(ctx context.Context, lvName string, vgName string, sizePercent int)) *MockLVM_CreateLV_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int))
 	})
 	return _c
 }
@@ -156,22 +161,22 @@ func (_c *MockLVM_CreateLV_Call) Return(_a0 error) *MockLVM_CreateLV_Call {
 	return _c
 }
 
-func (_c *MockLVM_CreateLV_Call) RunAndReturn(run func(string, string, int) error) *MockLVM_CreateLV_Call {
+func (_c *MockLVM_CreateLV_Call) RunAndReturn(run func(context.Context, string, string, int) error) *MockLVM_CreateLV_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CreateVG provides a mock function with given fields: vg
-func (_m *MockLVM) CreateVG(vg lvm.VolumeGroup) error {
-	ret := _m.Called(vg)
+// CreateVG provides a mock function with given fields: ctx, vg
+func (_m *MockLVM) CreateVG(ctx context.Context, vg lvm.VolumeGroup) error {
+	ret := _m.Called(ctx, vg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateVG")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lvm.VolumeGroup) error); ok {
-		r0 = rf(vg)
+	if rf, ok := ret.Get(0).(func(context.Context, lvm.VolumeGroup) error); ok {
+		r0 = rf(ctx, vg)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -185,14 +190,15 @@ type MockLVM_CreateVG_Call struct {
 }
 
 // CreateVG is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vg lvm.VolumeGroup
-func (_e *MockLVM_Expecter) CreateVG(vg interface{}) *MockLVM_CreateVG_Call {
-	return &MockLVM_CreateVG_Call{Call: _e.mock.On("CreateVG", vg)}
+func (_e *MockLVM_Expecter) CreateVG(ctx interface{}, vg interface{}) *MockLVM_CreateVG_Call {
+	return &MockLVM_CreateVG_Call{Call: _e.mock.On("CreateVG", ctx, vg)}
 }
 
-func (_c *MockLVM_CreateVG_Call) Run(run func(vg lvm.VolumeGroup)) *MockLVM_CreateVG_Call {
+func (_c *MockLVM_CreateVG_Call) Run(run func(ctx context.Context, vg lvm.VolumeGroup)) *MockLVM_CreateVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(lvm.VolumeGroup))
+		run(args[0].(context.Context), args[1].(lvm.VolumeGroup))
 	})
 	return _c
 }
@@ -202,22 +208,22 @@ func (_c *MockLVM_CreateVG_Call) Return(_a0 error) *MockLVM_CreateVG_Call {
 	return _c
 }
 
-func (_c *MockLVM_CreateVG_Call) RunAndReturn(run func(lvm.VolumeGroup) error) *MockLVM_CreateVG_Call {
+func (_c *MockLVM_CreateVG_Call) RunAndReturn(run func(context.Context, lvm.VolumeGroup) error) *MockLVM_CreateVG_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteLV provides a mock function with given fields: lvName, vgName
-func (_m *MockLVM) DeleteLV(lvName string, vgName string) error {
-	ret := _m.Called(lvName, vgName)
+// DeleteLV provides a mock function with given fields: ctx, lvName, vgName
+func (_m *MockLVM) DeleteLV(ctx context.Context, lvName string, vgName string) error {
+	ret := _m.Called(ctx, lvName, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteLV")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(lvName, vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, lvName, vgName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -231,15 +237,16 @@ type MockLVM_DeleteLV_Call struct {
 }
 
 // DeleteLV is a helper method to define mock.On call
+//   - ctx context.Context
 //   - lvName string
 //   - vgName string
-func (_e *MockLVM_Expecter) DeleteLV(lvName interface{}, vgName interface{}) *MockLVM_DeleteLV_Call {
-	return &MockLVM_DeleteLV_Call{Call: _e.mock.On("DeleteLV", lvName, vgName)}
+func (_e *MockLVM_Expecter) DeleteLV(ctx interface{}, lvName interface{}, vgName interface{}) *MockLVM_DeleteLV_Call {
+	return &MockLVM_DeleteLV_Call{Call: _e.mock.On("DeleteLV", ctx, lvName, vgName)}
 }
 
-func (_c *MockLVM_DeleteLV_Call) Run(run func(lvName string, vgName string)) *MockLVM_DeleteLV_Call {
+func (_c *MockLVM_DeleteLV_Call) Run(run func(ctx context.Context, lvName string, vgName string)) *MockLVM_DeleteLV_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -249,22 +256,22 @@ func (_c *MockLVM_DeleteLV_Call) Return(_a0 error) *MockLVM_DeleteLV_Call {
 	return _c
 }
 
-func (_c *MockLVM_DeleteLV_Call) RunAndReturn(run func(string, string) error) *MockLVM_DeleteLV_Call {
+func (_c *MockLVM_DeleteLV_Call) RunAndReturn(run func(context.Context, string, string) error) *MockLVM_DeleteLV_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteVG provides a mock function with given fields: vg
-func (_m *MockLVM) DeleteVG(vg lvm.VolumeGroup) error {
-	ret := _m.Called(vg)
+// DeleteVG provides a mock function with given fields: ctx, vg
+func (_m *MockLVM) DeleteVG(ctx context.Context, vg lvm.VolumeGroup) error {
+	ret := _m.Called(ctx, vg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteVG")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lvm.VolumeGroup) error); ok {
-		r0 = rf(vg)
+	if rf, ok := ret.Get(0).(func(context.Context, lvm.VolumeGroup) error); ok {
+		r0 = rf(ctx, vg)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -278,14 +285,15 @@ type MockLVM_DeleteVG_Call struct {
 }
 
 // DeleteVG is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vg lvm.VolumeGroup
-func (_e *MockLVM_Expecter) DeleteVG(vg interface{}) *MockLVM_DeleteVG_Call {
-	return &MockLVM_DeleteVG_Call{Call: _e.mock.On("DeleteVG", vg)}
+func (_e *MockLVM_Expecter) DeleteVG(ctx interface{}, vg interface{}) *MockLVM_DeleteVG_Call {
+	return &MockLVM_DeleteVG_Call{Call: _e.mock.On("DeleteVG", ctx, vg)}
 }
 
-func (_c *MockLVM_DeleteVG_Call) Run(run func(vg lvm.VolumeGroup)) *MockLVM_DeleteVG_Call {
+func (_c *MockLVM_DeleteVG_Call) Run(run func(ctx context.Context, vg lvm.VolumeGroup)) *MockLVM_DeleteVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(lvm.VolumeGroup))
+		run(args[0].(context.Context), args[1].(lvm.VolumeGroup))
 	})
 	return _c
 }
@@ -295,22 +303,22 @@ func (_c *MockLVM_DeleteVG_Call) Return(_a0 error) *MockLVM_DeleteVG_Call {
 	return _c
 }
 
-func (_c *MockLVM_DeleteVG_Call) RunAndReturn(run func(lvm.VolumeGroup) error) *MockLVM_DeleteVG_Call {
+func (_c *MockLVM_DeleteVG_Call) RunAndReturn(run func(context.Context, lvm.VolumeGroup) error) *MockLVM_DeleteVG_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ExtendLV provides a mock function with given fields: lvName, vgName, sizePercent
-func (_m *MockLVM) ExtendLV(lvName string, vgName string, sizePercent int) error {
-	ret := _m.Called(lvName, vgName, sizePercent)
+// ExtendLV provides a mock function with given fields: ctx, lvName, vgName, sizePercent
+func (_m *MockLVM) ExtendLV(ctx context.Context, lvName string, vgName string, sizePercent int) error {
+	ret := _m.Called(ctx, lvName, vgName, sizePercent)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExtendLV")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, int) error); ok {
-		r0 = rf(lvName, vgName, sizePercent)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int) error); ok {
+		r0 = rf(ctx, lvName, vgName, sizePercent)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -324,16 +332,17 @@ type MockLVM_ExtendLV_Call struct {
 }
 
 // ExtendLV is a helper method to define mock.On call
+//   - ctx context.Context
 //   - lvName string
 //   - vgName string
 //   - sizePercent int
-func (_e *MockLVM_Expecter) ExtendLV(lvName interface{}, vgName interface{}, sizePercent interface{}) *MockLVM_ExtendLV_Call {
-	return &MockLVM_ExtendLV_Call{Call: _e.mock.On("ExtendLV", lvName, vgName, sizePercent)}
+func (_e *MockLVM_Expecter) ExtendLV(ctx interface{}, lvName interface{}, vgName interface{}, sizePercent interface{}) *MockLVM_ExtendLV_Call {
+	return &MockLVM_ExtendLV_Call{Call: _e.mock.On("ExtendLV", ctx, lvName, vgName, sizePercent)}
 }
 
-func (_c *MockLVM_ExtendLV_Call) Run(run func(lvName string, vgName string, sizePercent int)) *MockLVM_ExtendLV_Call {
+func (_c *MockLVM_ExtendLV_Call) Run(run func(ctx context.Context, lvName string, vgName string, sizePercent int)) *MockLVM_ExtendLV_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int))
 	})
 	return _c
 }
@@ -343,14 +352,14 @@ func (_c *MockLVM_ExtendLV_Call) Return(_a0 error) *MockLVM_ExtendLV_Call {
 	return _c
 }
 
-func (_c *MockLVM_ExtendLV_Call) RunAndReturn(run func(string, string, int) error) *MockLVM_ExtendLV_Call {
+func (_c *MockLVM_ExtendLV_Call) RunAndReturn(run func(context.Context, string, string, int) error) *MockLVM_ExtendLV_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ExtendVG provides a mock function with given fields: vg, pvs
-func (_m *MockLVM) ExtendVG(vg lvm.VolumeGroup, pvs []string) (lvm.VolumeGroup, error) {
-	ret := _m.Called(vg, pvs)
+// ExtendVG provides a mock function with given fields: ctx, vg, pvs
+func (_m *MockLVM) ExtendVG(ctx context.Context, vg lvm.VolumeGroup, pvs []string) (lvm.VolumeGroup, error) {
+	ret := _m.Called(ctx, vg, pvs)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExtendVG")
@@ -358,17 +367,17 @@ func (_m *MockLVM) ExtendVG(vg lvm.VolumeGroup, pvs []string) (lvm.VolumeGroup, 
 
 	var r0 lvm.VolumeGroup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(lvm.VolumeGroup, []string) (lvm.VolumeGroup, error)); ok {
-		return rf(vg, pvs)
+	if rf, ok := ret.Get(0).(func(context.Context, lvm.VolumeGroup, []string) (lvm.VolumeGroup, error)); ok {
+		return rf(ctx, vg, pvs)
 	}
-	if rf, ok := ret.Get(0).(func(lvm.VolumeGroup, []string) lvm.VolumeGroup); ok {
-		r0 = rf(vg, pvs)
+	if rf, ok := ret.Get(0).(func(context.Context, lvm.VolumeGroup, []string) lvm.VolumeGroup); ok {
+		r0 = rf(ctx, vg, pvs)
 	} else {
 		r0 = ret.Get(0).(lvm.VolumeGroup)
 	}
 
-	if rf, ok := ret.Get(1).(func(lvm.VolumeGroup, []string) error); ok {
-		r1 = rf(vg, pvs)
+	if rf, ok := ret.Get(1).(func(context.Context, lvm.VolumeGroup, []string) error); ok {
+		r1 = rf(ctx, vg, pvs)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -382,15 +391,16 @@ type MockLVM_ExtendVG_Call struct {
 }
 
 // ExtendVG is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vg lvm.VolumeGroup
 //   - pvs []string
-func (_e *MockLVM_Expecter) ExtendVG(vg interface{}, pvs interface{}) *MockLVM_ExtendVG_Call {
-	return &MockLVM_ExtendVG_Call{Call: _e.mock.On("ExtendVG", vg, pvs)}
+func (_e *MockLVM_Expecter) ExtendVG(ctx interface{}, vg interface{}, pvs interface{}) *MockLVM_ExtendVG_Call {
+	return &MockLVM_ExtendVG_Call{Call: _e.mock.On("ExtendVG", ctx, vg, pvs)}
 }
 
-func (_c *MockLVM_ExtendVG_Call) Run(run func(vg lvm.VolumeGroup, pvs []string)) *MockLVM_ExtendVG_Call {
+func (_c *MockLVM_ExtendVG_Call) Run(run func(ctx context.Context, vg lvm.VolumeGroup, pvs []string)) *MockLVM_ExtendVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(lvm.VolumeGroup), args[1].([]string))
+		run(args[0].(context.Context), args[1].(lvm.VolumeGroup), args[2].([]string))
 	})
 	return _c
 }
@@ -400,14 +410,14 @@ func (_c *MockLVM_ExtendVG_Call) Return(_a0 lvm.VolumeGroup, _a1 error) *MockLVM
 	return _c
 }
 
-func (_c *MockLVM_ExtendVG_Call) RunAndReturn(run func(lvm.VolumeGroup, []string) (lvm.VolumeGroup, error)) *MockLVM_ExtendVG_Call {
+func (_c *MockLVM_ExtendVG_Call) RunAndReturn(run func(context.Context, lvm.VolumeGroup, []string) (lvm.VolumeGroup, error)) *MockLVM_ExtendVG_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetVG provides a mock function with given fields: name
-func (_m *MockLVM) GetVG(name string) (lvm.VolumeGroup, error) {
-	ret := _m.Called(name)
+// GetVG provides a mock function with given fields: ctx, name
+func (_m *MockLVM) GetVG(ctx context.Context, name string) (lvm.VolumeGroup, error) {
+	ret := _m.Called(ctx, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetVG")
@@ -415,17 +425,17 @@ func (_m *MockLVM) GetVG(name string) (lvm.VolumeGroup, error) {
 
 	var r0 lvm.VolumeGroup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (lvm.VolumeGroup, error)); ok {
-		return rf(name)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (lvm.VolumeGroup, error)); ok {
+		return rf(ctx, name)
 	}
-	if rf, ok := ret.Get(0).(func(string) lvm.VolumeGroup); ok {
-		r0 = rf(name)
+	if rf, ok := ret.Get(0).(func(context.Context, string) lvm.VolumeGroup); ok {
+		r0 = rf(ctx, name)
 	} else {
 		r0 = ret.Get(0).(lvm.VolumeGroup)
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -439,14 +449,15 @@ type MockLVM_GetVG_Call struct {
 }
 
 // GetVG is a helper method to define mock.On call
+//   - ctx context.Context
 //   - name string
-func (_e *MockLVM_Expecter) GetVG(name interface{}) *MockLVM_GetVG_Call {
-	return &MockLVM_GetVG_Call{Call: _e.mock.On("GetVG", name)}
+func (_e *MockLVM_Expecter) GetVG(ctx interface{}, name interface{}) *MockLVM_GetVG_Call {
+	return &MockLVM_GetVG_Call{Call: _e.mock.On("GetVG", ctx, name)}
 }
 
-func (_c *MockLVM_GetVG_Call) Run(run func(name string)) *MockLVM_GetVG_Call {
+func (_c *MockLVM_GetVG_Call) Run(run func(ctx context.Context, name string)) *MockLVM_GetVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -456,14 +467,14 @@ func (_c *MockLVM_GetVG_Call) Return(_a0 lvm.VolumeGroup, _a1 error) *MockLVM_Ge
 	return _c
 }
 
-func (_c *MockLVM_GetVG_Call) RunAndReturn(run func(string) (lvm.VolumeGroup, error)) *MockLVM_GetVG_Call {
+func (_c *MockLVM_GetVG_Call) RunAndReturn(run func(context.Context, string) (lvm.VolumeGroup, error)) *MockLVM_GetVG_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// LVExists provides a mock function with given fields: lvName, vgName
-func (_m *MockLVM) LVExists(lvName string, vgName string) (bool, error) {
-	ret := _m.Called(lvName, vgName)
+// LVExists provides a mock function with given fields: ctx, lvName, vgName
+func (_m *MockLVM) LVExists(ctx context.Context, lvName string, vgName string) (bool, error) {
+	ret := _m.Called(ctx, lvName, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LVExists")
@@ -471,17 +482,17 @@ func (_m *MockLVM) LVExists(lvName string, vgName string) (bool, error) {
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string) (bool, error)); ok {
-		return rf(lvName, vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
+		return rf(ctx, lvName, vgName)
 	}
-	if rf, ok := ret.Get(0).(func(string, string) bool); ok {
-		r0 = rf(lvName, vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
+		r0 = rf(ctx, lvName, vgName)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(lvName, vgName)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, lvName, vgName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -495,15 +506,16 @@ type MockLVM_LVExists_Call struct {
 }
 
 // LVExists is a helper method to define mock.On call
+//   - ctx context.Context
 //   - lvName string
 //   - vgName string
-func (_e *MockLVM_Expecter) LVExists(lvName interface{}, vgName interface{}) *MockLVM_LVExists_Call {
-	return &MockLVM_LVExists_Call{Call: _e.mock.On("LVExists", lvName, vgName)}
+func (_e *MockLVM_Expecter) LVExists(ctx interface{}, lvName interface{}, vgName interface{}) *MockLVM_LVExists_Call {
+	return &MockLVM_LVExists_Call{Call: _e.mock.On("LVExists", ctx, lvName, vgName)}
 }
 
-func (_c *MockLVM_LVExists_Call) Run(run func(lvName string, vgName string)) *MockLVM_LVExists_Call {
+func (_c *MockLVM_LVExists_Call) Run(run func(ctx context.Context, lvName string, vgName string)) *MockLVM_LVExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -513,14 +525,14 @@ func (_c *MockLVM_LVExists_Call) Return(_a0 bool, _a1 error) *MockLVM_LVExists_C
 	return _c
 }
 
-func (_c *MockLVM_LVExists_Call) RunAndReturn(run func(string, string) (bool, error)) *MockLVM_LVExists_Call {
+func (_c *MockLVM_LVExists_Call) RunAndReturn(run func(context.Context, string, string) (bool, error)) *MockLVM_LVExists_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ListLVs provides a mock function with given fields: vgName
-func (_m *MockLVM) ListLVs(vgName string) (*lvm.LVReport, error) {
-	ret := _m.Called(vgName)
+// ListLVs provides a mock function with given fields: ctx, vgName
+func (_m *MockLVM) ListLVs(ctx context.Context, vgName string) (*lvm.LVReport, error) {
+	ret := _m.Called(ctx, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListLVs")
@@ -528,19 +540,19 @@ func (_m *MockLVM) ListLVs(vgName string) (*lvm.LVReport, error) {
 
 	var r0 *lvm.LVReport
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*lvm.LVReport, error)); ok {
-		return rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*lvm.LVReport, error)); ok {
+		return rf(ctx, vgName)
 	}
-	if rf, ok := ret.Get(0).(func(string) *lvm.LVReport); ok {
-		r0 = rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *lvm.LVReport); ok {
+		r0 = rf(ctx, vgName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*lvm.LVReport)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(vgName)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, vgName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -554,14 +566,15 @@ type MockLVM_ListLVs_Call struct {
 }
 
 // ListLVs is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vgName string
-func (_e *MockLVM_Expecter) ListLVs(vgName interface{}) *MockLVM_ListLVs_Call {
-	return &MockLVM_ListLVs_Call{Call: _e.mock.On("ListLVs", vgName)}
+func (_e *MockLVM_Expecter) ListLVs(ctx interface{}, vgName interface{}) *MockLVM_ListLVs_Call {
+	return &MockLVM_ListLVs_Call{Call: _e.mock.On("ListLVs", ctx, vgName)}
 }
 
-func (_c *MockLVM_ListLVs_Call) Run(run func(vgName string)) *MockLVM_ListLVs_Call {
+func (_c *MockLVM_ListLVs_Call) Run(run func(ctx context.Context, vgName string)) *MockLVM_ListLVs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -571,14 +584,14 @@ func (_c *MockLVM_ListLVs_Call) Return(_a0 *lvm.LVReport, _a1 error) *MockLVM_Li
 	return _c
 }
 
-func (_c *MockLVM_ListLVs_Call) RunAndReturn(run func(string) (*lvm.LVReport, error)) *MockLVM_ListLVs_Call {
+func (_c *MockLVM_ListLVs_Call) RunAndReturn(run func(context.Context, string) (*lvm.LVReport, error)) *MockLVM_ListLVs_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ListLVsByName provides a mock function with given fields: vgName
-func (_m *MockLVM) ListLVsByName(vgName string) ([]string, error) {
-	ret := _m.Called(vgName)
+// ListLVsByName provides a mock function with given fields: ctx, vgName
+func (_m *MockLVM) ListLVsByName(ctx context.Context, vgName string) ([]string, error) {
+	ret := _m.Called(ctx, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListLVsByName")
@@ -586,19 +599,19 @@ func (_m *MockLVM) ListLVsByName(vgName string) ([]string, error) {
 
 	var r0 []string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]string, error)); ok {
-		return rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, vgName)
 	}
-	if rf, ok := ret.Get(0).(func(string) []string); ok {
-		r0 = rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, vgName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(vgName)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, vgName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -612,14 +625,15 @@ type MockLVM_ListLVsByName_Call struct {
 }
 
 // ListLVsByName is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vgName string
-func (_e *MockLVM_Expecter) ListLVsByName(vgName interface{}) *MockLVM_ListLVsByName_Call {
-	return &MockLVM_ListLVsByName_Call{Call: _e.mock.On("ListLVsByName", vgName)}
+func (_e *MockLVM_Expecter) ListLVsByName(ctx interface{}, vgName interface{}) *MockLVM_ListLVsByName_Call {
+	return &MockLVM_ListLVsByName_Call{Call: _e.mock.On("ListLVsByName", ctx, vgName)}
 }
 
-func (_c *MockLVM_ListLVsByName_Call) Run(run func(vgName string)) *MockLVM_ListLVsByName_Call {
+func (_c *MockLVM_ListLVsByName_Call) Run(run func(ctx context.Context, vgName string)) *MockLVM_ListLVsByName_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -629,14 +643,14 @@ func (_c *MockLVM_ListLVsByName_Call) Return(_a0 []string, _a1 error) *MockLVM_L
 	return _c
 }
 
-func (_c *MockLVM_ListLVsByName_Call) RunAndReturn(run func(string) ([]string, error)) *MockLVM_ListLVsByName_Call {
+func (_c *MockLVM_ListLVsByName_Call) RunAndReturn(run func(context.Context, string) ([]string, error)) *MockLVM_ListLVsByName_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ListPVs provides a mock function with given fields: vgName
-func (_m *MockLVM) ListPVs(vgName string) ([]lvm.PhysicalVolume, error) {
-	ret := _m.Called(vgName)
+// ListPVs provides a mock function with given fields: ctx, vgName
+func (_m *MockLVM) ListPVs(ctx context.Context, vgName string) ([]lvm.PhysicalVolume, error) {
+	ret := _m.Called(ctx, vgName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListPVs")
@@ -644,19 +658,19 @@ func (_m *MockLVM) ListPVs(vgName string) ([]lvm.PhysicalVolume, error) {
 
 	var r0 []lvm.PhysicalVolume
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]lvm.PhysicalVolume, error)); ok {
-		return rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]lvm.PhysicalVolume, error)); ok {
+		return rf(ctx, vgName)
 	}
-	if rf, ok := ret.Get(0).(func(string) []lvm.PhysicalVolume); ok {
-		r0 = rf(vgName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []lvm.PhysicalVolume); ok {
+		r0 = rf(ctx, vgName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]lvm.PhysicalVolume)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(vgName)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, vgName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -670,14 +684,15 @@ type MockLVM_ListPVs_Call struct {
 }
 
 // ListPVs is a helper method to define mock.On call
+//   - ctx context.Context
 //   - vgName string
-func (_e *MockLVM_Expecter) ListPVs(vgName interface{}) *MockLVM_ListPVs_Call {
-	return &MockLVM_ListPVs_Call{Call: _e.mock.On("ListPVs", vgName)}
+func (_e *MockLVM_Expecter) ListPVs(ctx interface{}, vgName interface{}) *MockLVM_ListPVs_Call {
+	return &MockLVM_ListPVs_Call{Call: _e.mock.On("ListPVs", ctx, vgName)}
 }
 
-func (_c *MockLVM_ListPVs_Call) Run(run func(vgName string)) *MockLVM_ListPVs_Call {
+func (_c *MockLVM_ListPVs_Call) Run(run func(ctx context.Context, vgName string)) *MockLVM_ListPVs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -687,14 +702,14 @@ func (_c *MockLVM_ListPVs_Call) Return(_a0 []lvm.PhysicalVolume, _a1 error) *Moc
 	return _c
 }
 
-func (_c *MockLVM_ListPVs_Call) RunAndReturn(run func(string) ([]lvm.PhysicalVolume, error)) *MockLVM_ListPVs_Call {
+func (_c *MockLVM_ListPVs_Call) RunAndReturn(run func(context.Context, string) ([]lvm.PhysicalVolume, error)) *MockLVM_ListPVs_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ListVGs provides a mock function with given fields: taggedByLVMS
-func (_m *MockLVM) ListVGs(taggedByLVMS bool) ([]lvm.VolumeGroup, error) {
-	ret := _m.Called(taggedByLVMS)
+// ListVGs provides a mock function with given fields: ctx
+func (_m *MockLVM) ListVGs(ctx context.Context) ([]lvm.VolumeGroup, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListVGs")
@@ -702,19 +717,19 @@ func (_m *MockLVM) ListVGs(taggedByLVMS bool) ([]lvm.VolumeGroup, error) {
 
 	var r0 []lvm.VolumeGroup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(bool) ([]lvm.VolumeGroup, error)); ok {
-		return rf(taggedByLVMS)
+	if rf, ok := ret.Get(0).(func(context.Context) ([]lvm.VolumeGroup, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(bool) []lvm.VolumeGroup); ok {
-		r0 = rf(taggedByLVMS)
+	if rf, ok := ret.Get(0).(func(context.Context) []lvm.VolumeGroup); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]lvm.VolumeGroup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(bool) error); ok {
-		r1 = rf(taggedByLVMS)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -728,14 +743,14 @@ type MockLVM_ListVGs_Call struct {
 }
 
 // ListVGs is a helper method to define mock.On call
-//   - taggedByLVMS bool
-func (_e *MockLVM_Expecter) ListVGs(taggedByLVMS interface{}) *MockLVM_ListVGs_Call {
-	return &MockLVM_ListVGs_Call{Call: _e.mock.On("ListVGs", taggedByLVMS)}
+//   - ctx context.Context
+func (_e *MockLVM_Expecter) ListVGs(ctx interface{}) *MockLVM_ListVGs_Call {
+	return &MockLVM_ListVGs_Call{Call: _e.mock.On("ListVGs", ctx)}
 }
 
-func (_c *MockLVM_ListVGs_Call) Run(run func(taggedByLVMS bool)) *MockLVM_ListVGs_Call {
+func (_c *MockLVM_ListVGs_Call) Run(run func(ctx context.Context)) *MockLVM_ListVGs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(bool))
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -745,7 +760,7 @@ func (_c *MockLVM_ListVGs_Call) Return(_a0 []lvm.VolumeGroup, _a1 error) *MockLV
 	return _c
 }
 
-func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(bool) ([]lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
+func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context) ([]lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -62,7 +62,7 @@ func (r *Reconciler) wipeDevice(ctx context.Context, deviceName string, blockDev
 	wiped := false
 	for _, device := range blockDevices {
 		if device.KName == deviceName {
-			if err := r.Wipefs.Wipe(device.KName); err != nil {
+			if err := r.Wipefs.Wipe(ctx, device.KName); err != nil {
 				return false, err
 			}
 			wiped = true
@@ -93,7 +93,7 @@ func (r *Reconciler) removeMapperReference(ctx context.Context, device lsblk.Blo
 			r.removeMapperReference(ctx, child)
 		}
 	}
-	if err := r.Dmsetup.Remove(device.KName); err != nil {
+	if err := r.Dmsetup.Remove(ctx, device.KName); err != nil {
 		if errors.Is(err, dmsetup.ErrReferenceNotFound) {
 			logger.Info("skipping the removal of device-mapper reference as the reference does not exist", "childName", device.KName)
 		} else {
