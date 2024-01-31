@@ -144,7 +144,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	lvmdConfig := &lvmd.Config{}
-	if err := loadConfFile(ctx, lvmdConfig, constants.LVMDDefaultFileConfigPath); err != nil {
+	if err := loadConfFile(ctx, lvmdConfig, lvmd.DefaultFileConfigPath); err != nil {
 		opts.SetupLog.Error(err, "lvmd config could not be loaded, starting without topolvm components and attempting bootstrap")
 		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 			return fmt.Errorf("unable to set up ready check: %w", err)
@@ -199,7 +199,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if err = (&vgmanager.Reconciler{
 		Client:        mgr.GetClient(),
 		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.NewFileConfigurator(mgr.GetClient(), operatorNamespace),
+		LVMD:          lvmd.DefaultConfigurator(),
 		Scheme:        mgr.GetScheme(),
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
 		Wipefs:        wipefs.NewDefaultHostWipefs(),
@@ -238,7 +238,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		fileNotExist := false
 		for {
 			// check if file exists, otherwise the watcher errors
-			_, err := os.Lstat(constants.LVMDDefaultFileConfigPath)
+			_, err := os.Lstat(lvmd.DefaultFileConfigPath)
 			if err != nil {
 				if os.IsNotExist(err) {
 					time.Sleep(100 * time.Millisecond)
@@ -251,7 +251,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				if fileNotExist {
 					cancel()
 				}
-				err = watcher.Add(constants.LVMDDefaultFileConfigPath)
+				err = watcher.Add(lvmd.DefaultFileConfigPath)
 				if err != nil {
 					opts.SetupLog.Error(err, "unable to add file path to watcher")
 				}

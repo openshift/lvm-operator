@@ -43,10 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -82,36 +80,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, builder.MatchEveryOwner, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.getObjsInNamespaceForReconcile)).
 		Complete(r)
-}
-
-// getObjsInNamespaceForReconcile reconciles the object anytime the given object is in the same namespace
-// as the available LVMVolumeGroups.
-func (r *Reconciler) getObjsInNamespaceForReconcile(ctx context.Context, obj client.Object) []reconcile.Request {
-	foundLVMVolumeGroupList := &lvmv1alpha1.LVMVolumeGroupList{}
-	listOps := &client.ListOptions{
-		Namespace: obj.GetNamespace(),
-	}
-
-	if err := r.List(ctx, foundLVMVolumeGroupList, listOps); err != nil {
-		log.FromContext(ctx).Error(err, "getObjsInNamespaceForReconcile: Failed to get LVMVolumeGroup objs")
-		return []reconcile.Request{}
-	}
-	if len(foundLVMVolumeGroupList.Items) < 1 {
-		return []reconcile.Request{}
-	}
-
-	var requests []reconcile.Request
-	for _, lvmVG := range foundLVMVolumeGroupList.Items {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      lvmVG.GetName(),
-				Namespace: lvmVG.GetNamespace(),
-			},
-		})
-	}
-	return requests
 }
 
 type Reconciler struct {
