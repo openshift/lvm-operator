@@ -18,27 +18,18 @@ type ArgPassable interface {
 
 // Options represents all pass-through options for logging verbosity
 type Options struct {
-	CSISideCar        *CSISideCarOptions
-	TopoLVMController *TopoLVMControllerOptions
-	TopoLVMNode       *TopoLVMNodeOptions
-	VGManager         *VGmanagerOptions
+	VGManager *VGmanagerOptions
 }
 
 // NewOptions creates a new option set and binds it's values against a given flagset.
 func NewOptions() *Options {
 	opts := &Options{
-		CSISideCar:        &CSISideCarOptions{},
-		TopoLVMController: &TopoLVMControllerOptions{},
-		TopoLVMNode:       &TopoLVMNodeOptions{},
-		VGManager:         &VGmanagerOptions{},
+		VGManager: &VGmanagerOptions{},
 	}
 	return opts
 }
 
 func (o *Options) BindFlags(fs *pflag.FlagSet) {
-	o.CSISideCar.BindFlags(fs)
-	o.TopoLVMController.BindFlags(fs)
-	o.TopoLVMNode.BindFlags(fs)
 	o.VGManager.BindFlags(fs)
 }
 
@@ -84,42 +75,6 @@ func (o *KlogOptions) AsArgs() []string {
 func (o *KlogOptions) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.V, "v", "", "number for the log level verbosity")
 	fs.StringVar(&o.VModule, "vmodule", "", "comma-separated list of pattern=N settings for file-filtered logging")
-}
-
-type CSISideCarOptions struct {
-	KlogOptions
-}
-
-func (o *CSISideCarOptions) BindFlags(fs *pflag.FlagSet) {
-	bindFlagsWithPrefix(&o.KlogOptions, fs, "csi-sidecar")
-}
-
-type TopoLVMControllerOptions struct {
-	KlogOptions
-	ZapOptions
-}
-
-func (o *TopoLVMControllerOptions) AsArgs() []string {
-	return append(o.ZapOptions.AsArgs(), o.KlogOptions.AsArgs()...)
-}
-
-func (o *TopoLVMControllerOptions) BindFlags(fs *pflag.FlagSet) {
-	bindFlagsWithPrefix(&o.KlogOptions, fs, "topolvm-controller")
-	bindFlagsWithPrefix(&o.ZapOptions, fs, "topolvm-controller")
-}
-
-type TopoLVMNodeOptions struct {
-	KlogOptions
-	ZapOptions
-}
-
-func (o *TopoLVMNodeOptions) BindFlags(fs *pflag.FlagSet) {
-	bindFlagsWithPrefix(&o.KlogOptions, fs, "topolvm-node")
-	bindFlagsWithPrefix(&o.ZapOptions, fs, "topolvm-node")
-}
-
-func (o *TopoLVMNodeOptions) AsArgs() []string {
-	return append(o.ZapOptions.AsArgs(), o.KlogOptions.AsArgs()...)
 }
 
 type VGmanagerOptions struct {
