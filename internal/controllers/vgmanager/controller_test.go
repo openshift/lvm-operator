@@ -24,7 +24,6 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	lvmdmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd/mocks"
 	wipefsmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs/mocks"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -32,8 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -112,6 +109,7 @@ func setupInstances() testInstances {
 	mockLSBLK := lsblkmocks.NewMockLSBLK(t)
 	mockLVM := lvmmocks.NewMockLVM(t)
 	mockWipefs := wipefsmocks.NewMockWipefs(t)
+	testLVMD := lvmd.NewFileConfigurator(filepath.Join(t.TempDir(), "lvmd.yaml"))
 
 	hostname := "test-host.vgmanager.test.io"
 	hostnameLabelKey := "kubernetes.io/hostname"
@@ -126,8 +124,6 @@ func setupInstances() testInstances {
 		Build()
 	fakeRecorder := record.NewFakeRecorder(100)
 	fakeRecorder.IncludeObject = true
-
-	testLVMD := lvmd.NewFileConfigurator(fakeClient, namespace.GetName())
 
 	return testInstances{
 		LVM:       mockLVM,
@@ -835,53 +831,4 @@ func testReconcileFailure(ctx context.Context) {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(MatchError(expectedError))
 	})
-}
-
-func TestGetObjsInNamespaceForReconcile(t *testing.T) {
-	tests := []struct {
-		name   string
-		objs   []client.Object
-		list   error
-		expect []reconcile.Request
-	}{
-		{
-			name: "test lvmvolumegroup not fetch error",
-			list: assert.AnError,
-		},
-		{
-			name: "test lvmvolumegroup found in a different namespace",
-			objs: []client.Object{
-				&lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test-vg", Namespace: "not-test"}},
-			},
-		},
-		{
-			name: "test lvmvolumegroup found in the same namespace",
-			objs: []client.Object{
-				&lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test-vg", Namespace: "test"}},
-			},
-			expect: []reconcile.Request{{NamespacedName: types.NamespacedName{Name: "test-vg", Namespace: "test"}}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			newScheme := runtime.NewScheme()
-			assert.NoError(t, lvmv1alpha1.AddToScheme(newScheme))
-			assert.NoError(t, corev1.AddToScheme(newScheme))
-			clnt := fake.NewClientBuilder().WithObjects(tt.objs...).
-				WithScheme(newScheme).WithInterceptorFuncs(interceptor.Funcs{
-				List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-					if tt.list != nil {
-						return tt.list
-					}
-					return client.List(ctx, list, opts...)
-				},
-			}).Build()
-
-			r := &Reconciler{Client: clnt}
-			requests := r.getObjsInNamespaceForReconcile(context.Background(),
-				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-vg", Namespace: "test"}})
-			assert.ElementsMatch(t, tt.expect, requests)
-		})
-	}
 }
