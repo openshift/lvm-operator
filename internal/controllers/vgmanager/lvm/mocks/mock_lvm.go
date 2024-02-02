@@ -640,25 +640,25 @@ func (_c *MockLVM_ListPVs_Call) RunAndReturn(run func(string) ([]lvm.PhysicalVol
 	return _c
 }
 
-// ListVGs provides a mock function with given fields:
-func (_m *MockLVM) ListVGs() ([]lvm.VolumeGroup, error) {
-	ret := _m.Called()
+// ListVGs provides a mock function with given fields: taggedByLVMS
+func (_m *MockLVM) ListVGs(taggedByLVMS bool) ([]lvm.VolumeGroup, error) {
+	ret := _m.Called(taggedByLVMS)
 
 	var r0 []lvm.VolumeGroup
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]lvm.VolumeGroup, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(bool) ([]lvm.VolumeGroup, error)); ok {
+		return rf(taggedByLVMS)
 	}
-	if rf, ok := ret.Get(0).(func() []lvm.VolumeGroup); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(bool) []lvm.VolumeGroup); ok {
+		r0 = rf(taggedByLVMS)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]lvm.VolumeGroup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(bool) error); ok {
+		r1 = rf(taggedByLVMS)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -672,13 +672,14 @@ type MockLVM_ListVGs_Call struct {
 }
 
 // ListVGs is a helper method to define mock.On call
-func (_e *MockLVM_Expecter) ListVGs() *MockLVM_ListVGs_Call {
-	return &MockLVM_ListVGs_Call{Call: _e.mock.On("ListVGs")}
+//   - taggedByLVMS bool
+func (_e *MockLVM_Expecter) ListVGs(taggedByLVMS interface{}) *MockLVM_ListVGs_Call {
+	return &MockLVM_ListVGs_Call{Call: _e.mock.On("ListVGs", taggedByLVMS)}
 }
 
-func (_c *MockLVM_ListVGs_Call) Run(run func()) *MockLVM_ListVGs_Call {
+func (_c *MockLVM_ListVGs_Call) Run(run func(taggedByLVMS bool)) *MockLVM_ListVGs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(bool))
 	})
 	return _c
 }
@@ -688,7 +689,7 @@ func (_c *MockLVM_ListVGs_Call) Return(_a0 []lvm.VolumeGroup, _a1 error) *MockLV
 	return _c
 }
 
-func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func() ([]lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
+func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(bool) ([]lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
 	_c.Call.Return(run)
 	return _c
 }

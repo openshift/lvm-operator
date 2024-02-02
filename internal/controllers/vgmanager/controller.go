@@ -187,7 +187,7 @@ func (r *Reconciler) reconcile(
 
 	devices := r.filterDevices(ctx, newDevices, r.Filters(volumeGroup, r.LVM, r.LSBLK))
 
-	vgs, err := r.LVM.ListVGs()
+	vgs, err := r.LVM.ListVGs(true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}

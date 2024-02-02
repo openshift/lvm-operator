@@ -164,7 +164,7 @@ func (r *Reconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha
 }
 
 func (r *Reconciler) setDevices(status *lvmv1alpha1.VGStatus, devices *FilteredBlockDevices) (bool, error) {
-	vgs, err := r.LVM.ListVGs()
+	vgs, err := r.LVM.ListVGs(true)
 	if err != nil {
 		return false, fmt.Errorf("failed to list volume groups. %v", err)
 	}
