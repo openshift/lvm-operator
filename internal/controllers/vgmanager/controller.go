@@ -194,7 +194,7 @@ func (r *Reconciler) reconcile(
 
 	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
 
-	vgs, err := r.LVM.ListVGs()
+	vgs, err := r.LVM.ListVGs(true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -287,7 +287,7 @@ func (r *Reconciler) reconcile(
 	}
 
 	// refresh list of vgs to be used in status
-	vgs, err = r.LVM.ListVGs()
+	vgs, err = r.LVM.ListVGs(true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -423,7 +423,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	}
 
 	// Check if volume group exists
-	vgs, err := r.LVM.ListVGs()
+	vgs, err := r.LVM.ListVGs(true)
 	if err != nil {
 		return fmt.Errorf("failed to list volume groups, %w", err)
 	}

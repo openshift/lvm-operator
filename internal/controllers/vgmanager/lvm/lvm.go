@@ -58,6 +58,7 @@ type VGReport struct {
 		Vg []struct {
 			Name   string `json:"vg_name"`
 			VgSize string `json:"vg_size"`
+			Tags   string `json:"vg_tags"`
 		} `json:"vg"`
 	} `json:"report"`
 }
@@ -95,7 +96,7 @@ type LVM interface {
 	GetVG(name string) (VolumeGroup, error)
 
 	ListPVs(vgName string) ([]PhysicalVolume, error)
-	ListVGs() ([]VolumeGroup, error)
+	ListVGs(taggedByLVMS bool) ([]VolumeGroup, error)
 	ListLVsByName(vgName string) ([]string, error)
 	ListLVs(vgName string) (*LVReport, error)
 
@@ -128,6 +129,9 @@ type VolumeGroup struct {
 
 	// PVs is the list of physical volumes associated with the volume group
 	PVs []PhysicalVolume `json:"pvs"`
+
+	// Tags is the list of tags associated with the volume group
+	Tags []string `json:"vg_tags"`
 }
 
 // PhysicalVolume represents a physical volume of linux lvm.
@@ -343,17 +347,29 @@ func (hlvm *HostLVM) ListPVs(vgName string) ([]PhysicalVolume, error) {
 }
 
 // ListVolumeGroups lists all volume groups and the physical volumes associated with them.
-func (hlvm *HostLVM) ListVGs() ([]VolumeGroup, error) {
+func (hlvm *HostLVM) ListVGs(tagged bool) ([]VolumeGroup, error) {
 	res := new(VGReport)
 
-	if err := hlvm.execute(res, "vgs", lvmsTag, "--reportformat", "json"); err != nil {
+	args := []string{
+		"vgs", "-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
+	}
+	if tagged {
+		args = append(args, lvmsTag)
+	}
+
+	if err := hlvm.execute(res, args...); err != nil {
 		return nil, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 
 	var vgList []VolumeGroup
 	for _, report := range res.Report {
 		for _, vg := range report.Vg {
-			vgList = append(vgList, VolumeGroup{Name: vg.Name, PVs: []PhysicalVolume{}})
+			vgList = append(vgList, VolumeGroup{
+				Name:   vg.Name,
+				VgSize: vg.VgSize,
+				PVs:    []PhysicalVolume{},
+				Tags:   strings.Split(vg.Tags, ","),
+			})
 		}
 	}
 
@@ -371,6 +387,10 @@ func (hlvm *HostLVM) ListVGs() ([]VolumeGroup, error) {
 			}
 		}
 		vgList[i].PVs = vgPvs
+	}
+
+	if !tagged {
+		return untaggedVGs(vgList), nil
 	}
 
 	return vgList, nil
@@ -537,4 +557,21 @@ func (hlvm *HostLVM) execute(v interface{}, args ...string) error {
 	}
 
 	return nil
+}
+
+func untaggedVGs(vgs []VolumeGroup) []VolumeGroup {
+	var untaggedVGs []VolumeGroup
+	for _, vg := range vgs {
+		tagPresent := false
+		for _, tag := range vg.Tags {
+			if tag == lvmsTag {
+				tagPresent = true
+				break
+			}
+		}
+		if !tagPresent {
+			untaggedVGs = append(untaggedVGs, vg)
+		}
+	}
+	return untaggedVGs
 }

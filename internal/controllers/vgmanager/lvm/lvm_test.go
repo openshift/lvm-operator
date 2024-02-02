@@ -256,7 +256,7 @@ func TestHostLVM_ListVGs(t *testing.T) {
 					return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0])
 				},
 			}
-			_, err := NewHostLVM(executor).ListVGs()
+			_, err := NewHostLVM(executor).ListVGs(true)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -591,4 +591,16 @@ func TestHostLVM_execute(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_untaggedVGs(t *testing.T) {
+	vgs := []VolumeGroup{
+		{Name: "vg1", Tags: []string{"tag1"}},
+		{Name: "vg2", Tags: []string{lvmsTag}},
+	}
+
+	vgs = untaggedVGs(vgs)
+
+	assert.Len(t, vgs, 1)
+	assert.Equal(t, "vg1", vgs[0].Name)
 }
