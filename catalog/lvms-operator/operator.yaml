@@ -86,13 +86,25 @@ properties:
             }
           }
       operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
       operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
-      operators.operatorframework.io/builder: operator-sdk-v1.25.3
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.33.0
       operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
         "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
       operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
       repository: https://github.com/openshift/lvm-operator
-      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     apiServiceDefinitions: {}
     crdDescriptions:
       owned:
