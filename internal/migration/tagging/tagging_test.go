@@ -23,12 +23,38 @@ func TestAddTagToVGs(t *testing.T) {
 	hostnameLabelKey := "kubernetes.io/hostname"
 	vgName := "vgtest1"
 
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName, Labels: map[string]string{
+		hostnameLabelKey: nodeName,
+	}}}
+
 	testCases := []struct {
-		name          string
-		clientObjects []client.Object
-		volumeGroups  []lvm.VolumeGroup
-		addTagCount   int
+		name                  string
+		clientObjects         []client.Object
+		untaggedVolumeGroups  []lvm.VolumeGroup
+		listVGsErr            error
+		addTagCountSuccessful int
+		addTagCountError      int
 	}{
+		{
+			name: "there is a matching CR in the same namespace, but no volume group to tag",
+			clientObjects: []client.Object{
+				&v1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{
+					Name:      vgName,
+					Namespace: namespace,
+				}},
+			},
+			untaggedVolumeGroups: []lvm.VolumeGroup{},
+		},
+		{
+			name: "there is a matching CR in the same namespace, but vg fetching failed",
+			clientObjects: []client.Object{
+				&v1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{
+					Name:      vgName,
+					Namespace: namespace,
+				}},
+			},
+			listVGsErr: assert.AnError,
+		},
 		{
 			name: "there is a matching CR in the same namespace, add a tag",
 			clientObjects: []client.Object{
@@ -36,13 +62,14 @@ func TestAddTagToVGs(t *testing.T) {
 					Name:      vgName,
 					Namespace: namespace,
 				}},
+				node,
 			},
-			volumeGroups: []lvm.VolumeGroup{
+			untaggedVolumeGroups: []lvm.VolumeGroup{
 				{
 					Name: vgName,
 				},
 			},
-			addTagCount: 1,
+			addTagCountSuccessful: 1,
 		},
 		{
 			name: "there are two matching CRs in the same namespace, add tags",
@@ -55,8 +82,9 @@ func TestAddTagToVGs(t *testing.T) {
 					Name:      "vgtest2",
 					Namespace: namespace,
 				}},
+				node,
 			},
-			volumeGroups: []lvm.VolumeGroup{
+			untaggedVolumeGroups: []lvm.VolumeGroup{
 				{
 					Name: vgName,
 				},
@@ -64,17 +92,63 @@ func TestAddTagToVGs(t *testing.T) {
 					Name: "vgtest2",
 				},
 			},
-			addTagCount: 2,
+			addTagCountSuccessful: 2,
+		}, {
+			name: "there are two matching CRs in the same namespace, add tags but fail on both of them",
+			clientObjects: []client.Object{
+				&v1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{
+					Name:      vgName,
+					Namespace: namespace,
+				}},
+				&v1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{
+					Name:      "vgtest2",
+					Namespace: namespace,
+				}},
+				node,
+			},
+			untaggedVolumeGroups: []lvm.VolumeGroup{
+				{
+					Name: vgName,
+				},
+				{
+					Name: "vgtest2",
+				},
+			},
+			addTagCountError: 2,
 		},
 		{
-			name:          "there is no matching CR, do not add a tag",
-			clientObjects: []client.Object{},
-			volumeGroups: []lvm.VolumeGroup{
+			name: "there are two matching CRs in the same namespace, add tags but fail on one of them",
+			clientObjects: []client.Object{
+				&v1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{
+					Name:      vgName,
+					Namespace: namespace,
+				}},
+				&v1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{
+					Name:      "vgtest2",
+					Namespace: namespace,
+				}},
+				node,
+			},
+			untaggedVolumeGroups: []lvm.VolumeGroup{
+				{
+					Name: vgName,
+				},
+				{
+					Name: "vgtest2",
+				},
+			},
+			addTagCountSuccessful: 1,
+			addTagCountError:      1,
+		},
+		{
+			name:          "there is no matching LVMVolumeGroup CR, do not add a tag",
+			clientObjects: []client.Object{node},
+			untaggedVolumeGroups: []lvm.VolumeGroup{
 				{
 					Name: vgName,
 				},
 			},
-			addTagCount: 0,
+			addTagCountSuccessful: 0,
 		},
 		{
 			name: "there is a matching CR in a different namespace, do not add a tag",
@@ -83,13 +157,14 @@ func TestAddTagToVGs(t *testing.T) {
 					Name:      vgName,
 					Namespace: "test-namespace-2",
 				}},
+				node,
 			},
-			volumeGroups: []lvm.VolumeGroup{
+			untaggedVolumeGroups: []lvm.VolumeGroup{
 				{
 					Name: vgName,
 				},
 			},
-			addTagCount: 0,
+			addTagCountSuccessful: 0,
 		},
 		{
 			name: "there is a matching CR with a matching node selector, add a tag",
@@ -115,16 +190,14 @@ func TestAddTagToVGs(t *testing.T) {
 						},
 					},
 				},
-				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName, Labels: map[string]string{
-					hostnameLabelKey: nodeName,
-				}}},
+				node,
 			},
-			volumeGroups: []lvm.VolumeGroup{
+			untaggedVolumeGroups: []lvm.VolumeGroup{
 				{
 					Name: vgName,
 				},
 			},
-			addTagCount: 1,
+			addTagCountSuccessful: 1,
 		},
 		{
 			name: "there is a matching CR with a non-matching node selector, do not add a tag",
@@ -150,20 +223,16 @@ func TestAddTagToVGs(t *testing.T) {
 						},
 					},
 				},
-				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName, Labels: map[string]string{
-					hostnameLabelKey: nodeName,
-				}}},
+				node,
 			},
-			volumeGroups: []lvm.VolumeGroup{
+			untaggedVolumeGroups: []lvm.VolumeGroup{
 				{
 					Name: vgName,
 				},
 			},
-			addTagCount: 0,
+			addTagCountSuccessful: 0,
 		},
 	}
-
-	mockLVM := lvmmocks.NewMockLVM(t)
 
 	scheme, err := v1alpha1.SchemeBuilder.Build()
 	assert.NoError(t, err, "creating scheme")
@@ -172,13 +241,32 @@ func TestAddTagToVGs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			mockLVM := lvmmocks.NewMockLVM(t)
+			defer mockLVM.AssertExpectations(t)
 			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.clientObjects...).Build()
-			if tc.addTagCount > 0 {
-				mockLVM.EXPECT().AddTagToVG(mock.Anything).Return(nil).Times(tc.addTagCount)
+			if tc.addTagCountSuccessful > 0 {
+				mockLVM.EXPECT().AddTagToVG(mock.Anything).Return(nil).Times(tc.addTagCountSuccessful)
 			}
-			mockLVM.EXPECT().ListVGs().Return(tc.volumeGroups, nil).Once()
+			if tc.addTagCountError > 0 {
+				mockLVM.EXPECT().AddTagToVG(mock.Anything).Return(assert.AnError).Times(tc.addTagCountError)
+			}
+
+			if tc.listVGsErr != nil {
+				mockLVM.EXPECT().ListVGs(false).Return(nil, tc.listVGsErr).Times(1)
+			} else {
+				mockLVM.EXPECT().ListVGs(false).Return(tc.untaggedVolumeGroups, nil).Times(1)
+			}
+
 			err := tagging.AddTagToVGs(context.Background(), c, mockLVM, nodeName, namespace)
-			assert.NoError(t, err)
+
+			if tc.addTagCountError > 0 {
+				assert.ErrorIs(t, err, assert.AnError)
+			} else if tc.listVGsErr != nil {
+				assert.ErrorIs(t, err, tc.listVGsErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
 		})
 	}
 }
