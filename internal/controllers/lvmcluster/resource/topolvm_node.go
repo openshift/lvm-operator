@@ -87,6 +87,9 @@ func (n topolvmNode) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster
 		// containers
 		ds.Spec.Template.Spec.Containers = dsTemplate.Spec.Template.Spec.Containers
 
+		// volumes
+		ds.Spec.Template.Spec.Volumes = dsTemplate.Spec.Template.Spec.Volumes
+
 		// tolerations
 		ds.Spec.Template.Spec.Tolerations = dsTemplate.Spec.Template.Spec.Tolerations
 
