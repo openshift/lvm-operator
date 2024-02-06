@@ -255,9 +255,9 @@ func TestAddTagToVGs(t *testing.T) {
 			}
 
 			if tc.listVGsErr != nil {
-				mockLVM.EXPECT().ListVGs(false).Return(nil, tc.listVGsErr).Times(1)
+				mockLVM.EXPECT().ListVGs(ctx, false).Return(nil, tc.listVGsErr).Times(1)
 			} else {
-				mockLVM.EXPECT().ListVGs(false).Return(tc.untaggedVolumeGroups, nil).Times(1)
+				mockLVM.EXPECT().ListVGs(ctx, false).Return(tc.untaggedVolumeGroups, nil).Times(1)
 			}
 
 			err := tagging.AddTagToVGs(ctx, c, mockLVM, nodeName, namespace)

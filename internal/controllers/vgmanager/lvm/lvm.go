@@ -36,7 +36,6 @@ type ExitError interface {
 const (
 	DefaultChunkSize = "128"
 
-	lvmCmd        = "/usr/sbin/lvm"
 	vgsCmd        = "/usr/sbin/vgs"
 	pvsCmd        = "/usr/sbin/pvs"
 	lvsCmd        = "/usr/sbin/lvs"
@@ -336,13 +335,13 @@ func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, e
 	res := new(VGReport)
 
 	args := []string{
-		"vgs", "-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
+		"-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
 	}
 	if tagged {
 		args = append(args, lvmsTag)
 	}
 
-	if err := hlvm.RunCommandAsHostInto(ctx, res, args...); err != nil {
+	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
 		return nil, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 
