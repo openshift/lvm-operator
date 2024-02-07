@@ -17,8 +17,7 @@ limitations under the License.
 package lvm
 
 import (
-	"encoding/json"
-	"errors"
+	"context"
 	"fmt"
 	"strings"
 
@@ -37,7 +36,9 @@ type ExitError interface {
 const (
 	DefaultChunkSize = "128"
 
-	lvmCmd        = "/usr/sbin/lvm"
+	vgsCmd        = "/usr/sbin/vgs"
+	pvsCmd        = "/usr/sbin/pvs"
+	lvsCmd        = "/usr/sbin/lvs"
 	vgCreateCmd   = "/usr/sbin/vgcreate"
 	vgChangeCmd   = "/usr/sbin/vgchange"
 	vgExtendCmd   = "/usr/sbin/vgextend"
@@ -89,22 +90,22 @@ type LogicalVolume struct {
 }
 
 type LVM interface {
-	CreateVG(vg VolumeGroup) error
-	ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error)
-	AddTagToVG(vgName string) error
-	DeleteVG(vg VolumeGroup) error
-	GetVG(name string) (VolumeGroup, error)
+	CreateVG(ctx context.Context, vg VolumeGroup) error
+	ExtendVG(ctx context.Context, vg VolumeGroup, pvs []string) (VolumeGroup, error)
+	AddTagToVG(ctx context.Context, vgName string) error
+	DeleteVG(ctx context.Context, vg VolumeGroup) error
+	GetVG(ctx context.Context, name string) (VolumeGroup, error)
 
-	ListPVs(vgName string) ([]PhysicalVolume, error)
-	ListVGs(taggedByLVMS bool) ([]VolumeGroup, error)
-	ListLVsByName(vgName string) ([]string, error)
-	ListLVs(vgName string) (*LVReport, error)
+	ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error)
+	ListVGs(ctx context.Context, taggedByLVMS bool) ([]VolumeGroup, error)
+	ListLVsByName(ctx context.Context, vgName string) ([]string, error)
+	ListLVs(ctx context.Context, vgName string) (*LVReport, error)
 
-	LVExists(lvName, vgName string) (bool, error)
-	CreateLV(lvName, vgName string, sizePercent int) error
-	ExtendLV(lvName, vgName string, sizePercent int) error
-	ActivateLV(lvName, vgName string) error
-	DeleteLV(lvName, vgName string) error
+	LVExists(ctx context.Context, lvName, vgName string) (bool, error)
+	CreateLV(ctx context.Context, lvName, vgName string, sizePercent int) error
+	ExtendLV(ctx context.Context, lvName, vgName string, sizePercent int) error
+	ActivateLV(ctx context.Context, lvName, vgName string) error
+	DeleteLV(ctx context.Context, lvName, vgName string) error
 }
 
 type HostLVM struct {
@@ -162,7 +163,7 @@ type PhysicalVolume struct {
 }
 
 // CreateVG creates a new volume group
-func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
+func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup) error {
 	if vg.Name == "" {
 		return fmt.Errorf("failed to create volume group: volume group name is empty")
 	}
@@ -177,9 +178,7 @@ func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 		args = append(args, pv.PvName)
 	}
 
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgCreateCmd, args...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, vgCreateCmd, args...); err != nil {
 		return fmt.Errorf("failed to create volume group %q. %v", vg.Name, err)
 	}
 
@@ -187,7 +186,7 @@ func (hlvm *HostLVM) CreateVG(vg VolumeGroup) error {
 }
 
 // ExtendVG Extend extends the volume group only if new physical volumes are available
-func (hlvm *HostLVM) ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error) {
+func (hlvm *HostLVM) ExtendVG(ctx context.Context, vg VolumeGroup, pvs []string) (VolumeGroup, error) {
 	if vg.Name == "" {
 		return VolumeGroup{}, fmt.Errorf("failed to extend volume group: volume group name is empty")
 	}
@@ -199,9 +198,7 @@ func (hlvm *HostLVM) ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error)
 	args := []string{vg.Name}
 	args = append(args, pvs...)
 
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgExtendCmd, args...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, vgExtendCmd, args...); err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to extend volume group %q. %v", vg.Name, err)
 	}
 
@@ -213,37 +210,31 @@ func (hlvm *HostLVM) ExtendVG(vg VolumeGroup, pvs []string) (VolumeGroup, error)
 }
 
 // AddTagToVG adds a lvms tag to the volume group
-func (hlvm *HostLVM) AddTagToVG(vgName string) error {
+func (hlvm *HostLVM) AddTagToVG(ctx context.Context, vgName string) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to add tag to the volume group. Volume group name is empty")
 	}
 
 	args := []string{vgName, "--addtag", lvmsTag}
 
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, args...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, vgChangeCmd, args...); err != nil {
 		return fmt.Errorf("failed to add tag to the volume group %q. %v", vgName, err)
 	}
 
 	return nil
 }
 
-// Delete deletes a volume group and the physical volumes associated with it
-func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
+// DeleteVG deletes a volume group and the physical volumes associated with it
+func (hlvm *HostLVM) DeleteVG(ctx context.Context, vg VolumeGroup) error {
 	// Deactivate Volume Group
 	vgArgs := []string{"-an", vg.Name}
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(vgChangeCmd, vgArgs...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, vgChangeCmd, vgArgs...); err != nil {
 		return fmt.Errorf("failed to remove volume group %q: %w", vg.Name, err)
 	}
 
 	// Remove Volume Group
 	vgArgs = []string{vg.Name}
-	out, err = hlvm.ExecuteCommandWithOutputAsHost(vgRemoveCmd, vgArgs...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, vgRemoveCmd, vgArgs...); err != nil {
 		return fmt.Errorf("failed to remove volume group %q: %w", vg.Name, err)
 	}
 
@@ -252,24 +243,17 @@ func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
 	for _, pv := range vg.PVs {
 		pvArgs = append(pvArgs, pv.PvName)
 	}
-	out, err = hlvm.ExecuteCommandWithOutputAsHost(pvRemoveCmd, pvArgs...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, pvRemoveCmd, pvArgs...); err != nil {
 		return fmt.Errorf("failed to remove physical volumes for the volume group %q: %w", vg.Name, err)
 	}
 
 	for _, pv := range vg.PVs {
-		out, err := hlvm.ExecuteCommandWithOutputAsHost(lvmDevicesCmd, "--delpvid", pv.UUID)
-		_ = out.Close()
+		err := hlvm.RunCommandAsHost(ctx, lvmDevicesCmd, "--delpvid", pv.UUID)
+		if err, ok := exec.AsExecError(err); ok && err.ExitCode() == 5 {
+			// Exit Code 5 On lvmdevices --delpvid means that the PV with that UUID no longer exists
+			continue
+		}
 		if err != nil {
-			var exitError ExitError
-			if errors.As(err, &exitError) {
-				switch exitError.ExitCode() {
-				// Exit Code 5 On lvmdevices --delpvid means that the PV with that UUID no longer exists
-				case 5:
-					continue
-				}
-			}
 			return fmt.Errorf("failed to delete PV %s from device file for the volume group %s: %w", pv.UUID, vg.Name, err)
 		}
 	}
@@ -277,14 +261,14 @@ func (hlvm *HostLVM) DeleteVG(vg VolumeGroup) error {
 	return nil
 }
 
-// GetVolumeGroup returns a volume group along with the associated physical volumes
-func (hlvm *HostLVM) GetVG(name string) (VolumeGroup, error) {
+// GetVG returns a volume group along with the associated physical volumes
+func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error) {
 	res := new(VGReport)
 
 	args := []string{
-		"vgs", lvmsTag, "--units", "g", "--reportformat", "json",
+		lvmsTag, "--units", "g", "--reportformat", "json",
 	}
-	if err := hlvm.execute(res, args...); err != nil {
+	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 
@@ -306,7 +290,7 @@ func (hlvm *HostLVM) GetVG(name string) (VolumeGroup, error) {
 	}
 
 	// Get Physical Volumes associated with the Volume Group
-	pvs, err := hlvm.ListPVs(name)
+	pvs, err := hlvm.ListPVs(ctx, name)
 	if err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to list physical volumes for volume group %q. %v", name, err)
 	}
@@ -315,16 +299,16 @@ func (hlvm *HostLVM) GetVG(name string) (VolumeGroup, error) {
 	return volumeGroup, nil
 }
 
-// ListPhysicalVolumes returns list of physical volumes used to create the given volume group
-func (hlvm *HostLVM) ListPVs(vgName string) ([]PhysicalVolume, error) {
+// ListPVs returns list of physical volumes used to create the given volume group
+func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error) {
 	res := new(PVReport)
 	args := []string{
-		"pvs", "--units", "g", "-v", "--reportformat", "json",
+		"--units", "g", "-v", "--reportformat", "json",
 	}
 	if vgName != "" {
 		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
 	}
-	if err := hlvm.execute(res, args...); err != nil {
+	if err := hlvm.RunCommandAsHostInto(ctx, res, pvsCmd, args...); err != nil {
 		return []PhysicalVolume{}, err
 	}
 
@@ -346,18 +330,18 @@ func (hlvm *HostLVM) ListPVs(vgName string) ([]PhysicalVolume, error) {
 	return pvs, nil
 }
 
-// ListVolumeGroups lists all volume groups and the physical volumes associated with them.
-func (hlvm *HostLVM) ListVGs(tagged bool) ([]VolumeGroup, error) {
+// ListVGs lists all volume groups and the physical volumes associated with them.
+func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, error) {
 	res := new(VGReport)
 
 	args := []string{
-		"vgs", "-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
+		"-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
 	}
 	if tagged {
 		args = append(args, lvmsTag)
 	}
 
-	if err := hlvm.execute(res, args...); err != nil {
+	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
 		return nil, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 
@@ -373,7 +357,7 @@ func (hlvm *HostLVM) ListVGs(tagged bool) ([]VolumeGroup, error) {
 		}
 	}
 
-	pvs, err := hlvm.ListPVs("")
+	pvs, err := hlvm.ListPVs(ctx, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list physical volumes: %w", err)
 	}
@@ -396,18 +380,18 @@ func (hlvm *HostLVM) ListVGs(tagged bool) ([]VolumeGroup, error) {
 	return vgList, nil
 }
 
-// ListLogicalVolumes returns list of logical volumes for a volume group
-func (hlvm *HostLVM) ListLVsByName(vgName string) ([]string, error) {
+// ListLVsByName returns list of logical volumes for a volume group
+func (hlvm *HostLVM) ListLVsByName(ctx context.Context, vgName string) ([]string, error) {
 	if vgName == "" {
 		return nil, fmt.Errorf("failed to list lvs by volume group: volume group name is empty")
 	}
 
-	res, err := hlvm.ListLVs(vgName)
+	res, err := hlvm.ListLVs(ctx, vgName)
 	if err != nil {
 		return []string{}, err
 	}
 
-	lvs := []string{}
+	var lvs []string
 	for _, report := range res.Report {
 		for _, lv := range report.Lv {
 			lvs = append(lvs, lv.Name)
@@ -416,13 +400,13 @@ func (hlvm *HostLVM) ListLVsByName(vgName string) ([]string, error) {
 	return lvs, nil
 }
 
-// LVReport returns the output for `lvs` command in json format
-func (hlvm *HostLVM) ListLVs(vgName string) (*LVReport, error) {
+// ListLVs returns the output for `lvs` command in json format
+func (hlvm *HostLVM) ListLVs(ctx context.Context, vgName string) (*LVReport, error) {
 	res := new(LVReport)
 	args := []string{
-		"lvs", "-S", fmt.Sprintf("vgname=%s", vgName), "--units", "g", "--reportformat", "json",
+		"-S", fmt.Sprintf("vgname=%s", vgName), "--units", "g", "--reportformat", "json",
 	}
-	if err := hlvm.execute(res, args...); err != nil {
+	if err := hlvm.RunCommandAsHostInto(ctx, res, lvsCmd, args...); err != nil {
 		return nil, err
 	}
 
@@ -430,8 +414,8 @@ func (hlvm *HostLVM) ListLVs(vgName string) (*LVReport, error) {
 }
 
 // LVExists checks if a logical volume exists in a volume group
-func (hlvm *HostLVM) LVExists(lvName, vgName string) (bool, error) {
-	lvs, err := hlvm.ListLVsByName(vgName)
+func (hlvm *HostLVM) LVExists(ctx context.Context, lvName, vgName string) (bool, error) {
+	lvs, err := hlvm.ListLVsByName(ctx, vgName)
 	if err != nil {
 		return false, err
 	}
@@ -446,7 +430,7 @@ func (hlvm *HostLVM) LVExists(lvName, vgName string) (bool, error) {
 }
 
 // DeleteLV deactivates the logical volume and deletes it
-func (hlvm *HostLVM) DeleteLV(lvName, vgName string) error {
+func (hlvm *HostLVM) DeleteLV(ctx context.Context, lvName, vgName string) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to delete logical volume in volume group: volume group name is empty")
 	}
@@ -456,16 +440,12 @@ func (hlvm *HostLVM) DeleteLV(lvName, vgName string) error {
 	lv := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// deactivate logical volume
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-an", lv)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, lvChangeCmd, "-an", lv); err != nil {
 		return fmt.Errorf("failed to deactivate thin pool %q in volume group %q. %w", lvName, vgName, err)
 	}
 
 	// delete logical volume
-	out, err = hlvm.ExecuteCommandWithOutputAsHost(lvRemoveCmd, lv)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, lvRemoveCmd, lv); err != nil {
 		return fmt.Errorf("failed to delete logical volume %q in volume group %q. %w", lvName, vgName, err)
 	}
 
@@ -473,7 +453,7 @@ func (hlvm *HostLVM) DeleteLV(lvName, vgName string) error {
 }
 
 // CreateLV creates the logical volume
-func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
+func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePercent int) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to create logical volume in volume group: volume group name is empty")
 	}
@@ -487,9 +467,7 @@ func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
 	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent),
 		"-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
 
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvCreateCmd, args...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, lvCreateCmd, args...); err != nil {
 		return fmt.Errorf("failed to create logical volume %q in the volume group %q using command '%s': %w",
 			lvName, vgName, fmt.Sprintf("%s %s", lvCreateCmd, strings.Join(args, " ")), err)
 	}
@@ -498,7 +476,7 @@ func (hlvm *HostLVM) CreateLV(lvName, vgName string, sizePercent int) error {
 }
 
 // ExtendLV extends the logical volume, sizePercent has to be calculated based on virtual gibibytes.
-func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
+func (hlvm *HostLVM) ExtendLV(ctx context.Context, lvName, vgName string, sizePercent int) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to extend logical volume in volume group: volume group name is empty")
 	}
@@ -511,9 +489,7 @@ func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 
 	args := []string{"-l", fmt.Sprintf("%d%%Vg", sizePercent), fmt.Sprintf("%s/%s", vgName, lvName)}
 
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvExtendCmd, args...)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, lvExtendCmd, args...); err != nil {
 		return fmt.Errorf("failed to extend logical volume %q in the volume group %q using command '%s': %w",
 			lvName, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
 	}
@@ -522,7 +498,7 @@ func (hlvm *HostLVM) ExtendLV(lvName, vgName string, sizePercent int) error {
 }
 
 // ActivateLV activates the logical volume
-func (hlvm *HostLVM) ActivateLV(lvName, vgName string) error {
+func (hlvm *HostLVM) ActivateLV(ctx context.Context, lvName, vgName string) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to activate logical volume in volume group: volume group name is empty")
 	}
@@ -533,27 +509,8 @@ func (hlvm *HostLVM) ActivateLV(lvName, vgName string) error {
 	lv := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// deactivate logical volume
-	out, err := hlvm.ExecuteCommandWithOutputAsHost(lvChangeCmd, "-ay", lv)
-	_ = out.Close()
-	if err != nil {
+	if err := hlvm.RunCommandAsHost(ctx, lvChangeCmd, "-ay", lv); err != nil {
 		return fmt.Errorf("failed to activate thin pool %q in volume group %q. %w", lvName, vgName, err)
-	}
-
-	return nil
-}
-
-func (hlvm *HostLVM) execute(v interface{}, args ...string) error {
-	output, err := hlvm.ExecuteCommandWithOutputAsHost(lvmCmd, args...)
-	defer func() {
-		_ = output.Close()
-	}()
-	if err != nil {
-		return fmt.Errorf("failed to execute command. %v", err)
-	}
-
-	err = json.NewDecoder(output).Decode(&v)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal response. %v", err)
 	}
 
 	return nil

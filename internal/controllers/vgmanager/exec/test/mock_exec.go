@@ -17,29 +17,42 @@ limitations under the License.
 package test
 
 import (
+	"context"
+	"errors"
 	"io"
 	"strings"
 )
 
 type MockExecutor struct {
-	MockExecuteCommandWithOutput       func(command string, arg ...string) (io.ReadCloser, error)
-	MockExecuteCommandWithOutputAsHost func(command string, arg ...string) (io.ReadCloser, error)
+	MockExecuteCommandWithOutputAsHost func(ctx context.Context, command string, arg ...string) (io.ReadCloser, error)
+
+	MockRunCommandAsHost     func(ctx context.Context, command string, arg ...string) error
+	MockRunCommandAsHostInto func(ctx context.Context, into any, command string, arg ...string) error
 }
 
-// ExecuteCommandWithOutput mocks ExecuteCommandWithOutput
-func (e *MockExecutor) ExecuteCommandWithOutput(command string, arg ...string) (io.ReadCloser, error) {
-	if e.MockExecuteCommandWithOutput != nil {
-		return e.MockExecuteCommandWithOutput(command, arg...)
-	}
-
-	return io.NopCloser(strings.NewReader("")), nil
-}
-
-// ExecuteCommandWithOutputAsHost mocks ExecuteCommandWithOutputAsHost
-func (e *MockExecutor) ExecuteCommandWithOutputAsHost(command string, arg ...string) (io.ReadCloser, error) {
+// StartCommandWithOutputAsHost mocks StartCommandWithOutputAsHost
+func (e *MockExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
 	if e.MockExecuteCommandWithOutputAsHost != nil {
-		return e.MockExecuteCommandWithOutputAsHost(command, arg...)
+		return e.MockExecuteCommandWithOutputAsHost(ctx, command, arg...)
 	}
 
-	return io.NopCloser(strings.NewReader("")), nil
+	return io.NopCloser(strings.NewReader("")), errors.New("StartCommandWithOutputAsHost not mocked")
+}
+
+// RunCommandAsHost mocks RunCommandAsHost
+func (e *MockExecutor) RunCommandAsHost(ctx context.Context, command string, arg ...string) error {
+	if e.MockRunCommandAsHost != nil {
+		return e.MockRunCommandAsHost(ctx, command, arg...)
+	}
+
+	return errors.New("RunCommandAsHost not mocked")
+}
+
+// RunCommandAsHostInto mocks RunCommandAsHostInto
+func (e *MockExecutor) RunCommandAsHostInto(ctx context.Context, into any, command string, arg ...string) error {
+	if e.MockRunCommandAsHostInto != nil {
+		return e.MockRunCommandAsHostInto(ctx, into, command, arg...)
+	}
+
+	return errors.New("RunCommandAsHostInto not mocked")
 }

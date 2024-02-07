@@ -1,14 +1,17 @@
 package dmsetup
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	mockExec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func TestRemove(t *testing.T) {
@@ -23,7 +26,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	executor := &mockExec.MockExecutor{
-		MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+		MockExecuteCommandWithOutputAsHost: func(ctx context.Context, command string, args ...string) (io.ReadCloser, error) {
 			if args[0] != "remove" {
 				return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0])
 			}
@@ -38,7 +41,8 @@ func TestRemove(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := NewHostDmsetup(executor, DefaultDMSetup).Remove(tt.deviceName)
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			err := NewHostDmsetup(executor, DefaultDMSetup).Remove(ctx, tt.deviceName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

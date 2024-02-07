@@ -234,10 +234,10 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	}
 
 	By("triggering the second reconciliation after the initial setup", func() {
-		instances.LVM.EXPECT().ListVGs(true).Return(nil, nil).Once()
-		instances.LVM.EXPECT().ListPVs("").Return(nil, nil).Twice()
-		instances.LSBLK.EXPECT().ListBlockDevices().Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
-		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Return(lsblk.BlockDeviceInfos{
+		instances.LVM.EXPECT().ListVGs(ctx, true).Return(nil, nil).Once()
+		instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Twice()
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
 			blockDevice.KName: {
 				IsUsableLoopDev: false,
 			},
@@ -256,9 +256,9 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	})
 
 	// Requeue effects
-	instances.LVM.EXPECT().ListVGs(true).Return(nil, nil).Once()
-	instances.LSBLK.EXPECT().ListBlockDevices().Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
-	instances.LVM.EXPECT().ListPVs("").Return(nil, nil).Once()
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return(nil, nil).Once()
+	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+	instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 
 	// addDevicesToVG
 	var lvmPV lvm.PhysicalVolume
@@ -269,13 +269,13 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 			Name: vg.GetName(),
 			PVs:  []lvm.PhysicalVolume{lvmPV},
 		}
-		instances.LVM.EXPECT().CreateVG(lvmVG).Return(nil).Once()
+		instances.LVM.EXPECT().CreateVG(ctx, lvmVG).Return(nil).Once()
 	})
 
 	// addThinPoolToVG
 	By("mocking the creation of the thin pool in the vg", func() {
-		instances.LVM.EXPECT().ListLVs(lvmVG.Name).Return(&lvm.LVReport{Report: make([]lvm.LVReportItem, 0)}, nil).Once()
-		instances.LVM.EXPECT().CreateLV(vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent).Return(nil).Once()
+		instances.LVM.EXPECT().ListLVs(ctx, lvmVG.Name).Return(&lvm.LVReport{Report: make([]lvm.LVReportItem, 0)}, nil).Once()
+		instances.LVM.EXPECT().CreateLV(ctx, vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent).Return(nil).Once()
 	})
 
 	var createdVG lvm.VolumeGroup
@@ -294,11 +294,11 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 			VgSize: thinPool.LvSize,
 			PVs:    []lvm.PhysicalVolume{lvmPV},
 		}
-		instances.LVM.EXPECT().ListLVs(vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 			Lv: []lvm.LogicalVolume{thinPool},
 		}}}, nil).Once()
-		instances.LVM.EXPECT().ActivateLV(thinPool.Name, vg.GetName()).Return(nil).Once()
-		instances.LVM.EXPECT().ListVGs(true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
+		instances.LVM.EXPECT().ActivateLV(ctx, thinPool.Name, vg.GetName()).Return(nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
 	})
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
@@ -366,15 +366,15 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 				}},
 			},
 		}
-		instances.LSBLK.EXPECT().ListBlockDevices().Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 	})
 
 	By("mocking the now created vg and thin pool", func() {
-		instances.LVM.EXPECT().ListVGs(true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
-		instances.LVM.EXPECT().ListLVs(vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
+		instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 			Lv: []lvm.LogicalVolume{thinPool},
 		}}}, nil).Once()
-		instances.LVM.EXPECT().ActivateLV(thinPool.Name, createdVG.Name).Return(nil).Once()
+		instances.LVM.EXPECT().ActivateLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
 	})
 
 	By("triggering the verification reconcile that should confirm the ready state", func() {
@@ -398,10 +398,10 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
 		Expect(vg.Finalizers).ToNot(BeEmpty())
 		Expect(vg.DeletionTimestamp).ToNot(BeNil())
-		instances.LVM.EXPECT().ListVGs(true).Return([]lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
-		instances.LVM.EXPECT().LVExists(thinPool.Name, createdVG.Name).Return(true, nil).Once()
-		instances.LVM.EXPECT().DeleteLV(thinPool.Name, createdVG.Name).Return(nil).Once()
-		instances.LVM.EXPECT().DeleteVG(lvm.VolumeGroup{Name: createdVG.Name}).Return(nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
+		instances.LVM.EXPECT().LVExists(ctx, thinPool.Name, createdVG.Name).Return(true, nil).Once()
+		instances.LVM.EXPECT().DeleteLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
+		instances.LVM.EXPECT().DeleteVG(ctx, lvm.VolumeGroup{Name: createdVG.Name}).Return(nil).Once()
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).ToNot(Succeed())
@@ -585,7 +585,7 @@ func testThinPoolExtension(ctx context.Context) {
 	err = r.extendThinPool(ctx, "vg1", "1", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if lvSize has no unit")
 
-	mockLVM.EXPECT().GetVG("vg1").Once().Return(lvm.VolumeGroup{}, fmt.Errorf("mocked error"))
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Once().Return(lvm.VolumeGroup{}, fmt.Errorf("mocked error"))
 	err = r.extendThinPool(ctx, "vg1", "26.96g", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if GetVG fails")
 
@@ -593,45 +593,45 @@ func testThinPoolExtension(ctx context.Context) {
 	Expect(err).To(HaveOccurred(), "should error if lvSize is malformatted")
 
 	lvmVG := lvm.VolumeGroup{Name: "vg1"}
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if vgSize is empty")
 
 	lvmVG.VgSize = "1"
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if vgSize has no unit")
 
 	lvmVG.VgSize = "1m"
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if vg unit does not match lv unit")
 
 	lvmVG.VgSize = "1m"
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	err = r.extendThinPool(ctx, "vg1", "2m", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if unit is not gibibytes")
 
 	lvmVG.VgSize = "1123xxg"
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if vgSize is malformatted")
 
 	lvmVG.VgSize = "3g"
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	err = r.extendThinPool(ctx, "vg1", "3g", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).ToNot(HaveOccurred(), "should fast skip if no expansion is needed")
 
 	lvmVG.VgSize = "5g"
 	thinPool := &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1", SizePercent: 90}
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
-	mockLVM.EXPECT().ExtendLV(thinPool.Name, "vg1", thinPool.SizePercent).
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().ExtendLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).
 		Once().Return(fmt.Errorf("failed to extend lv"))
 	err = r.extendThinPool(ctx, "vg1", "3g", thinPool)
 	Expect(err).To(HaveOccurred(), "should fail if lvm extension fails")
 
-	mockLVM.EXPECT().GetVG("vg1").Return(lvmVG, nil).Once()
-	mockLVM.EXPECT().ExtendLV(thinPool.Name, "vg1", thinPool.SizePercent).
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
+	mockLVM.EXPECT().ExtendLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).
 		Once().Return(nil)
 	err = r.extendThinPool(ctx, "vg1", "3g", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "succeed if lvm extension succeeds")
@@ -647,17 +647,17 @@ func testThinPoolCreation(ctx context.Context) {
 	err := r.addThinPoolToVG(ctx, "vg1", nil)
 	Expect(err).To(HaveOccurred(), "should error if thin pool config is nil")
 
-	mockLVM.EXPECT().ListLVs("vg1").Once().Return(nil, fmt.Errorf("report error"))
+	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(nil, fmt.Errorf("report error"))
 	err = r.addThinPoolToVG(ctx, "vg1", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if list lvs report fails")
 
-	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "blub"}},
 	}}}, nil)
 	err = r.addThinPoolToVG(ctx, "vg1", &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1"})
 	Expect(err).To(HaveOccurred(), "should error if thin pool attributes cannot be parsed")
 
-	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "rwi---tz--"}},
 	}}}, nil)
 	err = r.addThinPoolToVG(ctx, "vg1", &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1"})
@@ -665,26 +665,26 @@ func testThinPoolCreation(ctx context.Context) {
 
 	thinPool := &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1", SizePercent: 90}
 
-	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(fmt.Errorf("mocked error"))
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(fmt.Errorf("mocked error"))
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).To(HaveOccurred(), "should create thin pool if it does not exist, but should fail if that does not work")
 
-	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(nil)
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(nil)
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should create thin pool if it does not exist")
 
 	lvmVG := lvm.VolumeGroup{Name: "vg1", VgSize: "5g"}
-	mockLVM.EXPECT().ListLVs("vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "twi---tz--", LvSize: "3g"}},
 	}}}, nil)
-	mockLVM.EXPECT().GetVG("vg1").Once().Return(lvmVG, nil)
-	mockLVM.EXPECT().ExtendLV(thinPool.Name, "vg1", thinPool.SizePercent).
+	mockLVM.EXPECT().GetVG(ctx, "vg1").Once().Return(lvmVG, nil)
+	mockLVM.EXPECT().ExtendLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).
 		Once().Return(nil)
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should not error if thin pool already exists, extension should work")
@@ -718,7 +718,7 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering listblockdevices failure", func() {
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(nil, fmt.Errorf("mocked error"))
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(nil, fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to list block devices"))
@@ -731,10 +731,10 @@ func testReconcileFailure(ctx context.Context) {
 		defer func() {
 			evalSymlinks = filepath.EvalSymlinks
 		}()
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
-		instances.Wipefs.EXPECT().Wipe("/dev/sda").Once().Return(fmt.Errorf("mocked error"))
+		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to wipe devices"))
@@ -747,11 +747,11 @@ func testReconcileFailure(ctx context.Context) {
 		defer func() {
 			evalSymlinks = filepath.EvalSymlinks
 		}()
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
-		instances.Wipefs.EXPECT().Wipe("/dev/sda").Once().Return(nil)
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(nil, fmt.Errorf("mocked error"))
+		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(nil)
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(nil, fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to list block devices after wiping devices"))
@@ -767,8 +767,8 @@ func testReconcileFailure(ctx context.Context) {
 		blockDevices := []lsblk.BlockDevice{
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return(blockDevices, nil)
-		instances.LVM.EXPECT().ListVGs(true).Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(blockDevices, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 		Expect(instances.client.Get(ctx, client.ObjectKey{
@@ -792,11 +792,11 @@ func testReconcileFailure(ctx context.Context) {
 		defer func() {
 			evalSymlinks = filepath.EvalSymlinks
 		}()
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
-		instances.LVM.EXPECT().ListPVs("").Once().Return(nil, nil)
-		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
+		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
 				IsUsableLoopDev: false,
 			},
@@ -813,21 +813,21 @@ func testReconcileFailure(ctx context.Context) {
 		defer func() {
 			evalSymlinks = filepath.EvalSymlinks
 		}()
-		instances.LSBLK.EXPECT().ListBlockDevices().Once().Return([]lsblk.BlockDevice{
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
 		vgs := []lvm.VolumeGroup{
 			{Name: "vg1", VgSize: "1g"},
 		}
-		instances.LVM.EXPECT().ListVGs(true).Once().Return(vgs, nil)
-		instances.LVM.EXPECT().ListPVs("").Once().Return(nil, nil)
-		instances.LSBLK.EXPECT().BlockDeviceInfos(mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(vgs, nil)
+		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
 				IsUsableLoopDev: false,
 			},
 		}, nil)
 		expectedError := fmt.Errorf("mocked error")
-		instances.LVM.EXPECT().ListLVs("vg1").Once().Return(nil, expectedError)
+		instances.LVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(nil, expectedError)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(MatchError(expectedError))
 	})

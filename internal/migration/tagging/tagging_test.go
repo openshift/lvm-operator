@@ -4,12 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	lvmmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm/mocks"
 	"github.com/openshift/lvm-operator/internal/migration/tagging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -241,23 +243,24 @@ func TestAddTagToVGs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			mockLVM := lvmmocks.NewMockLVM(t)
 			defer mockLVM.AssertExpectations(t)
 			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.clientObjects...).Build()
 			if tc.addTagCountSuccessful > 0 {
-				mockLVM.EXPECT().AddTagToVG(mock.Anything).Return(nil).Times(tc.addTagCountSuccessful)
+				mockLVM.EXPECT().AddTagToVG(ctx, mock.Anything).Return(nil).Times(tc.addTagCountSuccessful)
 			}
 			if tc.addTagCountError > 0 {
-				mockLVM.EXPECT().AddTagToVG(mock.Anything).Return(assert.AnError).Times(tc.addTagCountError)
+				mockLVM.EXPECT().AddTagToVG(ctx, mock.Anything).Return(assert.AnError).Times(tc.addTagCountError)
 			}
 
 			if tc.listVGsErr != nil {
-				mockLVM.EXPECT().ListVGs(false).Return(nil, tc.listVGsErr).Times(1)
+				mockLVM.EXPECT().ListVGs(ctx, false).Return(nil, tc.listVGsErr).Times(1)
 			} else {
-				mockLVM.EXPECT().ListVGs(false).Return(tc.untaggedVolumeGroups, nil).Times(1)
+				mockLVM.EXPECT().ListVGs(ctx, false).Return(tc.untaggedVolumeGroups, nil).Times(1)
 			}
 
-			err := tagging.AddTagToVGs(context.Background(), c, mockLVM, nodeName, namespace)
+			err := tagging.AddTagToVGs(ctx, c, mockLVM, nodeName, namespace)
 
 			if tc.addTagCountError > 0 {
 				assert.ErrorIs(t, err, assert.AnError)

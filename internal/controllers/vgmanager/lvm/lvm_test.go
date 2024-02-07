@@ -17,15 +17,16 @@ limitations under the License.
 package lvm
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var mockVgsOutput = `{
@@ -84,29 +85,31 @@ func TestHostLVM_GetVG(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			executor := &test.MockExecutor{
-				MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
-					if args[0] == "vgs" {
+				MockRunCommandAsHostInto: func(ctx context.Context, into any, command string, args ...string) error {
+					if command == vgsCmd {
 						if tt.vgsErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+							return fmt.Errorf("mocked error")
 						}
-						return io.NopCloser(strings.NewReader(mockVgsOutput)), nil
-					} else if args[0] == "pvs" {
+
+						return json.Unmarshal([]byte(mockVgsOutput), &into)
+					} else if command == pvsCmd {
 						if tt.pvsErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+							return fmt.Errorf("mocked error")
 						}
 						argsConcat := strings.Join(args, " ")
-						out := "pvs --units g -v --reportformat json -S vgname=%s"
+						out := "--units g -v --reportformat json -S vgname=%s"
 						if argsConcat == fmt.Sprintf(out, "vg1") {
-							return io.NopCloser(strings.NewReader(mockPvsOutputForVG1)), nil
+							return json.Unmarshal([]byte(mockPvsOutputForVG1), &into)
 						} else if argsConcat == fmt.Sprintf(out, "vg2") {
-							return io.NopCloser(strings.NewReader(mockPvsOutputForVG2)), nil
+							return json.Unmarshal([]byte(mockPvsOutputForVG2), &into)
 						}
 					}
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0])
+					return fmt.Errorf("invalid args %q", args[0])
 				},
 			}
-			vg, err := NewHostLVM(executor).GetVG(tt.vgName)
+			vg, err := NewHostLVM(executor).GetVG(ctx, tt.vgName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -128,6 +131,10 @@ func (m *MockedExitError) Error() string {
 
 func (m *MockedExitError) ExitCode() int {
 	return m.exitCode
+}
+
+func (m *MockedExitError) Unwrap() error {
+	return m
 }
 
 func TestHostLVM_DeleteVG(t *testing.T) {
@@ -177,22 +184,23 @@ func TestHostLVM_DeleteVG(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			executor := &test.MockExecutor{
-				MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+				MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 					switch command {
 					case vgChangeCmd:
 						if tt.vgChangeErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+							return fmt.Errorf("mocked error")
 						}
 						assert.ElementsMatch(t, args, []string{"-an", tt.volumeGroup.Name})
 					case vgRemoveCmd:
 						if tt.vgRemoveErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+							return fmt.Errorf("mocked error")
 						}
 						assert.ElementsMatch(t, args, []string{tt.volumeGroup.Name})
 					case pvRemoveCmd:
 						if tt.pvRemoveErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+							return fmt.Errorf("mocked error")
 						}
 						var pvArgs []string
 						for _, pv := range tt.volumeGroup.PVs {
@@ -201,7 +209,7 @@ func TestHostLVM_DeleteVG(t *testing.T) {
 						assert.ElementsMatch(t, args, pvArgs)
 					case lvmDevicesCmd:
 						if tt.lvmdevicesErr != nil {
-							return io.NopCloser(strings.NewReader("")), tt.lvmdevicesErr
+							return tt.lvmdevicesErr
 						}
 						assert.ElementsMatch(t, args, []string{"--delpvid"})
 						for _, pv := range tt.volumeGroup.PVs {
@@ -211,11 +219,11 @@ func TestHostLVM_DeleteVG(t *testing.T) {
 						}
 					}
 
-					return io.NopCloser(strings.NewReader("")), nil
+					return nil
 				},
 			}
 
-			err := NewHostLVM(executor).DeleteVG(tt.volumeGroup)
+			err := NewHostLVM(executor).DeleteVG(ctx, tt.volumeGroup)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -239,24 +247,24 @@ func TestHostLVM_ListVGs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			executor := &test.MockExecutor{
-				MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
-
-					if args[0] == "vgs" {
+				MockRunCommandAsHostInto: func(ctx context.Context, into any, command string, args ...string) error {
+					if command == vgsCmd {
 						if tt.vgsErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error on vgs")
+							return fmt.Errorf("mocked error on vgs")
 						}
-						return io.NopCloser(strings.NewReader(mockVgsOutput)), nil
-					} else if args[0] == "pvs" {
+						return json.Unmarshal([]byte(mockVgsOutput), &into)
+					} else if command == pvsCmd {
 						if tt.pvsErr {
-							return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error on pvs")
+							return fmt.Errorf("mocked error on pvs")
 						}
-						return io.NopCloser(strings.NewReader(mockPvsOutputForVG1)), nil
+						return json.Unmarshal([]byte(mockPvsOutputForVG1), &into)
 					}
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0])
+					return fmt.Errorf("invalid args %q", args[0])
 				},
 			}
-			_, err := NewHostLVM(executor).ListVGs(true)
+			_, err := NewHostLVM(executor).ListVGs(ctx, true)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -281,15 +289,16 @@ func TestHostLVM_CreateVG(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			executor := &test.MockExecutor{
-				MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+				MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 					if tt.execErr {
-						return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+						return fmt.Errorf("mocked error")
 					}
-					return io.NopCloser(strings.NewReader("")), nil
+					return nil
 				},
 			}
-			err := NewHostLVM(executor).CreateVG(tt.volumeGroup)
+			err := NewHostLVM(executor).CreateVG(ctx, tt.volumeGroup)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -316,14 +325,15 @@ func TestHostLVM_ExtendVG(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 				if tt.execErr {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+					return fmt.Errorf("mocked error")
 				}
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			}}
 
-			newVG, err := NewHostLVM(executor).ExtendVG(tt.volumeGroup, tt.PVs)
+			newVG, err := NewHostLVM(executor).ExtendVG(ctx, tt.volumeGroup, tt.PVs)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -352,14 +362,15 @@ func TestHostLVM_AddTagToVG(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 				if tt.execErr {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+					return fmt.Errorf("mocked error")
 				}
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			}}
 
-			err := NewHostLVM(executor).AddTagToVG(tt.vgName)
+			err := NewHostLVM(executor).AddTagToVG(ctx, tt.vgName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -387,9 +398,10 @@ func TestHostLVM_ListLVsByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHostInto: func(ctx context.Context, into any, command string, args ...string) error {
 				if tt.execErr {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+					return fmt.Errorf("mocked error")
 				}
 				var lvs []LogicalVolume
 				for i := range tt.wantLVs {
@@ -397,10 +409,10 @@ func TestHostLVM_ListLVsByName(t *testing.T) {
 				}
 				data, err := json.Marshal(LVReport{Report: []LVReportItem{{Lv: lvs}}})
 				assert.NoError(t, err)
-				return io.NopCloser(bytes.NewReader(data)), nil
+				return json.Unmarshal(data, &into)
 			}}
 
-			exists, err := NewHostLVM(executor).LVExists(tt.lvName, tt.vgName)
+			exists, err := NewHostLVM(executor).LVExists(ctx, tt.lvName, tt.vgName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -429,15 +441,16 @@ func TestHostLVM_CreateLV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 				if tt.execErr {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+					return fmt.Errorf("mocked error")
 				}
 				assert.ElementsMatch(t, args, []string{"-l", fmt.Sprintf("%d%%FREE", tt.sizePercent), "-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			}}
 
-			err := NewHostLVM(executor).CreateLV(tt.lvName, tt.vgName, tt.sizePercent)
+			err := NewHostLVM(executor).CreateLV(ctx, tt.lvName, tt.vgName, tt.sizePercent)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -465,16 +478,17 @@ func TestHostLVM_ExtendLV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 				if tt.execErr {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+					return fmt.Errorf("mocked error")
 				}
 
 				assert.ElementsMatch(t, args, []string{"-l", fmt.Sprintf("%d%%Vg", tt.sizePercent), fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			}}
 
-			err := NewHostLVM(executor).ExtendLV(tt.lvName, tt.vgName, tt.sizePercent)
+			err := NewHostLVM(executor).ExtendLV(ctx, tt.lvName, tt.vgName, tt.sizePercent)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -502,23 +516,24 @@ func TestHostLVM_DeleteLV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 				switch command {
 				case lvChangeCmd:
 					if tt.lvChangeErr {
-						return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+						return fmt.Errorf("mocked error")
 					}
 					assert.ElementsMatch(t, args, []string{"-an", fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
 				case lvRemoveCmd:
 					if tt.lvRemoveErr {
-						return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+						return fmt.Errorf("mocked error")
 					}
 					assert.ElementsMatch(t, args, []string{fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
 				}
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			}}
 
-			err := NewHostLVM(executor).DeleteLV(tt.lvName, tt.vgName)
+			err := NewHostLVM(executor).DeleteLV(ctx, tt.lvName, tt.vgName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -544,15 +559,16 @@ func TestHostLVM_ActivateLV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			executor := &test.MockExecutor{MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 				if tt.lvChangeErr {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("mocked error")
+					return fmt.Errorf("mocked error")
 				}
 				assert.ElementsMatch(t, args, []string{"-ay", fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			}}
 
-			err := NewHostLVM(executor).ActivateLV(tt.lvName, tt.vgName)
+			err := NewHostLVM(executor).ActivateLV(ctx, tt.lvName, tt.vgName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -567,31 +583,6 @@ func TestNewDefaultHostLVM(t *testing.T) {
 	assert.NotNilf(t, lvm, "lvm should not be nil")
 }
 
-func TestHostLVM_execute(t *testing.T) {
-	tests := []struct {
-		name        string
-		unmarshalTo any
-		wantErr     bool
-		json        string
-	}{
-		{"Unmarshal to nil", nil, true, ""},
-		{"Unmarshal ok", &LVReport{}, false, `{"report": [{"lv": [{"lv_name": "lv1"}]}]}`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			executor := &test.MockExecutor{MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
-				return io.NopCloser(strings.NewReader(tt.json)), nil
-			}}
-			err := NewHostLVM(executor).execute(tt.unmarshalTo, "bla")
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
 
 func Test_untaggedVGs(t *testing.T) {
 	vgs := []VolumeGroup{
