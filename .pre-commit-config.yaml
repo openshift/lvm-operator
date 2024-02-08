@@ -50,16 +50,17 @@ repos:
         exclude: ^vendor/
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.2
+    rev: v1.56.0
     hooks:
       - id: golangci-lint
         entry: golangci-lint run --fix
         args:
           - "--modules-download-mode=vendor"
-          - "--timeout=10m"
+          - "--timeout=20m"
         types: [go]
         language: golang
         require_serial: true
+        pass_filenames: false
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.6
     hooks:
