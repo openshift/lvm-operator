@@ -56,7 +56,7 @@ func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, 
 
 	if existingVolumeGroup != nil {
 		logger.Info("extending an existing volume group", "VGName", vgName)
-		if _, err := r.LVM.ExtendVG(*existingVolumeGroup, args); err != nil {
+		if _, err := r.LVM.ExtendVG(ctx, *existingVolumeGroup, args); err != nil {
 			return fmt.Errorf("failed to extend volume group %s: %w", vgName, err)
 		}
 	} else {
@@ -65,7 +65,7 @@ func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, 
 		for _, pvName := range args {
 			pvs = append(pvs, lvm.PhysicalVolume{PvName: pvName})
 		}
-		if err := r.LVM.CreateVG(lvm.VolumeGroup{Name: vgName, PVs: pvs}); err != nil {
+		if err := r.LVM.CreateVG(ctx, lvm.VolumeGroup{Name: vgName, PVs: pvs}); err != nil {
 			return fmt.Errorf("failed to create volume group %s: %w", vgName, err)
 		}
 	}
@@ -206,7 +206,7 @@ func isDeviceAlreadyPartOfVG(nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, d
 	for _, vgStatus := range nodeStatus.Spec.LVMVGStatus {
 		if vgStatus.Name == volumeGroup.Name {
 			for _, pv := range vgStatus.Devices {
-				if pv == diskName {
+				if resolvedPV, _ := evalSymlinks(pv); resolvedPV == diskName {
 					return true
 				}
 			}

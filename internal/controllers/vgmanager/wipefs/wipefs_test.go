@@ -1,14 +1,15 @@
 package wipefs
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
-	"strings"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	mockExec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func TestWipe(t *testing.T) {
@@ -23,22 +24,23 @@ func TestWipe(t *testing.T) {
 	}
 
 	executor := &mockExec.MockExecutor{
-		MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
+		MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
 			if args[0] != "--all" || args[1] != "--force" {
-				return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0:2])
+				return fmt.Errorf("invalid args %q", args[0:2])
 			}
 			if args[2] == "/dev/loop1" {
-				return io.NopCloser(strings.NewReader("")), nil
+				return nil
 			} else if args[2] == "/dev/loop2" {
-				return io.NopCloser(strings.NewReader("no such file or directory")), errors.New("no such file or directory")
+				return errors.New("no such file or directory")
 			}
-			return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[2])
+			return fmt.Errorf("invalid args %q", args[2])
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := NewHostWipefs(executor, DefaultWipefs).Wipe(tt.deviceName)
+			ctx := log.IntoContext(context.Background(), testr.New(t))
+			err := NewHostWipefs(executor, DefaultWipefs).Wipe(ctx, tt.deviceName)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

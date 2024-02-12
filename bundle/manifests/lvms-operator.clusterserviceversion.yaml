@@ -129,8 +129,12 @@ spec:
           resources:
           - deployments
           verbs:
+          - create
+          - delete
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - apps
@@ -502,7 +506,8 @@ spec:
           selector:
             matchLabels:
               app.kubernetes.io/name: lvms-operator
-          strategy: {}
+          strategy:
+            type: Recreate
           template:
             metadata:
               annotations:
@@ -515,7 +520,7 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --leader-elect
+                - --leader-elect=false
                 command:
                 - /lvms
                 - operator
@@ -565,7 +570,7 @@ spec:
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: lvms-operator
-              terminationGracePeriodSeconds: 60
+              terminationGracePeriodSeconds: 10
               volumes:
               - name: cert
                 secret:
@@ -674,18 +679,6 @@ spec:
           - create
           - patch
           - update
-        - apiGroups:
-          - ""
-          resources:
-          - configmaps
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         serviceAccountName: vg-manager
     strategy: deployment
   installModes:

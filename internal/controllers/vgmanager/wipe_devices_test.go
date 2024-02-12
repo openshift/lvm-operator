@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	dmsetupmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup/mocks"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	wipefsmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -181,12 +183,13 @@ func TestWipeDevices(t *testing.T) {
 	}()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			r := &Reconciler{Wipefs: mockWipefs, Dmsetup: mockDmsetup}
 			if tt.wipeCount > 0 {
-				mockWipefs.EXPECT().Wipe(mock.Anything).Return(nil).Times(tt.wipeCount)
+				mockWipefs.EXPECT().Wipe(ctx, mock.Anything).Return(nil).Times(tt.wipeCount)
 			}
 			if tt.removeReferenceCount > 0 {
-				mockDmsetup.EXPECT().Remove(mock.Anything).Return(nil).Times(tt.removeReferenceCount)
+				mockDmsetup.EXPECT().Remove(ctx, mock.Anything).Return(nil).Times(tt.removeReferenceCount)
 			}
 			volumeGroup := &v1alpha1.LVMVolumeGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "vg1"},
@@ -197,7 +200,7 @@ func TestWipeDevices(t *testing.T) {
 				}},
 			}
 
-			wiped, err := r.wipeDevicesIfNecessary(context.Background(), volumeGroup, &tt.nodeStatus, tt.blockDevices)
+			wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, &tt.nodeStatus, tt.blockDevices)
 			if tt.wipeCount > 0 {
 				assert.True(t, wiped)
 			} else {

@@ -12,6 +12,8 @@ import (
 // see https://kubernetes.io/docs/reference/labels-annotations-taints/#node-role-kubernetes-io-control-plane
 const ControlPlaneIDLabel = "node-role.kubernetes.io/control-plane"
 
+const LeaseName = "1136b8a6.topolvm.io"
+
 type LeaderElectionResolver interface {
 	Resolve(ctx context.Context) (configv1.LeaderElection, error)
 }
@@ -26,7 +28,7 @@ func NewLeaderElectionResolver(
 ) (LeaderElectionResolver, error) {
 	defaultElectionConfig := leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{
 		Disable: !enableLeaderElection,
-	}, operatorNamespace, "1136b8a6.topolvm.io")
+	}, operatorNamespace, LeaseName)
 
 	return &nodeLookupSNOLeaderElection{
 		snoCheck:              snoCheck,

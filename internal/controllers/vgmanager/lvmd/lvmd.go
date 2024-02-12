@@ -3,16 +3,12 @@ package lvmd
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/topolvm/topolvm/lvmd"
 	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
 
-	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
@@ -24,9 +20,18 @@ type ThinPoolConfig = lvmd.ThinPoolConfig
 
 var TypeThin = lvmd.TypeThin
 
-func NewFileConfigurator(client client.Client, namespace string) *CachedFileConfig {
+const (
+	DefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
+	maxReadLength         = 2 * 1 << 20 // 2MB
+)
+
+func DefaultConfigurator() *CachedFileConfig {
+	return NewFileConfigurator(DefaultFileConfigPath)
+}
+
+func NewFileConfigurator(path string) *CachedFileConfig {
 	return &CachedFileConfig{
-		FileConfig: FileConfig{Client: client, Namespace: namespace},
+		FileConfig: FileConfig{path: path},
 	}
 }
 
@@ -61,69 +66,51 @@ func (c *CachedFileConfig) Save(ctx context.Context, config *Config) error {
 }
 
 type FileConfig struct {
-	client.Client
-	Namespace string
+	path string
 }
 
 func (c FileConfig) Load(ctx context.Context) (*Config, error) {
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.LVMDConfigMapName,
-			Namespace: c.Namespace,
-		},
-	}
-	err := c.Client.Get(ctx, client.ObjectKeyFromObject(cm), cm)
-	if k8serrors.IsNotFound(err) {
+	file, err := os.Open(c.path)
+	if os.IsNotExist(err) {
 		// If the file does not exist, return nil for both
 		return nil, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to get ConfigMap %s: %w", cm.Name, err)
+		return nil, fmt.Errorf("failed to open config file %s: %w", c.path, err)
+	}
+	defer file.Close()
+
+	limitedReader := &io.LimitedReader{R: file, N: maxReadLength}
+	cfgBytes, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file %s: %w", c.path, err)
+	}
+
+	if limitedReader.N <= 0 {
+		return nil, fmt.Errorf("the read limit is reached for config file %s", c.path)
 	}
 
 	config := &Config{}
-	if err = yaml.Unmarshal([]byte(cm.Data["lvmd.yaml"]), config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	if err = yaml.Unmarshal(cfgBytes, config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file %s: %w", c.path, err)
 	}
 	return config, nil
 }
 
 func (c FileConfig) Save(ctx context.Context, config *Config) error {
 	out, err := yaml.Marshal(config)
+	if err == nil {
+		err = os.WriteFile(c.path, out, 0600)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to marshal config file: %w", err)
+		return fmt.Errorf("failed to save config file %s: %w", c.path, err)
 	}
-
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.LVMDConfigMapName,
-			Namespace: c.Namespace,
-		},
-	}
-	_, err = ctrl.CreateOrUpdate(ctx, c.Client, cm, func() error {
-		cm.Data = map[string]string{"lvmd.yaml": string(out)}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to apply ConfigMap %s: %w", cm.GetName(), err)
-	}
-
 	return nil
 }
 
 func (c FileConfig) Delete(ctx context.Context) error {
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.LVMDConfigMapName,
-			Namespace: c.Namespace,
-		},
+	err := os.Remove(c.path)
+	if err != nil {
+		return fmt.Errorf("failed to delete config file %s: %w", c.path, err)
 	}
-	if err := c.Client.Delete(ctx, cm); err != nil {
-		if k8serrors.IsNotFound(err) {
-			// If the file does not exist, return nil
-			return nil
-		}
-		return fmt.Errorf("failed to delete ConfigMap: %w", err)
-	}
-
-	return nil
+	return err
 }
