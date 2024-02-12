@@ -19,6 +19,7 @@ package filter
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
@@ -54,6 +55,9 @@ var (
 		"bios", "boot", "reserved",
 	}
 )
+
+// evalSymlinks redefined to be able to override in tests
+var evalSymlinks = filepath.EvalSymlinks
 
 type Filter func(lsblk.BlockDevice, []lvm.PhysicalVolume, lsblk.BlockDeviceInfos) error
 
@@ -102,7 +106,11 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
 			if dev.FSType == FSTypeLVM2Member {
 				var foundPV *lvm.PhysicalVolume
 				for _, pv := range pvs {
-					if pv.PvName == dev.KName {
+					resolvedPVPath, err := evalSymlinks(pv.PvName)
+					if err != nil {
+						return fmt.Errorf("the pv %s could not be resolved via symlink: %w", pv, err)
+					}
+					if resolvedPVPath == dev.KName {
 						foundPV = &pv
 						break
 					}
