@@ -2,7 +2,7 @@
 ARG OCP_VERSION=4.16
 ARG GOLANG_VERSION=1.21
 ARG RHEL_VERSION=9
-ARG UBI_VERSION=9.3
+ARG RHEL_MINOR_VERSION=2
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -28,17 +28,15 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/${OCP_VERSION}:base-rhel${RHEL_VERSION} as baseocp
+FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel:9.2-1168
 
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi${RHEL_VERSION}/ubi-minimal:${UBI_VERSION}
-
-RUN microdnf update -y && \
-    microdnf install --nodocs --noplugins -y \
+RUN dnf update -y && \
+    dnf install --nodocs --noplugins -y \
         util-linux \
         e2fsprogs \
         xfsprogs \
         glibc && \
-    microdnf clean all
+    dnf clean all
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .
