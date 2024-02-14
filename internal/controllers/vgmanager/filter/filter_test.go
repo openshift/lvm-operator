@@ -212,6 +212,9 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			},
 		},
 	}
+	evalSymlinks = func(path string) (string, error) {
+		return path, nil
+	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
 			mockLVM := lvmmocks.NewMockLVM(t)

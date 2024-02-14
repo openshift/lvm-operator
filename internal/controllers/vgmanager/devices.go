@@ -207,7 +207,7 @@ func isDeviceAlreadyPartOfVG(nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, d
 	for _, vgStatus := range nodeStatus.Spec.LVMVGStatus {
 		if vgStatus.Name == volumeGroup.Name {
 			for _, pv := range vgStatus.Devices {
-				if pv == diskName {
+				if resolvedPV, _ := evalSymlinks(pv); resolvedPV == diskName {
 					return true
 				}
 			}
