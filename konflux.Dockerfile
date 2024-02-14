@@ -1,14 +1,6 @@
 # https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
-ARG OCP_VERSION=4.16
-ARG GOLANG_VERSION=1.21
-ARG RHEL_VERSION=9
-ARG RHEL_MINOR_VERSION=2
-ARG TARGETOS
-ARG TARGETARCH
-ARG TARGETPLATFORM
-
 # Build the manager binary
-FROM registry.ci.openshift.org/ocp/builder:rhel-${RHEL_VERSION}-golang-${GOLANG_VERSION}-openshift-${OCP_VERSION} as builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.21 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
