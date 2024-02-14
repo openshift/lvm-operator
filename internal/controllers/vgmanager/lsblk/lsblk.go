@@ -1,7 +1,7 @@
 package lsblk
 
 import (
-	"encoding/json"
+	"context"
 	"strings"
 
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
@@ -49,9 +49,9 @@ type BlockDevice struct {
 }
 
 type LSBLK interface {
-	ListBlockDevices() ([]BlockDevice, error)
-	IsUsableLoopDev(b BlockDevice) (bool, error)
-	BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error)
+	ListBlockDevices(ctx context.Context) ([]BlockDevice, error)
+	IsUsableLoopDev(ctx context.Context, b BlockDevice) (bool, error)
+	BlockDeviceInfos(ctx context.Context, bs []BlockDevice) (BlockDeviceInfos, error)
 }
 
 type HostLSBLK struct {
@@ -79,22 +79,14 @@ func (b BlockDevice) HasChildren() bool {
 }
 
 // ListBlockDevices lists the block devices using the lsblk command
-func (lsblk *HostLSBLK) ListBlockDevices() ([]BlockDevice, error) {
+func (lsblk *HostLSBLK) ListBlockDevices(ctx context.Context) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
 	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
 	args := []string{"--json", "--paths", "-o", columns}
 
-	output, err := lsblk.ExecuteCommandWithOutputAsHost(lsblk.lsblk, args...)
-	defer func() {
-		_ = output.Close()
-	}()
-	if err != nil {
+	if err := lsblk.RunCommandAsHostInto(ctx, &blockDeviceMap, lsblk.lsblk, args...); err != nil {
 		return []BlockDevice{}, err
-	}
-
-	if err = json.NewDecoder(output).Decode(&blockDeviceMap); err != nil {
-		return nil, err
 	}
 
 	return blockDeviceMap["blockdevices"], nil
@@ -103,23 +95,15 @@ func (lsblk *HostLSBLK) ListBlockDevices() ([]BlockDevice, error) {
 // IsUsableLoopDev returns true if the loop device isn't in use by Kubernetes
 // by matching the back file path against a standard string used to mount devices
 // from host into pods
-func (lsblk *HostLSBLK) IsUsableLoopDev(b BlockDevice) (bool, error) {
+func (lsblk *HostLSBLK) IsUsableLoopDev(ctx context.Context, b BlockDevice) (bool, error) {
 	// holds back-file string of the loop device
 	var loopDeviceMap map[string][]struct {
 		BackFile string `json:"back-file"`
 	}
 
 	args := []string{b.Name, "-O", "BACK-FILE", "--json"}
-	output, err := lsblk.ExecuteCommandWithOutputAsHost(lsblk.losetup, args...)
-	defer func() {
-		_ = output.Close()
-	}()
-	if err != nil {
+	if err := lsblk.RunCommandAsHostInto(ctx, &loopDeviceMap, lsblk.losetup, args...); err != nil {
 		return true, err
-	}
-
-	if err = json.NewDecoder(output).Decode(&loopDeviceMap); err != nil {
-		return false, err
 	}
 
 	for _, backFile := range loopDeviceMap["loopdevices"] {
@@ -152,7 +136,7 @@ func flattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
 	return flattened
 }
 
-func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, error) {
+func (lsblk *HostLSBLK) BlockDeviceInfos(ctx context.Context, bs []BlockDevice) (BlockDeviceInfos, error) {
 	flattenedMap := flattenedBlockDevices(bs)
 
 	blockDeviceInfos := make(BlockDeviceInfos)
@@ -160,7 +144,7 @@ func (lsblk *HostLSBLK) BlockDeviceInfos(bs []BlockDevice) (BlockDeviceInfos, er
 	for _, dev := range flattenedMap {
 		if dev.Type == "loop" {
 			info := blockDeviceInfos[dev.KName]
-			info.IsUsableLoopDev, _ = lsblk.IsUsableLoopDev(dev)
+			info.IsUsableLoopDev, _ = lsblk.IsUsableLoopDev(ctx, dev)
 			blockDeviceInfos[dev.KName] = info
 		}
 	}

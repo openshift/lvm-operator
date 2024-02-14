@@ -2,8 +2,8 @@ package vgmanager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 
@@ -102,7 +102,6 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 	}
 
 	lvsCommandForVG1 := []string{
-		"lvs",
 		"-S",
 		"vgname=vg1",
 		"--units",
@@ -113,11 +112,11 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 
 	mockExecutorForLVSOutput := func(output string) lvmexec.Executor {
 		return &mockExec.MockExecutor{
-			MockExecuteCommandWithOutputAsHost: func(command string, args ...string) (io.ReadCloser, error) {
-				if !slices.Equal(args, lvsCommandForVG1) {
-					return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args)
+			MockRunCommandAsHostInto: func(ctx context.Context, into any, command string, args ...string) error {
+				if !slices.Equal(args, lvsCommandForVG1) || !strings.Contains(command, "lvs") {
+					return fmt.Errorf("invalid args %q", args)
 				}
-				return io.NopCloser(strings.NewReader(output)), nil
+				return json.Unmarshal([]byte(output), &into)
 			},
 		}
 	}
@@ -222,8 +221,9 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := log.IntoContext(context.Background(), testr.New(t))
 			r := &Reconciler{LVM: lvm.NewHostLVM(tt.fields.executor)}
-			tt.wantErr(t, r.validateLVs(log.IntoContext(context.Background(), testr.New(t)), tt.args.volumeGroup), fmt.Sprintf("validateLVs(%v)", tt.args.volumeGroup))
+			tt.wantErr(t, r.validateLVs(ctx, tt.args.volumeGroup), fmt.Sprintf("validateLVs(%v)", tt.args.volumeGroup))
 		})
 	}
 }

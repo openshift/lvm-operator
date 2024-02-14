@@ -1,4 +1,10 @@
-# The LVM Operator
+# The LVM Operator - part of LVMS
+
+## [Official LVMS Product Documentation](https://docs.openshift.com/container-platform/latest/storage/persistent_storage/persistent_storage_local/persistent-storage-using-lvms.html)
+
+For the latest information about usage and installation of LVMS (Logical Volume Manager Storage) in OpenShift, please use the official product documentation linked above.
+
+## Overview
 
 Use the LVM Operator with `LVMCluster` custom resources to deploy and manage LVM storage on OpenShift clusters.
 

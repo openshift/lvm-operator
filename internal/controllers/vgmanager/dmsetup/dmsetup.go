@@ -2,6 +2,7 @@ package dmsetup
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ var (
 )
 
 type Dmsetup interface {
-	Remove(deviceName string) error
+	Remove(ctx context.Context, deviceName string) error
 }
 
 type HostDmsetup struct {
@@ -35,14 +36,14 @@ func NewHostDmsetup(executor exec.Executor, dmsetup string) *HostDmsetup {
 }
 
 // Remove removes the device's reference from the device-mapper
-func (dmsetup *HostDmsetup) Remove(deviceName string) error {
+func (dmsetup *HostDmsetup) Remove(ctx context.Context, deviceName string) error {
 	if len(deviceName) == 0 {
 		return errors.New("failed to remove device-mapper reference. Device name is empty")
 	}
 
 	args := []string{"remove"}
 	args = append(args, deviceName)
-	output, err := dmsetup.ExecuteCommandWithOutputAsHost(dmsetup.dmsetup, args...)
+	output, err := dmsetup.StartCommandWithOutputAsHost(ctx, dmsetup.dmsetup, args...)
 	if err == nil {
 		return nil
 	}
@@ -52,6 +53,10 @@ func (dmsetup *HostDmsetup) Remove(deviceName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read output from device-mapper %q: %w", deviceName, err)
 	}
+	if err := output.Close(); err != nil {
+		return fmt.Errorf("failed to close output from device-mapper %q: %w", deviceName, err)
+	}
+
 	if bytes.Contains(data, []byte("not found")) {
 		return ErrReferenceNotFound
 	}

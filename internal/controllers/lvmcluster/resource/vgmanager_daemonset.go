@@ -24,6 +24,7 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
+	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -109,16 +110,15 @@ var (
 	LVMDConfMapVol     = corev1.Volume{
 		Name: LVMDConfMapVolName,
 		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				Optional: ptr.To(true),
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: constants.LVMDConfigMapName,
-				},
-			},
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: filepath.Dir(lvmd.DefaultFileConfigPath),
+				Type: &HostPathDirectoryOrCreate},
 		},
 	}
 	LVMDConfMapVolMount = corev1.VolumeMount{
-		Name: LVMDConfMapVolName, MountPath: constants.LVMDDefaultConfigDir,
+		Name:             LVMDConfMapVolName,
+		MountPath:        filepath.Dir(lvmd.DefaultFileConfigPath),
+		MountPropagation: &hostContainerPropagation,
 	}
 )
 

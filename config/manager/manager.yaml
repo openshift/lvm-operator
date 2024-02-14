@@ -24,6 +24,8 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lvms-operator
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       annotations:
@@ -41,7 +43,7 @@ spec:
         - /lvms
         - operator
         args:
-        - --leader-elect
+        - --leader-elect=false
         image: controller:latest
         # if name is changed here, same should be reflected in 'controller/defaults.go'
         # search for 'ContainerName'
@@ -80,4 +82,4 @@ spec:
         - name: socket-dir
           emptyDir: {}
       serviceAccountName: lvms-operator
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 10

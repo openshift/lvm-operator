@@ -173,14 +173,16 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	logger.Info(fmt.Sprintf("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name))
 	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
 
+	topologyQueue := workqueue.NewRateLimitingQueueWithConfig(rateLimiter, workqueue.RateLimitingQueueConfig{
+		Name: "csitopology",
+	})
+
 	topologyInformer := topology.NewNodeTopology(
 		p.options.DriverName,
 		clientset,
 		factory.Core().V1().Nodes(),
 		factory.Storage().V1().CSINodes(),
-		workqueue.NewRateLimitingQueueWithConfig(rateLimiter, workqueue.RateLimitingQueueConfig{
-			Name: "csitopology",
-		}),
+		topologyQueue,
 	)
 
 	managedByID := "external-provisioner"
@@ -280,6 +282,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	}()
 	go func() {
 		defer wg.Done()
+		defer topologyQueue.ShutDown()
 		provisionController.Run(ctx)
 		logger.Info("provisioner controller finished shutdown")
 	}()
