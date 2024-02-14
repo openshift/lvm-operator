@@ -117,6 +117,18 @@ func NewCmd(opts *Options) *cobra.Command {
 	return cmd
 }
 
+// NoManagedFields removes the managedFields from the object.
+// This is used to reduce memory usage of the objects in the cache.
+// This MUST NOT be used for SSA.
+func NoManagedFields(i any) (any, error) {
+	it, ok := i.(client.Object)
+	if !ok {
+		return nil, fmt.Errorf("unexpected object type: %T", i)
+	}
+	it.SetManagedFields(nil)
+	return it, nil
+}
+
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
@@ -174,6 +186,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			Port: 9443,
 		}},
 		Cache: cache.Options{
+			DefaultTransform: NoManagedFields,
 			ByObject: map[client.Object]cache.ByObject{
 				&lvmv1alpha1.LVMCluster{}:               {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 				&lvmv1alpha1.LVMVolumeGroup{}:           {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
