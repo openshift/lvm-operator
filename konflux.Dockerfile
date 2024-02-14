@@ -20,6 +20,7 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
+# ELS is the extended support lifecycle image for RHEL 9 and can only be used by Red Hat Products
 FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel:9.2-1168
 
 RUN dnf update -y && \
