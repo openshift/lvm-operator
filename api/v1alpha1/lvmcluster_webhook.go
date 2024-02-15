@@ -44,7 +44,6 @@ var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
 	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
 	ErrInvalidNamespace                                      = errors.New("invalid namespace was supplied")
-	ErrAtLeastOneDeviceClassRequired                         = errors.New("at least one deviceClass is required")
 	ErrOnlyOneDefaultDeviceClassAllowed                      = errors.New("only one default deviceClass is allowed")
 	ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector = errors.New("either paths or optionalPaths must be specified when DeviceSelector is specified")
 	ErrEmptyPathsWithMultipleDeviceClasses                   = errors.New("path list should not be empty when there are multiple deviceClasses")
@@ -279,9 +278,6 @@ func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Ob
 
 func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnings, error) {
 	deviceClasses := l.Spec.Storage.DeviceClasses
-	if len(deviceClasses) < 1 {
-		return nil, ErrAtLeastOneDeviceClassRequired
-	}
 	countDefault := 0
 	for _, deviceClass := range deviceClasses {
 		if deviceClass.Default {
