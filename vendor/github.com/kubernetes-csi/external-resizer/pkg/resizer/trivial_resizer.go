@@ -18,7 +18,7 @@ package resizer
 
 import (
 	"github.com/kubernetes-csi/external-resizer/pkg/util"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
@@ -46,11 +46,11 @@ func (r *trivialResizer) CanSupport(pv *v1.PersistentVolume, pvc *v1.PersistentV
 
 	source := pv.Spec.CSI
 	if source == nil {
-		klog.V(4).Infof("PV %s is not a CSI volume, skip it", pv.Name)
+		klog.V(4).InfoS("PV is not a CSI volume, skip it", "PV", klog.KObj(pv))
 		return false
 	}
 	if source.Driver != r.name {
-		klog.V(4).Infof("Skip resize PV %s for resizer %s", pv.Name, source.Driver)
+		klog.V(4).InfoS("Skip resize", "PV", klog.KObj(pv), "resizer", source.Driver)
 		return false
 	}
 	return true
