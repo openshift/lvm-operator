@@ -288,7 +288,7 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 		return nil, fmt.Errorf("%w. Currently, there are %d default deviceClasses", ErrOnlyOneDefaultDeviceClassAllowed, countDefault)
 	}
 	if countDefault == 0 {
-		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly"}, nil
+		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly or you will have to declare another default StorageClass"}, nil
 	}
 
 	return nil, nil

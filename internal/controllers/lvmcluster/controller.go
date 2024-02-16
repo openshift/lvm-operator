@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	v1 "k8s.io/api/apps/v1"
 	"os"
 	"time"
 
@@ -281,23 +282,38 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 	var readyVGCount int
 	var isReady, isDegraded, isFailed bool
 
-	for _, nodeItem := range vgNodeStatusList.Items {
-		for _, item := range nodeItem.Spec.LVMVGStatus {
-			if item.Status == lvmv1alpha1.VGStatusReady {
-				readyVGCount++
-				isReady = true
-			} else if item.Status == lvmv1alpha1.VGStatusDegraded {
-				isDegraded = true
-			} else if item.Status == lvmv1alpha1.VGStatusFailed {
-				isFailed = true
-			}
+	if len(vgNodeStatusList.Items) > 0 {
+		for _, nodeItem := range vgNodeStatusList.Items {
+			for _, item := range nodeItem.Spec.LVMVGStatus {
+				if item.Status == lvmv1alpha1.VGStatusReady {
+					readyVGCount++
+					isReady = true
+				} else if item.Status == lvmv1alpha1.VGStatusDegraded {
+					isDegraded = true
+				} else if item.Status == lvmv1alpha1.VGStatusFailed {
+					isFailed = true
+				}
 
-			vgNodeMap[item.Name] = append(vgNodeMap[item.Name],
-				lvmv1alpha1.NodeStatus{
-					Node:     nodeItem.Name,
-					VGStatus: *item.DeepCopy(),
-				},
-			)
+				vgNodeMap[item.Name] = append(vgNodeMap[item.Name],
+					lvmv1alpha1.NodeStatus{
+						Node:     nodeItem.Name,
+						VGStatus: *item.DeepCopy(),
+					},
+				)
+			}
+		}
+	} else {
+		ds := &v1.DaemonSet{}
+		ds.SetNamespace(r.Namespace)
+		ds.SetName(resource.VGManagerUnit)
+		if err := r.Get(ctx, types.NamespacedName{Name: resource.VGManagerUnit, Namespace: r.Namespace}, ds); err == nil {
+			if err := resource.VerifyDaemonSetReadiness(ds); err == nil {
+				isReady = true
+			} else {
+				isDegraded = true
+			}
+		} else {
+			isFailed = true
 		}
 	}
 
