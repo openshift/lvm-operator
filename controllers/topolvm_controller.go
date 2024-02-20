@@ -212,10 +212,6 @@ func getControllerContainer() *corev1.Container {
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmControllerCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmControllerMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmControllerCPURequest),
 			corev1.ResourceMemory: resource.MustParse(TopolvmControllerMemRequest),
@@ -279,10 +275,6 @@ func getCsiProvisionerContainer() *corev1.Container {
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiProvisionerCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmCsiProvisionerMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiProvisionerCPURequest),
 			corev1.ResourceMemory: resource.MustParse(TopolvmCsiProvisionerMemRequest),
@@ -335,10 +327,6 @@ func getCsiResizerContainer() *corev1.Container {
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiResizerCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmCsiResizerMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiResizerCPURequest),
 			corev1.ResourceMemory: resource.MustParse(TopolvmCsiResizerMemRequest),
@@ -366,10 +354,6 @@ func getCsiSnapshotterContainer() *corev1.Container {
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiSnapshotterCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmCsiSnapshotterMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmCsiSnapshotterCPURequest),
 			corev1.ResourceMemory: resource.MustParse(TopolvmCsiSnapshotterMemRequest),
@@ -389,10 +373,6 @@ func getCsiSnapshotterContainer() *corev1.Container {
 
 func getLivenessProbeContainer() *corev1.Container {
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPULimit),
-			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPURequest),
 			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemRequest),

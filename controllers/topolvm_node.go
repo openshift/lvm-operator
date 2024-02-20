@@ -247,10 +247,6 @@ func getLvmdContainer() *corev1.Container {
 	}
 
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmdCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmdMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmdCPURequest),
 			corev1.ResourceMemory: resource.MustParse(TopolvmdMemRequest),
@@ -288,10 +284,6 @@ func getNodeContainer() *corev1.Container {
 	}
 
 	requirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(TopolvmNodeCPULimit),
-			corev1.ResourceMemory: resource.MustParse(TopolvmNodeMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmNodeCPURequest),
 			corev1.ResourceMemory: resource.MustParse(TopolvmNodeMemRequest),
@@ -361,10 +353,6 @@ func getCsiRegistrarContainer() *corev1.Container {
 	}
 
 	requirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(CSIRegistrarCPULimit),
-			corev1.ResourceMemory: resource.MustParse(CSIRegistrarMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(CSIRegistrarCPURequest),
 			corev1.ResourceMemory: resource.MustParse(CSIRegistrarMemRequest),
@@ -384,10 +372,6 @@ func getCsiRegistrarContainer() *corev1.Container {
 
 func getNodeLivenessProbeContainer() *corev1.Container {
 	resourceRequirements := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPULimit),
-			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemLimit),
-		},
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(LivenessProbeCPURequest),
 			corev1.ResourceMemory: resource.MustParse(LivenessProbeMemRequest),
