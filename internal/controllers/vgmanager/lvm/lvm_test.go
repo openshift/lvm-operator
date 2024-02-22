@@ -583,7 +583,6 @@ func TestNewDefaultHostLVM(t *testing.T) {
 	assert.NotNilf(t, lvm, "lvm should not be nil")
 }
 
-
 func Test_untaggedVGs(t *testing.T) {
 	vgs := []VolumeGroup{
 		{Name: "vg1", Tags: []string{"tag1"}},

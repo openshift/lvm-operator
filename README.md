@@ -52,6 +52,7 @@ end
     * [Single LVMCluster support](#single-lvmcluster-support)
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
     * [Missing native LVM RAID Configuration support](#missing-native-lvm-raid-configuration-support)
+    * [Missing LV-level encryption support](#missing-lv-level-encryption-support)
     * [Snapshotting and Cloning in Multi-Node Topologies](#snapshotting-and-cloning-in-multi-node-topologies)
     * [Validation of `LVMCluster` CRs outside the `openshift-storage` namespace](#validation-of-lvmcluster-crs-outside-the-openshift-storage-namespace)
 - [Troubleshooting](#troubleshooting)
@@ -453,6 +454,65 @@ Simply create a RAID array with `mdadm` and then use this in your `deviceSelecto
 3. Any recovery and syncing will then happen with `mdraid`: [Replacing Disks](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#replacing-a-failed-disk-in-raid_managing-raid) and [Repairing](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#repairing-raid-disks_managing-raid) will work transparently of LVMS and can be covered by a sysadmin of the Node.
 
 _NOTE: Currently, RAID Arrays created with `mdraid` are not automatically recognized when not using any `deviceSelector`, thus they MUST be specified explicitly._
+
+### Missing LV-level encryption support
+
+Currently, LVM Operator does not have a native LV-level encryption support. Instead, you can encrypt the entire disk or partitions, and use them within LVMCluster. This way all LVs created by LVMS on this disk will be encrypted out-of-the-box.
+
+Here is an example `MachineConfig` that can be used to configure encrypted partitions during an OpenShift installation:
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 98-encrypted-disk-partition-master
+  labels:
+    machineconfiguration.openshift.io/role: master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      disks:
+        - device: /dev/nvme0n1
+          wipeTable: false
+          partitions:
+            - sizeMiB: 204800
+              startMiB: 600000
+              label: application
+              number: 5
+      luks:
+        - clevis:
+            tpm2: true
+          device: /dev/disk/by-partlabel/application
+          name: application
+          options:
+          - --cipher
+          - aes-cbc-essiv:sha256
+          wipeVolume: true
+```
+
+Then, the path to the encrypted partition `/dev/mapper/application` can be specified in the `deviceSelector`.
+
+For non-OpenShift clusters, you can encrypt a disk using LUKS with `cryptsetup`, and then use this in your `deviceSelector` within `LVMCluster`:
+
+1. Set up the `/dev/sdb` device for encryption. This will also remove all the data on the device:
+
+   ```bash
+   cryptsetup -y -v luksFormat /dev/sdb
+   ```
+
+    You'll be prompted to set a passphrase to unlock the volume.
+
+2. Create a logical device-mapper device named `encrypted`, mounted to the LUKS-encrypted device:
+
+   ```bash
+   cryptsetup luksOpen /dev/sdb encrypted
+   ```
+
+    You'll be prompted to enter the passphrase you set when creating the volume.
+
+3. You can now reference `/dev/mapper/encrypted` in the `deviceSelector`.
 
 ### Snapshotting and Cloning in Multi-Node Topologies
 
