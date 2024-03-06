@@ -40,12 +40,12 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/tagging"
 	"github.com/spf13/cobra"
-	topolvmClient "github.com/topolvm/topolvm/client"
-	"github.com/topolvm/topolvm/controllers"
-	"github.com/topolvm/topolvm/driver"
-	topoLVMD "github.com/topolvm/topolvm/lvmd"
-	"github.com/topolvm/topolvm/lvmd/command"
-	"github.com/topolvm/topolvm/runners"
+	"github.com/topolvm/topolvm"
+	"github.com/topolvm/topolvm/pkg/controller"
+
+	"github.com/topolvm/topolvm/pkg/driver"
+	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
+	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,23 +150,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("unable to set up ready check: %w", err)
 		}
 	} else {
-		topoClient := topolvmClient.NewWrappedClient(mgr.GetClient())
-		command.Containerized = true
-		dcm := topoLVMD.NewDeviceClassManager(lvmdConfig.DeviceClasses)
-		ocm := topoLVMD.NewLvcreateOptionClassManager(lvmdConfig.LvcreateOptionClasses)
-		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, dcm, ocm)
+		topoLVMD.Containerized(true)
+		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, lvmdConfig.DeviceClasses, lvmdConfig.LvcreateOptionClasses)
 
-		lvController := controllers.NewLogicalVolumeReconcilerWithServices(topoClient, nodeName, vgclnt, lvclnt)
-
-		if err := lvController.SetupWithManager(mgr); err != nil {
+		if err := controller.SetupLogicalVolumeReconcilerWithServices(mgr, mgr.GetClient(), nodeName, vgclnt, lvclnt); err != nil {
 			return fmt.Errorf("unable to create LogicalVolumeReconciler: %w", err)
 		}
 
-		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, topoClient, nodeName)); err != nil { // adjusted signature
+		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, mgr.GetClient(), nodeName)); err != nil { // adjusted signature
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
-		if err := os.MkdirAll(driver.DeviceDirectory, 0755); err != nil {
+		if err := os.MkdirAll(topolvm.DeviceDirectory, 0755); err != nil {
 			return err
 		}
 		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),

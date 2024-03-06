@@ -35,8 +35,8 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/microlvms"
 	"github.com/spf13/cobra"
-	topolvmcontrollers "github.com/topolvm/topolvm/controllers"
-	"github.com/topolvm/topolvm/driver"
+	topolvmcontrollers "github.com/topolvm/topolvm/pkg/controller"
+	"github.com/topolvm/topolvm/pkg/driver"
 	"google.golang.org/grpc"
 	"k8s.io/utils/ptr"
 
@@ -244,13 +244,11 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	// register TopoLVM controllers
-	topolvmNodeController := topolvmcontrollers.NewNodeReconciler(mgr.GetClient(), false)
-	if err := topolvmNodeController.SetupWithManager(mgr); err != nil {
+	if err := topolvmcontrollers.SetupNodeReconciler(mgr, mgr.GetClient(), false); err != nil {
 		return fmt.Errorf("unable to create TopoLVM Node controller: %w", err)
 	}
 
-	topolvmPVCController := topolvmcontrollers.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader())
-	if err := topolvmPVCController.SetupWithManager(mgr); err != nil {
+	if err := topolvmcontrollers.SetupPersistentVolumeClaimReconciler(mgr, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
 		return fmt.Errorf("unable to create TopoLVM PVC controller: %w", err)
 	}
 

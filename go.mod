@@ -26,7 +26,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
-	github.com/topolvm/topolvm v0.26.0
+	github.com/topolvm/topolvm v0.27.1-0.20240306010159-8c6c91dc8b7f
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.61.0
 	gotest.tools/v3 v3.5.1
@@ -45,7 +45,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240215124933-f1ed56c2e23c
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240306083609-90f16b4ca817
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
