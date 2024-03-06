@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/topolvm/topolvm/lvmd"
-	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
+	lvmdCMD "github.com/topolvm/topolvm/cmd/lvmd/app"
+	lvmd "github.com/topolvm/topolvm/pkg/lvmd/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"

@@ -375,22 +375,27 @@ github.com/stretchr/objx
 ## explicit; go 1.20
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
-# github.com/topolvm/topolvm v0.26.0 => github.com/openshift/topolvm v0.15.3-0.20240215124933-f1ed56c2e23c
+# github.com/topolvm/topolvm v0.27.1-0.20240306010159-8c6c91dc8b7f => github.com/openshift/topolvm v0.15.3-0.20240306083609-90f16b4ca817
 ## explicit; go 1.20
 github.com/topolvm/topolvm
 github.com/topolvm/topolvm/api/legacy/v1
 github.com/topolvm/topolvm/api/v1
-github.com/topolvm/topolvm/client
-github.com/topolvm/topolvm/controllers
-github.com/topolvm/topolvm/driver
-github.com/topolvm/topolvm/driver/internal/k8s
-github.com/topolvm/topolvm/filesystem
-github.com/topolvm/topolvm/getter
-github.com/topolvm/topolvm/lvmd
-github.com/topolvm/topolvm/lvmd/command
-github.com/topolvm/topolvm/lvmd/proto
-github.com/topolvm/topolvm/pkg/lvmd/cmd
-github.com/topolvm/topolvm/runners
+github.com/topolvm/topolvm/cmd/lvmd/app
+github.com/topolvm/topolvm/internal/client
+github.com/topolvm/topolvm/internal/controller
+github.com/topolvm/topolvm/internal/driver
+github.com/topolvm/topolvm/internal/driver/internal/k8s
+github.com/topolvm/topolvm/internal/filesystem
+github.com/topolvm/topolvm/internal/getter
+github.com/topolvm/topolvm/internal/lvmd
+github.com/topolvm/topolvm/internal/lvmd/command
+github.com/topolvm/topolvm/internal/runners
+github.com/topolvm/topolvm/pkg/controller
+github.com/topolvm/topolvm/pkg/driver
+github.com/topolvm/topolvm/pkg/lvmd
+github.com/topolvm/topolvm/pkg/lvmd/proto
+github.com/topolvm/topolvm/pkg/lvmd/types
+github.com/topolvm/topolvm/pkg/runners
 # go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.47.0
 ## explicit; go 1.20
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
@@ -1277,4 +1282,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240215124933-f1ed56c2e23c
+# github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240306083609-90f16b4ca817
