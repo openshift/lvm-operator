@@ -71,7 +71,9 @@ repos:
           "--check-filenames",
           "--check-hidden",
           "--exclude-file",
-          "go.sum"
+          "go.sum",
+          "--exclude-file",
+          "./test/e2e/testdata/0000_03_security-openshift_01_scc.crd.yaml", # original definition has typos
         ]
         exclude: ^vendor/
         pass_filenames: true
