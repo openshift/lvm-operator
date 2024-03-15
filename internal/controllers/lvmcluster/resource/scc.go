@@ -54,10 +54,19 @@ func (c openshiftSccs) GetName() string {
 func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 	sccs := getAllSCCs(r.GetNamespace())
-	for _, scc := range sccs {
+	for _, template := range sccs {
+		scc := &secv1.SecurityContextConstraints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: template.Name,
+			},
+		}
+
 		result, err := cutil.CreateOrUpdate(ctx, r, scc, func() error {
+			if scc.CreationTimestamp.IsZero() {
+				template.DeepCopyInto(scc)
+			}
 			labels.SetManagedLabels(r.Scheme(), scc, cluster)
-			// no need to mutate any field
+			scc.Users = template.Users
 			return nil
 		})
 		if err != nil {

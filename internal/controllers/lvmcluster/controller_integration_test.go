@@ -18,10 +18,12 @@ package lvmcluster
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
@@ -174,6 +176,31 @@ var _ = Describe("LVMCluster controller", func() {
 				}).WithContext(ctx).Should(Succeed())
 				scOut = &storagev1.StorageClass{}
 			}
+
+			By("confirming creation of the SecurityContextConstraints")
+			// we only have one SCC for vg-manager
+			scc := &secv1.SecurityContextConstraints{}
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: constants.SCCPrefix + "vgmanager"}, scc)
+			}).WithContext(ctx).Should(Succeed())
+			Expect(scc.Users).ToNot(BeEmpty())
+			Expect(scc.Users).To(ContainElement(
+				fmt.Sprintf("system:serviceaccount:%s:%s", testLvmClusterNamespace, constants.VGManagerServiceAccount)))
+			scc = nil
+
+			By("confirming overwriting the SCC User gets reset")
+			Eventually(func(ctx context.Context) []string {
+				oldSCC := &secv1.SecurityContextConstraints{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: constants.SCCPrefix + "vgmanager"}, oldSCC)).To(Succeed())
+				Expect(k8sClient.Patch(ctx, oldSCC, client.RawPatch(types.MergePatchType, []byte(`{"users": []}`)))).To(Succeed())
+				return oldSCC.Users
+			}).WithContext(ctx).Should(BeEmpty())
+
+			Eventually(func(ctx context.Context) []string {
+				scc := &secv1.SecurityContextConstraints{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: constants.SCCPrefix + "vgmanager"}, scc)).To(Succeed())
+				return scc.Users
+			}).WithContext(ctx).WithTimeout(5 * time.Second).Should(Not(BeEmpty()))
 		})
 	})
 
