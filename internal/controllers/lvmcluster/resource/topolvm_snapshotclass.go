@@ -104,6 +104,9 @@ func getTopolvmSnapshotClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*snapapi.Vo
 	var vsc []*snapapi.VolumeSnapshotClass
 
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
+		if deviceClass.ThinPoolConfig == nil {
+			continue
+		}
 		snapshotClass := &snapapi.VolumeSnapshotClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: GetVolumeSnapshotClassName(deviceClass.Name),
