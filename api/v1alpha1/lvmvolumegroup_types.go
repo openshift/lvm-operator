@@ -34,9 +34,8 @@ type LVMVolumeGroupSpec struct {
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
 	// ThinPoolConfig contains configurations for the thin-pool
-	// +kubebuilder:validation:Required
-	// +required
-	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+	// +optional
+	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
 
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional

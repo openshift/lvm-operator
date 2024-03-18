@@ -63,6 +63,13 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	It("minimum viable create for ReadWriteMany configuration", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 	It("duplicate LVMClusters get rejected", func(ctx SpecContext) {
 		generatedName := generateUniqueNameForTestCase(ctx)
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, generatedName)
