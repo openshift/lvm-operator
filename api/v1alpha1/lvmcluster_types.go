@@ -78,10 +78,16 @@ type DeviceClass struct {
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
+	// AccessMode is the access mode for the PVs created from the deviceclass.
+	// If not specified, it defaults to ReadWriteOnce.
+	// ReadWriteMany will use sanlock to allow multiple nodes to mount the PV.
+	// +kubebuilder:default=ReadWriteOnce
+	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany
+	AccessMode corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+
 	// ThinPoolConfig contains configurations for the thin-pool
-	// +kubebuilder:validation:Required
-	// +required
-	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+	// +optional
+	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
 
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
