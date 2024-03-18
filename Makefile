@@ -40,7 +40,7 @@ OPERATOR_VERSION ?= 0.0.1
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
-OPERATOR_SDK_VERSION ?= 1.33.0
+OPERATOR_SDK_VERSION ?= 1.34.1
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -305,11 +305,11 @@ jsonnet: ## Download jsonnet locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo and gomega locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.15.0)
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.16.0)
 
 MOCKERY = $(shell pwd)/bin/mockery
 mockery: ## Download mockery and add locally if necessary
-	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.40.1)
+	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.40.3)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
