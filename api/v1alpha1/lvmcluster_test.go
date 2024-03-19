@@ -66,7 +66,6 @@ var _ = Describe("webhook acceptance tests", func() {
 	It("minimum viable create for ReadWriteMany configuration", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
-		resource.Spec.Storage.DeviceClasses[0].AccessMode = "ReadWriteMany"
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})

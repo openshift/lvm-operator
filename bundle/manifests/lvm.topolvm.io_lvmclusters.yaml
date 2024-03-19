@@ -211,8 +211,6 @@ spec:
                           - name
                           - overprovisionRatio
                           type: object
-                      required:
-                      - thinPoolConfig
                       type: object
                     type: array
                 type: object

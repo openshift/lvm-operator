@@ -49,16 +49,6 @@ spec:
                       PVs
                     items:
                       properties:
-                        accessMode:
-                          default: ReadWriteOnce
-                          description: |-
-                            AccessMode is the access mode for the PVs created from the deviceclass.
-                            If not specified, it defaults to ReadWriteOnce.
-                            ReadWriteMany will use sanlock to allow multiple nodes to mount the PV.
-                          enum:
-                          - ReadWriteOnce
-                          - ReadWriteMany
-                          type: string
                         default:
                           description: Default is a flag to indicate whether the device-class
                             is the default

@@ -18,7 +18,10 @@ type Config = lvmdCMD.Config
 type DeviceClass = lvmd.DeviceClass
 type ThinPoolConfig = lvmd.ThinPoolConfig
 
-var TypeThin = lvmd.TypeThin
+var (
+	TypeThin  = lvmd.TypeThin
+	TypeThick = lvmd.TypeThick
+)
 
 const (
 	DefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
