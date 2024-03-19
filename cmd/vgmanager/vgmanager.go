@@ -42,7 +42,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
-
 	"github.com/topolvm/topolvm/pkg/driver"
 	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
 	"github.com/topolvm/topolvm/pkg/runners"
