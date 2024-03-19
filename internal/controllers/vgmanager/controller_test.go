@@ -360,6 +360,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 				Name:        vg.GetName(),
 				VolumeGroup: vg.GetName(),
 				Type:        lvmd.TypeThick,
+				SpareGB:     ptr.To(uint64(0)),
 			}))
 		}
 	})
