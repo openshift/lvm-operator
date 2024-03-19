@@ -217,7 +217,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		<-c
 		cancel()
 		<-c
-		os.Exit(1) // second signal. Exit directly.
+		os.Exit(0) // second signal. Exit directly.
 	}()
 
 	// Create new watcher.
