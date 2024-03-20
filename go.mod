@@ -28,6 +28,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/topolvm/topolvm v0.27.1-0.20240306010159-8c6c91dc8b7f
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.6.0
 	google.golang.org/grpc v1.62.1
 	gotest.tools/v3 v3.5.1
 	k8s.io/api v0.29.2
@@ -111,7 +112,6 @@ require (
 	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

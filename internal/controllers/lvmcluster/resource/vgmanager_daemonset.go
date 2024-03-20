@@ -42,6 +42,8 @@ var (
 	devDirPath          = "/dev"
 	udevPath            = "/run/udev"
 	sysPath             = "/sys"
+	runLvmPath          = "/run/lvm"
+	runSanlockPath      = "/run/sanlock"
 	metricsCertsDirPath = "/tmp/k8s-metrics-server/serving-certs"
 )
 
@@ -119,6 +121,60 @@ var (
 		Name:             LVMDConfMapVolName,
 		MountPath:        filepath.Dir(lvmd.DefaultFileConfigPath),
 		MountPropagation: &hostContainerPropagation,
+	}
+)
+
+var (
+	LVMConfVolName = "lvm-config"
+	LVMConfVol     = corev1.Volume{
+		Name: LVMConfVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/lvm",
+				Type: &HostPathDirectoryOrCreate},
+		},
+	}
+	LVMConfVolMount = corev1.VolumeMount{
+		Name:             LVMConfVolName,
+		MountPath:        "/etc/lvm",
+		MountPropagation: &hostContainerPropagation,
+	}
+)
+
+var (
+	RunLvmVolName = "run-lvm"
+	RunLvmVol     = corev1.Volume{
+		Name: RunLvmVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/run/lvms/lvm",
+				Type: &HostPathDirectoryOrCreate,
+			},
+		},
+	}
+
+	// RunLvmVolMount is the corresponding mount for RunLvmVol
+	RunLvmVolMount = corev1.VolumeMount{
+		Name:      RunLvmVolName,
+		MountPath: runLvmPath,
+	}
+)
+
+var (
+	RunSanlockVolName = "run-sanlock"
+	RunSanlockVol     = corev1.Volume{
+		Name: RunSanlockVolName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				Medium: corev1.StorageMediumMemory,
+			},
+		},
+	}
+
+	// RunSanlockVolMount is the corresponding mount for RunSanlockVol
+	RunSanlockVolMount = corev1.VolumeMount{
+		Name:      RunSanlockVolName,
+		MountPath: runSanlockPath,
 	}
 )
 
@@ -214,8 +270,11 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		CSIPluginVol,
 		PodVol,
 		LVMDConfMapVol,
+		LVMConfVol,
 		DevHostDirVol,
 		UDevHostDirVol,
+		RunLvmVol,
+		RunSanlockVol,
 		SysHostDirVol,
 		MetricsCertsDirVol,
 	}
@@ -225,8 +284,11 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		CSIPluginVolMount,
 		PodVolMount,
 		LVMDConfMapVolMount,
+		LVMConfVolMount,
 		DevHostDirVolMount,
 		UDevHostDirVolMount,
+		RunLvmVolMount,
+		RunSanlockVolMount,
 		SysHostDirVolMount,
 		MetricsCertsDirVolMount,
 	}

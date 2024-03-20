@@ -27,6 +27,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
+	"github.com/openshift/lvm-operator/cmd/vgmanager/runner"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
@@ -67,14 +68,24 @@ import (
 const (
 	DefaultDiagnosticsAddr = ":8443"
 	DefaultProbeAddr       = ":8081"
+	lvmConfig              = `
+global {
+	use_lvmlockd = 1
+}
+
+activation {
+	udev_sync = 0
+	udev_rules = 0
+}`
 )
 
 type Options struct {
 	Scheme   *runtime.Scheme
 	SetupLog logr.Logger
 
-	diagnosticsAddr string
-	healthProbeAddr string
+	diagnosticsAddr     string
+	healthProbeAddr     string
+	enableSharedVolumes bool
 }
 
 // NewCmd creates a new CLI command
@@ -95,6 +106,10 @@ func NewCmd(opts *Options) *cobra.Command {
 	)
 	cmd.Flags().StringVar(
 		&opts.healthProbeAddr, "health-probe-bind-address", DefaultProbeAddr, "The address the probe endpoint binds to.",
+	)
+	cmd.Flags().BoolVar(
+		&opts.enableSharedVolumes, "enable-shared-volumes", true,
+		"Enable using shared volumes. Enabling this will ensure sanlock, lvmlockd, and watchdog runs on every node, and vgs are created using the locks.",
 	)
 	return cmd
 }
@@ -140,6 +155,22 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	if opts.enableSharedVolumes {
+		//create lvm.conf file
+		err := os.WriteFile("/etc/lvm/lvm.conf", []byte(lvmConfig), 0644)
+		if err != nil {
+			return fmt.Errorf("could not write lvm.conf file: %w", err)
+		}
+
+		if err := mgr.Add(runner.NewSanlockRunner(nodeName)); err != nil {
+			return fmt.Errorf("could not add sanlock runner: %w", err)
+		}
+
+		if err := mgr.Add(runner.NewLvmlockdRunner(nodeName)); err != nil {
+			return fmt.Errorf("could not add lvmlockd runner: %w", err)
+		}
 	}
 
 	lvmdConfig := &lvmd.Config{}
