@@ -94,6 +94,8 @@ github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
 github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
+github.com/jakobmoellerdev/topolvm v0.0.0-20240319162427-d8b41d1216f0 h1:ol3RdsKbtWbmqwwRUnomeebu1frYbBV0dGeCILEt5iA=
+github.com/jakobmoellerdev/topolvm v0.0.0-20240319162427-d8b41d1216f0/go.mod h1:sp/P6O6+7is1dnV6am+yk+djRxxfcOPyzW4Bi2CfEyU=
 github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGwWFoC7ycTf1rcQZHOlsJ6N8=
@@ -155,8 +157,6 @@ github.com/openshift/client-go v0.0.0-20240312121557-60dd5f9fbf8d h1:vdrC3QYkFcs
 github.com/openshift/client-go v0.0.0-20240312121557-60dd5f9fbf8d/go.mod h1:Y5Hp789dTrF6Fq8cA5YQlpwffmlLy8mc2un/CY0cg7Q=
 github.com/openshift/library-go v0.0.0-20240312152318-4109a9e7a437 h1:xMflL80gT2cXxnmDkR8QLZCbfh/x38jV5XOfLiNlsLE=
 github.com/openshift/library-go v0.0.0-20240312152318-4109a9e7a437/go.mod h1:ePlaOqUiPplRc++6aYdMe+2FmXb2xTNS9Nz5laG2YmI=
-github.com/openshift/topolvm v0.15.3-0.20240314121823-1339f4f8b9ae h1:j6Y1iy4+Ml7QM3psiAeUtLUY+mFHfdi7xolnNtwz8fI=
-github.com/openshift/topolvm v0.15.3-0.20240314121823-1339f4f8b9ae/go.mod h1:BfEw9thAo64c4xYejdbGYPOHPWhAKIaGwq72gP2Lqkc=
 github.com/operator-framework/api v0.22.0 h1:UZSn+iaQih4rCReezOnWTTJkMyawwV5iLnIItaOzytY=
 github.com/operator-framework/api v0.22.0/go.mod h1:p/7YDbr+n4fmESfZ47yLAV1SvkfE6NU2aX8KhcfI0GA=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=

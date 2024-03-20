@@ -96,7 +96,6 @@ type Reconciler struct {
 	NodeName  string
 	Namespace string
 	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
-	Shutdown  context.CancelFunc
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -402,11 +401,9 @@ func (r *Reconciler) updateLVMDConfigAfterReconcile(
 		if err := r.LVMD.Save(ctx, newCFG); err != nil {
 			return fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 		}
-		msg := "updated lvmd config with new deviceClasses, now restarting.."
+		msg := "updated lvmd config with new deviceClasses"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
-
-		r.Shutdown()
 	}
 	return nil
 }
