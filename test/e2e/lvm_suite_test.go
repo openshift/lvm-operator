@@ -60,5 +60,8 @@ var _ = AfterSuite(func(ctx context.Context) {
 
 var _ = Describe("LVM Operator e2e tests", func() {
 	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
-	Describe("PVC", Serial, Ordered, pvcTest)
+	Describe("PVC", Serial, Ordered, func() {
+		Describe("Thin", Serial, Ordered, pvcTestThinProvisioning)
+		Describe("Thick", Serial, Ordered, pvcTestThickProvisioning)
+	})
 })

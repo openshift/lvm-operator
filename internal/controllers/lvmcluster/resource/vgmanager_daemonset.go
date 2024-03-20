@@ -42,6 +42,7 @@ var (
 	devDirPath          = "/dev"
 	udevPath            = "/run/udev"
 	sysPath             = "/sys"
+	runPath             = "/run"
 	metricsCertsDirPath = "/tmp/k8s-metrics-server/serving-certs"
 )
 
@@ -119,6 +120,45 @@ var (
 		Name:             LVMDConfMapVolName,
 		MountPath:        filepath.Dir(lvmd.DefaultFileConfigPath),
 		MountPropagation: &hostContainerPropagation,
+	}
+)
+
+var (
+	LVMConfVolName = "lvm-config"
+	LVMConfVol     = corev1.Volume{
+		Name: LVMConfVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/lvm",
+				Type: &HostPathDirectoryOrCreate},
+		},
+	}
+	LVMConfVolMount = corev1.VolumeMount{
+		Name:             LVMConfVolName,
+		MountPath:        "/etc/lvm",
+		MountPropagation: &hostContainerPropagation,
+	}
+)
+
+var (
+	// RunVolMount is the corresponding mount for RunLvmVol
+	RunVolMount = corev1.VolumeMount{
+		Name:             RunVolName,
+		MountPath:        runPath,
+		MountPropagation: &hostContainerPropagation,
+	}
+)
+
+var (
+	RunVolName = "run"
+	RunVol     = corev1.Volume{
+		Name: RunVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/run",
+				Type: &directoryHostPath,
+			},
+		},
 	}
 )
 
@@ -214,8 +254,10 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		CSIPluginVol,
 		PodVol,
 		LVMDConfMapVol,
+		LVMConfVol,
 		DevHostDirVol,
 		UDevHostDirVol,
+		RunVol,
 		SysHostDirVol,
 		MetricsCertsDirVol,
 	}
@@ -225,8 +267,10 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		CSIPluginVolMount,
 		PodVolMount,
 		LVMDConfMapVolMount,
+		LVMConfVolMount,
 		DevHostDirVolMount,
 		UDevHostDirVolMount,
+		RunVolMount,
 		SysHostDirVolMount,
 		MetricsCertsDirVolMount,
 	}
@@ -329,12 +373,13 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 
 				Spec: corev1.PodSpec{
-					PriorityClassName:  constants.PriorityClassNameUserCritical,
-					Volumes:            volumes,
-					Containers:         containers,
-					HostPID:            true,
-					Tolerations:        tolerations,
-					ServiceAccountName: constants.VGManagerServiceAccount,
+					TerminationGracePeriodSeconds: ptr.To(int64(30)),
+					PriorityClassName:             constants.PriorityClassNameUserCritical,
+					Volumes:                       volumes,
+					Containers:                    containers,
+					HostPID:                       true,
+					Tolerations:                   tolerations,
+					ServiceAccountName:            constants.VGManagerServiceAccount,
 				},
 			},
 		},

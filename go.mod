@@ -28,6 +28,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/topolvm/topolvm v0.27.1-0.20240306010159-8c6c91dc8b7f
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.6.0
 	google.golang.org/grpc v1.62.1
 	gotest.tools/v3 v3.5.1
 	k8s.io/api v0.29.2
@@ -45,7 +46,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240314121823-1339f4f8b9ae
+replace github.com/topolvm/topolvm => github.com/jakobmoellerdev/topolvm v0.0.0-20240320171902-69dd13fca375
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -111,7 +112,6 @@ require (
 	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

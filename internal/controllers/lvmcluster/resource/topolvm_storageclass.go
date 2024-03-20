@@ -143,6 +143,16 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 				constants.DeviceClassKey:    deviceClass.Name,
 				"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
 			},
+			// AllowedTopologies: []v1.TopologySelectorTerm{
+			// 	{
+			// 		MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+			// 			{
+			// 				Key: topolvm.GetDeviceClassTopologyNodeKey(deviceClass.Name),
+			// 				Values:
+			// 			},
+			// 		},
+			// 	},
+			// },
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {

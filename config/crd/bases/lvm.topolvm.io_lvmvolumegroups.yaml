@@ -70,6 +70,14 @@ spec:
                       type: string
                     type: array
                 type: object
+              nodeAccessPolicy:
+                default: IsolatedToNode
+                description: NodeAccessPolicy describes the policy for accessing the
+                  deviceClass on the node.
+                enum:
+                - SharedAcrossNodes
+                - IsolatedToNode
+                type: string
               nodeSelector:
                 description: NodeSelector chooses nodes
                 properties:
@@ -177,8 +185,6 @@ spec:
                 - name
                 - overprovisionRatio
                 type: object
-            required:
-            - thinPoolConfig
             type: object
           status:
             description: LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup

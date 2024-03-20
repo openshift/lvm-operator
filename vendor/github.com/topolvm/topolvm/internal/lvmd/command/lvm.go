@@ -211,7 +211,7 @@ func (vg *VolumeGroup) CreateVolume(ctx context.Context, name string, size uint6
 		return ErrNoMultipleOfSectorSize
 	}
 
-	lvcreateArgs := []string{"lvcreate", "-n", name, "-L", fmt.Sprintf("%vb", size), "-W", "y", "-y"}
+	lvcreateArgs := []string{"lvcreate", "-n", name, "-L", fmt.Sprintf("%vb", size), "-an"}
 	for _, tag := range tags {
 		lvcreateArgs = append(lvcreateArgs, "--addtag")
 		lvcreateArgs = append(lvcreateArgs, tag)
@@ -385,7 +385,7 @@ func (t *ThinPool) CreateVolume(ctx context.Context, name string, size uint64, t
 		fmt.Sprintf("%vb", size),
 		"-W",
 		"y",
-		"-y",
+		"-an",
 	}
 	for _, tag := range tags {
 		lvcreateArgs = append(lvcreateArgs, "--addtag")
@@ -549,6 +549,11 @@ func (l *LogicalVolume) Activate(ctx context.Context, access string) error {
 	}
 
 	return callLVM(ctx, lvchangeArgs...)
+}
+
+// Deactivate deactivates the logical volume for desired access.
+func (l *LogicalVolume) Deactivate(ctx context.Context) error {
+	return callLVM(ctx, []string{"lvchange", "-k", "n", "-a", "n", l.path}...)
 }
 
 // Resize this volume.

@@ -15,11 +15,11 @@ import (
 )
 
 // AddTagToVGs adds a lvms tag to the existing volume groups. This is a temporary logic that should be removed in v4.16.
-func AddTagToVGs(ctx context.Context, c client.Client, lvm lvm.LVM, nodeName string, namespace string) error {
+func AddTagToVGs(ctx context.Context, c client.Client, runlvm lvm.LVM, nodeName string, namespace string) error {
 	logger := log.FromContext(ctx)
 
 	// now we get all untagged vgs on the node
-	vgs, err := lvm.ListVGs(ctx, false)
+	vgs, err := runlvm.ListVGs(ctx, false, lvm.ListVGOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list volume groups on node "+
 			"to determine if tag migration is necessary: %w", err)
@@ -49,7 +49,7 @@ func AddTagToVGs(ctx context.Context, c client.Client, lvm lvm.LVM, nodeName str
 				continue
 			}
 			logger.Info("tagging volume group managed by LVMS", "vg", vg.Name)
-			if err := lvm.AddTagToVG(ctx, vg.Name); err != nil {
+			if err := runlvm.AddTagToVG(ctx, vg.Name); err != nil {
 				taggingErr = errors.Join(taggingErr, fmt.Errorf("failed to tag volume group %s: %w", vg.Name, err))
 				continue
 			}

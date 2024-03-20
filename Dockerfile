@@ -42,7 +42,9 @@ RUN microdnf update -y && \
         util-linux \
         e2fsprogs \
         xfsprogs \
-        glibc && \
+        glibc \
+        lvm2-lockd \
+        sanlock && \
     microdnf clean all
 
 WORKDIR /

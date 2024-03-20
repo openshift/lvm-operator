@@ -40,6 +40,11 @@ func GetTopologyNodeKey() string {
 	return fmt.Sprintf("topology.%s/node", GetPluginName())
 }
 
+// GetDeviceClassTopologyNodeKey returns the key of topology that represents node name.
+func GetDeviceClassTopologyNodeKey() string {
+	return fmt.Sprintf("topology.%s/shared-device-class", GetPluginName())
+}
+
 // GetDeviceClassKey returns the key used in CSI volume create requests to specify a device-class.
 func GetDeviceClassKey() string {
 	return fmt.Sprintf("%s/device-class", GetPluginName())

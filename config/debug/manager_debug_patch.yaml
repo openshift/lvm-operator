@@ -22,6 +22,8 @@ spec:
             - "operator"
           args:
             - "--vgmanager-cmd=/usr/sbin/dlv,exec,--listen=:2345,--headless=true,--log=true,--accept-multiclient,--api-version=2,--continue,/usr/sbin/lvms,--,vgmanager"
+            - "--leader-elect=false"
+            - "--vgmanager-zap-log-level=debug"
           ports:
             - containerPort: 2345
               name: "debug"

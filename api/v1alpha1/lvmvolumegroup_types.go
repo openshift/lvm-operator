@@ -34,9 +34,14 @@ type LVMVolumeGroupSpec struct {
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
 	// ThinPoolConfig contains configurations for the thin-pool
-	// +kubebuilder:validation:Required
-	// +required
-	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+	// +optional
+	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
+
+	// NodeAccessPolicy describes the policy for accessing the deviceClass on the node.
+	// +kubebuilder:validation:Enum=SharedAcrossNodes;IsolatedToNode
+	// +kubebuilder:default=IsolatedToNode
+	// +optional
+	NodeAccessPolicy NodeAccessPolicy `json:"nodeAccessPolicy,omitempty"`
 
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional

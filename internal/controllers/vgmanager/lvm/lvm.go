@@ -20,8 +20,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -60,6 +65,7 @@ type VGReport struct {
 			Name   string `json:"vg_name"`
 			VgSize string `json:"vg_size"`
 			Tags   string `json:"vg_tags"`
+			VgAttr string `json:"vg_attr"`
 		} `json:"vg"`
 	} `json:"report"`
 }
@@ -89,15 +95,29 @@ type LogicalVolume struct {
 	MetadataPercent string `json:"metadata_percent"`
 }
 
+type CreateVGOptions struct {
+	NodeAccessPolicy    v1alpha1.NodeAccessPolicy
+	OwnsGlobalLockSpace func() bool
+}
+
+type DeleteVGOptions struct {
+	NodeAccessPolicy    v1alpha1.NodeAccessPolicy
+	OwnsGlobalLockSpace func() bool
+}
+
+type ListVGOptions struct {
+	VGName string
+}
+
 type LVM interface {
-	CreateVG(ctx context.Context, vg VolumeGroup) error
+	CreateVG(ctx context.Context, vg VolumeGroup, opts CreateVGOptions) error
 	ExtendVG(ctx context.Context, vg VolumeGroup, pvs []string) (VolumeGroup, error)
 	AddTagToVG(ctx context.Context, vgName string) error
-	DeleteVG(ctx context.Context, vg VolumeGroup) error
+	DeleteVG(ctx context.Context, vg VolumeGroup, opts DeleteVGOptions) error
 	GetVG(ctx context.Context, name string) (VolumeGroup, error)
 
 	ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error)
-	ListVGs(ctx context.Context, taggedByLVMS bool) ([]VolumeGroup, error)
+	ListVGs(ctx context.Context, taggedByLVMS bool, opts ListVGOptions) ([]VolumeGroup, error)
 	ListLVsByName(ctx context.Context, vgName string) ([]string, error)
 	ListLVs(ctx context.Context, vgName string) (*LVReport, error)
 
@@ -111,6 +131,8 @@ type LVM interface {
 type HostLVM struct {
 	exec.Executor
 }
+
+var _ LVM = &HostLVM{}
 
 func NewDefaultHostLVM() *HostLVM {
 	return NewHostLVM(&exec.CommandExecutor{})
@@ -133,6 +155,14 @@ type VolumeGroup struct {
 
 	// Tags is the list of tags associated with the volume group
 	Tags []string `json:"vg_tags"`
+
+	// VgAttr describes the attributes of the VolumeGroup
+	VgAttr string `json:"lv_attr"`
+}
+
+// Attributes returns the attributes of the volume group
+func (vg VolumeGroup) Attributes() (VgAttr, error) {
+	return ParsedVgAttr(vg.VgAttr)
 }
 
 // PhysicalVolume represents a physical volume of linux lvm.
@@ -163,7 +193,7 @@ type PhysicalVolume struct {
 }
 
 // CreateVG creates a new volume group
-func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup) error {
+func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup, opts CreateVGOptions) error {
 	if vg.Name == "" {
 		return fmt.Errorf("failed to create volume group: volume group name is empty")
 	}
@@ -173,6 +203,23 @@ func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup) error {
 	}
 
 	args := []string{vg.Name, "--addtag", lvmsTag}
+
+	if opts.NodeAccessPolicy == v1alpha1.NodeAccessPolicySharedAcrossNodes {
+		for _, pv := range vg.PVs {
+			if err := hlvm.RunCommandAsHost(ctx, lvmDevicesCmd, "--adddev", pv.PvName); err != nil {
+				return fmt.Errorf("failed to add PV %s to device file: %w", pv.UUID, err)
+			}
+		}
+
+		if opts.OwnsGlobalLockSpace() {
+			args = append(args, "--shared")
+		} else {
+			log.FromContext(ctx).Info("Skipping shared VG Creation as another node is the lockspace owner.")
+			// If the global lockspace is not present (vg doesn't exist) and we are not the leader,
+			// we need to skip the VG Creation
+			return nil
+		}
+	}
 
 	for _, pv := range vg.PVs {
 		args = append(args, pv.PvName)
@@ -225,11 +272,18 @@ func (hlvm *HostLVM) AddTagToVG(ctx context.Context, vgName string) error {
 }
 
 // DeleteVG deletes a volume group and the physical volumes associated with it
-func (hlvm *HostLVM) DeleteVG(ctx context.Context, vg VolumeGroup) error {
+func (hlvm *HostLVM) DeleteVG(ctx context.Context, vg VolumeGroup, opts DeleteVGOptions) error {
 	// Deactivate Volume Group
 	vgArgs := []string{"-an", vg.Name}
 	if err := hlvm.RunCommandAsHost(ctx, vgChangeCmd, vgArgs...); err != nil {
 		return fmt.Errorf("failed to remove volume group %q: %w", vg.Name, err)
+	}
+
+	if opts.NodeAccessPolicy == v1alpha1.NodeAccessPolicySharedAcrossNodes && !opts.OwnsGlobalLockSpace() {
+		if err := hlvm.RunCommandAsHost(ctx, vgChangeCmd, vg.Name, "--lock-stop"); err != nil {
+			return fmt.Errorf("failed to stop lock for shared volume group %q: %w", vg.Name, err)
+		}
+		return nil
 	}
 
 	// Remove Volume Group
@@ -263,40 +317,20 @@ func (hlvm *HostLVM) DeleteVG(ctx context.Context, vg VolumeGroup) error {
 
 // GetVG returns a volume group along with the associated physical volumes
 func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error) {
-	res := new(VGReport)
-
-	args := []string{
-		lvmsTag, "--units", "g", "--reportformat", "json",
-	}
-	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
-		return VolumeGroup{}, fmt.Errorf("failed to list volume groups. %v", err)
-	}
-
-	vgFound := false
-	volumeGroup := VolumeGroup{}
-	for _, report := range res.Report {
-		for _, vg := range report.Vg {
-			if vg.Name == name {
-				volumeGroup.Name = vg.Name
-				volumeGroup.VgSize = vg.VgSize
-				vgFound = true
-				break
-			}
-		}
-	}
-
-	if !vgFound {
+	vgs, err := hlvm.ListVGs(ctx, false, ListVGOptions{
+		VGName: name,
+	})
+	if len(vgs) == 0 {
 		return VolumeGroup{}, ErrVolumeGroupNotFound
 	}
-
-	// Get Physical Volumes associated with the Volume Group
-	pvs, err := hlvm.ListPVs(ctx, name)
-	if err != nil {
-		return VolumeGroup{}, fmt.Errorf("failed to list physical volumes for volume group %q. %v", name, err)
+	if len(vgs) > 1 {
+		return VolumeGroup{}, fmt.Errorf("multiple volume groups found with the name %q", name)
 	}
-
-	volumeGroup.PVs = pvs
-	return volumeGroup, nil
+	if err, ok := exec.AsExecError(err); ok && strings.Contains(err.Error(),
+		fmt.Sprintf("Volume group %q not found", name)) {
+		return VolumeGroup{}, ErrVolumeGroupNotFound
+	}
+	return vgs[0], err
 }
 
 // ListPVs returns list of physical volumes used to create the given volume group
@@ -331,12 +365,17 @@ func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolu
 }
 
 // ListVGs lists all volume groups and the physical volumes associated with them.
-func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, error) {
+func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool, opts ListVGOptions) ([]VolumeGroup, error) {
 	res := new(VGReport)
 
-	args := []string{
-		"-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
+	var args []string
+
+	if opts.VGName != "" {
+		args = append(args, opts.VGName)
 	}
+
+	args = append(args, "-o", "vg_name,vg_size,vg_tags,vg_attr", "--units", "g", "--reportformat", "json")
+
 	if tagged {
 		args = append(args, lvmsTag)
 	}
@@ -353,6 +392,7 @@ func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, e
 				VgSize: vg.VgSize,
 				PVs:    []PhysicalVolume{},
 				Tags:   strings.Split(vg.Tags, ","),
+				VgAttr: vg.VgAttr,
 			})
 		}
 	}
@@ -371,6 +411,30 @@ func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, e
 			}
 		}
 		vgList[i].PVs = vgPvs
+	}
+
+	for _, vg := range vgList {
+		attributes, err := vg.Attributes()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get volume group attributes: %w", err)
+		}
+
+		if attributes.ClusteredOrShared != Shared {
+			continue
+		}
+
+		if err := retry.OnError(wait.Backoff{
+			Steps:    3,
+			Duration: 3 * time.Second,
+			Factor:   2.0,
+		}, func(err error) bool {
+			log.FromContext(ctx).Error(err, "Lock start for shared volume group encountered an error. Retrying...")
+			return true
+		}, func() error {
+			return hlvm.RunCommandAsHost(ctx, vgChangeCmd, vg.Name, "--lock-start")
+		}); err != nil {
+			return nil, fmt.Errorf("failed to start lock for shared volume group %q: %w", vg.Name, err)
+		}
 	}
 
 	if !tagged {

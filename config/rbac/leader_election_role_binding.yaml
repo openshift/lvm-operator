@@ -10,3 +10,6 @@ subjects:
 - kind: ServiceAccount
   name: lvms-operator
   namespace: system
+- kind: ServiceAccount
+  name: vg-manager
+  namespace: system

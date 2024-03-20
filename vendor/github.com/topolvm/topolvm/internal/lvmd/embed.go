@@ -139,6 +139,14 @@ func (l *embeddedServiceClients) CreateLV(ctx context.Context, in *proto.CreateL
 	return l.lvServiceServer.CreateLV(ctx, in)
 }
 
+func (l *embeddedServiceClients) ActivateLV(ctx context.Context, in *proto.ActivateLVRequest, opts ...grpc.CallOption) (*proto.Empty, error) {
+	return l.lvServiceServer.ActivateLV(ctx, in)
+}
+
+func (l *embeddedServiceClients) DeactivateLV(ctx context.Context, in *proto.DeactivateLVRequest, opts ...grpc.CallOption) (*proto.Empty, error) {
+	return l.lvServiceServer.DeactivateLV(ctx, in)
+}
+
 func (l *embeddedServiceClients) RemoveLV(ctx context.Context, in *proto.RemoveLVRequest, _ ...grpc.CallOption) (*proto.Empty, error) {
 	return l.lvServiceServer.RemoveLV(ctx, in)
 }
