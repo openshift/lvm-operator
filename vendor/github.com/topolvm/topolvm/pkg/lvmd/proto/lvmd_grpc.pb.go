@@ -27,6 +27,8 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	LVService_CreateLV_FullMethodName         = "/proto.LVService/CreateLV"
+	LVService_ActivateLV_FullMethodName       = "/proto.LVService/ActivateLV"
+	LVService_DeactivateLV_FullMethodName     = "/proto.LVService/DeactivateLV"
 	LVService_RemoveLV_FullMethodName         = "/proto.LVService/RemoveLV"
 	LVService_ResizeLV_FullMethodName         = "/proto.LVService/ResizeLV"
 	LVService_CreateLVSnapshot_FullMethodName = "/proto.LVService/CreateLVSnapshot"
@@ -38,6 +40,10 @@ const (
 type LVServiceClient interface {
 	// Create a logical volume.
 	CreateLV(ctx context.Context, in *CreateLVRequest, opts ...grpc.CallOption) (*CreateLVResponse, error)
+	// Activate a logical volume.
+	ActivateLV(ctx context.Context, in *ActivateLVRequest, opts ...grpc.CallOption) (*Empty, error)
+	// Deactivate a logical volume.
+	DeactivateLV(ctx context.Context, in *DeactivateLVRequest, opts ...grpc.CallOption) (*Empty, error)
 	// Remove a logical volume.
 	RemoveLV(ctx context.Context, in *RemoveLVRequest, opts ...grpc.CallOption) (*Empty, error)
 	// Resize a logical volume.
@@ -56,6 +62,24 @@ func NewLVServiceClient(cc grpc.ClientConnInterface) LVServiceClient {
 func (c *lVServiceClient) CreateLV(ctx context.Context, in *CreateLVRequest, opts ...grpc.CallOption) (*CreateLVResponse, error) {
 	out := new(CreateLVResponse)
 	err := c.cc.Invoke(ctx, LVService_CreateLV_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lVServiceClient) ActivateLV(ctx context.Context, in *ActivateLVRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, LVService_ActivateLV_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lVServiceClient) DeactivateLV(ctx context.Context, in *DeactivateLVRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, LVService_DeactivateLV_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +119,10 @@ func (c *lVServiceClient) CreateLVSnapshot(ctx context.Context, in *CreateLVSnap
 type LVServiceServer interface {
 	// Create a logical volume.
 	CreateLV(context.Context, *CreateLVRequest) (*CreateLVResponse, error)
+	// Activate a logical volume.
+	ActivateLV(context.Context, *ActivateLVRequest) (*Empty, error)
+	// Deactivate a logical volume.
+	DeactivateLV(context.Context, *DeactivateLVRequest) (*Empty, error)
 	// Remove a logical volume.
 	RemoveLV(context.Context, *RemoveLVRequest) (*Empty, error)
 	// Resize a logical volume.
@@ -109,6 +137,12 @@ type UnimplementedLVServiceServer struct {
 
 func (UnimplementedLVServiceServer) CreateLV(context.Context, *CreateLVRequest) (*CreateLVResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateLV not implemented")
+}
+func (UnimplementedLVServiceServer) ActivateLV(context.Context, *ActivateLVRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ActivateLV not implemented")
+}
+func (UnimplementedLVServiceServer) DeactivateLV(context.Context, *DeactivateLVRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeactivateLV not implemented")
 }
 func (UnimplementedLVServiceServer) RemoveLV(context.Context, *RemoveLVRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveLV not implemented")
@@ -146,6 +180,42 @@ func _LVService_CreateLV_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(LVServiceServer).CreateLV(ctx, req.(*CreateLVRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LVService_ActivateLV_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ActivateLVRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LVServiceServer).ActivateLV(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LVService_ActivateLV_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LVServiceServer).ActivateLV(ctx, req.(*ActivateLVRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LVService_DeactivateLV_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeactivateLVRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LVServiceServer).DeactivateLV(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LVService_DeactivateLV_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LVServiceServer).DeactivateLV(ctx, req.(*DeactivateLVRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -214,6 +284,14 @@ var LVService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateLV",
 			Handler:    _LVService_CreateLV_Handler,
+		},
+		{
+			MethodName: "ActivateLV",
+			Handler:    _LVService_ActivateLV_Handler,
+		},
+		{
+			MethodName: "DeactivateLV",
+			Handler:    _LVService_DeactivateLV_Handler,
 		},
 		{
 			MethodName: "RemoveLV",

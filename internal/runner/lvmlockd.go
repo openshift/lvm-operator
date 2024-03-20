@@ -3,11 +3,12 @@ package runner
 import (
 	"context"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"hash/fnv"
-	"k8s.io/client-go/util/retry"
 	"os"
 	"os/exec"
+
+	"golang.org/x/sync/errgroup"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -29,11 +30,18 @@ func (l *lvmlockdRunner) Start(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Starting lvmlockd runnable")
 
+	if err := os.Remove("/run/lvm/lvmlockd.socket"); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove lvmlockd socket: %w", err)
+	}
+	if err := os.Remove("/run/lvmlockd.pid"); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove lvmlockd socket: %w", err)
+	}
+
 	errs, ctx := errgroup.WithContext(ctx)
 
 	errs.Go(func() error {
 		hostID := hashToNumber(l.nodeName, 2000)
-		args := []string{"--daemon-debug", "--gl-type=sanlock", fmt.Sprintf("--host-id=%d", hostID)}
+		args := []string{"-f", "--gl-type=sanlock", fmt.Sprintf("--host-id=%d", hostID)}
 
 		err := retry.OnError(retry.DefaultRetry, func(err error) bool { return true }, func() error {
 			cmd := exec.Command("lvmlockd", args...)

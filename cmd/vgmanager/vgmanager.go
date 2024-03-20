@@ -18,6 +18,7 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -27,7 +28,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
-	"github.com/openshift/lvm-operator/cmd/vgmanager/runner"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
@@ -40,6 +40,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/tagging"
+	"github.com/openshift/lvm-operator/internal/runner"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
@@ -47,6 +48,7 @@ import (
 	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
 	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -78,6 +80,8 @@ activation {
 	udev_rules = 0
 }`
 )
+
+var ErrConfigModified = errors.New("lvmd config file is modified")
 
 type Options struct {
 	Scheme   *runtime.Scheme
@@ -115,7 +119,9 @@ func NewCmd(opts *Options) *cobra.Command {
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
-	ctx, cancel := context.WithCancel(cmd.Context())
+	ctx, cancelWithCause := context.WithCancelCause(cmd.Context())
+	defer cancelWithCause(nil)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	lvm := lvm.NewDefaultHostLVM()
@@ -152,13 +158,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				operatorNamespace: {},
 			},
 		},
+		GracefulShutdownTimeout: ptr.To(time.Duration(-1)),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
+	var volumeGroupLock runner.VolumeGroupLock
 	if opts.enableSharedVolumes {
-		//create lvm.conf file
+		// create lvm.conf file
 		err := os.WriteFile("/etc/lvm/lvm.conf", []byte(lvmConfig), 0644)
 		if err != nil {
 			return fmt.Errorf("could not write lvm.conf file: %w", err)
@@ -171,6 +179,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		if err := mgr.Add(runner.NewLvmlockdRunner(nodeName)); err != nil {
 			return fmt.Errorf("could not add lvmlockd runner: %w", err)
 		}
+
+		if volumeGroupLock, err = runner.NewVolumeGroupLock(mgr, nodeName, operatorNamespace); err != nil {
+			return fmt.Errorf("could not create volume group lock: %w", err)
+		} else if err := mgr.Add(volumeGroupLock); err != nil {
+			return fmt.Errorf("could not add volume group lock: %w", err)
+		}
+	} else {
+		volumeGroupLock = runner.NewNoneVolumeGroupLock()
 	}
 
 	lvmdConfig := &lvmd.Config{}
@@ -222,18 +238,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	if err = (&vgmanager.Reconciler{
-		Client:        mgr.GetClient(),
-		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.DefaultConfigurator(),
-		Scheme:        mgr.GetScheme(),
-		LSBLK:         lsblk.NewDefaultHostLSBLK(),
-		Wipefs:        wipefs.NewDefaultHostWipefs(),
-		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
-		LVM:           lvm,
-		NodeName:      nodeName,
-		Namespace:     operatorNamespace,
-		Filters:       filter.DefaultFilters,
-		Shutdown:      cancel,
+		Client:              mgr.GetClient(),
+		EventRecorder:       mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		LVMD:                lvmd.DefaultConfigurator(),
+		Scheme:              mgr.GetScheme(),
+		LSBLK:               lsblk.NewDefaultHostLSBLK(),
+		Wipefs:              wipefs.NewDefaultHostWipefs(),
+		Dmsetup:             dmsetup.NewDefaultHostDmsetup(),
+		LVM:                 lvm,
+		NodeName:            nodeName,
+		Namespace:           operatorNamespace,
+		Filters:             filter.DefaultFilters,
+		IsVolumeGroupLeader: volumeGroupLock.IsLeader,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
@@ -241,15 +257,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
-
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, []os.Signal{os.Interrupt, syscall.SIGTERM}...)
-	go func() {
-		<-c
-		cancel()
-		<-c
-		os.Exit(0) // second signal. Exit directly.
-	}()
 
 	// Create new watcher.
 	watcher, err := fsnotify.NewWatcher()
@@ -260,38 +267,38 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	// Start listening for events.
 	go func() {
-		fileNotExist := false
-		for {
-			// check if file exists, otherwise the watcher errors
-			_, err := os.Lstat(lvmd.DefaultFileConfigPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					time.Sleep(100 * time.Millisecond)
-					fileNotExist = true
-				} else {
-					opts.SetupLog.Error(err, "unable to check if lvmd config file exists")
+		// check if file exists, otherwise the watcher errors
+		fi, err := os.Stat(lvmd.DefaultFileConfigDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				if err := os.MkdirAll(lvmd.DefaultFileConfigDir, 0755); err != nil {
+					opts.SetupLog.Error(err, "unable to create lvmd config directory when it did not exist before")
 				}
 			} else {
-				// This handles the first time the file is created through the configmap
-				if fileNotExist {
-					cancel()
-				}
-				err = watcher.Add(lvmd.DefaultFileConfigPath)
-				if err != nil {
-					opts.SetupLog.Error(err, "unable to add file path to watcher")
-				}
-				break
+				opts.SetupLog.Error(err, "unable to check if lvmd config directory exists")
+				cancelWithCause(err)
 			}
+		} else if !fi.IsDir() {
+			opts.SetupLog.Error(err, "expected lvmd config directory is not a directory")
+			cancelWithCause(err)
 		}
+
+		if err = watcher.Add(lvmd.DefaultFileConfigDir); err != nil {
+			opts.SetupLog.Error(err, "unable to add file path to watcher")
+		}
+
 		for {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
 					return
 				}
+				if event.Name != lvmd.DefaultFileConfigPath {
+					continue
+				}
 				if event.Has(fsnotify.Write) || event.Has(fsnotify.Remove) || event.Has(fsnotify.Chmod) {
 					opts.SetupLog.Info("lvmd config file is modified", "eventName", event.Name)
-					cancel()
+					cancelWithCause(fmt.Errorf("%w: %s", ErrConfigModified, event.Name))
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -305,6 +312,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	opts.SetupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
+	}
+
+	if errors.Is(context.Cause(ctx), ErrConfigModified) {
+		opts.SetupLog.Info("restarting controller due to modified configuration")
+		return run(cmd, nil, opts)
+	} else if err := ctx.Err(); err != nil {
+		opts.SetupLog.Error(err, "exiting abnormally")
+		os.Exit(1)
 	}
 
 	return nil

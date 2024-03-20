@@ -3,9 +3,10 @@ package runner
 import (
 	"context"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"os/exec"
+
+	"golang.org/x/sync/errgroup"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -27,10 +28,14 @@ func (s *sanlockRunner) Start(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Starting sanlock runnable")
 
+	if err := os.RemoveAll("/run/sanlock"); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove sanlock socket: %w", err)
+	}
+
 	errs, ctx := errgroup.WithContext(ctx)
 
 	errs.Go(func() error {
-		args := []string{"daemon", "-D", "-w", "0", "-U", "root", "-G", "root", "-e", s.nodeName}
+		args := []string{"daemon", "-Q", "1", "-D", "-w", "0", "-U", "root", "-G", "root", "-e", s.nodeName}
 		cmd := exec.Command("sanlock", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

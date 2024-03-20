@@ -42,8 +42,7 @@ var (
 	devDirPath          = "/dev"
 	udevPath            = "/run/udev"
 	sysPath             = "/sys"
-	runLvmPath          = "/run/lvm"
-	runSanlockPath      = "/run/sanlock"
+	runPath             = "/run"
 	metricsCertsDirPath = "/tmp/k8s-metrics-server/serving-certs"
 )
 
@@ -142,39 +141,24 @@ var (
 )
 
 var (
-	RunLvmVolName = "run-lvm"
-	RunLvmVol     = corev1.Volume{
-		Name: RunLvmVolName,
-		VolumeSource: corev1.VolumeSource{
-			HostPath: &corev1.HostPathVolumeSource{
-				Path: "/run/lvms/lvm",
-				Type: &HostPathDirectoryOrCreate,
-			},
-		},
-	}
-
-	// RunLvmVolMount is the corresponding mount for RunLvmVol
-	RunLvmVolMount = corev1.VolumeMount{
-		Name:      RunLvmVolName,
-		MountPath: runLvmPath,
+	// RunVolMount is the corresponding mount for RunLvmVol
+	RunVolMount = corev1.VolumeMount{
+		Name:             RunVolName,
+		MountPath:        runPath,
+		MountPropagation: &hostContainerPropagation,
 	}
 )
 
 var (
-	RunSanlockVolName = "run-sanlock"
-	RunSanlockVol     = corev1.Volume{
-		Name: RunSanlockVolName,
+	RunVolName = "run"
+	RunVol     = corev1.Volume{
+		Name: RunVolName,
 		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{
-				Medium: corev1.StorageMediumMemory,
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/run",
+				Type: &directoryHostPath,
 			},
 		},
-	}
-
-	// RunSanlockVolMount is the corresponding mount for RunSanlockVol
-	RunSanlockVolMount = corev1.VolumeMount{
-		Name:      RunSanlockVolName,
-		MountPath: runSanlockPath,
 	}
 )
 
@@ -273,8 +257,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		LVMConfVol,
 		DevHostDirVol,
 		UDevHostDirVol,
-		RunLvmVol,
-		RunSanlockVol,
+		RunVol,
 		SysHostDirVol,
 		MetricsCertsDirVol,
 	}
@@ -287,8 +270,7 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 		LVMConfVolMount,
 		DevHostDirVolMount,
 		UDevHostDirVolMount,
-		RunLvmVolMount,
-		RunSanlockVolMount,
+		RunVolMount,
 		SysHostDirVolMount,
 		MetricsCertsDirVolMount,
 	}

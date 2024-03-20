@@ -327,14 +327,8 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
-		cancelled := false
-		cancelable := func() {
-			cancelled = true
-		}
-		instances.Reconciler.Shutdown = cancelable
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(ctx, func() bool { return cancelled }).Should(BeTrue())
 	})
 
 	By("verifying the lvmd config generation", func() {

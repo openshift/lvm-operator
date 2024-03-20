@@ -70,6 +70,14 @@ spec:
                       type: string
                     type: array
                 type: object
+              nodeAccessPolicy:
+                default: IsolatedToNode
+                description: NodeAccessPolicy describes the policy for accessing the
+                  deviceClass on the node.
+                enum:
+                - SharedAcrossNodes
+                - IsolatedToNode
+                type: string
               nodeSelector:
                 description: NodeSelector chooses nodes
                 properties:

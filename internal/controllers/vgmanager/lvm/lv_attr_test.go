@@ -1,4 +1,4 @@
-package vgmanager
+package lvm
 
 import (
 	"fmt"

@@ -24,7 +24,8 @@ var (
 )
 
 const (
-	DefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
+	DefaultFileConfigDir  = "/etc/topolvm"
+	DefaultFileConfigPath = DefaultFileConfigDir + "/lvmd.yaml"
 	maxReadLength         = 2 * 1 << 20 // 2MB
 )
 
@@ -112,6 +113,10 @@ func (c FileConfig) Save(ctx context.Context, config *Config) error {
 
 func (c FileConfig) Delete(ctx context.Context) error {
 	err := os.Remove(c.path)
+	if os.IsNotExist(err) {
+		log.FromContext(ctx).Info("lvmd config file not found, nothing to delete")
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to delete config file %s: %w", c.path, err)
 	}

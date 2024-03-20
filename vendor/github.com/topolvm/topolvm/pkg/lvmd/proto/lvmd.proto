@@ -32,6 +32,19 @@ message CreateLVRequest {
     int64 size_bytes = 6;                   // Volume size in canonical CSI bytes.
 }
 
+// Represents the input for ActivateLV.
+message ActivateLVRequest {
+    string name = 1;       // The logical volume name.
+    string device_class = 2;
+    string access_type = 3; // Access type of the volume
+}
+
+// Represents the input for DeactivateLV.
+message DeactivateLVRequest {
+    string name = 1;       // The logical volume name.
+    string device_class = 2;
+}
+
 // Represents the response of CreateLV.
 message CreateLVResponse {
     LogicalVolume volume = 1;  // Information of the created volume.
@@ -112,6 +125,12 @@ message WatchItem {
 service LVService {
     // Create a logical volume.
     rpc CreateLV(CreateLVRequest) returns (CreateLVResponse);
+
+    // Activate a logical volume.
+    rpc ActivateLV(ActivateLVRequest) returns (Empty);
+    // Deactivate a logical volume.
+    rpc DeactivateLV(DeactivateLVRequest) returns (Empty);
+
     // Remove a logical volume.
     rpc RemoveLV(RemoveLVRequest) returns (Empty);
     // Resize a logical volume.

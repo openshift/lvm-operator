@@ -82,6 +82,12 @@ type DeviceClass struct {
 	// +optional
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
 
+	// NodeAccessPolicy describes the policy for accessing the deviceClass on the node.
+	// +kubebuilder:validation:Enum=SharedAcrossNodes;IsolatedToNode
+	// +kubebuilder:default=IsolatedToNode
+	// +optional
+	NodeAccessPolicy NodeAccessPolicy `json:"nodeAccessPolicy,omitempty"`
+
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`
@@ -92,6 +98,17 @@ type DeviceClass struct {
 	// +optional
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
 }
+
+// NodeAccessPolicy describes the policy for accessing the deviceClass on the node.
+type NodeAccessPolicy string
+
+const (
+	// NodeAccessPolicySharedAcrossNodes means that the deviceClass is shared across all nodes
+	NodeAccessPolicySharedAcrossNodes NodeAccessPolicy = "SharedAcrossNodes"
+
+	// NodeAccessPolicyIsolatedToNode means that the deviceClass is isolated to the node
+	NodeAccessPolicyIsolatedToNode NodeAccessPolicy = "IsolatedToNode"
+)
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned
 type DeviceSelector struct {
