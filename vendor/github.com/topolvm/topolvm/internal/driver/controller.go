@@ -284,6 +284,20 @@ func (s controllerServerNoLocked) CreateVolume(ctx context.Context, req *csi.Cre
 		return nil, err
 	}
 
+	// TODO Shared Device Class Switch
+	// {
+	// Segments:
+	// 	map[string]string{
+	// 		topolvm.GetDeviceClassTopologyNodeKey(): deviceClass,
+	// 	},
+	// },
+	// {
+	// Segments:
+	// 	map[string]string{
+	// 		topolvm.GetTopologyNodeKey(): node,
+	// 	},
+	// },
+
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: requestCapacityBytes,
@@ -291,7 +305,9 @@ func (s controllerServerNoLocked) CreateVolume(ctx context.Context, req *csi.Cre
 			ContentSource: source,
 			AccessibleTopology: []*csi.Topology{
 				{
-					Segments: map[string]string{topolvm.GetTopologyNodeKey(): node},
+					Segments: map[string]string{
+						topolvm.GetDeviceClassTopologyNodeKey(): deviceClass,
+					},
 				},
 			},
 		},

@@ -28,7 +28,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
-	"github.com/openshift/lvm-operator/cmd/vgmanager/runner"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
@@ -41,6 +40,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/tagging"
+	"github.com/openshift/lvm-operator/internal/runner"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
@@ -164,8 +164,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
+	var volumeGroupLock runner.VolumeGroupLock
 	if opts.enableSharedVolumes {
-		//create lvm.conf file
+		// create lvm.conf file
 		err := os.WriteFile("/etc/lvm/lvm.conf", []byte(lvmConfig), 0644)
 		if err != nil {
 			return fmt.Errorf("could not write lvm.conf file: %w", err)
@@ -178,6 +179,14 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		if err := mgr.Add(runner.NewLvmlockdRunner(nodeName)); err != nil {
 			return fmt.Errorf("could not add lvmlockd runner: %w", err)
 		}
+
+		if volumeGroupLock, err = runner.NewVolumeGroupLock(mgr, nodeName, operatorNamespace); err != nil {
+			return fmt.Errorf("could not create volume group lock: %w", err)
+		} else if err := mgr.Add(volumeGroupLock); err != nil {
+			return fmt.Errorf("could not add volume group lock: %w", err)
+		}
+	} else {
+		volumeGroupLock = runner.NewNoneVolumeGroupLock()
 	}
 
 	lvmdConfig := &lvmd.Config{}
@@ -229,17 +238,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	if err = (&vgmanager.Reconciler{
-		Client:        mgr.GetClient(),
-		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.DefaultConfigurator(),
-		Scheme:        mgr.GetScheme(),
-		LSBLK:         lsblk.NewDefaultHostLSBLK(),
-		Wipefs:        wipefs.NewDefaultHostWipefs(),
-		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
-		LVM:           lvm,
-		NodeName:      nodeName,
-		Namespace:     operatorNamespace,
-		Filters:       filter.DefaultFilters,
+		Client:              mgr.GetClient(),
+		EventRecorder:       mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		LVMD:                lvmd.DefaultConfigurator(),
+		Scheme:              mgr.GetScheme(),
+		LSBLK:               lsblk.NewDefaultHostLSBLK(),
+		Wipefs:              wipefs.NewDefaultHostWipefs(),
+		Dmsetup:             dmsetup.NewDefaultHostDmsetup(),
+		LVM:                 lvm,
+		NodeName:            nodeName,
+		Namespace:           operatorNamespace,
+		Filters:             filter.DefaultFilters,
+		IsVolumeGroupLeader: volumeGroupLock.IsLeader,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
@@ -273,10 +283,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			cancelWithCause(err)
 		}
 
-		err = watcher.Add(lvmd.DefaultFileConfigDir)
-		if err != nil {
+		if err = watcher.Add(lvmd.DefaultFileConfigDir); err != nil {
 			opts.SetupLog.Error(err, "unable to add file path to watcher")
 		}
+
 		for {
 			select {
 			case event, ok := <-watcher.Events:

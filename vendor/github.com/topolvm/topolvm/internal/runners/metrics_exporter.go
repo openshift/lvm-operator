@@ -128,8 +128,8 @@ func NewMetricsExporter(vgServiceClient proto.VGServiceClient, client client.Cli
 	}
 }
 
-func (m *metricsExporter) RegisterAll() error {
-	collectors := []prometheus.Collector{
+func (m *metricsExporter) GetCollectors() []prometheus.Collector {
+	return []prometheus.Collector{
 		m.availableBytes,
 		m.sizeBytes,
 		m.thinPool.tpSizeBytes,
@@ -137,7 +137,10 @@ func (m *metricsExporter) RegisterAll() error {
 		m.thinPool.metadataPercent,
 		m.thinPool.opAvailableBytes,
 	}
-	for _, c := range collectors {
+}
+
+func (m *metricsExporter) RegisterAll() error {
+	for _, c := range m.GetCollectors() {
 		if err := metrics.Registry.Register(c); err != nil {
 			return err
 		}
@@ -146,12 +149,9 @@ func (m *metricsExporter) RegisterAll() error {
 }
 
 func (m *metricsExporter) UnregisterAll() {
-	metrics.Registry.Unregister(m.availableBytes)
-	metrics.Registry.Unregister(m.sizeBytes)
-	metrics.Registry.Unregister(m.thinPool.tpSizeBytes)
-	metrics.Registry.Unregister(m.thinPool.dataPercent)
-	metrics.Registry.Unregister(m.thinPool.metadataPercent)
-	metrics.Registry.Unregister(m.thinPool.opAvailableBytes)
+	for _, c := range m.GetCollectors() {
+		metrics.Registry.Unregister(c)
+	}
 }
 
 // Start implements controller-runtime's manager.Runnable.

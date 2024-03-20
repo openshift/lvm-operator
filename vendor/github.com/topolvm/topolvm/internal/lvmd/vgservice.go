@@ -208,7 +208,6 @@ func (s *vgService) send(server proto.VGService_WatchServer) error {
 		}
 
 		spare := GetSpare(dc)
-		// vgFree = 10Gi, Spare = 1<<30
 		if vgFree < spare {
 			vgFree = 0
 		} else {

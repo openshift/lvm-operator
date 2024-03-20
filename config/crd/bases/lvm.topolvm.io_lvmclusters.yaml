@@ -98,6 +98,14 @@ spec:
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                           type: string
+                        nodeAccessPolicy:
+                          default: IsolatedToNode
+                          description: NodeAccessPolicy describes the policy for accessing
+                            the deviceClass on the node.
+                          enum:
+                          - SharedAcrossNodes
+                          - IsolatedToNode
+                          type: string
                         nodeSelector:
                           description: NodeSelector chooses nodes on which to create
                             the deviceclass

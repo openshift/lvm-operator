@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -165,6 +166,14 @@ func (s *nodeServerNoLocked) NodePublishVolume(ctx context.Context, req *csi.Nod
 		return nil, status.Errorf(codes.NotFound, "failed to find LV: %s", volumeID)
 	}
 
+	if _, err := s.lvService.ActivateLV(ctx, &proto.ActivateLVRequest{
+		Name:        lv.GetName(),
+		DeviceClass: lvr.Spec.DeviceClass,
+		AccessType:  convertReadOnlyToAccessType(req.GetReadonly()),
+	}); err != nil {
+		return nil, fmt.Errorf("failed to activate LV: %v", err)
+	}
+
 	if isBlockVol {
 		err = s.nodePublishBlockVolume(req, lv)
 	} else if isFsVol {
@@ -174,6 +183,13 @@ func (s *nodeServerNoLocked) NodePublishVolume(ctx context.Context, req *csi.Nod
 		return nil, err
 	}
 	return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func convertReadOnlyToAccessType(readOnly bool) string {
+	if readOnly {
+		return "ro"
+	}
+	return "rw"
 }
 
 func makeMountOptions(readOnly bool, mountOption *csi.VolumeCapability_MountVolume) ([]string, error) {
@@ -357,6 +373,30 @@ func (s *nodeServerNoLocked) NodeUnpublishVolume(ctx context.Context, req *csi.N
 	if err != nil {
 		return nil, err
 	}
+
+	lvr, err := s.k8sLVService.GetVolume(ctx, volumeID)
+	if err != nil {
+		return nil, err
+	}
+	lv, err := s.getLvFromContext(ctx, lvr.Spec.DeviceClass, volumeID)
+	if err != nil {
+		return nil, err
+	}
+	if lv == nil {
+		return nil, status.Errorf(codes.NotFound, "failed to find LV: %s", volumeID)
+	}
+
+	if _, err := s.lvService.DeactivateLV(ctx, &proto.DeactivateLVRequest{
+		Name:        lv.GetName(),
+		DeviceClass: lvr.Spec.DeviceClass,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to deactivate LV: %v", err)
+	}
+
+	nodeLogger.Info("NodeUnpublishVolume is succeeded",
+		"volume_id", req.GetVolumeId(),
+		"target_path", targetPath)
+
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -381,10 +421,6 @@ func (s *nodeServerNoLocked) nodeUnpublishFilesystemVolume(req *csi.NodeUnpublis
 	if err != nil && !os.IsNotExist(err) {
 		return status.Errorf(codes.Internal, "remove device failed for %s: error=%v", device, err)
 	}
-
-	nodeLogger.Info("NodeUnpublishVolume(fs) is succeeded",
-		"volume_id", req.GetVolumeId(),
-		"target_path", targetPath)
 	return nil
 }
 
@@ -392,9 +428,6 @@ func (s *nodeServerNoLocked) nodeUnpublishBlockVolume(req *csi.NodeUnpublishVolu
 	if err := os.Remove(req.GetTargetPath()); err != nil {
 		return status.Errorf(codes.Internal, "remove failed for %s: error=%v", req.GetTargetPath(), err)
 	}
-	nodeLogger.Info("NodeUnpublishVolume(block) is succeeded",
-		"volume_id", req.GetVolumeId(),
-		"target_path", req.GetTargetPath())
 	return nil
 }
 
@@ -582,6 +615,8 @@ func (s *nodeServerNoLocked) NodeGetInfo(ctx context.Context, req *csi.NodeGetIn
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
 				topolvm.GetTopologyNodeKey(): s.nodeName,
+				// TODO Get Call from s.client to retrieve all vgs and check for shared volume groups
+				topolvm.GetDeviceClassTopologyNodeKey(): "vg1",
 			},
 		},
 	}, nil

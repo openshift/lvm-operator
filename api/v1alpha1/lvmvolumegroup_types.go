@@ -37,6 +37,12 @@ type LVMVolumeGroupSpec struct {
 	// +optional
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
 
+	// NodeAccessPolicy describes the policy for accessing the deviceClass on the node.
+	// +kubebuilder:validation:Enum=SharedAcrossNodes;IsolatedToNode
+	// +kubebuilder:default=IsolatedToNode
+	// +optional
+	NodeAccessPolicy NodeAccessPolicy `json:"nodeAccessPolicy,omitempty"`
+
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`

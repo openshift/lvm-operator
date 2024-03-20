@@ -93,9 +93,10 @@ type Reconciler struct {
 	lsblk.LSBLK
 	wipefs.Wipefs
 	dmsetup.Dmsetup
-	NodeName  string
-	Namespace string
-	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	NodeName            string
+	Namespace           string
+	Filters             func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	IsVolumeGroupLeader func() bool
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -200,7 +201,7 @@ func (r *Reconciler) reconcile(
 
 	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
 
-	vgs, err := r.LVM.ListVGs(ctx, true)
+	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -266,7 +267,7 @@ func (r *Reconciler) reconcile(
 	logger.Info("new available devices discovered", "available", devices.Available)
 
 	// Create VG/extend VG
-	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, devices.Available); err != nil {
+	if err = r.addDevicesToVG(ctx, vgs, volumeGroup, devices.Available); err != nil {
 		err = fmt.Errorf("failed to create/extend volume group %s: %w", volumeGroup.Name, err)
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorVGCreateOrExtendFailed, err)
 		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
@@ -297,7 +298,7 @@ func (r *Reconciler) reconcile(
 	}
 
 	// refresh list of vgs to be used in status
-	vgs, err = r.LVM.ListVGs(ctx, true)
+	vgs, err = r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -436,7 +437,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	}
 
 	// Check if volume group exists
-	vgs, err := r.LVM.ListVGs(ctx, true)
+	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list volume groups, %w", err)
 	}
@@ -476,7 +477,10 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			}
 		}
 
-		if err = r.LVM.DeleteVG(ctx, existingVG); err != nil {
+		if err = r.LVM.DeleteVG(ctx, existingVG, lvm.DeleteVGOptions{
+			NodeAccessPolicy:    volumeGroup.Spec.NodeAccessPolicy,
+			OwnsGlobalLockSpace: r.IsVolumeGroupLeader,
+		}); err != nil {
 			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
 				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
@@ -548,18 +552,18 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				continue
 			}
 			thinPoolExists = true
-			lvAttr, err := ParsedLvAttr(lv.LvAttr)
+			lvAttr, err := lvm.ParsedLvAttr(lv.LvAttr)
 			if err != nil {
 				return fmt.Errorf("could not parse lv_attr from logical volume %s: %w", lv.Name, err)
 			}
-			if lvAttr.VolumeType != VolumeTypeThinPool {
+			if lvAttr.VolumeType != lvm.VolumeTypeThinPool {
 				return fmt.Errorf("found logical volume in volume group that is not of type Thin-Pool, "+
 					"even though there is a Thin-Pool configured: %s, lv_attr: %s,"+
 					"this is most likely a corruption of the thin pool or a setup gone wrong",
 					string(lvAttr.VolumeType), lvAttr)
 			}
 
-			if lvAttr.State != StateActive {
+			if lvAttr.State != lvm.StateActive {
 				// If inactive, try activating it
 				err := r.LVM.ActivateLV(ctx, lv.Name, volumeGroup.Name)
 				if err != nil {
@@ -599,11 +603,11 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	for _, report := range resp.Report {
 		for _, lv := range report.Lv {
 			if lv.Name == config.Name {
-				lvAttr, err := ParsedLvAttr(lv.LvAttr)
+				lvAttr, err := lvm.ParsedLvAttr(lv.LvAttr)
 				if err != nil {
 					return fmt.Errorf("could not parse lvattr to determine if thin pool exists: %w", err)
 				}
-				if lvAttr.VolumeType == VolumeTypeThinPool {
+				if lvAttr.VolumeType == lvm.VolumeTypeThinPool {
 					logger.Info("lvm thinpool already exists")
 					if err := r.extendThinPool(ctx, vgName, lv.LvSize, config); err != nil {
 						return fmt.Errorf("failed to extend the lvm thinpool %s in volume group %s: %w", config.Name, vgName, err)

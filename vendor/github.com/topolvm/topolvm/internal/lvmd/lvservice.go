@@ -150,6 +150,74 @@ func (s *lvService) CreateLV(ctx context.Context, req *proto.CreateLVRequest) (*
 	}, nil
 }
 
+func (s *lvService) ActivateLV(ctx context.Context, req *proto.ActivateLVRequest) (*proto.Empty, error) {
+	logger := log.FromContext(ctx).WithValues("name", req.GetName())
+
+	logger.Info("trying to activate LV")
+
+	dc, err := s.dcmapper.DeviceClass(req.DeviceClass)
+	if errors.Is(err, ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	} else if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	vg, err := command.FindVolumeGroup(ctx, dc.VolumeGroup)
+	if errors.Is(err, command.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	} else if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	lv, err := vg.FindVolume(ctx, req.GetName())
+	if errors.Is(err, command.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	} else if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if err := lv.Activate(ctx, req.AccessType); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Info("activated LV")
+
+	return &proto.Empty{}, nil
+}
+
+func (s *lvService) DeactivateLV(ctx context.Context, req *proto.DeactivateLVRequest) (*proto.Empty, error) {
+	logger := log.FromContext(ctx).WithValues("name", req.GetName())
+
+	logger.Info("trying to deactivate LV")
+
+	dc, err := s.dcmapper.DeviceClass(req.DeviceClass)
+	if errors.Is(err, ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	} else if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	vg, err := command.FindVolumeGroup(ctx, dc.VolumeGroup)
+	if errors.Is(err, command.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	} else if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	lv, err := vg.FindVolume(ctx, req.GetName())
+	if errors.Is(err, command.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	} else if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if err := lv.Deactivate(ctx); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Info("activated LV")
+
+	return &proto.Empty{}, nil
+}
+
 func (s *lvService) RemoveLV(ctx context.Context, req *proto.RemoveLVRequest) (*proto.Empty, error) {
 	logger := log.FromContext(ctx).WithValues("name", req.GetName())
 

@@ -46,7 +46,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/jakobmoellerdev/topolvm v0.0.0-20240319162427-d8b41d1216f0
+replace github.com/topolvm/topolvm => github.com/jakobmoellerdev/topolvm v0.0.0-20240320171902-69dd13fca375
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect

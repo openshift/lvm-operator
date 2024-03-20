@@ -113,6 +113,10 @@ func (c FileConfig) Save(ctx context.Context, config *Config) error {
 
 func (c FileConfig) Delete(ctx context.Context) error {
 	err := os.Remove(c.path)
+	if os.IsNotExist(err) {
+		log.FromContext(ctx).Info("lvmd config file not found, nothing to delete")
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to delete config file %s: %w", c.path, err)
 	}
