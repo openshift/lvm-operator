@@ -374,7 +374,7 @@ github.com/stretchr/objx
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
-# github.com/topolvm/topolvm v0.27.1-0.20240306010159-8c6c91dc8b7f => github.com/openshift/topolvm v0.15.3-0.20240314121823-1339f4f8b9ae
+# github.com/topolvm/topolvm v0.27.1-0.20240306010159-8c6c91dc8b7f => github.com/openshift/topolvm v0.15.3-0.20240321104545-ab31b05c1b85
 ## explicit; go 1.20
 github.com/topolvm/topolvm
 github.com/topolvm/topolvm/api/legacy/v1
@@ -1287,4 +1287,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240314121823-1339f4f8b9ae
+# github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240321104545-ab31b05c1b85

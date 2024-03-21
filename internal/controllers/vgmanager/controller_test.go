@@ -302,14 +302,8 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	})
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
-		cancelled := false
-		cancelable := func() {
-			cancelled = true
-		}
-		instances.Reconciler.Shutdown = cancelable
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(ctx, func() bool { return cancelled }).Should(BeTrue())
 	})
 
 	By("verifying the lvmd config generation", func() {
