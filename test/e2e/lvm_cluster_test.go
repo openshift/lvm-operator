@@ -37,7 +37,6 @@ func lvmClusterTest() {
 	})
 
 	Describe("Filesystem Type", Serial, func() {
-
 		It("should default to xfs", func(ctx SpecContext) {
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
@@ -70,6 +69,16 @@ func lvmClusterTest() {
 				dc.Default = false
 			}
 
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+		})
+	})
+
+	Describe("Thick Provisioning", Serial, func() {
+		It("should become ready if ThinPoolConfig is empty (thick provisioning)", func(ctx SpecContext) {
+			for _, dc := range cluster.Spec.Storage.DeviceClasses {
+				dc.ThinPoolConfig = nil
+			}
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
 		})

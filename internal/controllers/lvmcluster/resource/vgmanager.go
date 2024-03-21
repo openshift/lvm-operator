@@ -55,6 +55,9 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 		r.GetVGManagerCommand(),
 		r.GetLogPassthroughOptions().VGManager.AsArgs(),
 	)
+	if err := ctrl.SetControllerReference(lvmCluster, &dsTemplate, r.Scheme()); err != nil {
+		return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
+	}
 
 	// create desired daemonset or update mutable fields on existing one
 	ds := &appsv1.DaemonSet{
@@ -66,14 +69,16 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	// the anonymous mutate function modifies the daemonset object after fetching it.
 	// if the daemonset does not already exist, it creates it, otherwise, it updates it
 	result, err := ctrl.CreateOrUpdate(ctx, r, ds, func() error {
-		if err := ctrl.SetControllerReference(lvmCluster, ds, r.Scheme()); err != nil {
-			return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
-		}
 		// at creation, deep copy the whole daemonset
 		if ds.CreationTimestamp.IsZero() {
 			dsTemplate.DeepCopyInto(ds)
 			return nil
 		}
+
+		if err := ctrl.SetControllerReference(lvmCluster, ds, r.Scheme()); err != nil {
+			return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
+		}
+
 		// if update, update only mutable fields
 		initMapIfNil(&ds.ObjectMeta.Labels)
 		initMapIfNil(&ds.Spec.Template.ObjectMeta.Labels)
