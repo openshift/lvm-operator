@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-logr/logr/testr"
@@ -30,6 +31,13 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	evalSymlinks = func(path string) (string, error) {
+		return path, nil
+	}
+	defer func() {
+		evalSymlinks = filepath.EvalSymlinks
+	}()
 
 	r := &Reconciler{}
 
