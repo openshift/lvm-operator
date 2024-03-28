@@ -34,8 +34,9 @@ import (
 
 func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
-		Name:   vg.GetName(),
-		Status: lvmv1alpha1.VGStatusProgressing,
+		Name:                  vg.GetName(),
+		Status:                lvmv1alpha1.VGStatusProgressing,
+		DeviceDiscoveryPolicy: vg.Spec.DeviceDiscoveryPolicy,
 	}
 
 	// Set devices for the VGStatus.
@@ -48,8 +49,9 @@ func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lv
 
 func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
-		Name:   vg.GetName(),
-		Status: lvmv1alpha1.VGStatusReady,
+		Name:                  vg.GetName(),
+		Status:                lvmv1alpha1.VGStatusReady,
+		DeviceDiscoveryPolicy: vg.Spec.DeviceDiscoveryPolicy,
 	}
 
 	// Set devices for the VGStatus.
@@ -62,9 +64,10 @@ func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alp
 
 func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices, err error) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
-		Name:   vg.GetName(),
-		Status: lvmv1alpha1.VGStatusFailed,
-		Reason: err.Error(),
+		Name:                  vg.GetName(),
+		Status:                lvmv1alpha1.VGStatusFailed,
+		Reason:                err.Error(),
+		DeviceDiscoveryPolicy: vg.Spec.DeviceDiscoveryPolicy,
 	}
 
 	// Set devices for the VGStatus.

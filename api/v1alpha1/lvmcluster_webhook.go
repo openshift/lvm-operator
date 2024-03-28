@@ -43,6 +43,7 @@ var _ webhook.CustomValidator = &lvmClusterValidator{}
 var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
 	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
+	ErrDeviceDiscoveryPolicyNotSet                           = errors.New("DeviceDiscoveryPolicy is not set for the DeviceClass")
 	ErrInvalidNamespace                                      = errors.New("invalid namespace was supplied")
 	ErrAtLeastOneDeviceClassRequired                         = errors.New("at least one deviceClass is required")
 	ErrOnlyOneDefaultDeviceClassAllowed                      = errors.New("only one default deviceClass is allowed")
@@ -165,6 +166,14 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		var newDevices, newOptionalDevices, oldDevices, oldOptionalDevices []string
 		var oldForceWipeOption, newForceWipeOption *bool
 
+		newDeviceDiscoveryPolicy := deviceClass.DeviceDiscoveryPolicy
+		oldDeviceDiscoveryPolicy, err := v.getDeviceDiscoveryPolicyOfDeviceClass(oldLVMCluster, deviceClass.Name)
+		if err != nil {
+			return warnings, fmt.Errorf("DeviceDiscoveryPolicy can not be empty: %w", err)
+		} else if newDeviceDiscoveryPolicy != oldDeviceDiscoveryPolicy {
+			return warnings, fmt.Errorf("DeviceDiscoveryPolicy can not be changed once set")
+		}
+
 		newThinPoolConfig = deviceClass.ThinPoolConfig
 		oldThinPoolConfig, err = v.getThinPoolsConfigOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
@@ -192,7 +201,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		oldDevices, oldOptionalDevices, oldForceWipeOption, err = v.getPathsOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
 		// Is this a new device class?
-		if err == ErrDeviceClassNotFound {
+		if errors.Is(err, ErrDeviceClassNotFound) {
 			continue
 		}
 
@@ -215,14 +224,12 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		}
 
 		// Validate all the old paths still exist
-		err := validateDevicePathsStillExist(oldDevices, newDevices)
-		if err != nil {
+		if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
 			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
 		}
 
 		// Validate all the old optional paths still exist
-		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
-		if err != nil {
+		if err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
 			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
 		}
 	}
@@ -432,6 +439,19 @@ func (v *lvmClusterValidator) getThinPoolsConfigOfDeviceClass(l *LVMCluster, dev
 	}
 
 	return nil, ErrDeviceClassNotFound
+}
+
+func (v *lvmClusterValidator) getDeviceDiscoveryPolicyOfDeviceClass(l *LVMCluster, deviceClassName string) (DeviceDiscoveryPolicy, error) {
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.Name == deviceClassName {
+			if deviceClass.ThinPoolConfig != nil {
+				return deviceClass.DeviceDiscoveryPolicy, nil
+			}
+			return "", ErrDeviceDiscoveryPolicyNotSet
+		}
+	}
+
+	return "", ErrDeviceDiscoveryPolicyNotSet
 }
 
 func (v *lvmClusterValidator) verifyFstype(l *LVMCluster) error {

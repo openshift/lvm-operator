@@ -61,6 +61,13 @@ const (
 	FilesystemTypeXFS  DeviceFilesystemType = "xfs"
 )
 
+type DeviceDiscoveryPolicy string
+
+const (
+	DeviceDiscoveryPolicyInstallStatic  DeviceDiscoveryPolicy = "InstallStatic"
+	DeviceDiscoveryPolicyRuntimeDynamic DeviceDiscoveryPolicy = "RuntimeDynamic"
+)
+
 type DeviceClass struct {
 	// Name of the class, the VG and possibly the storageclass.
 	// Validations to confirm that this field can be used as metadata.name field in storageclass
@@ -69,6 +76,17 @@ type DeviceClass struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
 	Name string `json:"name,omitempty"`
+
+	// DeviceDiscoveryPolicy is a flag to indicate whether the device should be discovered
+	// at install time or at runtime (static or dynamic configuration of devices)
+	// If set to DeviceDiscoveryPolicyInstallStatic, the devices will not be added to the VG if they are not present at setup time.
+	// If set to DeviceDiscoveryPolicyRuntimeDynamic, the devices will be added to the VG if they are present at runtime.
+	// By default, the value is set to RuntimeDynamic.
+	// This field cannot be updated once the LVMCluster is created.
+	// +kubebuilder:validation:Enum=InstallStatic;RuntimeDynamic
+	// +kubebuilder:default=RuntimeDynamic
+	// +kubebuilder:validation:Required
+	DeviceDiscoveryPolicy DeviceDiscoveryPolicy `json:"deviceDiscoveryPolicy,omitempty"`
 
 	// DeviceSelector is a set of rules that should match for a device to be included in the LVMCluster
 	// +optional
