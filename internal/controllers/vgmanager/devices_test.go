@@ -33,9 +33,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 
 	r := &Reconciler{}
 
-	filters := filter.DefaultFilters(nil)
-	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
-	delete(filters, "noBindMounts")
+	filters := filter.DefaultFilters(nil, nil)
 
 	testCases := []struct {
 		description           string

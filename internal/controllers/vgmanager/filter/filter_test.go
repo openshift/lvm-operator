@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type filterTestCase struct {
@@ -23,6 +24,103 @@ type advancedFilterTestCase struct {
 	lvmExpect []lvm.PhysicalVolume
 }
 
+func TestNewDeviceInStaticVolumeGroup(t *testing.T) {
+	type vgAndStatusFilterTestCase struct {
+		filterTestCase
+		vg     *lvmv1alpha1.LVMVolumeGroup
+		status *lvmv1alpha1.LVMVolumeGroupNodeStatus
+	}
+
+	testcases := []vgAndStatusFilterTestCase{
+		{
+			filterTestCase: filterTestCase{
+				label:     "static with discovered device is okay",
+				device:    lsblk.BlockDevice{KName: "dev1"},
+				expectErr: false,
+			},
+			vg: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyInstallStatic,
+				},
+			},
+			status: &lvmv1alpha1.LVMVolumeGroupNodeStatus{Spec: lvmv1alpha1.LVMVolumeGroupNodeStatusSpec{
+				LVMVGStatus: []lvmv1alpha1.VGStatus{
+					{Name: "vg1", Devices: []string{"dev1"}},
+				},
+			}},
+		},
+		{
+			filterTestCase: filterTestCase{
+				label:     "static with new device errors",
+				device:    lsblk.BlockDevice{KName: "newdev"},
+				expectErr: true,
+			},
+			vg: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyInstallStatic,
+				},
+			},
+			status: &lvmv1alpha1.LVMVolumeGroupNodeStatus{Spec: lvmv1alpha1.LVMVolumeGroupNodeStatusSpec{
+				LVMVGStatus: []lvmv1alpha1.VGStatus{
+					{Name: "vg1", Devices: []string{"dev1"}},
+				},
+			}},
+		},
+		{
+			filterTestCase: filterTestCase{
+				label:     "dynamic with new device is okay",
+				device:    lsblk.BlockDevice{KName: "newdev"},
+				expectErr: false,
+			},
+			vg: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic,
+				},
+			},
+			status: &lvmv1alpha1.LVMVolumeGroupNodeStatus{Spec: lvmv1alpha1.LVMVolumeGroupNodeStatusSpec{
+				LVMVGStatus: []lvmv1alpha1.VGStatus{
+					{Name: "vg1", Devices: []string{"dev1"}},
+				},
+			}},
+		},
+		{
+			filterTestCase: filterTestCase{
+				label:     "static without status is okay",
+				device:    lsblk.BlockDevice{KName: "dev1"},
+				expectErr: false,
+			},
+			vg: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyInstallStatic,
+				},
+			},
+			status: nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.label, func(t *testing.T) {
+			err := DefaultFilters(tc.vg, tc.status)[newDeviceInStaticVolumeGroup](tc.device, nil, nil)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestNotReadOnly(t *testing.T) {
 	testcases := []filterTestCase{
 		{label: "tc false", device: lsblk.BlockDevice{ReadOnly: false}, expectErr: false},
@@ -30,7 +128,7 @@ func TestNotReadOnly(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notReadOnly](tc.device, nil, nil)
+			err := DefaultFilters(nil, nil)[notReadOnly](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -48,7 +146,7 @@ func TestNotSuspended(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notSuspended](tc.device, nil, nil)
+			err := DefaultFilters(nil, nil)[notSuspended](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -66,7 +164,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device, nil, nil)
+			err := DefaultFilters(nil, nil)[onlyValidFilesystemSignatures](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -83,7 +181,7 @@ func TestNoChildren(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noChildren](tc.device, nil, nil)
+			err := DefaultFilters(nil, nil)[noChildren](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -99,12 +197,14 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: lsblk.BlockDevice{Name: "dev2", Type: "disk"}, expectErr: false},
 	}
 	for _, tc := range testcases {
-		err := DefaultFilters(nil)[usableDeviceType](tc.device, nil, nil)
-		if tc.expectErr {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
+		t.Run(tc.label, func(t *testing.T) {
+			err := DefaultFilters(nil, nil)[usableDeviceType](tc.device, nil, nil)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 
@@ -123,7 +223,7 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device, nil, nil)
+			err := DefaultFilters(nil, nil)[noInvalidPartitionLabel](tc.device, nil, nil)
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -196,7 +296,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
 			vg.SetName("vg1")
 
-			err := DefaultFilters(vg)[onlyValidFilesystemSignatures](tc.device, tc.lvmExpect, nil)
+			err := DefaultFilters(vg, nil)[onlyValidFilesystemSignatures](tc.device, tc.lvmExpect, nil)
 			tc.assertErr(t, err, fmt.Sprintf("onlyValidFilesystemSignatures(%v)", tc.device))
 		})
 	}

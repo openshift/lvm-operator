@@ -37,12 +37,13 @@ const FSTypeLVM2Member = "LVM2_member"
 const (
 	// filter names:
 	notReadOnly                   = "notReadOnly"
+	newDeviceInStaticVolumeGroup  = "newDeviceInStaticVolumeGroup"
 	notSuspended                  = "notSuspended"
 	noInvalidPartitionLabel       = "noInvalidPartitionLabel"
 	onlyValidFilesystemSignatures = "onlyValidFilesystemSignatures"
-	noBindMounts                  = "noBindMounts"
-	noChildren                    = "noChildren"
-	usableDeviceType              = "usableDeviceType"
+
+	noChildren       = "noChildren"
+	usableDeviceType = "usableDeviceType"
 )
 
 var (
@@ -70,8 +71,38 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 	return errors.Is(err, ErrDeviceAlreadySetupCorrectly) || errors.Is(err, ErrLVMPartition)
 }
 
-func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
+func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.LVMVolumeGroupNodeStatus) Filters {
 	return Filters{
+		newDeviceInStaticVolumeGroup: func(dev lsblk.BlockDevice, pvs []lvm.PhysicalVolume, bdi lsblk.BlockDeviceInfos) error {
+			if status == nil || vg.Spec.DeviceDiscoveryPolicy != lvmv1alpha1.DeviceDiscoveryPolicyInstallStatic {
+				return nil
+			}
+
+			for _, vgStatus := range status.Spec.LVMVGStatus {
+				if vgStatus.Name == vg.Name {
+					if len(vgStatus.Devices) == 0 {
+						// if no devices are set, we can't check if the device is part of the VG
+						// because we did not have an initial setup
+						break
+					}
+
+					deviceExistsInVG := false
+					for _, device := range vgStatus.Devices {
+						if device == dev.KName {
+							deviceExistsInVG = true
+							break
+						}
+					}
+					if !deviceExistsInVG {
+						return fmt.Errorf("%s was not part of %s at creation (static device discovery enabled)", dev.Name, vg.Name)
+					}
+
+					break
+				}
+			}
+			return nil
+		},
+
 		notReadOnly: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
 			if dev.ReadOnly {
 				return fmt.Errorf("%s cannot be read-only", dev.Name)

@@ -94,7 +94,7 @@ type Reconciler struct {
 	dmsetup.Dmsetup
 	NodeName  string
 	Namespace string
-	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	Filters   func(*lvmv1alpha1.LVMVolumeGroup, *lvmv1alpha1.LVMVolumeGroupNodeStatus) filter.Filters
 	Shutdown  context.CancelFunc
 }
 
@@ -198,7 +198,7 @@ func (r *Reconciler) reconcile(
 
 	logger.V(1).Info("block device infos", "bdi", bdi)
 
-	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
+	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup, nodeStatus))
 
 	vgs, err := r.LVM.ListVGs(ctx, true)
 	if err != nil {

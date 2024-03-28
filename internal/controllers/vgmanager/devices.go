@@ -152,9 +152,6 @@ func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []
 			if errors.Is(err, ErrDeviceAlreadyPartOfVG) {
 				logger.Info(fmt.Sprintf("skipping potential device candidate that is already part of volume group %s: %s", volumeGroup.Name, path))
 				continue
-			} else if errors.Is(err, ErrVolumeGroupStaticAndAlreadySetUp) {
-				logger.Info(fmt.Sprintf("skipping potential device candidate for static volume group %s: %s", volumeGroup.Name, path))
-				continue
 			} else if err != nil {
 				// An error for required devices is critical
 				return nil, fmt.Errorf("unable to validate discovered device %s: %v", path, err)
@@ -175,10 +172,6 @@ func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []
 			logger.Info(fmt.Sprintf("skipping required device that is already part of volume group %s: %s", volumeGroup.Name, path))
 			atLeastOneDeviceIsAlreadyInVolumeGroup = true
 			continue
-		} else if errors.Is(err, ErrVolumeGroupStaticAndAlreadySetUp) {
-			logger.Info(fmt.Sprintf("skipping required device for static volume group %s: %s", volumeGroup.Name, path))
-			atLeastOneDeviceIsAlreadyInVolumeGroup = true
-			continue
 		} else if err != nil {
 			// An error for required devices is critical
 			return nil, fmt.Errorf("unable to validate device %s: %v", path, err)
@@ -193,10 +186,6 @@ func (r *Reconciler) getNewDevicesToBeAdded(ctx context.Context, blockDevices []
 		// Check if we should skip this device
 		if errors.Is(err, ErrDeviceAlreadyPartOfVG) {
 			logger.Info(fmt.Sprintf("skipping optional device that is already part of volume group %s: %s", volumeGroup.Name, path))
-			atLeastOneDeviceIsAlreadyInVolumeGroup = true
-			continue
-		} else if errors.Is(err, ErrVolumeGroupStaticAndAlreadySetUp) {
-			logger.Info(fmt.Sprintf("skipping optional device for static volume group %s: %s", volumeGroup.Name, path))
 			atLeastOneDeviceIsAlreadyInVolumeGroup = true
 			continue
 		} else if err != nil {
@@ -238,25 +227,6 @@ func isDeviceAlreadyPartOfVG(nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, d
 	return false
 }
 
-// isVolumeGroupStaticAndAlreadySetUp checks if the volume group is static and already set up
-// If the volume group is static and already set up, we should not add any more devices to it.
-// This is because the volume group is already set up with the devices it needs.
-func isVolumeGroupStaticAndAlreadySetUp(nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
-	if nodeStatus == nil || volumeGroup == nil {
-		return false
-	}
-	for _, vgStatus := range nodeStatus.Spec.LVMVGStatus {
-		if vgStatus.Name == volumeGroup.Name {
-			if len(vgStatus.Devices) > 0 && volumeGroup.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicyInstallStatic {
-				return true
-			}
-			break
-		}
-	}
-
-	return false
-}
-
 func hasExactDisk(blockDevices []lsblk.BlockDevice, deviceName string) (lsblk.BlockDevice, bool) {
 	for _, blockDevice := range blockDevices {
 		if blockDevice.KName == deviceName {
@@ -275,7 +245,6 @@ func hasExactDisk(blockDevices []lsblk.BlockDevice, deviceName string) (lsblk.Bl
 var evalSymlinks = filepath.EvalSymlinks
 
 var ErrDeviceAlreadyPartOfVG = errors.New("device is already part of the volume group")
-var ErrVolumeGroupStaticAndAlreadySetUp = errors.New("volume group is static and already set up")
 
 // getValidDevice will do various checks on a device path to make sure it is a valid device
 //
@@ -291,8 +260,6 @@ func getValidDevice(devicePath string, blockDevices []lsblk.BlockDevice, nodeSta
 	// Make sure this isn't a duplicate in the VG
 	if isDeviceAlreadyPartOfVG(nodeStatus, diskName, volumeGroup) {
 		return lsblk.BlockDevice{}, ErrDeviceAlreadyPartOfVG // No error, we just don't want a duplicate
-	} else if isVolumeGroupStaticAndAlreadySetUp(nodeStatus, volumeGroup) {
-		return lsblk.BlockDevice{}, ErrVolumeGroupStaticAndAlreadySetUp // No error, we just don't want to add more devices to a static VG
 	}
 
 	// Make sure the block device exists
