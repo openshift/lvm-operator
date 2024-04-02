@@ -21,7 +21,8 @@ type ThinPoolConfig = lvmd.ThinPoolConfig
 var TypeThin = lvmd.TypeThin
 
 const (
-	DefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
+	DefaultFileConfigDir  = "/etc/topolvm"
+	DefaultFileConfigPath = DefaultFileConfigDir + "/lvmd.yaml"
 	maxReadLength         = 2 * 1 << 20 // 2MB
 )
 
