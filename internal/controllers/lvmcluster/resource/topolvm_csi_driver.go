@@ -101,10 +101,13 @@ func getCSIDriverResource() *storagev1.CSIDriver {
 			Name: constants.TopolvmCSIDriverName,
 		},
 		Spec: storagev1.CSIDriverSpec{
-			AttachRequired:       &attachRequired,
-			PodInfoOnMount:       &podInfoOnMount,
-			StorageCapacity:      &storageCapacity,
-			VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{storagev1.VolumeLifecyclePersistent},
+			AttachRequired:  &attachRequired,
+			PodInfoOnMount:  &podInfoOnMount,
+			StorageCapacity: &storageCapacity,
+			VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{
+				storagev1.VolumeLifecyclePersistent,
+				storagev1.VolumeLifecycleEphemeral,
+			},
 		},
 	}
 	return csiDriver
