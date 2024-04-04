@@ -31,6 +31,16 @@ metadata:
     containerImage: quay.io/ocs-dev/lvm-operator:latest
     description: Logical volume manager storage provides dynamically provisioned local
       storage for container workloads
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "true"
+    features.operators.openshift.io/disconnected: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
     olm.skipRange: ""
     operatorframework.io/cluster-monitoring: "true"
     operatorframework.io/initialization-resource: |-
@@ -63,7 +73,7 @@ metadata:
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    repository: https://github.com/red-hat-storage/lvm-operator
+    repository: https://github.com/openshift/lvm-operator
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.ppc64le: supported
@@ -431,7 +441,7 @@ spec:
   - LVM
   links:
   - name: Source Repository
-    url: https://github.com/red-hat-storage/lvm-operator
+    url: https://github.com/openshift/lvm-operator
   maintainers:
   - email: ocs-support@redhat.com
     name: Red Hat Support
