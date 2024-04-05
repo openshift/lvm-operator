@@ -177,8 +177,6 @@ spec:
                 - name
                 - overprovisionRatio
                 type: object
-            required:
-            - thinPoolConfig
             type: object
           status:
             description: LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
