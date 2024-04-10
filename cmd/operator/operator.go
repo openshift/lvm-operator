@@ -38,6 +38,7 @@ import (
 	topolvmcontrollers "github.com/topolvm/topolvm/pkg/controller"
 	"github.com/topolvm/topolvm/pkg/driver"
 	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -260,7 +261,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return true, nil
 	})
 	csi.RegisterIdentityServer(grpcServer, identityServer)
-	controllerSever, err := driver.NewControllerServer(mgr)
+	controllerSever, err := driver.NewControllerServer(mgr, driver.ControllerServerSettings{
+		MinimumAllocationSettings: driver.MinimumAllocationSettings{
+			Filesystem: map[string]driver.Quantity{
+				string(lvmv1alpha1.FilesystemTypeExt4): driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeExt4)),
+				string(lvmv1alpha1.FilesystemTypeXFS):  driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeXFS)),
+			},
+			Block: driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeBlock)),
+		},
+	})
 	if err != nil {
 		return err
 	}
