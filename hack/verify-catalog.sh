@@ -10,7 +10,7 @@ function print_failure {
 
 if [ "${OPENSHIFT_CI:-false}" = true ]; then
     echo "> generating the OLM catalog"
-    make catalog-render
+    make catalog
 
     test -z "$(git status --porcelain | \grep -v '^??')" || print_failure
     echo "> verified generated catalog"
