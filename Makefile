@@ -41,7 +41,7 @@ OPERATOR_VERSION ?= 0.0.1
 ENVTEST_K8S_VERSION = 1.26.0
 
 OPERATOR_SDK_VERSION ?= 1.23.0
-RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
