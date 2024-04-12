@@ -40,7 +40,7 @@ MUST_GATHER_FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(MUST_GATHE
 IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)
 # VGMANAGER_IMG is the image for the vgmanager daemonset
 VGMANAGER_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(VGMANAGER_IMAGE_NAME):$(IMAGE_TAG)
-RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+RBAC_PROXY_IMG ?= gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
 
 
 # BUNDLE_IMG defines the image used for the bundle.
