@@ -298,7 +298,7 @@ bundle-push: ## Push the bundle image.
 
 ##@ Catalog image
 .PHONY: catalog
-catalog: ## Render a catalog from the bundle by wrapping it in a alpha channel.
+catalog: opm ## Render a catalog from the bundle by wrapping it in a alpha channel.
 	@echo "Rendering the catalog at $(CATALOG_DIR)"
 	@rm -rf $(CATALOG_DIR)
 	@mkdir -p $(CATALOG_DIR)/$(IMAGE_NAME)
