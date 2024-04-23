@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	"github.com/pkg/errors"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -101,7 +99,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 		capacityQuantity, err := resource.ParseQuantity(capacity)
 		if err != nil {
-			logger.Error(errors.Wrapf(err, "failed to parse capacity for node %s", node.Name), "failed to parse capacity")
+			logger.Error(fmt.Errorf("failed to parse capacity for node %s: %w", node.Name, err), "failed to parse capacity")
 			return ctrl.Result{}, nil
 		}
 		if requestedStorage.Cmp(capacityQuantity) < 0 {
