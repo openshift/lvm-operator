@@ -48,6 +48,7 @@ end
 - [Cleanup](#cleanup)
 - [Metrics](#metrics)
 - [Known Limitations](#known-limitations)
+    * [Dynamic Device Discovery](#dynamic-device-discovery)
     * [Unsupported Device Types](#unsupported-device-types)
     * [Single LVMCluster support](#single-lvmcluster-support)
     * [Upgrades from v 4.10 and v4.11](#upgrades-from-v-410-and-v411)
@@ -368,6 +369,16 @@ $ oc patch namespace/openshift-storage -p '{"metadata": {"labels": {"openshift.i
 LVMS provides [TopoLVM metrics](https://github.com/topolvm/topolvm/blob/v0.21.0/docs/topolvm-node.md#prometheus-metrics) and `controller-runtime` metrics, which can be accessed via OpenShift Console.
 
 ## Known Limitations
+
+### Dynamic Device Discovery
+
+When a `DeviceSelector` isn't configured for a device class, LVMS operates dynamically, continuously monitoring attached devices on the node and adding them to the volume group if they're unused and supported. However, this approach presents several potential issues:
+
+- LVMS may inadvertently add a device to the volume group that wasn't intended for LVMS.
+- Removing devices could disrupt the volume group.
+- LVMS lacks awareness of volume group changes that could lead to data loss, potentially necessitating manual node remediation.
+
+Given these considerations, it's advised against using LVMS in dynamic discovery mode for production environments.
 
 ### Unsupported Device Types
 

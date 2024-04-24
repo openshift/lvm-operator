@@ -93,7 +93,8 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 
-	err = v.verifyPathsAreNotEmpty(l)
+	pathWarnings, err := v.verifyPathsAreNotEmpty(l)
+	warnings = append(warnings, pathWarnings...)
 	if err != nil {
 		return warnings, err
 	}
@@ -129,7 +130,8 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		return warnings, err
 	}
 
-	err = v.verifyPathsAreNotEmpty(l)
+	pathWarnings, err := v.verifyPathsAreNotEmpty(l)
+	warnings = append(warnings, pathWarnings...)
 	if err != nil {
 		return warnings, err
 	}
@@ -298,23 +300,25 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 	return nil, nil
 }
 
-func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) error {
+func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.Warnings, error) {
 
 	var deviceClassesWithoutPaths []string
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			if len(deviceClass.DeviceSelector.Paths) == 0 && len(deviceClass.DeviceSelector.OptionalPaths) == 0 {
-				return ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector
+				return nil, ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector
 			}
 		} else {
 			deviceClassesWithoutPaths = append(deviceClassesWithoutPaths, deviceClass.Name)
 		}
 	}
 	if len(l.Spec.Storage.DeviceClasses) > 1 && len(deviceClassesWithoutPaths) > 0 {
-		return fmt.Errorf("%w. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", ErrEmptyPathsWithMultipleDeviceClasses, strings.Join(deviceClassesWithoutPaths, `,`))
+		return nil, fmt.Errorf("%w. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", ErrEmptyPathsWithMultipleDeviceClasses, strings.Join(deviceClassesWithoutPaths, `,`))
+	} else if len(l.Spec.Storage.DeviceClasses) == 1 && len(deviceClassesWithoutPaths) == 1 {
+		return admission.Warnings{fmt.Sprintf("no device path(s) under deviceSelector.paths was specified for the %s deviceClass, LVMS will actively monitor and dynamically utilize any supported unused devices. This is not recommended for production environments. Please refer to the limitations outlined in the product documentation for further details.", deviceClassesWithoutPaths[0])}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
