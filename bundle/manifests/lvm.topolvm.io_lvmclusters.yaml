@@ -301,6 +301,18 @@ spec:
                         description: NodeStatus defines the observed state of the
                           deviceclass on the node
                         properties:
+                          deviceDiscoveryPolicy:
+                            default: RuntimeDynamic
+                            description: |-
+                              DeviceDiscoveryPolicy is a field to indicate whether the devices are discovered
+                              at runtime or preconfigured through a DeviceSelector
+                              Setting this to DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
+                              Setting this to DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
+                              By default, the value is set to RuntimeDynamic.
+                            enum:
+                            - Preconfigured
+                            - RuntimeDynamic
+                            type: string
                           devices:
                             description: Devices is the list of devices used by the
                               volume group

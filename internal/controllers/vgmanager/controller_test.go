@@ -266,8 +266,9 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
-			Name:   vg.GetName(),
-			Status: lvmv1alpha1.VGStatusProgressing,
+			Name:                  vg.GetName(),
+			Status:                lvmv1alpha1.VGStatusProgressing,
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 	})
 
@@ -365,9 +366,10 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
-			Name:    vg.GetName(),
-			Status:  lvmv1alpha1.VGStatusReady,
-			Devices: []string{device},
+			Name:                  vg.GetName(),
+			Status:                lvmv1alpha1.VGStatusReady,
+			Devices:               []string{device},
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		oldReadyGeneration = nodeStatus.GetGeneration()
 	})
@@ -422,9 +424,10 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
-			Name:    vg.GetName(),
-			Status:  lvmv1alpha1.VGStatusReady,
-			Devices: []string{device},
+			Name:                  vg.GetName(),
+			Status:                lvmv1alpha1.VGStatusReady,
+			Devices:               []string{device},
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		Expect(oldReadyGeneration).To(Equal(nodeStatus.GetGeneration()))
 	})
