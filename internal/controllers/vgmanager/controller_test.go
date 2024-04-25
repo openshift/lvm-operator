@@ -240,13 +240,11 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		GinkgoHelper()
 		Eventually(instances.recorder.Events).WithContext(ctx).WithTimeout(timeout).Should(Receive(SatisfyAll(
 			ContainSubstring(msg),
-			ContainSubstring(eventType)),
-			ContainSubstring("LVMVolumeGroupNodeStatus")))
+			ContainSubstring(eventType))))
 		Eventually(instances.recorder.Events).WithContext(ctx).WithTimeout(timeout).Should(Receive(SatisfyAll(
 			ContainSubstring(fmt.Sprintf("update on node %s", client.ObjectKeyFromObject(nodeStatus))),
 			ContainSubstring(msg),
-			ContainSubstring(eventType)),
-			ContainSubstring("LVMVolumeGroup")))
+			ContainSubstring(eventType))))
 	}
 
 	By("triggering the second reconciliation after the initial setup", func() {

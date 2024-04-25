@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pelletier/go-toml"
+	toml "github.com/pelletier/go-toml/v2"
 )
 
 type Collector struct {

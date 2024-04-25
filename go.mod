@@ -3,7 +3,7 @@ module github.com/openshift/lvm-operator
 go 1.21
 
 require (
-	github.com/aws/aws-sdk-go v1.51.0
+	github.com/aws/aws-sdk-go v1.51.26
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-logr/logr v1.4.1
@@ -14,38 +14,37 @@ require (
 	github.com/kubernetes-csi/external-resizer v1.10.0
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
 	github.com/kubernetes-csi/external-snapshotter/v6 v6.3.3
-	github.com/onsi/ginkgo/v2 v2.16.0
-	github.com/onsi/gomega v1.31.1
-	github.com/openshift/api v0.0.0-20240315040729-3b0a3e66537a
-	github.com/openshift/client-go v0.0.0-20240312121557-60dd5f9fbf8d
-	github.com/openshift/library-go v0.0.0-20240312152318-4109a9e7a437
-	github.com/operator-framework/api v0.22.0
-	github.com/pelletier/go-toml v1.9.5
-	github.com/pkg/errors v0.9.1
+	github.com/onsi/ginkgo/v2 v2.17.1
+	github.com/onsi/gomega v1.33.0
+	github.com/openshift/api v0.0.0-20240423014330-2cb60a113ad1
+	github.com/openshift/client-go v0.0.0-20240422164335-6c851f4919dd
+	github.com/openshift/library-go v0.0.0-20240422143640-fad649cbbd63
+	github.com/operator-framework/api v0.23.0
+	github.com/pelletier/go-toml/v2 v2.1.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
-	github.com/topolvm/topolvm v0.28.1-0.20240410004534-b0a2229dc10d
+	github.com/topolvm/topolvm v0.28.1-0.20240417041403-377af27af742
 	go.uber.org/zap v1.27.0
-	google.golang.org/grpc v1.62.1
+	google.golang.org/grpc v1.63.2
 	gotest.tools/v3 v3.5.1
-	k8s.io/api v0.29.2
-	k8s.io/apiextensions-apiserver v0.29.2
-	k8s.io/apimachinery v0.29.2
-	k8s.io/apiserver v0.29.2
-	k8s.io/client-go v0.29.2
-	k8s.io/component-helpers v0.29.2
-	k8s.io/csi-translation-lib v0.29.2
+	k8s.io/api v0.29.4
+	k8s.io/apiextensions-apiserver v0.29.4
+	k8s.io/apimachinery v0.29.4
+	k8s.io/apiserver v0.29.4
+	k8s.io/client-go v0.29.4
+	k8s.io/component-helpers v0.29.4
+	k8s.io/csi-translation-lib v0.29.4
 	k8s.io/klog/v2 v2.120.1
-	k8s.io/kubelet v0.29.2
+	k8s.io/kubelet v0.29.4
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57
-	sigs.k8s.io/controller-runtime v0.17.2
+	sigs.k8s.io/controller-runtime v0.17.3
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v9 v9.1.0-rc.0.0.20231129150350-3b3bde60df73
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240410085813-a5c797a83619
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240417074211-92e1e0e34402
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -89,6 +88,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.0 // indirect
 	github.com/prometheus/common v0.50.0 // indirect
@@ -106,14 +106,14 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.1.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240314144324-c7f7c6466f7f // indirect
 	golang.org/x/mod v0.16.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
+	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
@@ -125,9 +125,9 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/component-base v0.29.2 // indirect
+	k8s.io/component-base v0.29.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
-	k8s.io/mount-utils v0.29.2 // indirect
+	k8s.io/mount-utils v0.29.4 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.1 // indirect
 	sigs.k8s.io/gateway-api v1.0.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
