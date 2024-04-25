@@ -32,7 +32,7 @@ Developers must follow these steps to make a change:
    review process (effectively repeating steps 3-7 as needed).
 
 To test the changes in must-gather follow these steps:
-1. Run `make lvm-must-gather`
+1. Run `make lvms-must-gather`
 2. It will create an image named `quay.io/lvms_dev/lvm-must-gather:latest`
 3. Tag it and push it to your image repository to use it with the `oc adm` command
 

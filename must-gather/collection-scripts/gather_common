@@ -1,0 +1,14 @@
+#!/bin/bash
+
+get_log_collection_args() {
+    # validation of MUST_GATHER_SINCE and MUST_GATHER_SINCE_TIME is done by the
+    # caller (oc adm must-gather) so it's safe to use the values as they are.
+    log_collection_args=""
+
+    if [ -n "${MUST_GATHER_SINCE:-}" ]; then
+        log_collection_args=--since="${MUST_GATHER_SINCE}"
+    fi
+    if [ -n "${MUST_GATHER_SINCE_TIME:-}" ]; then
+        log_collection_args=--since-time="${MUST_GATHER_SINCE_TIME}"
+    fi
+}
