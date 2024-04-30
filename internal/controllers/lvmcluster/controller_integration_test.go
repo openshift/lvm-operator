@@ -197,20 +197,7 @@ var _ = Describe("LVMCluster controller", func() {
 
 	Context("Reconciliation on deleting the LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR deletion", func(ctx context.Context) {
-
-			// delete lvmVolumeGroupNodeStatus as it should be deleted by vgmanager
-			// and if it is present lvmcluster reconciler takes it as vg is present on node
-			// we will now remove the node which will cause the LVM cluster status to also lose that vg
 			By("confirming absence of lvm cluster CR and deletion of operator created resources")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
-			}).WithContext(ctx).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
-			// deletion of LVMCluster CR and thus also the NodeStatus through the removal controller
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
-			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
-
 			// deletion of LVMCluster CR
 			By("deleting the LVMClusterCR")
 			Expect(k8sClient.Delete(ctx, lvmClusterOut)).Should(Succeed())
@@ -258,6 +245,11 @@ var _ = Describe("LVMCluster controller", func() {
 				return k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
 			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
+			By("confirming absence of LVMVolumeGroupNodeStatus Resource")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
+
 			By("confirming absence of TopolvmStorageClasses")
 			for _, scName := range scNames {
 				Eventually(func(ctx context.Context) error {
@@ -268,6 +260,19 @@ var _ = Describe("LVMCluster controller", func() {
 			By("confirming absence of LVMCluster CR")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
+
+			// create lvmVolumeGroupNodeStatus again to test the removal by the node controller
+			lvmVolumeGroupNodeStatusIn.ResourceVersion = ""
+			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
+			By("verifying NodeStatus is created again")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Succeed())
+			// we will now remove the node which will trigger deletion of the NodeStatus through the node removal controller
+			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
 			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 		})
 	})
