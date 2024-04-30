@@ -168,6 +168,30 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("failed to introspect running pod image: %w", err)
 	}
 
+	// The resource was deleted
+	if !lvmCluster.DeletionTimestamp.IsZero() {
+		// Check for existing LogicalVolumes
+		lvsExist, err := r.logicalVolumesExist(ctx)
+		if err != nil {
+			// check every 10 seconds if there are still PVCs present
+			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
+		}
+		if lvsExist {
+			waitForLVRemoval := time.Second * 10
+			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion", waitForLVRemoval)
+			r.WarningEvent(ctx, lvmCluster, EventReasonErrorDeletionPending, err)
+			// check every 10 seconds if there are still PVCs present
+			return ctrl.Result{RequeueAfter: waitForLVRemoval}, nil
+		}
+
+		logger.Info("processing LVMCluster deletion")
+		if err := r.processDelete(ctx, lvmCluster); err != nil {
+			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
+			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
+		}
+		return reconcile.Result{}, nil
+	}
+
 	result, reconcileError := r.reconcile(ctx, lvmCluster)
 
 	statusError := r.updateLVMClusterStatus(ctx, lvmCluster)
@@ -185,30 +209,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 // errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
 func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-
-	// The resource was deleted
-	if !instance.DeletionTimestamp.IsZero() {
-		// Check for existing LogicalVolumes
-		lvsExist, err := r.logicalVolumesExist(ctx)
-		if err != nil {
-			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
-		}
-		if lvsExist {
-			waitForLVRemoval := time.Second * 10
-			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion", waitForLVRemoval)
-			r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
-			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{RequeueAfter: waitForLVRemoval}, nil
-		}
-
-		logger.Info("processing LVMCluster deletion")
-		if err := r.processDelete(ctx, instance); err != nil {
-			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
-			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
-		}
-		return reconcile.Result{}, nil
-	}
 
 	if updated := controllerutil.AddFinalizer(instance, lvmClusterFinalizer); updated {
 		if err := r.Client.Update(ctx, instance); err != nil {
@@ -421,6 +421,7 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 		resourceDeletionList := []resource.Manager{
 			resource.TopoLVMStorageClass(),
 			resource.LVMVGs(),
+			resource.LVMVGNodeStatus(),
 			resource.CSIDriver(),
 			resource.VGManager(),
 		}
