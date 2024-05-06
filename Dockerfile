@@ -23,7 +23,7 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/4.16:base-rhel9
+FROM --platform=$TARGETPLATFORM fedora:latest
 
 RUN dnf update -y && \
     dnf install --nodocs --noplugins -y \
