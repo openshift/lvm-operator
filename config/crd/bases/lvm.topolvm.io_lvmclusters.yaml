@@ -40,12 +40,13 @@ spec:
             description: LVMClusterSpec defines the desired state of LVMCluster
             properties:
               storage:
-                description: `storage` contains the device class configuration for local
-                  storage devices.
+                description: Storage describes the deviceClass configuration for local
+                  storage devices
                 properties:
                   deviceClasses:
-                    description: `deviceClasses` contains the configuration to assign the local storage devices 
-                      to the LVM volume groups that you can use to provision persistent volume claims (PVCs).
+                    description: DeviceClasses are a rules that assign local storage
+                      devices to volumegroups that are used for creating lvm based
+                      PVs
                     items:
                       properties:
                         default:
