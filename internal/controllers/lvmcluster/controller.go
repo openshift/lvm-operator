@@ -293,7 +293,7 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 		instance.Status.State = lvmv1alpha1.LVMStatusFailed
 	} else if isDegraded {
 		instance.Status.State = lvmv1alpha1.LVMStatusDegraded
-	} else if isReady && expectedVGCount == readyVGCount {
+	} else if isReady && expectedVGCount <= readyVGCount { // readyVGCount can be greater than expectedVGCount in case there are taints on some nodes, e.g. during an upgrade. See https://issues.redhat.com/browse/OCPBUGS-30830 for further details.
 		instance.Status.State = lvmv1alpha1.LVMStatusReady
 		instance.Status.Ready = true
 	}
