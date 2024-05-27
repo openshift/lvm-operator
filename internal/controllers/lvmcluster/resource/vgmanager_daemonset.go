@@ -252,9 +252,11 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				Privileged: ptr.To(true),
 				RunAsUser:  ptr.To(int64(0)),
 			},
-			Ports: []corev1.ContainerPort{{Name: constants.TopolvmNodeContainerHealthzName,
-				ContainerPort: 8081,
-				Protocol:      corev1.ProtocolTCP}},
+			Ports: []corev1.ContainerPort{
+				{Name: constants.TopolvmNodeContainerHealthzName,
+					ContainerPort: 8081,
+					Protocol:      corev1.ProtocolTCP},
+			},
 			LivenessProbe: &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
@@ -262,7 +264,15 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				FailureThreshold:    3,
 				InitialDelaySeconds: 1,
 				TimeoutSeconds:      1,
-				PeriodSeconds:       10},
+				PeriodSeconds:       30},
+			ReadinessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{Path: "/readyz",
+						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
+				FailureThreshold:    3,
+				InitialDelaySeconds: 1,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       60},
 			VolumeMounts: volumeMounts,
 			Resources:    resourceRequirements,
 			Env: []corev1.EnvVar{
