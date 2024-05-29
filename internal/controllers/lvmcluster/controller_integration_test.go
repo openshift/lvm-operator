@@ -154,6 +154,19 @@ var _ = Describe("LVMCluster controller", func() {
 				return lvmClusterOut.Status.State == lvmv1alpha1.LVMStatusReady
 			}).Should(BeTrue())
 
+			By("verifying LVMCluster .Status.Conditions are Ready")
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
+					return false
+				}
+				for _, c := range lvmClusterOut.Status.Conditions {
+					if c.Status == metav1.ConditionFalse {
+						return false
+					}
+				}
+				return true
+			}).Should(BeTrue())
+
 			By("confirming presence of CSIDriver")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, csiDriverName, csiDriverOut)
