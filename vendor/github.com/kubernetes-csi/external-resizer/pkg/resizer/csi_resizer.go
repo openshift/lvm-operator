@@ -31,7 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
@@ -46,7 +45,6 @@ func NewResizerFromClient(
 	csiClient csi.Client,
 	timeout time.Duration,
 	k8sClient kubernetes.Interface,
-	informerFactory informers.SharedInformerFactory,
 	driverName string) (Resizer, error) {
 
 	supportControllerService, err := supportsPluginControllerService(csiClient, timeout)
@@ -69,7 +67,7 @@ func NewResizerFromClient(
 			return nil, fmt.Errorf("failed to check if plugin supports node resize: %v", err)
 		}
 		if supportsNodeResize {
-			klog.Info("The CSI driver supports node resize only, using trivial resizer to handle resize requests")
+			klog.InfoS("The CSI driver supports node resize only, using trivial resizer to handle resize requests")
 			return newTrivialResizer(driverName), nil
 		}
 		return nil, resizeNotSupportErr
@@ -115,11 +113,11 @@ func (r *csiResizer) CanSupport(pv *v1.PersistentVolume, pvc *v1.PersistentVolum
 	}
 	source := pv.Spec.CSI
 	if source == nil {
-		klog.V(4).Infof("PV %s is not a CSI volume, skip it", pv.Name)
+		klog.V(4).InfoS("PV is not a CSI volume, skip it", "PV", klog.KObj(pv))
 		return false
 	}
 	if source.Driver != r.name {
-		klog.V(4).Infof("Skip resize PV %s for resizer %s", pv.Name, source.Driver)
+		klog.V(4).InfoS("Skip resize PV", "PV", klog.KObj(pv), "resizer", source.Driver)
 		return false
 	}
 	return true

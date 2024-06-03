@@ -35,9 +35,10 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/microlvms"
 	"github.com/spf13/cobra"
-	topolvmcontrollers "github.com/topolvm/topolvm/controllers"
-	"github.com/topolvm/topolvm/driver"
+	topolvmcontrollers "github.com/topolvm/topolvm/pkg/controller"
+	"github.com/topolvm/topolvm/pkg/driver"
 	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -117,6 +118,18 @@ func NewCmd(opts *Options) *cobra.Command {
 	return cmd
 }
 
+// NoManagedFields removes the managedFields from the object.
+// This is used to reduce memory usage of the objects in the cache.
+// This MUST NOT be used for SSA.
+func NoManagedFields(i any) (any, error) {
+	it, ok := i.(client.Object)
+	if !ok {
+		return nil, fmt.Errorf("unexpected object type: %T", i)
+	}
+	it.SetManagedFields(nil)
+	return it, nil
+}
+
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
@@ -174,6 +187,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			Port: 9443,
 		}},
 		Cache: cache.Options{
+			DefaultTransform: NoManagedFields,
 			ByObject: map[client.Object]cache.ByObject{
 				&lvmv1alpha1.LVMCluster{}:               {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 				&lvmv1alpha1.LVMVolumeGroup{}:           {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
@@ -231,13 +245,11 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	// register TopoLVM controllers
-	topolvmNodeController := topolvmcontrollers.NewNodeReconciler(mgr.GetClient(), false)
-	if err := topolvmNodeController.SetupWithManager(mgr); err != nil {
+	if err := topolvmcontrollers.SetupNodeReconciler(mgr, mgr.GetClient(), false); err != nil {
 		return fmt.Errorf("unable to create TopoLVM Node controller: %w", err)
 	}
 
-	topolvmPVCController := topolvmcontrollers.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader())
-	if err := topolvmPVCController.SetupWithManager(mgr); err != nil {
+	if err := topolvmcontrollers.SetupPersistentVolumeClaimReconciler(mgr, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
 		return fmt.Errorf("unable to create TopoLVM PVC controller: %w", err)
 	}
 
@@ -249,7 +261,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return true, nil
 	})
 	csi.RegisterIdentityServer(grpcServer, identityServer)
-	controllerSever, err := driver.NewControllerServer(mgr)
+	controllerSever, err := driver.NewControllerServer(mgr, driver.ControllerServerSettings{
+		MinimumAllocationSettings: driver.MinimumAllocationSettings{
+			Filesystem: map[string]driver.Quantity{
+				string(lvmv1alpha1.FilesystemTypeExt4): driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeExt4)),
+				string(lvmv1alpha1.FilesystemTypeXFS):  driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeXFS)),
+			},
+			Block: driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeBlock)),
+		},
+	})
 	if err != nil {
 		return err
 	}

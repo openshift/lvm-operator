@@ -2,7 +2,7 @@
 set -euo pipefail
 
 function print_failure {
-    echo "There are unexpected changes to the tree when running 'make catalog-render'. Please"
+    echo "There are unexpected changes to the tree when running 'make catalog'. Please"
     echo "run these commands locally and double-check the Git repository for unexpected changes which may"
     echo "need to be committed."
     exit 1
@@ -10,7 +10,7 @@ function print_failure {
 
 if [ "${OPENSHIFT_CI:-false}" = true ]; then
     echo "> generating the OLM catalog"
-    make catalog-render
+    make catalog
 
     test -z "$(git status --porcelain | \grep -v '^??')" || print_failure
     echo "> verified generated catalog"

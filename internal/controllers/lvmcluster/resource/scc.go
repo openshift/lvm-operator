@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -54,24 +54,27 @@ func (c openshiftSccs) GetName() string {
 func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 	sccs := getAllSCCs(r.GetNamespace())
-	for _, scc := range sccs {
-		err := r.Get(ctx, client.ObjectKeyFromObject(scc), &secv1.SecurityContextConstraints{})
-		if err == nil {
-			// Don't update the SCC
-			logger.V(2).Info("SecurityContextConstraint exists, skipping creation", "name", scc.Name)
-			continue
+	for _, template := range sccs {
+		scc := &secv1.SecurityContextConstraints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: template.Name,
+			},
 		}
 
-		if !errors.IsNotFound(err) {
-			return fmt.Errorf("something went wrong when checking for SecurityContextConstraint: %w", err)
-		}
-
-		labels.SetManagedLabels(r.Scheme(), scc, cluster)
-		if err := r.Create(ctx, scc); err != nil {
+		result, err := cutil.CreateOrUpdate(ctx, r, scc, func() error {
+			if scc.CreationTimestamp.IsZero() {
+				template.DeepCopyInto(scc)
+			}
+			labels.SetManagedLabels(r.Scheme(), scc, cluster)
+			scc.Users = template.Users
+			return nil
+		})
+		if err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", c.GetName(), err)
 		}
-
-		logger.V(2).Info("SecurityContextConstraint created", "name", scc.Name)
+		if result != cutil.OperationResultNone {
+			logger.V(2).Info("SecurityContextConstraint applied to cluster", "operation", result, "name", scc.Name)
+		}
 	}
 
 	return nil

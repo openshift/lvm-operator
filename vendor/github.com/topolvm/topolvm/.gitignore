@@ -5,7 +5,8 @@
 *.dll
 *.so
 *.dylib
-bin
+bin/*
+Dockerfile.cross
 
 # Test binary, build with `go test -c`
 *.test
@@ -19,17 +20,17 @@ bin
 
 # editor and IDE paraphernalia
 .idea
+.vscode
 *.swp
 *.swo
 *~
-/.vscode
 
 # ignore tools
 /bin
 /build
-/e2e/build
-/e2e/tmpbin
 /include
+/test/e2e/build
+/test/e2e/tmpbin
 /testbin
 
 # ignore unneeded generated configs

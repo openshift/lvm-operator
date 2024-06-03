@@ -6,6 +6,7 @@ BINDIR := $(shell pwd)/bin
 CONTROLLER_GEN := $(BINDIR)/controller-gen
 STATICCHECK := $(BINDIR)/staticcheck
 CONTAINER_STRUCTURE_TEST := $(BINDIR)/container-structure-test
+GOLANGCI_LINT = $(BINDIR)/golangci-lint
 PROTOC := PATH=$(BINDIR):$(PATH) $(BINDIR)/protoc -I=$(shell pwd)/include:.
 PACKAGES := unzip lvm2 xfsprogs thin-provisioning-tools patch
 ENVTEST_ASSETS_DIR := $(shell pwd)/testbin
@@ -71,16 +72,16 @@ help: ## Display this help.
 
 ##@ Development
 
-lvmd/proto/lvmd.pb.go: lvmd/proto/lvmd.proto
+pkg/lvmd/proto/lvmd.pb.go: pkg/lvmd/proto/lvmd.proto
 	$(PROTOC) --go_out=module=github.com/topolvm/topolvm:. $<
 
-lvmd/proto/lvmd_grpc.pb.go: lvmd/proto/lvmd.proto
+pkg/lvmd/proto/lvmd_grpc.pb.go: pkg/lvmd/proto/lvmd.proto
 	$(PROTOC) --go-grpc_out=module=github.com/topolvm/topolvm:. $<
 
-docs/lvmd-protocol.md: lvmd/proto/lvmd.proto
+docs/lvmd-protocol.md: pkg/lvmd/proto/lvmd.proto
 	$(PROTOC) --doc_out=./docs --doc_opt=markdown,$@ $<
 
-PROTOBUF_GEN = lvmd/proto/lvmd.pb.go lvmd/proto/lvmd_grpc.pb.go docs/lvmd-protocol.md
+PROTOBUF_GEN = pkg/lvmd/proto/lvmd.pb.go pkg/lvmd/proto/lvmd_grpc.pb.go docs/lvmd-protocol.md
 
 .PHONY: manifests
 manifests: generate-legacy-api ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
@@ -88,7 +89,7 @@ manifests: generate-legacy-api ## Generate WebhookConfiguration, ClusterRole and
 		crd:crdVersions=v1 \
 		rbac:roleName=topolvm-controller \
 		webhook \
-		paths="./api/...;./controllers;./hook;./driver/internal/k8s;./pkg/..." \
+		paths="./api/...;./internal/...;./cmd/..." \
 		output:crd:artifacts:config=config/crd/bases
 	cat config/crd/bases/topolvm.io_logicalvolumes.yaml | xargs -d"	" printf "$$CRD_TEMPLATE" > charts/topolvm/templates/crds/topolvm.io_logicalvolumes.yaml
 	cat config/crd/bases/topolvm.cybozu.com_logicalvolumes.yaml | xargs -d"	" printf "$$LEGACY_CRD_TEMPLATE" > charts/topolvm/templates/crds/topolvm.cybozu.com_logicalvolumes.yaml
@@ -117,9 +118,14 @@ check-uncommitted: generate ## Check if latest generated artifacts are committed
 .PHONY: lint
 lint: ## Run lint
 	test -z "$$(gofmt -s -l . | grep -vE '^vendor|^api/v1/zz_generated.deepcopy.go' | tee /dev/stderr)"
+	$(GOLANGCI_LINT) run
 	$(STATICCHECK) ./...
 	go vet ./...
 	test -z "$$(go vet ./... | grep -v '^vendor' | tee /dev/stderr)"
+
+.PHONY: lint-fix
+lint-fix: ## Run golangci-lint linter and perform fixes
+	$(GOLANGCI_LINT) run --fix
 
 .PHONY: test
 test: lint ## Run lint and unit tests.
@@ -132,7 +138,7 @@ groupname-test: ## Run unit tests that depends on the groupname.
 	go install ./...
 
 	mkdir -p $(ENVTEST_ASSETS_DIR)
-	source <($(BINDIR)/setup-envtest use $(ENVTEST_KUBERNETES_VERSION) --bin-dir=$(ENVTEST_ASSETS_DIR) -p env); GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn TEST_LEGACY=true go test -count=1 -race -v --timeout=60s ./client/*
+	source <($(BINDIR)/setup-envtest use $(ENVTEST_KUBERNETES_VERSION) --bin-dir=$(ENVTEST_ASSETS_DIR) -p env); GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn TEST_LEGACY=true go test -count=1 -race -v --timeout=60s ./internal/client/*
 	TEST_LEGACY=true go test -count=1 -race -v --timeout=60s ./constants*.go
 
 .PHONY: clean
@@ -154,11 +160,11 @@ build-topolvm: build/hypertopolvm build/lvmd
 
 build/hypertopolvm: $(GO_FILES)
 	mkdir -p build
-	GOARCH=$(GOARCH) go build -o $@ -ldflags "-w -s -X github.com/topolvm/topolvm.Version=$(TOPOLVM_VERSION)" ./pkg/hypertopolvm
+	GOARCH=$(GOARCH) go build -o $@ -ldflags "-w -s -X github.com/topolvm/topolvm.Version=$(TOPOLVM_VERSION)" ./cmd/hypertopolvm
 
 build/lvmd: $(GO_FILES)
 	mkdir -p build
-	GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o $@ -ldflags "-w -s -X github.com/topolvm/topolvm.Version=$(TOPOLVM_VERSION)" ./pkg/lvmd
+	GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o $@ -ldflags "-w -s -X github.com/topolvm/topolvm.Version=$(TOPOLVM_VERSION)" ./cmd/lvmd
 
 .PHONY: csi-sidecars
 csi-sidecars: ## Build sidecar binaries.
@@ -262,8 +268,8 @@ install-helm-docs: | $(BINDIR)
 .PHONY: tools
 tools: install-kind install-container-structure-test install-helm install-helm-docs | $(BINDIR) ## Install development tools.
 	GOBIN=$(BINDIR) go install honnef.co/go/tools/cmd/staticcheck@latest
-	# Follow the official documentation to install the `latest` version, because explicitly specifying the version will get an error.
-	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell dirname $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION)
+	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION)
 
 	$(CURL) -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-linux-x86_64.zip

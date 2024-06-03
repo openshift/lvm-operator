@@ -60,7 +60,11 @@ func VerifyLVMSSetup(ctx context.Context, cluster *v1alpha1.LVMCluster) {
 	validateVGManager(ctx)
 	validateLVMVolumeGroup(ctx)
 	validateStorageClass(ctx)
-	validateVolumeSnapshotClass(ctx)
+	for _, dc := range cluster.Spec.Storage.DeviceClasses {
+		if dc.ThinPoolConfig != nil {
+			validateVolumeSnapshotClass(ctx)
+		}
+	}
 }
 
 func GetStorageClass(ctx context.Context, name types.NamespacedName) *storagev1.StorageClass {

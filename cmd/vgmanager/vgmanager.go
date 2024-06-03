@@ -18,6 +18,7 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -40,13 +41,13 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/tagging"
 	"github.com/spf13/cobra"
-	topolvmClient "github.com/topolvm/topolvm/client"
-	"github.com/topolvm/topolvm/controllers"
-	"github.com/topolvm/topolvm/driver"
-	topoLVMD "github.com/topolvm/topolvm/lvmd"
-	"github.com/topolvm/topolvm/lvmd/command"
-	"github.com/topolvm/topolvm/runners"
+	"github.com/topolvm/topolvm"
+	"github.com/topolvm/topolvm/pkg/controller"
+	"github.com/topolvm/topolvm/pkg/driver"
+	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
+	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -69,6 +70,8 @@ const (
 	DefaultDiagnosticsAddr = ":8443"
 	DefaultProbeAddr       = ":8081"
 )
+
+var ErrConfigModified = errors.New("lvmd config file is modified")
 
 type Options struct {
 	Scheme   *runtime.Scheme
@@ -101,7 +104,9 @@ func NewCmd(opts *Options) *cobra.Command {
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
-	ctx, cancel := context.WithCancel(cmd.Context())
+	ctx, cancelWithCause := context.WithCancelCause(cmd.Context())
+	defer cancelWithCause(nil)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	lvm := lvm.NewDefaultHostLVM()
@@ -138,6 +143,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				operatorNamespace: {},
 			},
 		},
+		GracefulShutdownTimeout: ptr.To(time.Duration(-1)),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
@@ -150,23 +156,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("unable to set up ready check: %w", err)
 		}
 	} else {
-		topoClient := topolvmClient.NewWrappedClient(mgr.GetClient())
-		command.Containerized = true
-		dcm := topoLVMD.NewDeviceClassManager(lvmdConfig.DeviceClasses)
-		ocm := topoLVMD.NewLvcreateOptionClassManager(lvmdConfig.LvcreateOptionClasses)
-		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, dcm, ocm)
+		topoLVMD.Containerized(true)
+		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, lvmdConfig.DeviceClasses, lvmdConfig.LvcreateOptionClasses)
 
-		lvController := controllers.NewLogicalVolumeReconcilerWithServices(topoClient, nodeName, vgclnt, lvclnt)
-
-		if err := lvController.SetupWithManager(mgr); err != nil {
+		if err := controller.SetupLogicalVolumeReconcilerWithServices(mgr, mgr.GetClient(), nodeName, vgclnt, lvclnt); err != nil {
 			return fmt.Errorf("unable to create LogicalVolumeReconciler: %w", err)
 		}
 
-		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, topoClient, nodeName)); err != nil { // adjusted signature
+		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, mgr.GetClient(), nodeName)); err != nil { // adjusted signature
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
-		if err := os.MkdirAll(driver.DeviceDirectory, 0755); err != nil {
+		if err := os.MkdirAll(topolvm.DeviceDirectory, 0755); err != nil {
 			return err
 		}
 		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
@@ -208,7 +209,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		NodeName:      nodeName,
 		Namespace:     operatorNamespace,
 		Filters:       filter.DefaultFilters,
-		Shutdown:      cancel,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
@@ -217,72 +217,77 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, []os.Signal{os.Interrupt, syscall.SIGTERM}...)
-	go func() {
-		<-c
-		cancel()
-		<-c
-		os.Exit(1) // second signal. Exit directly.
-	}()
-
 	// Create new watcher.
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("unable to set up file watcher: %w", err)
 	}
 	defer watcher.Close()
-
-	// Start listening for events.
-	go func() {
-		fileNotExist := false
-		for {
-			// check if file exists, otherwise the watcher errors
-			_, err := os.Lstat(lvmd.DefaultFileConfigPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					time.Sleep(100 * time.Millisecond)
-					fileNotExist = true
-				} else {
-					opts.SetupLog.Error(err, "unable to check if lvmd config file exists")
-				}
-			} else {
-				// This handles the first time the file is created through the configmap
-				if fileNotExist {
-					cancel()
-				}
-				err = watcher.Add(lvmd.DefaultFileConfigPath)
-				if err != nil {
-					opts.SetupLog.Error(err, "unable to add file path to watcher")
-				}
-				break
-			}
-		}
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if event.Has(fsnotify.Write) || event.Has(fsnotify.Remove) || event.Has(fsnotify.Chmod) {
-					opts.SetupLog.Info("lvmd config file is modified", "eventName", event.Name)
-					cancel()
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				opts.SetupLog.Error(err, "file watcher error")
-			}
-		}
-	}()
+	// Start listening for events on TopoLVM files.
+	go watchTopoLVMAndNotify(opts, cancelWithCause, watcher)
 
 	opts.SetupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
 	}
 
+	if errors.Is(context.Cause(ctx), ErrConfigModified) {
+		opts.SetupLog.Info("restarting controller due to modified configuration")
+		return run(cmd, nil, opts)
+	} else if err := ctx.Err(); err != nil {
+		opts.SetupLog.Error(err, "exiting abnormally")
+		os.Exit(1)
+	}
+
 	return nil
+}
+
+// watchTopoLVMAndNotify watches for changes to the lvmd config file and cancels the context if it changes.
+// This is used to restart the manager when the lvmd config file changes.
+// This is a blocking function and should be run in a goroutine.
+// If the directory does not exist, it will be created to make it possible to watch for changes.
+// If the watch determines that the lvmd config file has been modified, it will cancel the context with the ErrConfigModified error.
+func watchTopoLVMAndNotify(opts *Options, cancelWithCause context.CancelCauseFunc, watcher *fsnotify.Watcher) {
+	// check if file exists, otherwise the watcher errors
+	fi, err := os.Stat(lvmd.DefaultFileConfigDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(lvmd.DefaultFileConfigDir, 0755); err != nil {
+				opts.SetupLog.Error(err, "unable to create lvmd config directory when it did not exist before")
+			}
+		} else {
+			opts.SetupLog.Error(err, "unable to check if lvmd config directory exists")
+			cancelWithCause(err)
+		}
+	} else if !fi.IsDir() {
+		opts.SetupLog.Error(err, "expected lvmd config directory is not a directory")
+		cancelWithCause(err)
+	}
+
+	err = watcher.Add(lvmd.DefaultFileConfigDir)
+	if err != nil {
+		opts.SetupLog.Error(err, "unable to add file path to watcher")
+	}
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Name != lvmd.DefaultFileConfigPath {
+				continue
+			}
+			if event.Has(fsnotify.Write) || event.Has(fsnotify.Remove) || event.Has(fsnotify.Chmod) {
+				opts.SetupLog.Info("lvmd config file is modified", "eventName", event.Name)
+				cancelWithCause(fmt.Errorf("%w: %s", ErrConfigModified, event.Name))
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			opts.SetupLog.Error(err, "file watcher error")
+		}
+	}
 }
 
 func loadConfFile(ctx context.Context, config *lvmd.Config, cfgFilePath string) error {

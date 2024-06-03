@@ -64,3 +64,18 @@ const (
 	PriorityClassNameUserCritical    = "openshift-user-critical"
 	PriorityClassNameClusterCritical = "system-cluster-critical"
 )
+
+// these constants are derived from the TopoLVM recommendations but maintained separately to allow easy override.
+// see https://github.com/topolvm/topolvm/blob/a967c95da14f80955332a00ebb258e319c6c39ac/cmd/topolvm-controller/app/root.go#L17-L28
+const (
+	// DefaultMinimumAllocationSizeBlock is the default minimum size for a block volume.
+	// Derived from the usual physical extent size of 4Mi * 2 (for accommodating metadata)
+	DefaultMinimumAllocationSizeBlock = "8Mi"
+	// DefaultMinimumAllocationSizeXFS is the default minimum size for a filesystem volume with XFS formatting.
+	// Derived from the hard XFS minimum size of 300Mi that is enforced by the XFS filesystem.
+	DefaultMinimumAllocationSizeXFS = "300Mi"
+	// DefaultMinimumAllocationSizeExt4 is the default minimum size for a filesystem volume with ext4 formatting.
+	// Derived from the usual 4096K blocks, 1024 inode default and journaling overhead,
+	// Allows for more than 80% free space after formatting, anything lower significantly reduces this percentage.
+	DefaultMinimumAllocationSizeExt4 = "32Mi"
+)

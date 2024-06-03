@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/topolvm/topolvm/lvmd"
-	lvmdCMD "github.com/topolvm/topolvm/pkg/lvmd/cmd"
+	lvmdCMD "github.com/topolvm/topolvm/cmd/lvmd/app"
+	lvmd "github.com/topolvm/topolvm/pkg/lvmd/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
@@ -18,10 +18,14 @@ type Config = lvmdCMD.Config
 type DeviceClass = lvmd.DeviceClass
 type ThinPoolConfig = lvmd.ThinPoolConfig
 
-var TypeThin = lvmd.TypeThin
+var (
+	TypeThin  = lvmd.TypeThin
+	TypeThick = lvmd.TypeThick
+)
 
 const (
-	DefaultFileConfigPath = "/etc/topolvm/lvmd.yaml"
+	DefaultFileConfigDir  = "/etc/topolvm"
+	DefaultFileConfigPath = DefaultFileConfigDir + "/lvmd.yaml"
 	maxReadLength         = 2 * 1 << 20 // 2MB
 )
 

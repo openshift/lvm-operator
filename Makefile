@@ -28,6 +28,8 @@ SHELL = /usr/bin/env bash -o pipefail
 
 UNAME := $(shell uname)
 
+SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
 ## Versions
 
 # OPERATOR_VERSION defines the project version for the bundle.
@@ -40,7 +42,12 @@ OPERATOR_VERSION ?= 0.0.1
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
-OPERATOR_SDK_VERSION ?= 1.33.0
+OPERATOR_SDK_VERSION ?= 1.34.1
+CONTROLLER_TOOLS_VERSION := 0.14.0
+CONTROLLER_RUNTIME_VERSION := $(shell awk '/sigs\.k8s\.io\/controller-runtime/ {print substr($$2, 2)}' $(SELF_DIR)/go.mod)
+GINKGO_VERSION := $(shell awk '/github.com\/onsi\/ginkgo\/v2/ {print $$2}' $(SELF_DIR)/go.mod)
+ENVTEST_BRANCH := release-$(shell echo $(CONTROLLER_RUNTIME_VERSION) | cut -d "." -f 1-2)
+ENVTEST_KUBERNETES_VERSION := $(shell echo $(KUBERNETES_VERSION) | cut -d "." -f 1-2)
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -96,6 +103,32 @@ REPLACES ?=
 # Creating the New CatalogSource requires publishing CSVs that replace one Operator,
 # but can skip several. This can be accomplished using the skipRange annotation:
 SKIP_RANGE ?=
+
+## Variables for the catalog
+
+# CATALOG_IMG defines the image used for the catalog.
+CATALOG_IMAGE_NAME ?= $(IMAGE_NAME)-catalog
+CATALOG_REPO ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(CATALOG_IMAGE_NAME)
+CATALOG_IMG ?= $(CATALOG_REPO):$(IMAGE_TAG)
+CATALOG_DIR ?= ./catalog
+
+define CATALOG_CHANNEL
+---
+schema: olm.channel
+package: $(IMAGE_NAME)
+name: alpha
+entries:
+  - name: lvms-operator.v$(OPERATOR_VERSION)
+endef
+export CATALOG_CHANNEL
+
+define CATALOG_PACKAGE
+---
+schema: olm.package
+name: $(IMAGE_NAME)
+defaultChannel: alpha
+endef
+export CATALOG_PACKAGE
 
 ##@ Development
 
@@ -231,31 +264,20 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 ##@ Catalog image
-
-# A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
-# These images MUST exist in a registry and be pull-able.
-BUNDLE_IMGS ?= $(BUNDLE_IMG)
-
-# CATALOG_IMG defines the image used for the catalog.
-CATALOG_IMAGE_NAME ?= $(IMAGE_NAME)-catalog
-CATALOG_REPO ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(CATALOG_IMAGE_NAME)
-CATALOG_IMG ?= $(CATALOG_REPO):$(IMAGE_TAG)
-
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
-.PHONY: catalog-render
-catalog-render: opm ## Render the catalog based on the given bundle
-	$(OPM) render $(BUNDLE_IMG) -oyaml > ./catalog/lvms-operator/operator.yaml
-	$(OPM) validate ./catalog
+.PHONY: catalog
+catalog: opm ## Render a catalog from the bundle by wrapping it in a alpha channel.
+	@echo "Rendering the catalog at $(CATALOG_DIR)"
+	@rm -rf $(CATALOG_DIR)
+	@mkdir -p $(CATALOG_DIR)/$(IMAGE_NAME)
+	@echo "$$CATALOG_CHANNEL" > $(CATALOG_DIR)/channel.yaml
+	@echo "$$CATALOG_PACKAGE" > $(CATALOG_DIR)/package.yaml
+	$(OPM) render ./bundle -oyaml > $(CATALOG_DIR)/$(IMAGE_NAME)/v$(OPERATOR_VERSION).yaml
+	$(OPM) validate $(CATALOG_DIR)
 
 .PHONY: catalog-build
-catalog-build: opm catalog-render ## Build a catalog image.
+catalog-build: opm catalog ## Build a catalog image from the rendered catalog.
 	$(IMAGE_BUILD_CMD) build -f catalog.Dockerfile -t $(CATALOG_IMG) .
 
-# Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
@@ -289,15 +311,15 @@ performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS 
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION))
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.3.0)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.4.1)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH))
 
 JSONNET = $(shell pwd)/bin/jsonnet
 jsonnet: ## Download jsonnet locally if necessary.
@@ -305,11 +327,11 @@ jsonnet: ## Download jsonnet locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo and gomega locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.15.0)
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION))
 
 MOCKERY = $(shell pwd)/bin/mockery
 mockery: ## Download mockery and add locally if necessary
-	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.40.1)
+	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.40.3)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -326,7 +348,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.36.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.39.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else

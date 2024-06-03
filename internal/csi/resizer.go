@@ -68,7 +68,6 @@ func (r *Resizer) Start(ctx context.Context) error {
 		csiClient,
 		r.options.CSIOperationTimeout,
 		clientset,
-		factory,
 		r.options.DriverName)
 	if err != nil {
 		return err

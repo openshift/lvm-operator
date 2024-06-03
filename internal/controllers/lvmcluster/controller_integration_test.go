@@ -18,10 +18,12 @@ package lvmcluster
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
@@ -152,6 +154,19 @@ var _ = Describe("LVMCluster controller", func() {
 				return lvmClusterOut.Status.State == lvmv1alpha1.LVMStatusReady
 			}).Should(BeTrue())
 
+			By("verifying LVMCluster .Status.Conditions are Ready")
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
+					return false
+				}
+				for _, c := range lvmClusterOut.Status.Conditions {
+					if c.Status == metav1.ConditionFalse {
+						return false
+					}
+				}
+				return true
+			}).Should(BeTrue())
+
 			By("confirming presence of CSIDriver")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, csiDriverName, csiDriverOut)
@@ -174,25 +189,37 @@ var _ = Describe("LVMCluster controller", func() {
 				}).WithContext(ctx).Should(Succeed())
 				scOut = &storagev1.StorageClass{}
 			}
+
+			By("confirming creation of the SecurityContextConstraints")
+			// we only have one SCC for vg-manager
+			scc := &secv1.SecurityContextConstraints{}
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: constants.SCCPrefix + "vgmanager"}, scc)
+			}).WithContext(ctx).Should(Succeed())
+			Expect(scc.Users).ToNot(BeEmpty())
+			Expect(scc.Users).To(ContainElement(
+				fmt.Sprintf("system:serviceaccount:%s:%s", testLvmClusterNamespace, constants.VGManagerServiceAccount)))
+			scc = nil
+
+			By("confirming overwriting the SCC User gets reset")
+			Eventually(func(ctx context.Context) []string {
+				oldSCC := &secv1.SecurityContextConstraints{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: constants.SCCPrefix + "vgmanager"}, oldSCC)).To(Succeed())
+				Expect(k8sClient.Patch(ctx, oldSCC, client.RawPatch(types.MergePatchType, []byte(`{"users": []}`)))).To(Succeed())
+				return oldSCC.Users
+			}).WithContext(ctx).Should(BeEmpty())
+
+			Eventually(func(ctx context.Context) []string {
+				scc := &secv1.SecurityContextConstraints{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: constants.SCCPrefix + "vgmanager"}, scc)).To(Succeed())
+				return scc.Users
+			}).WithContext(ctx).WithTimeout(5 * time.Second).Should(Not(BeEmpty()))
 		})
 	})
 
 	Context("Reconciliation on deleting the LVMCluster CR", func() {
 		It("should reconcile LVMCluster CR deletion", func(ctx context.Context) {
-
-			// delete lvmVolumeGroupNodeStatus as it should be deleted by vgmanager
-			// and if it is present lvmcluster reconciler takes it as vg is present on node
-			// we will now remove the node which will cause the LVM cluster status to also lose that vg
 			By("confirming absence of lvm cluster CR and deletion of operator created resources")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
-			}).WithContext(ctx).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
-			// deletion of LVMCluster CR and thus also the NodeStatus through the removal controller
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
-			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
-
 			// deletion of LVMCluster CR
 			By("deleting the LVMClusterCR")
 			Expect(k8sClient.Delete(ctx, lvmClusterOut)).Should(Succeed())
@@ -220,6 +247,11 @@ var _ = Describe("LVMCluster controller", func() {
 				return k8sClient.Get(ctx, lvmVolumeGroupName, lvmVolumeGroupOut)
 			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
+			By("confirming absence of LVMVolumeGroupNodeStatus Resource")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
+
 			By("confirming absence of TopolvmStorageClasses")
 			for _, scName := range scNames {
 				Eventually(func(ctx context.Context) error {
@@ -230,6 +262,19 @@ var _ = Describe("LVMCluster controller", func() {
 			By("confirming absence of LVMCluster CR")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, lvmClusterName, lvmClusterOut)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
+
+			// create lvmVolumeGroupNodeStatus again to test the removal by the node controller
+			lvmVolumeGroupNodeStatusIn.ResourceVersion = ""
+			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
+			By("verifying NodeStatus is created again")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Succeed())
+			// we will now remove the node which will trigger deletion of the NodeStatus through the node removal controller
+			Expect(k8sClient.Delete(ctx, nodeIn)).Should(Succeed())
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
 			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 		})
 	})
