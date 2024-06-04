@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -40,6 +41,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -309,6 +311,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 
+	if err := mgr.AddReadyzCheck("readyz", func(req *http.Request) error {
+		if err := readyCheck(mgr)(req); err != nil {
+			return err
+		}
+		return mgr.GetWebhookServer().StartedChecker()(req)
+	}); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
+	}
+
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, []os.Signal{os.Interrupt, syscall.SIGTERM}...)
 	go func() {
@@ -324,4 +335,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	return nil
+}
+
+// readyCheck returns a healthz.Checker that verifies the operator is ready
+func readyCheck(mgr manager.Manager) healthz.Checker {
+	return func(req *http.Request) error {
+		// Perform various checks here to determine if the operator is ready
+		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
+			return fmt.Errorf("informer cache not synced and thus not ready")
+		}
+		return nil
+	}
 }
