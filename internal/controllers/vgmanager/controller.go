@@ -33,7 +33,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -125,13 +124,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err != nil {
-		if k8serrors.IsNotFound(err) {
-			if err := r.Create(ctx, nodeStatus); err != nil {
-				return ctrl.Result{}, fmt.Errorf("could not create previously non-existing LVMVolumeGroupNodeStatus: %w", err)
-			}
-		} else {
-			return ctrl.Result{}, fmt.Errorf("could not determine if LVMVolumeGroupNodeStatus still needs to be created: %w", err)
-		}
+		return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus: %w", err)
 	}
 
 	return r.reconcile(ctx, volumeGroup, nodeStatus)
