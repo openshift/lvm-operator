@@ -289,12 +289,12 @@ func generateContainer(mode k8sv1.PersistentVolumeMode) k8sv1.Container {
 func generatePodConsumingPVC(pvc *k8sv1.PersistentVolumeClaim) *k8sv1.Pod {
 	return &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:                       fmt.Sprintf("%s-consumer", pvc.GetName()),
-			Namespace:                  testNamespace,
-			DeletionGracePeriodSeconds: ptr.To(int64(1)),
+			Name:      fmt.Sprintf("%s-consumer", pvc.GetName()),
+			Namespace: testNamespace,
 		},
 		Spec: k8sv1.PodSpec{
-			Containers: []k8sv1.Container{generateContainer(*pvc.Spec.VolumeMode)},
+			TerminationGracePeriodSeconds: ptr.To(int64(1)),
+			Containers:                    []k8sv1.Container{generateContainer(*pvc.Spec.VolumeMode)},
 			Volumes: []k8sv1.Volume{{
 				Name: VolumeNameForPVCTests,
 				VolumeSource: k8sv1.VolumeSource{
@@ -308,12 +308,12 @@ func generatePodConsumingPVC(pvc *k8sv1.PersistentVolumeClaim) *k8sv1.Pod {
 func generatePodWithEphemeralVolume(mode k8sv1.PersistentVolumeMode) *k8sv1.Pod {
 	return &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:                       fmt.Sprintf("%s-ephemeral", strings.ToLower(string(mode))),
-			Namespace:                  testNamespace,
-			DeletionGracePeriodSeconds: ptr.To(int64(1)),
+			Name:      fmt.Sprintf("%s-ephemeral", strings.ToLower(string(mode))),
+			Namespace: testNamespace,
 		},
 		Spec: k8sv1.PodSpec{
-			Containers: []k8sv1.Container{generateContainer(mode)},
+			TerminationGracePeriodSeconds: ptr.To(int64(1)),
+			Containers:                    []k8sv1.Container{generateContainer(mode)},
 			Volumes: []k8sv1.Volume{{
 				Name: VolumeNameForPVCTests,
 				VolumeSource: k8sv1.VolumeSource{
