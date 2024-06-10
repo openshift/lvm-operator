@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +34,10 @@ func lvmClusterTest() {
 		cluster = GetDefaultTestLVMClusterTemplate()
 	})
 	AfterEach(func(ctx SpecContext) {
+		if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
+			By("Test failed, skipping cluster cleanup")
+			return
+		}
 		DeleteResource(ctx, cluster)
 	})
 

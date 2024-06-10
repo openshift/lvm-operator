@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 
@@ -70,6 +71,10 @@ func pvcTestThinProvisioning() {
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
 		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
+				By("Test failed, skipping cluster cleanup")
+				return
+			}
 			DeleteResource(ctx, cluster)
 		})
 	})
@@ -113,6 +118,10 @@ func pvcTestThickProvisioning() {
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
 		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
+				By("Test failed, skipping cluster cleanup")
+				return
+			}
 			DeleteResource(ctx, cluster)
 		})
 	})
