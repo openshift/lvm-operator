@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -48,6 +49,7 @@ import (
 	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -68,7 +70,7 @@ import (
 
 const (
 	DefaultDiagnosticsAddr = ":8443"
-	DefaultProbeAddr       = ":8081"
+	DefaultHealthProbeAddr = ":8081"
 )
 
 var ErrConfigModified = errors.New("lvmd config file is modified")
@@ -98,7 +100,7 @@ func NewCmd(opts *Options) *cobra.Command {
 		&opts.diagnosticsAddr, "diagnosticsAddr", DefaultDiagnosticsAddr, "The address the diagnostics endpoint binds to.",
 	)
 	cmd.Flags().StringVar(
-		&opts.healthProbeAddr, "health-probe-bind-address", DefaultProbeAddr, "The address the probe endpoint binds to.",
+		&opts.healthProbeAddr, "health-probe-bind-address", DefaultHealthProbeAddr, "The address the probe endpoint binds to.",
 	)
 	return cmd
 }
@@ -152,9 +154,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	lvmdConfig := &lvmd.Config{}
 	if err := loadConfFile(ctx, lvmdConfig, lvmd.DefaultFileConfigPath); err != nil {
 		opts.SetupLog.Error(err, "lvmd config could not be loaded, starting without topolvm components and attempting bootstrap")
-		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-			return fmt.Errorf("unable to set up ready check: %w", err)
-		}
 	} else {
 		topoLVMD.Containerized(true)
 		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, lvmdConfig.DeviceClasses, lvmdConfig.LvcreateOptionClasses)
@@ -211,6 +210,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		Filters:       filter.DefaultFilters,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
+	}
+
+	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr)); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -320,4 +323,15 @@ func registrationPath() string {
 
 func pluginRegistrationSocketPath() string {
 	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.TopolvmCSIDriverName)
+}
+
+// readyCheck returns a healthz.Checker that verifies the operator is ready
+func readyCheck(mgr manager.Manager) healthz.Checker {
+	return func(req *http.Request) error {
+		// Perform various checks here to determine if the operator is ready
+		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
+			return fmt.Errorf("informer cache not synced and thus not ready")
+		}
+		return nil
+	}
 }
