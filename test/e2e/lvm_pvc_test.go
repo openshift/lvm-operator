@@ -73,6 +73,7 @@ func pvcTestThinProvisioning() {
 		DeferCleanup(func(ctx SpecContext) {
 			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 				By("Test failed, skipping cluster cleanup")
+				skipSuiteCleanup.Store(true)
 				return
 			}
 			DeleteResource(ctx, cluster)
@@ -120,6 +121,7 @@ func pvcTestThickProvisioning() {
 		DeferCleanup(func(ctx SpecContext) {
 			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 				By("Test failed, skipping cluster cleanup")
+				skipSuiteCleanup.Store(true)
 				return
 			}
 			DeleteResource(ctx, cluster)

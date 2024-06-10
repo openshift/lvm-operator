@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
-	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 
@@ -118,20 +117,11 @@ func DeleteResource(ctx context.Context, obj client.Object) {
 }
 
 func lvmNamespaceCleanup(ctx context.Context) {
-	if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
-		By("Test failed, skipping namespace cleanup")
-		return
-	}
 	DeleteResource(ctx, &k8sv1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
 }
 
 // afterTestSuiteCleanup is the function called to tear down the test environment.
 func afterTestSuiteCleanup(ctx context.Context) {
-	if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
-		By("Test failed, skipping operator and disk cleanup")
-		return
-	}
-
 	if lvmOperatorUninstall {
 		By("AfterTestSuite: uninstalling LVM Operator")
 		uninstallLVM(ctx, lvmCatalogSourceImage, lvmSubscriptionChannel)

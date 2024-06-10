@@ -36,6 +36,7 @@ func lvmClusterTest() {
 	AfterEach(func(ctx SpecContext) {
 		if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 			By("Test failed, skipping cluster cleanup")
+			skipSuiteCleanup.Store(true)
 			return
 		}
 		DeleteResource(ctx, cluster)
