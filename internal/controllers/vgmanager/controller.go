@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -617,12 +618,19 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	}
 
 	logger.Info("creating lvm thinpool")
-	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent); err != nil {
+	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config.ChunkSize)); err != nil {
 		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
 	logger.Info("successfully created thinpool")
 
 	return nil
+}
+
+func convertChunkSize(size *resource.Quantity) int64 {
+	if size == nil {
+		return lvmv1alpha1.ChunkSizeDefault.Value()
+	}
+	return size.Value()
 }
 
 func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
