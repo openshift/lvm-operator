@@ -26,6 +26,7 @@ import (
 	wipefsmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs/mocks"
 	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	corev1 "k8s.io/api/core/v1"
@@ -294,7 +295,8 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	if vg.Spec.ThinPoolConfig != nil {
 		By("mocking the creation of the thin pool in the vg", func() {
 			instances.LVM.EXPECT().ListLVs(ctx, lvmVG.Name).Return(&lvm.LVReport{Report: make([]lvm.LVReportItem, 0)}, nil).Once()
-			instances.LVM.EXPECT().CreateLV(ctx, vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent).Return(nil).Once()
+			instances.LVM.EXPECT().CreateLV(ctx, vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent,
+				calculateExpectedChunkSize(vg.Spec.ThinPoolConfig.ChunkSize)).Return(nil).Once()
 		})
 		By("mocking the report of LVs to now contain the thin pool", func() {
 			// validateLVs
@@ -725,14 +727,14 @@ func testThinPoolCreation(ctx context.Context) {
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(fmt.Errorf("mocked error"))
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize)).Once().Return(fmt.Errorf("mocked error"))
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).To(HaveOccurred(), "should create thin pool if it does not exist, but should fail if that does not work")
 
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(nil)
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize)).Once().Return(nil)
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should create thin pool if it does not exist")
 
@@ -888,4 +890,11 @@ func testReconcileFailure(ctx context.Context) {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(MatchError(expectedError))
 	})
+}
+
+func calculateExpectedChunkSize(chunkSize *resource.Quantity) int64 {
+	if chunkSize == nil {
+		return lvmv1alpha1.ChunkSizeDefault.Value()
+	}
+	return chunkSize.Value()
 }

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr/testr"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -425,18 +426,19 @@ func TestHostLVM_ListLVsByName(t *testing.T) {
 
 func TestHostLVM_CreateLV(t *testing.T) {
 	tests := []struct {
-		name        string
-		lvName      string
-		vgName      string
-		sizePercent int
-		wantErr     bool
-		execErr     bool
+		name           string
+		lvName         string
+		vgName         string
+		sizePercent    int
+		chunkSizeBytes int64
+		wantErr        bool
+		execErr        bool
 	}{
-		{"Empty Volume Group Name", "lv1", "", 10, true, false},
-		{"Empty Logical Volume Name", "", "vg1", 10, true, false},
-		{"Invalid SizePercent", "lv1", "vg1", -10, true, false},
-		{"Error on Exec", "lv1", "vg1", 10, true, true},
-		{"LV created successfully", "lv1", "vg1", 10, false, false},
+		{"Empty Volume Group Name", "lv1", "", 10, lvmv1alpha1.ChunkSizeDefault.Value(), true, false},
+		{"Empty Logical Volume Name", "", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), true, false},
+		{"Invalid SizePercent", "lv1", "vg1", -10, lvmv1alpha1.ChunkSizeDefault.Value(), true, false},
+		{"Error on Exec", "lv1", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), true, true},
+		{"LV created successfully", "lv1", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), false, false},
 	}
 
 	for _, tt := range tests {
@@ -446,11 +448,11 @@ func TestHostLVM_CreateLV(t *testing.T) {
 				if tt.execErr {
 					return fmt.Errorf("mocked error")
 				}
-				assert.ElementsMatch(t, args, []string{"-l", fmt.Sprintf("%d%%FREE", tt.sizePercent), "-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
+				assert.ElementsMatch(t, args, []string{"-l", fmt.Sprintf("%d%%FREE", tt.sizePercent), "-c", fmt.Sprintf("%vb", tt.chunkSizeBytes), "-Z", "y", "-T", fmt.Sprintf("%s/%s", tt.vgName, tt.lvName)})
 				return nil
 			}}
 
-			err := NewHostLVM(executor).CreateLV(ctx, tt.lvName, tt.vgName, tt.sizePercent)
+			err := NewHostLVM(executor).CreateLV(ctx, tt.lvName, tt.vgName, tt.sizePercent, tt.chunkSizeBytes)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
