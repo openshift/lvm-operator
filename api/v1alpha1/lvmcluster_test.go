@@ -145,19 +145,6 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrInvalidNamespace.Error()))
 	})
 
-	It("no device classes are not allowed", func(ctx SpecContext) {
-		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses = nil
-
-		err := k8sClient.Create(ctx, resource)
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(Satisfy(k8serrors.IsForbidden))
-
-		statusError := &k8serrors.StatusError{}
-		Expect(errors.As(err, &statusError)).To(BeTrue())
-		Expect(statusError.Status().Message).To(ContainSubstring(ErrAtLeastOneDeviceClassRequired.Error()))
-	})
-
 	It("device classes cannot be removed in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		resource.Spec.Storage.DeviceClasses = []DeviceClass{

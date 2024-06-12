@@ -406,6 +406,44 @@ func TestComputeReadiness(t *testing.T) {
 			expectedState: lvmv1alpha1.LVMStatusReady,
 			expectedReady: true,
 		},
+		{
+			desc: "unmanaged volume groups",
+			conditions: []metav1.Condition{
+				{
+					Type:    lvmv1alpha1.ResourcesAvailable,
+					Status:  metav1.ConditionTrue,
+					Reason:  ReasonResourcesAvailable,
+					Message: MessageResourcesAvailable,
+				},
+				{
+					Type:    lvmv1alpha1.VolumeGroupsReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  ReasonVGsUnmanaged,
+					Message: MessageVGsUnmanaged,
+				},
+			},
+			expectedState: lvmv1alpha1.LVMStatusReady,
+			expectedReady: true,
+		},
+		{
+			desc: "unmanaged volume groups, but vgmanager is not ready",
+			conditions: []metav1.Condition{
+				{
+					Type:    lvmv1alpha1.ResourcesAvailable,
+					Status:  metav1.ConditionFalse,
+					Reason:  ReasonResourcesSyncFailed,
+					Message: MessageReasonResourcesSyncFailed,
+				},
+				{
+					Type:    lvmv1alpha1.VolumeGroupsReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  ReasonVGsUnmanaged,
+					Message: MessageVGsUnmanaged,
+				},
+			},
+			expectedState: lvmv1alpha1.LVMStatusFailed,
+			expectedReady: false,
+		},
 	}
 	for _, testCase := range testTable {
 		t.Run(testCase.desc, func(t *testing.T) {

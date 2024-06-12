@@ -118,7 +118,7 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 		logger.V(2).Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
 	}
 
-	if err := verifyDaemonSetReadiness(ds); err != nil {
+	if err := VerifyDaemonSetReadiness(ds); err != nil {
 		return fmt.Errorf("DaemonSet is not considered ready: %w", err)
 	}
 

@@ -262,12 +262,19 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx)
 
-	vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
-	if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
-		return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
+	if len(instance.Spec.Storage.DeviceClasses) == 0 {
+		// technically we only need to check for the vgmanager daemonset, and we can
+		// assume that if the vgmanager is running, the VGs are ready to be processed.
+		setVolumeGroupsReadyConditionUnmanaged(instance)
+	} else {
+		vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
+		if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
+			return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
+		}
+		setVolumeGroupsReadyCondition(instance, vgNodeStatusList)
+		instance.Status.DeviceClassStatuses = computeDeviceClassStatuses(vgNodeStatusList)
 	}
-	setVolumeGroupsReadyCondition(instance, vgNodeStatusList)
-	instance.Status.DeviceClassStatuses = computeDeviceClassStatuses(vgNodeStatusList)
+
 	instance.Status.State, instance.Status.Ready = computeLVMClusterReadiness(instance.Status.Conditions)
 
 	// Apply status changes

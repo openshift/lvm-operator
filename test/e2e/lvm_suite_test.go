@@ -19,6 +19,7 @@ package e2e
 import (
 	"context"
 	"flag"
+	"sync/atomic"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	ctrlZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
+
+var skipSuiteCleanup = atomic.Bool{}
 
 func TestLvm(t *testing.T) {
 	flag.Parse()
@@ -54,6 +57,10 @@ var _ = BeforeSuite(func(ctx context.Context) {
 })
 
 var _ = AfterSuite(func(ctx context.Context) {
+	if skipSuiteCleanup.Load() {
+		Skip("Skipping cleanup of Namespace and Operator")
+	}
+
 	lvmNamespaceCleanup(ctx)
 	afterTestSuiteCleanup(ctx)
 })

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,6 +29,9 @@ const (
 
 	ReasonVGsReady  = "VGsReady"
 	MessageVGsReady = "All the VGs are ready"
+
+	ReasonVGsUnmanaged  = "VGsUnmanaged"
+	MessageVGsUnmanaged = "VGs are unmanaged and not part of the LVMCluster, but the manager is running"
 )
 
 func setInitialConditions(instance *lvmv1alpha1.LVMCluster) {
@@ -105,6 +107,15 @@ func setVolumeGroupsReadyConditionDegraded(instance *lvmv1alpha1.LVMCluster) {
 	})
 }
 
+func setVolumeGroupsReadyConditionUnmanaged(instance *lvmv1alpha1.LVMCluster) {
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+		Type:    lvmv1alpha1.VolumeGroupsReady,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonVGsUnmanaged,
+		Message: MessageVGsUnmanaged,
+	})
+}
+
 func computeVolumeGroupsReadyReason(vgNodeStatusList *lvmv1alpha1.LVMVolumeGroupNodeStatusList) string {
 	vgsCount := 0
 	readyVGsCount := 0
@@ -176,8 +187,22 @@ func translateReasonToState(reason string, currentState lvmv1alpha1.LVMStateType
 		if currentState != lvmv1alpha1.LVMStatusFailed && currentState != lvmv1alpha1.LVMStatusDegraded {
 			return lvmv1alpha1.LVMStatusProgressing
 		}
-	case ReasonResourcesAvailable, ReasonVGsReady:
-		if currentState != lvmv1alpha1.LVMStatusFailed && currentState != lvmv1alpha1.LVMStatusDegraded && currentState != lvmv1alpha1.LVMStatusProgressing {
+	case ReasonResourcesAvailable, ReasonVGsReady, ReasonVGsUnmanaged:
+		transitionToReadyAcceptable := true
+		// if at least one other state was signalling Failed, Degraded or Progressing State,
+		// we should not transition to Ready State. only if all other states are acceptable
+		// we can transition to Ready State
+		for _, unacceptableCurrentState := range []lvmv1alpha1.LVMStateType{
+			lvmv1alpha1.LVMStatusFailed,
+			lvmv1alpha1.LVMStatusDegraded,
+			lvmv1alpha1.LVMStatusProgressing,
+		} {
+			if currentState == unacceptableCurrentState {
+				transitionToReadyAcceptable = false
+				break
+			}
+		}
+		if transitionToReadyAcceptable {
 			return lvmv1alpha1.LVMStatusReady
 		}
 	default:

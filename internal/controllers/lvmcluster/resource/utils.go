@@ -45,7 +45,7 @@ func GetVolumeSnapshotClassName(deviceName string) string {
 	return constants.VolumeSnapshotClassPrefix + deviceName
 }
 
-func verifyDaemonSetReadiness(ds *appsv1.DaemonSet) error {
+func VerifyDaemonSetReadiness(ds *appsv1.DaemonSet) error {
 	// If the update strategy is not a rolling update, there will be nothing to wait for
 	if ds.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
 		return nil
