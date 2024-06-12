@@ -112,7 +112,7 @@ func setVolumeGroupsReadyConditionUnmanaged(instance *lvmv1alpha1.LVMCluster) {
 		Type:    lvmv1alpha1.VolumeGroupsReady,
 		Status:  metav1.ConditionTrue,
 		Reason:  ReasonVGsUnmanaged,
-		Message: ReasonVGsUnmanaged,
+		Message: MessageVGsUnmanaged,
 	})
 }
 
