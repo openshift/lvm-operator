@@ -215,6 +215,13 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(instances.client.Create(ctx, vg)).To(Succeed())
 	})
 
+	By("creating the LVMVolumeGroupNodeStatus", func() {
+		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+		nodeStatus.SetName(instances.node.GetName())
+		nodeStatus.SetNamespace(instances.namespace.GetName())
+		Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+	})
+
 	By("triggering the Reconciliation after the VG was created", func() {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
@@ -499,10 +506,22 @@ func testNodeSelector(ctx context.Context) {
 		"kubernetes.io/hostname": "test-node-2",
 	}}}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
-		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(matchingNode.GetName())
+	nodeStatus.SetNamespace(volumeGroup.GetNamespace())
+
+	schema := scheme.Scheme
+	schema.AddKnownTypes(lvmv1alpha1.GroupVersion)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(schema).
+		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup, nodeStatus).
 		Build()
-	r := &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	r := &Reconciler{
+		Client:    fakeClient,
+		Scheme:    schema,
+		NodeName:  matchingNode.GetName(),
+		Namespace: volumeGroup.GetNamespace(),
+	}
 	By("first verifying correct node resolution")
 	res, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
 	Expect(err).ToNot(HaveOccurred(), "should not error on valid node selector")
@@ -755,6 +774,13 @@ func testReconcileFailure(ctx context.Context) {
 	instances := setupInstances()
 	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
 	instances.LVMD = mockLVMD
+
+	By("creating the LVMVolumeGroupNodeStatus", func() {
+		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+		nodeStatus.SetName(instances.node.GetName())
+		nodeStatus.SetNamespace(instances.namespace.GetName())
+		Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+	})
 
 	vg := &lvmv1alpha1.LVMVolumeGroup{}
 	By("creating the LVMVolumeGroup with the mocked device", func() {

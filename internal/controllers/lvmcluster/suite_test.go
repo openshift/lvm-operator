@@ -50,7 +50,6 @@ import (
 var (
 	k8sClient client.Client
 	testEnv   *envtest.Environment
-	ctx       context.Context
 	cancel    context.CancelFunc
 )
 
@@ -72,6 +71,7 @@ var _ = BeforeSuite(func() {
 	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	logf.SetLogger(logger)
 
+	var ctx context.Context
 	ctx, cancel = context.WithCancel(context.Background())
 
 	By("bootstrapping test environment")

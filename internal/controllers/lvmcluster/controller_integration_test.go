@@ -130,32 +130,26 @@ var _ = Describe("LVMCluster controller", func() {
 
 			Expect(k8sClient.Create(ctx, lvmClusterIn)).Should(Succeed())
 
-			// create lvmVolumeGroupNodeStatus as it should be created by vgmanager and
-			// lvmcluster controller expecting this to be present to set the status properly
-			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
-			By("verifying NodeStatus is created")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
-			}).WithContext(ctx).Should(Succeed())
-
 			By("verifying LVMCluster .Status.Ready is true")
-			Eventually(func() bool {
+			Eventually(func(ctx context.Context) bool {
 				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
 					return false
 				}
 				return lvmClusterOut.Status.Ready
-			}).Should(BeTrue())
+			}).WithContext(ctx).Should(BeTrue(), func() string {
+				return fmt.Sprintf("LVMCluster .Status is not ready: %v", lvmClusterOut.Status)
+			})
 
 			By("verifying LVMCluster .Status.State is Ready")
-			Eventually(func() bool {
+			Eventually(func(ctx context.Context) bool {
 				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
 					return false
 				}
 				return lvmClusterOut.Status.State == lvmv1alpha1.LVMStatusReady
-			}).Should(BeTrue())
+			}).WithContext(ctx).WithTimeout(10 * time.Second).Should(BeTrue())
 
 			By("verifying LVMCluster .Status.Conditions are Ready")
-			Eventually(func() bool {
+			Eventually(func(ctx context.Context) bool {
 				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
 					return false
 				}
@@ -165,7 +159,7 @@ var _ = Describe("LVMCluster controller", func() {
 					}
 				}
 				return true
-			}).Should(BeTrue())
+			}).WithContext(ctx).Should(BeTrue())
 
 			By("confirming presence of CSIDriver")
 			Eventually(func(ctx context.Context) error {
@@ -224,12 +218,6 @@ var _ = Describe("LVMCluster controller", func() {
 			By("deleting the LVMClusterCR")
 			Expect(k8sClient.Delete(ctx, lvmClusterOut)).Should(Succeed())
 
-			// auto deletion of CSI Driver resource based on CR deletion
-			By("confirming absence of CSI Driver Resource")
-			Eventually(func(ctx context.Context) error {
-				return k8sClient.Get(ctx, csiDriverName, csiDriverOut)
-			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
-
 			// envtest does not support garbage collection, so we simulate the deletion
 			// see https://book.kubebuilder.io/reference/envtest.html?highlight=considerations#testing-considerations
 			By("confirming vg-manager has owner reference of LVMCluster")
@@ -250,6 +238,12 @@ var _ = Describe("LVMCluster controller", func() {
 			By("confirming absence of LVMVolumeGroupNodeStatus Resource")
 			Eventually(func(ctx context.Context) error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lvmVolumeGroupNodeStatusIn), lvmVolumeGroupNodeStatusIn)
+			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
+
+			// auto deletion of CSI Driver resource based on CR deletion
+			By("confirming absence of CSI Driver Resource")
+			Eventually(func(ctx context.Context) error {
+				return k8sClient.Get(ctx, csiDriverName, csiDriverOut)
 			}).WithContext(ctx).Should(Satisfy(errors.IsNotFound))
 
 			By("confirming absence of TopolvmStorageClasses")
