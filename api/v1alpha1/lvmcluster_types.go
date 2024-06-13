@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,7 +51,39 @@ type ThinPoolConfig struct {
 	// +kubebuilder:validation:Required
 	// +required
 	OverprovisionRatio int `json:"overprovisionRatio"`
+
+	// ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
+	// When set to Host, the chunk size is calculated based on the lvm2 host setting on the node.
+	// When set to Static, the chunk size is calculated based on the static size attribute provided within ChunkSize.
+	// +kubebuilder:default=Static
+	// +kubebuilder:validation:Enum=Host;Static
+	// +required
+	ChunkSizeCalculationPolicy ChunkSizeCalculationPolicy `json:"chunkSizeCalculationPolicy,omitempty"`
+
+	// ChunkSize specifies the statically calculated chunk size for the thin pool.
+	// Thus, It is only used when the ChunkSizeCalculationPolicy is set to Static.
+	// No ChunkSize with a ChunkSizeCalculationPolicy set to Static will result in a default chunk size of 128Ki.
+	// It can be between 64Ki and 1Gi due to the underlying limitations of lvm2.
+	// +optional
+	ChunkSize *resource.Quantity `json:"chunkSize,omitempty"`
 }
+
+// ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
+// for more information, see man lvm.
+type ChunkSizeCalculationPolicy string
+
+const (
+	// ChunkSizeCalculationPolicyHost calculates the chunk size based on the lvm2 host setting on the node.
+	ChunkSizeCalculationPolicyHost ChunkSizeCalculationPolicy = "Host"
+	// ChunkSizeCalculationPolicyStatic calculates the chunk size based on a static size attribute.
+	ChunkSizeCalculationPolicyStatic ChunkSizeCalculationPolicy = "Static"
+)
+
+var (
+	ChunkSizeMinimum = resource.MustParse("64Ki")
+	ChunkSizeDefault = resource.MustParse("128Ki")
+	ChunkSizeMaximum = resource.MustParse("1Gi")
+)
 
 type DeviceFilesystemType string
 

@@ -11,6 +11,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -60,6 +61,12 @@ var _ = Describe("webhook acceptance tests", func() {
 	It("minimum viable create", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
+			To(Equal(ChunkSizeCalculationPolicyStatic))
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).To(BeNil())
+
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
@@ -396,6 +403,42 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	It("updating ThinPoolConfig.ChunkSizeCalculationPolicy is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy = ChunkSizeCalculationPolicyHost
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating ThinPoolConfig.ChunkSize is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("500Ki"))
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 	It("device paths cannot be added to device class in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
@@ -501,4 +544,61 @@ var _ = Describe("webhook acceptance tests", func() {
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
+
+	It("chunk size change before create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("256Ki"))
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
+			To(Equal(ChunkSizeCalculationPolicyStatic))
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize.String()).To(Equal("256Ki"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("host chunk policy with chunk size is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy = ChunkSizeCalculationPolicyHost
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("256Ki"))
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+	})
+
+	It("thin pool chunk size <64KiB is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("32Ki"))
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+	})
+
+	It("thin pool chunk size >1Gi is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("2Gi"))
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+	})
+
+	It("host chunk policy without chunk size is ok", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy = ChunkSizeCalculationPolicyHost
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
+			To(Equal(ChunkSizeCalculationPolicyHost))
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).To(BeNil())
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 })

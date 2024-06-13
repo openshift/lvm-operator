@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/openshift/lvm-operator/internal/cluster"
@@ -113,6 +114,11 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 
+	err = v.verifyChunkSize(l)
+	if err != nil {
+		return warnings, err
+	}
+
 	return warnings, nil
 }
 
@@ -171,7 +177,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 
 		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && !errors.Is(err, ErrDeviceClassNotFound)) ||
 			(newThinPoolConfig == nil && oldThinPoolConfig != nil) {
-			return warnings, fmt.Errorf("ThinPoolConfig can not be changed")
+			return warnings, ErrThinPoolConfigCannotBeChanged
 		}
 
 		if newThinPoolConfig != nil && oldThinPoolConfig != nil {
@@ -181,6 +187,10 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 				return warnings, fmt.Errorf("ThinPoolConfig.SizePercent is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if newThinPoolConfig.OverprovisionRatio != oldThinPoolConfig.OverprovisionRatio {
 				return warnings, fmt.Errorf("ThinPoolConfig.OverprovisionRatio is invalid: %w", ErrThinPoolConfigCannotBeChanged)
+			} else if newThinPoolConfig.ChunkSizeCalculationPolicy != oldThinPoolConfig.ChunkSizeCalculationPolicy {
+				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSizeCalculationPolicy is invalid: %w", ErrThinPoolConfigCannotBeChanged)
+			} else if !reflect.DeepEqual(newThinPoolConfig.ChunkSize, oldThinPoolConfig.ChunkSize) {
+				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSize is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			}
 		}
 
@@ -215,17 +225,14 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
-		// Validate all the old paths still exist
-		err := validateDevicePathsStillExist(oldDevices, newDevices)
-		if err != nil {
+		if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
 			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
 		}
 
-		// Validate all the old optional paths still exist
-		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
-		if err != nil {
+		if err := validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
 			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
 		}
+
 	}
 
 	return warnings, nil
@@ -438,6 +445,28 @@ func (v *lvmClusterValidator) verifyFstype(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.FilesystemType != FilesystemTypeExt4 && deviceClass.FilesystemType != FilesystemTypeXFS {
 			return fmt.Errorf("fstype '%s' is not a supported filesystem type", deviceClass.FilesystemType)
+		}
+	}
+
+	return nil
+}
+
+func (v *lvmClusterValidator) verifyChunkSize(l *LVMCluster) error {
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.ThinPoolConfig == nil {
+			continue
+		}
+		if dc.ThinPoolConfig.ChunkSizeCalculationPolicy == ChunkSizeCalculationPolicyHost && dc.ThinPoolConfig.ChunkSize != nil {
+			return fmt.Errorf("chunk size can not be set when chunk size calculation policy is set to Host")
+		}
+
+		if dc.ThinPoolConfig.ChunkSize != nil {
+			if dc.ThinPoolConfig.ChunkSize.Cmp(ChunkSizeMinimum) < 0 {
+				return fmt.Errorf("chunk size must be greater than or equal to %s", ChunkSizeMinimum.String())
+			}
+			if dc.ThinPoolConfig.ChunkSize.Cmp(ChunkSizeMaximum) > 0 {
+				return fmt.Errorf("chunk size must be less than or equal to %s", ChunkSizeMaximum.String())
+			}
 		}
 	}
 

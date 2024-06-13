@@ -150,6 +150,27 @@ spec:
               thinPoolConfig:
                 description: ThinPoolConfig contains configurations for the thin-pool
                 properties:
+                  chunkSize:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      ChunkSize specifies the statically calculated chunk size for the thin pool.
+                      Thus, It is only used when the ChunkSizeCalculationPolicy is set to Static.
+                      No ChunkSize with a ChunkSizeCalculationPolicy set to Static will result in a default chunk size of 128Ki.
+                      It can be between 64Ki and 1Gi due to the underlying limitations of lvm2.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  chunkSizeCalculationPolicy:
+                    default: Static
+                    description: |-
+                      ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
+                      When set to Host, the chunk size is calculated based on the lvm2 host setting on the node.
+                      When set to Static, the chunk size is calculated based on the static size attribute provided within ChunkSize.
+                    enum:
+                    - Host
+                    - Static
+                    type: string
                   name:
                     description: Name specifies a name for the thin pool.
                     type: string
