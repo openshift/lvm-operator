@@ -34,8 +34,6 @@ type ExitError interface {
 }
 
 const (
-	DefaultChunkSize = "128"
-
 	vgsCmd        = "/usr/sbin/vgs"
 	pvsCmd        = "/usr/sbin/pvs"
 	lvsCmd        = "/usr/sbin/lvs"
@@ -102,7 +100,7 @@ type LVM interface {
 	ListLVs(ctx context.Context, vgName string) (*LVReport, error)
 
 	LVExists(ctx context.Context, lvName, vgName string) (bool, error)
-	CreateLV(ctx context.Context, lvName, vgName string, sizePercent int) error
+	CreateLV(ctx context.Context, lvName, vgName string, sizePercent int, chunkSizeBytes int64) error
 	ExtendLV(ctx context.Context, lvName, vgName string, sizePercent int) error
 	ActivateLV(ctx context.Context, lvName, vgName string) error
 	DeleteLV(ctx context.Context, lvName, vgName string) error
@@ -453,7 +451,7 @@ func (hlvm *HostLVM) DeleteLV(ctx context.Context, lvName, vgName string) error 
 }
 
 // CreateLV creates the logical volume
-func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePercent int) error {
+func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePercent int, chunkSizeBytes int64) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to create logical volume in volume group: volume group name is empty")
 	}
@@ -465,7 +463,7 @@ func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePe
 	}
 
 	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent),
-		"-c", DefaultChunkSize, "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
+		"-c", fmt.Sprintf("%vb", chunkSizeBytes), "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
 
 	if err := hlvm.RunCommandAsHost(ctx, lvCreateCmd, args...); err != nil {
 		return fmt.Errorf("failed to create logical volume %q in the volume group %q using command '%s': %w",
