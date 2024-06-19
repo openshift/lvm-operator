@@ -194,7 +194,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	setInitialConditions(instance)
+	setResourcesAvailableConditionInProgress(instance)
+	setVolumeGroupsReadyConditionInProgress(instance)
 
 	if updated := controllerutil.AddFinalizer(instance, lvmClusterFinalizer); updated {
 		if err := r.Client.Update(ctx, instance); err != nil {
@@ -272,7 +273,11 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 		if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
 			return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
 		}
-		setVolumeGroupsReadyCondition(instance, vgNodeStatusList)
+		nodes := &corev1.NodeList{}
+		if err := r.Client.List(ctx, nodes); err != nil {
+			return fmt.Errorf("failed to list Nodes: %w", err)
+		}
+		setVolumeGroupsReadyCondition(ctx, instance, nodes, vgNodeStatusList)
 		instance.Status.DeviceClassStatuses = computeDeviceClassStatuses(vgNodeStatusList)
 	}
 

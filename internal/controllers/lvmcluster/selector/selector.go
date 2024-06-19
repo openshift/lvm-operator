@@ -32,7 +32,7 @@ func ValidNodes(lvmCluster *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList) ([]c
 
 	for _, node := range nodes.Items {
 		// Check if node tolerates all taints
-		if !toleratesAllTaints(node.Spec.Taints, tolerations) {
+		if !ToleratesAllTaints(node.Spec.Taints, tolerations) {
 			continue
 		}
 
@@ -53,8 +53,8 @@ func ValidNodes(lvmCluster *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList) ([]c
 	return validNodes, nil
 }
 
-// tolerateAllTaints returns true if all taints are tolerated by the provided tolerations
-func toleratesAllTaints(taints []corev1.Taint, tolerations []corev1.Toleration) bool {
+// TolerateAllTaints returns true if all taints are tolerated by the provided tolerations
+func ToleratesAllTaints(taints []corev1.Taint, tolerations []corev1.Toleration) bool {
 	for _, taint := range taints {
 		if !corev1helper.TolerationsTolerateTaint(tolerations, &taint) {
 			return false
