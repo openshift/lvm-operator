@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	configv1 "github.com/openshift/api/config/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,8 +17,9 @@ import (
 type Type string
 
 const (
-	TypeOCP   Type = "openshift"
-	TypeOther Type = "other"
+	TypeOCP        Type = "openshift"
+	TypeOther      Type = "other"
+	TypeMicroShift Type = "microshift"
 )
 
 type TypeResolver interface {
@@ -64,8 +66,11 @@ func (r DefaultTypeResolver) GetType(ctx context.Context) (Type, error) {
 		logger.Info("Openshift Infrastructure not found, setting cluster type to other")
 		return TypeOther, nil
 	}
-
 	if meta.IsNoMatchError(err) {
+		if err := r.Get(ctx, types.NamespacedName{Name: "microshift-version", Namespace: "kube-public"}, &v1.ConfigMap{}); err == nil {
+			logger.Info("Microshift Version ConfigMap found, setting cluster type to MicroShift")
+			return TypeMicroShift, nil
+		}
 		logger.Info("Openshift Infrastructure not available in the cluster, setting cluster type to other")
 		return TypeOther, nil
 	}

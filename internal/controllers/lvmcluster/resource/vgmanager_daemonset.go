@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
@@ -205,15 +206,25 @@ var (
 )
 
 // newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command, args []string) appsv1.DaemonSet {
+func newVGManagerDaemonset(
+	lvmCluster *lvmv1alpha1.LVMCluster,
+	clusterType cluster.Type,
+	namespace, vgImage string,
+	command, args []string,
+) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
+	confMapVolume := LVMDConfMapVol
+	if clusterType == cluster.TypeMicroShift {
+		confMapVolume.VolumeSource.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
+	}
+
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{
 		RegistrationVol,
 		NodePluginVol,
 		CSIPluginVol,
 		PodVol,
-		LVMDConfMapVol,
+		confMapVolume,
 		DevHostDirVol,
 		UDevHostDirVol,
 		SysHostDirVol,
