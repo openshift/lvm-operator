@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
 )
 
 var (

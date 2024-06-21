@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	persistentvolumeclaim "github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	persistentvolumeclaim "github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume-claim"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"

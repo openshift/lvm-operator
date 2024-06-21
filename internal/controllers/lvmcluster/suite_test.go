@@ -25,9 +25,9 @@ import (
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
-	"github.com/openshift/lvm-operator/internal/cluster"
-	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
-	"github.com/openshift/lvm-operator/internal/controllers/node/removal"
+	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/node/removal"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	//+kubebuilder:scaffold:imports
 )

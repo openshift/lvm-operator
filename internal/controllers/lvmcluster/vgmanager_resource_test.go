@@ -20,13 +20,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
-	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/resource"
 	"gotest.tools/v3/assert"
 
 	"github.com/go-logr/logr/testr"
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"

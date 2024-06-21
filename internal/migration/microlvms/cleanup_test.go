@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/openshift/lvm-operator/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	appsv1 "k8s.io/api/apps/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

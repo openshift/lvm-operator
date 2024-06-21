@@ -19,7 +19,7 @@ package resource
 import (
 	"fmt"
 
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"

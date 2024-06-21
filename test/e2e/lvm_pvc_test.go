@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 )
 
 const (

@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/openshift/lvm-operator/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

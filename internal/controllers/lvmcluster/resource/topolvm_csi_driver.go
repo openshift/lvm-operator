@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	"github.com/openshift/lvm-operator/internal/controllers/labels"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

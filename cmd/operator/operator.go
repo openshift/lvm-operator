@@ -27,14 +27,14 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
-	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
-	"github.com/openshift/lvm-operator/internal/controllers/node/removal"
-	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
-	"github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
-	internalCSI "github.com/openshift/lvm-operator/internal/csi"
-	"github.com/openshift/lvm-operator/internal/migration/microlvms"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/node/removal"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume-claim"
+	internalCSI "github.com/openshift/lvm-operator/v4/internal/csi"
+	"github.com/openshift/lvm-operator/v4/internal/migration/microlvms"
 	"github.com/spf13/cobra"
 	topolvmcontrollers "github.com/topolvm/topolvm/pkg/controller"
 	"github.com/topolvm/topolvm/pkg/driver"
@@ -60,8 +60,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/cluster"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	//+kubebuilder:scaffold:imports
 )
 

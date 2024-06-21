@@ -20,16 +20,16 @@ import (
 	"context"
 
 	snapapiv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/openshift/lvm-operator/internal/controllers/labels"
-	internalselector "github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
+	internalselector "github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/selector"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 
 	secv1 "github.com/openshift/api/security/v1"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/cluster"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"

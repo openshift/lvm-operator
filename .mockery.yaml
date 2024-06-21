@@ -4,18 +4,18 @@ dir: "{{.InterfaceDir}}/mocks"
 mockname: "{{.Mock}}{{.InterfaceName}}"
 outpkg: "{{.PackageName}}"
 packages:
-  github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk:
+  github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk:
     interfaces:
       LSBLK:
-  github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm:
+  github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm:
     interfaces:
       LVM:
-  github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd:
+  github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd:
     interfaces:
       Configurator:
-  github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs:
+  github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs:
     interfaces:
       Wipefs:
-  github.com/openshift/lvm-operator/internal/controllers/vgmanager/dmsetup:
+  github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup:
     interfaces:
       Dmsetup:

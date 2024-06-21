@@ -5,7 +5,7 @@ package lvm
 import (
 	context "context"
 
-	lvm "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
+	lvm "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	mock "github.com/stretchr/testify/mock"
 )
 

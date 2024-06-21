@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	secv1 "github.com/openshift/api/security/v1"
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	"github.com/openshift/lvm-operator/internal/controllers/labels"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

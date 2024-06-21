@@ -1,4 +1,4 @@
-module github.com/openshift/lvm-operator
+module github.com/openshift/lvm-operator/v4
 
 go 1.21
 

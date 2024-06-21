@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	lvmv1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	lvmv1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 )
 
 const (

@@ -21,11 +21,11 @@ import (
 	"fmt"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	"github.com/openshift/lvm-operator/internal/controllers/labels"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 	"k8s.io/apimachinery/pkg/api/errors"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
