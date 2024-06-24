@@ -109,7 +109,7 @@ DeviceLoop:
 				filterLogger.Error(err, "filter error")
 				continue DeviceLoop
 			} else if !valid {
-				filterLogger.Info("does not match filter")
+				filterLogger.V(1).Info("does not match filter")
 				continue DeviceLoop
 			}
 		}
@@ -181,7 +181,7 @@ func (r *VGReconciler) filterMatchingDevices(blockDevices []internal.BlockDevice
 			//   - There were no required paths
 			//   - Devices were not already part of the volume group (meaning this was run after vg creation)
 			// This guarantees at least 1 device could be found between optionalPaths and paths
-			//if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
+			// if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
 			if len(filteredBlockDevices) == 0 && !devicesAlreadyInVG {
 				return nil, errors.New("at least 1 valid device is required if DeviceSelector paths or optionalPaths are specified")
 			}
