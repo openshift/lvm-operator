@@ -19,21 +19,22 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/meta"
-
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
+	"github.com/openshift/lvm-operator/api/v1alpha1"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/openshift/lvm-operator/api/v1alpha1"
 )
 
 const (
@@ -173,4 +174,128 @@ func validatePodData(ctx context.Context, pod *k8sv1.Pod, expectedData string, c
 		return err
 	}).WithContext(ctx).Should(Succeed())
 	return Expect(actualData).To(Equal(expectedData))
+}
+
+func SummaryOnFailure(ctx context.Context) {
+	if !CurrentSpecReport().Failed() {
+		GinkgoLogr.Info("skipping test namespace summary due to successful test run")
+		return
+	} else {
+		GinkgoLogr.Info("generating test namespace summary right after test failure")
+	}
+
+	// list and encode all k8s objects in the test namespace
+	listAndEncodeToWriter(
+		ctx,
+		&client.ListOptions{Namespace: installNamespace},
+		&v1alpha1.LVMClusterList{},
+		&v1alpha1.LVMVolumeGroupList{},
+		&v1alpha1.LVMVolumeGroupNodeStatusList{},
+		&k8sv1.PodList{},
+		&k8sv1.PersistentVolumeClaimList{},
+	)
+	listAndEncodeToWriter(
+		ctx,
+		&client.ListOptions{Namespace: testNamespace},
+		&v1alpha1.LVMClusterList{},
+		&v1alpha1.LVMVolumeGroupList{},
+		&v1alpha1.LVMVolumeGroupNodeStatusList{},
+		&k8sv1.PodList{},
+		&k8sv1.PersistentVolumeClaimList{},
+	)
+	listAndEncodeToWriter(ctx,
+		&client.ListOptions{},
+		&storagev1.StorageClassList{},
+		&snapapi.VolumeSnapshotList{},
+		&snapapi.VolumeSnapshotClassList{},
+		&k8sv1.PersistentVolumeList{},
+		&topolvmv1.LogicalVolumeList{},
+		&k8sv1.NodeList{},
+	)
+	listAndEncodeToWriter(ctx,
+		&client.ListOptions{FieldSelector: fields.AndSelectors(
+			fields.OneTermEqualSelector("involvedObject.kind", "PersistentVolumeClaim"),
+		), Namespace: testNamespace},
+		&k8sv1.EventList{})
+	listAndEncodeToWriter(ctx,
+		&client.ListOptions{FieldSelector: fields.AndSelectors(
+			fields.OneTermEqualSelector("involvedObject.kind", "Pod"),
+		), Namespace: testNamespace},
+		&k8sv1.EventList{})
+}
+
+var (
+	summaryEncoder = json.NewSerializerWithOptions(
+		json.DefaultMetaFactory,
+		scheme,
+		scheme,
+		json.SerializerOptions{
+			Yaml:   true,
+			Pretty: true,
+			Strict: true,
+		},
+	)
+)
+
+// listAndEncodeToWriter lists the given client.ObjectList and encodes each item to the GinkgoWriter.
+// This function is used to print the summary of the test namespace.
+// The generic yaml/json encoder is not used because it does not handle the output as kubernetes would
+// (e.g. it does not include the apiVersion and kind fields in the right formats).
+func listAndEncodeToWriter(ctx context.Context, options *client.ListOptions, typs ...client.ObjectList) {
+	for _, list := range typs {
+		if err := crClient.List(ctx, list, options); err != nil {
+			GinkgoLogr.Error(err, "Failed to list LVMClusters in test namespace")
+		}
+		objs, err := GenericGetItemsFromList(list)
+		if err != nil {
+			GinkgoLogr.Error(err, "Failed to get LVMClusters from list")
+		}
+		for _, item := range objs {
+			GinkgoWriter.Println("---")
+			if err := summaryEncoder.Encode(item, GinkgoWriter); err != nil {
+				GinkgoLogr.Error(err, "Failed to encode item in test summary")
+			}
+		}
+	}
+}
+
+// GenericGetItemsFromList returns a list of client.Object from a client.ObjectList.
+// This function uses reflection to get the Items field from the list as a slice of client.Object.
+// That's because the client.ObjectList interface does not provide a method to get the items.
+func GenericGetItemsFromList(list client.ObjectList) ([]client.Object, error) {
+	// Use reflection to get the value of the list
+	listValue := reflect.ValueOf(list)
+
+	// Ensure that the list is a pointer to a struct
+	if listValue.Kind() != reflect.Ptr || listValue.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("list should be a pointer to a struct")
+	}
+
+	// Dereference the pointer to get the struct value
+	listValue = listValue.Elem()
+
+	// Get the Items field by name
+	itemsField := listValue.FieldByName("Items")
+	if !itemsField.IsValid() {
+		return nil, fmt.Errorf("no Items field found in the list")
+	}
+
+	// Ensure that the Items field is a slice
+	if itemsField.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("Items field is not a slice")
+	}
+
+	// Convert each item in the Items slice to a client.Object
+	var result []client.Object
+	for i := 0; i < itemsField.Len(); i++ {
+		item := itemsField.Index(i).Addr().Interface() // Get the address of the item to get a pointer
+		if obj, ok := item.(client.Object); ok {
+			obj.SetManagedFields(nil)
+			result = append(result, obj)
+		} else {
+			return nil, fmt.Errorf("item does not implement client.Object")
+		}
+	}
+
+	return result, nil
 }
