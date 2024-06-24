@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	persistentvolumeclaim "github.com/openshift/lvm-operator/internal/controllers/persistent-volume-claim"
 	"github.com/stretchr/testify/assert"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -106,6 +107,10 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 						StorageClassName: ptr.To("blabla"),
 					},
 				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: "blabla"},
+					Provisioner: "random-provisioner",
+				},
 			},
 		},
 		{
@@ -118,10 +123,17 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-non-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To("my-provisioner"),
 					},
 					Status: v1.PersistentVolumeClaimStatus{
 						Phase: v1.ClaimBound,
+					},
+				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: "my-provisioner"},
+					Provisioner: constants.TopolvmCSIDriverName,
+					Parameters: map[string]string{
+						constants.DeviceClassKey: "my-device-class",
 					},
 				},
 			},
@@ -136,10 +148,17 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To("my-provisioner"),
 					},
 					Status: v1.PersistentVolumeClaimStatus{
 						Phase: v1.ClaimPending,
+					},
+				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: "my-provisioner"},
+					Provisioner: constants.TopolvmCSIDriverName,
+					Parameters: map[string]string{
+						constants.DeviceClassKey: "my-device-class",
 					},
 				},
 			},
@@ -156,10 +175,17 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{Namespace: defaultNamespace, Name: "test-pending-PVC"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						StorageClassName: ptr.To(constants.StorageClassPrefix + "bla"),
+						StorageClassName: ptr.To("my-provisioner"),
 					},
 					Status: v1.PersistentVolumeClaimStatus{
 						Phase: v1.ClaimPending,
+					},
+				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: "my-provisioner"},
+					Provisioner: constants.TopolvmCSIDriverName,
+					Parameters: map[string]string{
+						constants.DeviceClassKey: "my-device-class",
 					},
 				},
 			},
@@ -190,6 +216,13 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				&v1.Node{
 					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{persistentvolumeclaim.CapacityAnnotation + "bla": "10"}},
 				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: constants.StorageClassPrefix + "bla"},
+					Provisioner: constants.TopolvmCSIDriverName,
+					Parameters: map[string]string{
+						constants.DeviceClassKey: "bla",
+					},
+				},
 			},
 			expectNoStorageAvailable: true,
 			expectRequeue:            true,
@@ -217,6 +250,13 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				},
 				&v1.Node{
 					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{persistentvolumeclaim.CapacityAnnotation + "bla": "100"}},
+				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: constants.StorageClassPrefix + "bla"},
+					Provisioner: constants.TopolvmCSIDriverName,
+					Parameters: map[string]string{
+						constants.DeviceClassKey: "bla",
+					},
 				},
 			},
 			expectNoStorageAvailable: false,
@@ -248,6 +288,13 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 				},
 				&v1.Node{
 					ObjectMeta: metav1.ObjectMeta{Name: "idle"},
+				},
+				&storagev1.StorageClass{
+					ObjectMeta:  metav1.ObjectMeta{Name: constants.StorageClassPrefix + "bla"},
+					Provisioner: constants.TopolvmCSIDriverName,
+					Parameters: map[string]string{
+						constants.DeviceClassKey: "bla",
+					},
 				},
 			},
 			expectNoStorageAvailable: false,
