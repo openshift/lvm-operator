@@ -24,6 +24,7 @@ import (
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 
 	operatorv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -72,6 +73,7 @@ func init() {
 
 	utilruntime.Must(k8sscheme.AddToScheme(scheme))
 	utilruntime.Must(lvmv1.AddToScheme(scheme))
+	utilruntime.Must(topolvmv1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapapi.AddToScheme(scheme))

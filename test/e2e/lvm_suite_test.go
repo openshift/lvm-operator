@@ -66,6 +66,9 @@ var _ = AfterSuite(func(ctx context.Context) {
 })
 
 var _ = Describe("LVM Operator e2e tests", func() {
+	JustAfterEach(func(ctx SpecContext) {
+		SummaryOnFailure(ctx)
+	})
 	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
 	Describe("PVC", Serial, Ordered, func() {
 		Describe("Thin", Serial, Ordered, pvcTestThinProvisioning)
