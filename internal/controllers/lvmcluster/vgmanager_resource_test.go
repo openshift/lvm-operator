@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
 	"gotest.tools/v3/assert"
@@ -95,7 +96,7 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 			Spec: testCase.lvmclusterSpec,
 		}
 		r := newFakeReconciler(t, lvmcluster)
-		var unit = resource.VGManager()
+		var unit = resource.VGManager(cluster.TypeOCP)
 		err := unit.EnsureCreated(r, log.IntoContext(context.Background(), testr.New(t)), lvmcluster)
 		assert.NilError(t, err, "running EnsureCreated")
 		ds := &appsv1.DaemonSet{}

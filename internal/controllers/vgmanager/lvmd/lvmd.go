@@ -24,9 +24,11 @@ var (
 )
 
 const (
-	DefaultFileConfigDir  = "/etc/topolvm"
-	DefaultFileConfigPath = DefaultFileConfigDir + "/lvmd.yaml"
-	maxReadLength         = 2 * 1 << 20 // 2MB
+	DefaultFileConfigDir     = "/etc/topolvm"
+	MicroShiftFileConfigDir  = "/etc/microshift"
+	DefaultFileConfigPath    = DefaultFileConfigDir + "/lvmd.yaml"
+	MicroShiftFileConfigPath = MicroShiftFileConfigDir + "/lvmd.yaml"
+	maxReadLength            = 2 * 1 << 20 // 2MB
 )
 
 func DefaultConfigurator() *CachedFileConfig {

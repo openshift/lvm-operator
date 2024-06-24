@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,11 +29,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func VGManager() Manager {
-	return vgManager{}
+func VGManager(clusterType cluster.Type) Manager {
+	return vgManager{
+		clusterType: clusterType,
+	}
 }
 
-type vgManager struct{}
+type vgManager struct {
+	clusterType cluster.Type
+}
 
 var _ Manager = vgManager{}
 
@@ -50,6 +55,7 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	// get desired daemonset spec
 	dsTemplate := newVGManagerDaemonset(
 		lvmCluster,
+		v.clusterType,
 		r.GetNamespace(),
 		r.GetImageName(),
 		r.GetVGManagerCommand(),
