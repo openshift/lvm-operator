@@ -182,7 +182,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		registrationServer := internalCSI.NewRegistrationServer(
 			constants.TopolvmCSIDriverName, registrationPath(), []string{"1.0.0"})
 		registerapi.RegisterRegistrationServer(grpcServer, registrationServer)
-		if err = mgr.Add(runners.NewGRPCRunner(grpcServer, pluginRegistrationSocketPath(), false)); err != nil {
+		if err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, pluginRegistrationSocketPath(), false)); err != nil {
 			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
 		}
 
@@ -191,7 +191,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not setup topolvm node server: %w", err)
 		}
 		csi.RegisterNodeServer(grpcServer, nodeServer)
-		err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
+		err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
 		if err != nil {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
 		}

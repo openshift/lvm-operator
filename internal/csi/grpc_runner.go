@@ -2,6 +2,7 @@ package csi
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -32,11 +33,11 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	logger.Info("Starting gRPC server", "sockFile", r.sockFile)
 	err := os.Remove(r.sockFile)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove existing socket file before startup: %w", err)
 	}
 	lis, err := net.Listen("unix", r.sockFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to listen on %s: %w", r.sockFile, err)
 	}
 
 	go func() {
@@ -59,6 +60,9 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	case <-time.After(10 * time.Second):
 		r.srv.Stop()
 		logger.Info("Stopped gRPC server forcibly", "duration", time.Since(start))
+	}
+	if err := os.Remove(r.sockFile); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove socket file after shutdown: %w", err)
 	}
 	return nil
 }
