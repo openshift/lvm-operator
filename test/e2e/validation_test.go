@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	k8sv1 "k8s.io/api/core/v1"
@@ -119,11 +120,8 @@ func validateDaemonSet(ctx context.Context, name types.NamespacedName) bool {
 		if err := crClient.Get(ctx, name, ds); err != nil {
 			return err
 		}
-		isReady := ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-		if !isReady {
-			return fmt.Errorf("the DaemonSet %s is not considered ready", name)
-		}
-		return nil
+
+		return resource.VerifyDaemonSetReadiness(ds)
 	}, timeout, interval).WithContext(ctx).Should(Succeed())
 }
 
