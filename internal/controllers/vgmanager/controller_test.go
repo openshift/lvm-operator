@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -313,6 +314,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 				LvAttr:          "twi---tz--",
 				LvSize:          "1.0G",
 				MetadataPercent: "10.0",
+				ChunkSize:       strconv.FormatInt(ptr.To(resource.MustParse("128Ki")).Value(), 10),
 			}
 			createdVG = lvm.VolumeGroup{
 				Name:   vg.GetName(),
