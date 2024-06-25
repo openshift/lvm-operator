@@ -74,6 +74,7 @@ const (
 )
 
 var ErrConfigModified = errors.New("lvmd config file is modified")
+var ErrNoDeviceClassesAvailable = errors.New("no device classes in lvmd.yaml configured, can not startup correctly")
 
 type Options struct {
 	Scheme   *runtime.Scheme
@@ -212,11 +213,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
-	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr)); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr, lvmdConfig)); err != nil {
 		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err := mgr.AddHealthzCheck("healthz", func(req *http.Request) error {
+		if len(lvmdConfig.DeviceClasses) == 0 {
+			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy",
+				"available_device_classes", lvmdConfig.DeviceClasses)
+			return ErrNoDeviceClassesAvailable
+		}
+		return nil
+	}); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 
@@ -326,7 +334,7 @@ func pluginRegistrationSocketPath() string {
 }
 
 // readyCheck returns a healthz.Checker that verifies the operator is ready
-func readyCheck(mgr manager.Manager) healthz.Checker {
+func readyCheck(mgr manager.Manager, config *lvmd.Config) healthz.Checker {
 	return func(req *http.Request) error {
 		// Perform various checks here to determine if the operator is ready
 		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
