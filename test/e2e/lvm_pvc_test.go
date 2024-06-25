@@ -77,6 +77,7 @@ func pvcTestThinProvisioning() {
 				return
 			}
 			DeleteResource(ctx, cluster)
+			validateCSINodeInfo(ctx, cluster, false)
 		})
 	})
 
@@ -125,6 +126,7 @@ func pvcTestThickProvisioning() {
 				return
 			}
 			DeleteResource(ctx, cluster)
+			validateCSINodeInfo(ctx, cluster, false)
 		})
 	})
 

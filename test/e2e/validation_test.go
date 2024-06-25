@@ -27,10 +27,12 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -172,6 +174,54 @@ func validatePodData(ctx context.Context, pod *k8sv1.Pod, expectedData string, c
 		return err
 	}).WithContext(ctx).Should(Succeed())
 	return Expect(actualData).To(Equal(expectedData))
+}
+
+func validateCSINodeInfo(ctx context.Context, lvmCluster *v1alpha1.LVMCluster, shouldBePresent bool) bool {
+	GinkgoHelper()
+	By("validating the CSINode(s) for the Cluster to have the driver registered")
+	return Eventually(func(ctx context.Context) error {
+		var nodes []k8sv1.Node
+
+		nodeList := &k8sv1.NodeList{}
+		if err := crClient.List(ctx, nodeList); err != nil {
+			return fmt.Errorf("failed to list Nodes: %v", err)
+		}
+
+		cluster := lvmCluster
+		if err := crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); errors.IsNotFound(err) {
+			// LVMCluster not found to restrict search, validating all CSINodes in the Cluster
+			nodes = nodeList.Items
+		} else if err == nil {
+			if nodes, err = selector.ValidNodes(cluster, nodeList); err != nil {
+				return fmt.Errorf("failed to get valid nodes: %v", err)
+			}
+		} else {
+			return fmt.Errorf("failed to get LVMCluster %q: %v", cluster.Name, err)
+		}
+
+		for _, node := range nodes {
+			var csiNode storagev1.CSINode
+			if err := crClient.Get(ctx, client.ObjectKey{Name: node.Name}, &csiNode); err != nil {
+				return fmt.Errorf("failed to get CSINode %q: %v", node.Name, err)
+			}
+			exists := false
+			for _, d := range csiNode.Spec.Drivers {
+				if d.Name == csiDriverName {
+					exists = true
+					break
+				}
+			}
+			if exists != shouldBePresent {
+				return fmt.Errorf("CSINode %q should %scontain the driver %q",
+					node.Name,
+					map[bool]string{true: "", false: "not "}[shouldBePresent],
+					csiDriverName,
+				)
+			}
+		}
+
+		return nil
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
 }
 
 func SummaryOnFailure(ctx context.Context) {

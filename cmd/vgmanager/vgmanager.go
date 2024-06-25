@@ -213,7 +213,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
-	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr, lvmdConfig)); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr)); err != nil {
 		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
@@ -334,7 +334,7 @@ func pluginRegistrationSocketPath() string {
 }
 
 // readyCheck returns a healthz.Checker that verifies the operator is ready
-func readyCheck(mgr manager.Manager, config *lvmd.Config) healthz.Checker {
+func readyCheck(mgr manager.Manager) healthz.Checker {
 	return func(req *http.Request) error {
 		// Perform various checks here to determine if the operator is ready
 		if !mgr.GetCache().WaitForCacheSync(req.Context()) {

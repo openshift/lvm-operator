@@ -40,6 +40,7 @@ func lvmClusterTest() {
 			return
 		}
 		DeleteResource(ctx, cluster)
+		validateCSINodeInfo(ctx, cluster, false)
 	})
 
 	Describe("Filesystem Type", Serial, func() {
