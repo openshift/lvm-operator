@@ -1,11 +1,17 @@
 package lvmcluster
 
 import (
+	"context"
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1helper "k8s.io/component-helpers/scheduling/corev1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -22,10 +28,10 @@ const (
 	MessageVGReadinessInProgress = "VG readiness check is still in progress"
 
 	ReasonVGsFailed  = "VGsFailed"
-	MessageVGsFailed = "One or more vgs are failed"
+	MessageVGsFailed = "One or more VGs are failed"
 
 	ReasonVGsDegraded  = "VGsDegraded"
-	MessageVGsDegraded = "One or more vgs are degraded"
+	MessageVGsDegraded = "One or more VGs are degraded"
 
 	ReasonVGsReady  = "VGsReady"
 	MessageVGsReady = "All the VGs are ready"
@@ -33,22 +39,6 @@ const (
 	ReasonVGsUnmanaged  = "VGsUnmanaged"
 	MessageVGsUnmanaged = "VGs are unmanaged and not part of the LVMCluster, but the manager is running"
 )
-
-func setInitialConditions(instance *lvmv1alpha1.LVMCluster) {
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:    lvmv1alpha1.ResourcesAvailable,
-		Status:  metav1.ConditionFalse,
-		Reason:  ReasonReconciliationInProgress,
-		Message: MessageReconciliationInProgress,
-	})
-
-	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:    lvmv1alpha1.VolumeGroupsReady,
-		Status:  metav1.ConditionFalse,
-		Reason:  ReasonVGReadinessInProgress,
-		Message: MessageVGReadinessInProgress,
-	})
-}
 
 func setResourcesAvailableConditionTrue(instance *lvmv1alpha1.LVMCluster) {
 	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
@@ -68,16 +58,13 @@ func setResourcesAvailableConditionFalse(instance *lvmv1alpha1.LVMCluster, recon
 	})
 }
 
-func setVolumeGroupsReadyCondition(instance *lvmv1alpha1.LVMCluster, vgNodeStatusList *lvmv1alpha1.LVMVolumeGroupNodeStatusList) {
-	reason := computeVolumeGroupsReadyReason(vgNodeStatusList)
-	switch reason {
-	case ReasonVGsReady:
-		setVolumeGroupsReadyConditionTrue(instance)
-	case ReasonVGsFailed:
-		setVolumeGroupsReadyConditionFailed(instance)
-	case ReasonVGsDegraded:
-		setVolumeGroupsReadyConditionDegraded(instance)
-	}
+func setResourcesAvailableConditionInProgress(instance *lvmv1alpha1.LVMCluster) {
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+		Type:    lvmv1alpha1.ResourcesAvailable,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonReconciliationInProgress,
+		Message: MessageReconciliationInProgress,
+	})
 }
 
 func setVolumeGroupsReadyConditionTrue(instance *lvmv1alpha1.LVMCluster) {
@@ -107,6 +94,15 @@ func setVolumeGroupsReadyConditionDegraded(instance *lvmv1alpha1.LVMCluster) {
 	})
 }
 
+func setVolumeGroupsReadyConditionInProgress(instance *lvmv1alpha1.LVMCluster) {
+	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
+		Type:    lvmv1alpha1.VolumeGroupsReady,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonVGReadinessInProgress,
+		Message: MessageVGReadinessInProgress,
+	})
+}
+
 func setVolumeGroupsReadyConditionUnmanaged(instance *lvmv1alpha1.LVMCluster) {
 	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 		Type:    lvmv1alpha1.VolumeGroupsReady,
@@ -114,29 +110,6 @@ func setVolumeGroupsReadyConditionUnmanaged(instance *lvmv1alpha1.LVMCluster) {
 		Reason:  ReasonVGsUnmanaged,
 		Message: MessageVGsUnmanaged,
 	})
-}
-
-func computeVolumeGroupsReadyReason(vgNodeStatusList *lvmv1alpha1.LVMVolumeGroupNodeStatusList) string {
-	vgsCount := 0
-	readyVGsCount := 0
-	reason := ReasonVGReadinessInProgress
-	for _, nodeItem := range vgNodeStatusList.Items {
-		for _, vgStatus := range nodeItem.Spec.LVMVGStatus {
-			vgsCount++
-			switch vgStatus.Status {
-			case lvmv1alpha1.VGStatusReady:
-				readyVGsCount++
-			case lvmv1alpha1.VGStatusFailed:
-				return ReasonVGsFailed
-			case lvmv1alpha1.VGStatusDegraded:
-				reason = ReasonVGsDegraded
-			}
-		}
-	}
-	if readyVGsCount == vgsCount {
-		return ReasonVGsReady
-	}
-	return reason
 }
 
 func computeDeviceClassStatuses(vgNodeStatusList *lvmv1alpha1.LVMVolumeGroupNodeStatusList) []lvmv1alpha1.DeviceClassStatus {
@@ -209,4 +182,114 @@ func translateReasonToState(reason string, currentState lvmv1alpha1.LVMStateType
 		return lvmv1alpha1.LVMStatusUnknown
 	}
 	return currentState
+}
+
+func setVolumeGroupsReadyCondition(ctx context.Context, instance *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList, vgNodeStatusList *lvmv1alpha1.LVMVolumeGroupNodeStatusList) {
+	logger := log.FromContext(ctx)
+
+	err := validateDeviceClassSetup(instance, nodes, vgNodeStatusList)
+	if err == nil {
+		setVolumeGroupsReadyConditionTrue(instance)
+		return
+	} else {
+		logger.Error(err, "failed to validate device class setup")
+	}
+
+	degraded := false
+	for _, nodeItem := range vgNodeStatusList.Items {
+		for _, vgStatus := range nodeItem.Spec.LVMVGStatus {
+			switch vgStatus.Status {
+			case lvmv1alpha1.VGStatusFailed:
+				setVolumeGroupsReadyConditionFailed(instance)
+				return
+			case lvmv1alpha1.VGStatusDegraded:
+				degraded = true
+			}
+		}
+	}
+
+	if degraded {
+		setVolumeGroupsReadyConditionDegraded(instance)
+	}
+}
+
+func validateDeviceClassSetup(cluster *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList, nodeStatusList *lvmv1alpha1.LVMVolumeGroupNodeStatusList) error {
+	for _, deviceClass := range cluster.Spec.Storage.DeviceClasses {
+		validNodeExists := false
+		for _, node := range nodes.Items {
+			valid, err := isNodeValid(&node, cluster, &deviceClass)
+			if err != nil {
+				return err
+			}
+			if !valid {
+				continue
+			}
+
+			// If we reach this point, the node is valid, so check for the NodeStatus
+			validNodeExists = true
+			var relatedNodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus
+			for _, nodeStatus := range nodeStatusList.Items {
+				if node.Name == nodeStatus.Name {
+					relatedNodeStatus = &nodeStatus
+					break
+				}
+			}
+
+			// If no node status is found, return an error, we assume it should have been
+			// created by the LVMCluster controller
+			if relatedNodeStatus == nil {
+				return fmt.Errorf("no node status found for node %s,"+
+					"that is part of the expected nodes for device class %s",
+					node.Name, deviceClass.Name)
+			}
+
+			// Check if the VGStatus for the device class is present in the NodeStatus
+			var relatedVGStatus *lvmv1alpha1.VGStatus
+			for _, vgStatus := range relatedNodeStatus.Spec.LVMVGStatus {
+				if vgStatus.Name == deviceClass.Name {
+					relatedVGStatus = &vgStatus
+					break
+				}
+			}
+
+			// If no VGStatus is found, return an error, we assume it should have been
+			// created by the vgmanager
+			if relatedVGStatus == nil {
+				return fmt.Errorf("no VGStatus found for VG %s on node %s,"+
+					"that is part of the expected nodes for device class %s",
+					deviceClass.Name, node.Name, deviceClass.Name)
+			}
+
+			if relatedVGStatus.Status != lvmv1alpha1.VGStatusReady {
+				return fmt.Errorf("VG %s on node %s is not in ready state (%s),"+
+					"that is part of the expected nodes for device class %s",
+					deviceClass.Name, relatedVGStatus.Status, node.Name, deviceClass.Name)
+			}
+		}
+		if !validNodeExists {
+			return fmt.Errorf("no valid node found for device class %s",
+				deviceClass.Name)
+		}
+	}
+
+	return nil
+}
+
+func isNodeValid(node *corev1.Node, cluster *lvmv1alpha1.LVMCluster, deviceClass *lvmv1alpha1.DeviceClass) (bool, error) {
+	// Check if node tolerates all taints
+	if !selector.ToleratesAllTaints(node.Spec.Taints, cluster.Spec.Tolerations) {
+		return false, nil
+	}
+
+	// If no node selector is specified, the node is valid
+	// If there is one, make sure the node matches the terms
+	if deviceClass.NodeSelector != nil {
+		if matches, err := corev1helper.MatchNodeSelectorTerms(node, deviceClass.NodeSelector); err != nil {
+			return false, fmt.Errorf("error matching node selector terms: %v", err)
+		} else if !matches {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }

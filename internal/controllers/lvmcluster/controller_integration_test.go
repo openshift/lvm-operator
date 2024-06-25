@@ -130,6 +130,8 @@ var _ = Describe("LVMCluster controller", func() {
 
 			Expect(k8sClient.Create(ctx, lvmClusterIn)).Should(Succeed())
 
+			Expect(k8sClient.Create(ctx, lvmVolumeGroupNodeStatusIn)).Should(Succeed())
+
 			By("verifying LVMCluster .Status.Ready is true")
 			Eventually(func(ctx context.Context) bool {
 				if err := k8sClient.Get(ctx, lvmClusterName, lvmClusterOut); err != nil {
