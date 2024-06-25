@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
+	"github.com/topolvm/topolvm"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/tools/record"
@@ -67,12 +69,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	// Skip if StorageClassName does not contain the lvms prefix
-	lvmsPrefix, deviceClass, exists := strings.Cut(*pvc.Spec.StorageClassName, "-")
-	if !exists || fmt.Sprintf("%s-", lvmsPrefix) != constants.StorageClassPrefix {
-		logger.Info("skipping pvc as the storageClassName does not contain desired prefix",
-			"desired-prefix", constants.StorageClassPrefix)
+	var sc v1.StorageClass
+	if err = r.Client.Get(ctx, client.ObjectKey{Name: *pvc.Spec.StorageClassName}, &sc); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if sc.Provisioner != constants.TopolvmCSIDriverName {
+		logger.Info("skipping pvc as the storage class is not provisioned by topolvm")
 		return ctrl.Result{}, nil
+	}
+
+	deviceClass, deviceClassKeyPresent := sc.Parameters[constants.DeviceClassKey]
+	if !deviceClassKeyPresent {
+		deviceClass = topolvm.DefaultDeviceClassAnnotationName
 	}
 
 	// Skip if the PVC is not in Pending state.
