@@ -30,7 +30,6 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -577,6 +576,10 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 					"you should manually extend the metadata_partition or you will risk data loss: metadata_percent: %v", metadataPercentage, lv.MetadataPercent)
 			}
 
+			if err := verifyChunkSizeForPolicy(volumeGroup.Spec.ThinPoolConfig, lv); err != nil {
+				return err
+			}
+
 			logger.V(1).Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
 		}
 		if !thinPoolExists {
@@ -618,7 +621,7 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	}
 
 	logger.Info("creating lvm thinpool")
-	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config.ChunkSize)); err != nil {
+	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config)); err != nil {
 		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
 	logger.Info("successfully created thinpool")
@@ -626,11 +629,16 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	return nil
 }
 
-func convertChunkSize(size *resource.Quantity) int64 {
-	if size == nil {
+// convertChunkSize converts the chunk size from the ThinPoolConfig to the correct value for the LVM API
+// if the ChunkSizeCalculationPolicy is set to Host, it will return -1, signaling the LVM API to use the Host value.
+func convertChunkSize(config *lvmv1alpha1.ThinPoolConfig) int64 {
+	if config.ChunkSizeCalculationPolicy == lvmv1alpha1.ChunkSizeCalculationPolicyHost {
+		return -1
+	}
+	if config.ChunkSize == nil {
 		return lvmv1alpha1.ChunkSizeDefault.Value()
 	}
-	return size.Value()
+	return config.ChunkSize.Value()
 }
 
 func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
@@ -747,4 +755,21 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolume
 	}
 	r.Event(obj, corev1.EventTypeNormal, string(reason),
 		fmt.Sprintf("update on node %s: %s", client.ObjectKeyFromObject(nodeStatus), message))
+}
+
+func verifyChunkSizeForPolicy(config *lvmv1alpha1.ThinPoolConfig, lv lvm.LogicalVolume) error {
+	if config.ChunkSizeCalculationPolicy == lvmv1alpha1.ChunkSizeCalculationPolicyHost {
+		// Host policy means that the chunk size is not set by the user, but by the host and cannot be validated
+		// against the spec
+		return nil
+	}
+	if chunkSizeBytes, err := strconv.ParseInt(lv.ChunkSize, 10, 64); err == nil {
+		if chunkSizeBytes != convertChunkSize(config) {
+			return fmt.Errorf("chunk size of logical volume %s does not match the static policy: %w", lv.Name, err)
+		}
+	} else {
+		return fmt.Errorf("could not parse chunk size from logical volume %s to verify against static policy: %w", lv.Name, err)
+	}
+
+	return nil
 }

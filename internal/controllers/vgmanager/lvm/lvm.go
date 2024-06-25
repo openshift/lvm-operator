@@ -51,6 +51,18 @@ const (
 	lvmsTag = "@lvms"
 )
 
+var (
+	DefaultListLVColumns = []string{
+		"lv_name",
+		"vg_name",
+		"pool_lv",
+		"lv_attr",
+		"lv_size",
+		"metadata_percent",
+		"chunk_size",
+	}
+)
+
 // VGReport represents the output of the `vgs --reportformat json` command
 type VGReport struct {
 	Report []struct {
@@ -85,6 +97,7 @@ type LogicalVolume struct {
 	LvAttr          string `json:"lv_attr"`
 	LvSize          string `json:"lv_size"`
 	MetadataPercent string `json:"metadata_percent"`
+	ChunkSize       string `json:"chunk_size"`
 }
 
 type LVM interface {
@@ -402,7 +415,15 @@ func (hlvm *HostLVM) ListLVsByName(ctx context.Context, vgName string) ([]string
 func (hlvm *HostLVM) ListLVs(ctx context.Context, vgName string) (*LVReport, error) {
 	res := new(LVReport)
 	args := []string{
-		"-S", fmt.Sprintf("vgname=%s", vgName), "--units", "g", "--reportformat", "json",
+		"-S",
+		fmt.Sprintf("vgname=%s", vgName),
+		"--units",
+		"b",
+		"--nosuffix",
+		"--reportformat",
+		"json",
+		"-o",
+		strings.Join(DefaultListLVColumns, ","),
 	}
 	if err := hlvm.RunCommandAsHostInto(ctx, res, lvsCmd, args...); err != nil {
 		return nil, err
@@ -462,8 +483,13 @@ func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePe
 		return fmt.Errorf("failed to create logical volume in volume group: size percent should be greater than 0")
 	}
 
-	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent),
-		"-c", fmt.Sprintf("%vb", chunkSizeBytes), "-Z", "y", "-T", fmt.Sprintf("%s/%s", vgName, lvName)}
+	args := []string{"-l", fmt.Sprintf("%d%%FREE", sizePercent), "-Z", "y", "-T"}
+
+	if chunkSizeBytes > 0 {
+		args = append(args, "-c", fmt.Sprintf("%vb", chunkSizeBytes))
+	}
+
+	args = append(args, fmt.Sprintf("%s/%s", vgName, lvName))
 
 	if err := hlvm.RunCommandAsHost(ctx, lvCreateCmd, args...); err != nil {
 		return fmt.Errorf("failed to create logical volume %q in the volume group %q using command '%s': %w",
