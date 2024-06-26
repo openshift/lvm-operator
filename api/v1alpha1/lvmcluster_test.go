@@ -105,7 +105,12 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrDuplicateLVMCluster.Error()))
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-	})
+	},
+		// It can happen that the creation of the LVMCluster is not yet visible to the webhook, so we retry a few times.
+		// This is a workaround for the fact that the informer cache is not yet updated when the webhook is called.
+		// This is faster / more efficient than waiting for the informer cache to be updated with a set interval.
+		FlakeAttempts(3),
+	)
 
 	It("namespace cannot be looked up via ENV", func(ctx SpecContext) {
 		generatedName := generateUniqueNameForTestCase(ctx)

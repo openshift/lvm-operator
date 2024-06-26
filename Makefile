@@ -292,10 +292,21 @@ SUBSCRIPTION_CHANNEL ?= alpha
 # Handles only AWS as of now.
 DISK_INSTALL ?= false
 
+ifdef ARTIFACT_DIR
+SUMMARY_FILE = $(ARTIFACT_DIR)/lvms-e2e-summary.yaml
+endif
+
 .PHONY: e2e
 e2e: ginkgo ## Build and run e2e tests.
 	cd test/e2e && $(GINKGO) build
-	cd test/e2e && ./e2e.test --lvm-catalog-image=$(CATALOG_IMG) --lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) --lvm-operator-install=$(LVM_OPERATOR_INSTALL) --lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) --disk-install=$(DISK_INSTALL) -ginkgo.v
+	cd test/e2e && ./e2e.test \
+		--lvm-catalog-image=$(CATALOG_IMG) \
+		--lvm-subscription-channel=$(SUBSCRIPTION_CHANNEL) \
+		--lvm-operator-install=$(LVM_OPERATOR_INSTALL) \
+		--lvm-operator-uninstall=$(LVM_OPERATOR_UNINSTALL) \
+		--disk-install=$(DISK_INSTALL) \
+		--summary-file=$(SUMMARY_FILE) \
+		-ginkgo.v
 
 performance-stress-test: ## Build and run stress tests. Requires a fully setup LVMS installation. if you receive an error during running because of a missing token it might be because you have not logged in via token authentication but OIDC. you need a token login to run the performance test.
 	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage

@@ -205,8 +205,8 @@ var (
 	}
 )
 
-// newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(
+// templateVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
+func templateVGManagerDaemonset(
 	lvmCluster *lvmv1alpha1.LVMCluster,
 	clusterType cluster.Type,
 	namespace, vgImage string,
@@ -268,6 +268,14 @@ func newVGManagerDaemonset(
 					ContainerPort: 8081,
 					Protocol:      corev1.ProtocolTCP},
 			},
+			StartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
+						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
+				FailureThreshold:    10,
+				InitialDelaySeconds: 0,
+				TimeoutSeconds:      2,
+				PeriodSeconds:       2},
 			LivenessProbe: &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",

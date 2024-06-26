@@ -24,6 +24,8 @@ import (
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
+	topolvmv1 "github.com/topolvm/topolvm/api/v1"
+	"k8s.io/client-go/tools/clientcmd/api"
 
 	operatorv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -61,6 +63,7 @@ var (
 	crClient             crclient.Client
 	deserializer         runtime.Decoder
 	contentTester        *PodRunner
+	summaryFile          string
 )
 
 func init() {
@@ -69,9 +72,11 @@ func init() {
 	flag.BoolVar(&lvmOperatorInstall, "lvm-operator-install", true, "Install the LVM operator before starting tests")
 	flag.BoolVar(&lvmOperatorUninstall, "lvm-operator-uninstall", true, "Uninstall the LVM cluster and operator after test completion")
 	flag.BoolVar(&diskInstall, "disk-install", false, "Create and attach disks to the nodes. This currently only works with AWS")
+	flag.StringVar(&summaryFile, "summary-file", "", "The file to write the test summary to, if not provided, the summary will be written to stdout")
 
 	utilruntime.Must(k8sscheme.AddToScheme(scheme))
 	utilruntime.Must(lvmv1.AddToScheme(scheme))
+	utilruntime.Must(topolvmv1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapapi.AddToScheme(scheme))
@@ -101,9 +106,12 @@ func getKubeconfig(kubeconfig string) (*rest.Config, error) {
 	var err error
 	if kubeconfig != "" {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
+	} else if config, err = clientcmd.BuildConfigFromKubeconfigGetter("", func() (*api.Config, error) {
+		return clientcmd.NewDefaultClientConfigLoadingRules().Load()
+	}); err != nil {
 		config, err = rest.InClusterConfig()
 	}
+
 	if err != nil {
 		return nil, err
 	}
