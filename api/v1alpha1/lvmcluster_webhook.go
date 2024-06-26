@@ -24,6 +24,8 @@ import (
 	"strings"
 
 	"github.com/openshift/lvm-operator/internal/cluster"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,12 +46,14 @@ var _ webhook.CustomValidator = &lvmClusterValidator{}
 var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
 	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
+	ErrNodeSelectorNotSet                                    = errors.New("NodeSelector is not set for the DeviceClass")
 	ErrInvalidNamespace                                      = errors.New("invalid namespace was supplied")
 	ErrOnlyOneDefaultDeviceClassAllowed                      = errors.New("only one default deviceClass is allowed")
 	ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector = errors.New("either paths or optionalPaths must be specified when DeviceSelector is specified")
 	ErrEmptyPathsWithMultipleDeviceClasses                   = errors.New("path list should not be empty when there are multiple deviceClasses")
 	ErrDuplicateLVMCluster                                   = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
 	ErrThinPoolConfigCannotBeChanged                         = errors.New("ThinPoolConfig can not be changed")
+	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
 )
@@ -192,6 +196,14 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			} else if !reflect.DeepEqual(newThinPoolConfig.ChunkSize, oldThinPoolConfig.ChunkSize) {
 				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSize is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			}
+		}
+
+		newNodeSelector := deviceClass.NodeSelector
+		oldNodeSelector, err := v.getNodeSelectorOfDeviceClass(oldLVMCluster, deviceClass.Name)
+		if (newNodeSelector != nil && oldNodeSelector == nil && !errors.Is(err, ErrDeviceClassNotFound)) ||
+			(newNodeSelector == nil && oldNodeSelector != nil) ||
+			(newNodeSelector != nil && oldNodeSelector != nil && !reflect.DeepEqual(newNodeSelector, oldNodeSelector)) {
+			return warnings, ErrNodeSelectorCannotBeChanged
 		}
 
 		if deviceClass.DeviceSelector != nil {
@@ -425,6 +437,20 @@ func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassNa
 
 	err = ErrDeviceClassNotFound
 	return
+}
+
+func (v *lvmClusterValidator) getNodeSelectorOfDeviceClass(l *LVMCluster, deviceClassName string) (*corev1.NodeSelector, error) {
+
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.Name == deviceClassName {
+			if deviceClass.NodeSelector != nil {
+				return deviceClass.NodeSelector, nil
+			}
+			return nil, ErrNodeSelectorNotSet
+		}
+	}
+
+	return nil, ErrDeviceClassNotFound
 }
 
 func (v *lvmClusterValidator) getThinPoolsConfigOfDeviceClass(l *LVMCluster, deviceClassName string) (*ThinPoolConfig, error) {

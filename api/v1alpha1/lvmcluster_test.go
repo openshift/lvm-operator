@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/lvm-operator/internal/cluster"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +47,7 @@ var _ = Describe("webhook acceptance tests", func() {
 	defaultLVMClusterInUniqueNamespace := func(ctx SpecContext) *LVMCluster {
 		generatedName := generateUniqueNameForTestCase(ctx)
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, generatedName)
-		namespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
@@ -80,7 +80,7 @@ var _ = Describe("webhook acceptance tests", func() {
 	It("duplicate LVMClusters get rejected", func(ctx SpecContext) {
 		generatedName := generateUniqueNameForTestCase(ctx)
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, generatedName)
-		namespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
@@ -114,7 +114,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("namespace cannot be looked up via ENV", func(ctx SpecContext) {
 		generatedName := generateUniqueNameForTestCase(ctx)
-		inacceptableNamespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		inacceptableNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, inacceptableNamespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, inacceptableNamespace)).To(Succeed())
@@ -138,7 +138,7 @@ var _ = Describe("webhook acceptance tests", func() {
 		acceptableNamespace := "openshift-storage"
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, acceptableNamespace)
 		generatedName := generateUniqueNameForTestCase(ctx)
-		inacceptableNamespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		inacceptableNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, inacceptableNamespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, inacceptableNamespace)).To(Succeed())
@@ -350,6 +350,34 @@ var _ = Describe("webhook acceptance tests", func() {
 		updated := resource.DeepCopy()
 
 		Expect(k8sClient.Update(ctx, updated)).To(Succeed())
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating NodeSelector is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].NodeSelector = &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{
+			{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: "In",
+						Values:   []string{"some-node"},
+					},
+				},
+			},
+		}}
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrNodeSelectorCannotBeChanged.Error()))
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
