@@ -13,7 +13,9 @@ import (
 	mockExec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec/test"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -51,7 +53,7 @@ var mockLvsOutputThinPoolValid = `
       "report": [
           {
               "lv": [
-                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":""}
+                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "chunk_size": "524288"}
               ]
           }
       ]
@@ -105,9 +107,12 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 		"-S",
 		"vgname=vg1",
 		"--units",
-		"g",
+		"b",
+		"--nosuffix",
 		"--reportformat",
 		"json",
+		"-o",
+		strings.Join(lvm.DefaultListLVColumns, ","),
 	}
 
 	mockExecutorForLVSOutput := func(output string) lvmexec.Executor {
@@ -135,10 +140,25 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
 				Spec: lvmv1alpha1.LVMVolumeGroupSpec{ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
-					Name: "thin-pool-1",
+					Name:      "thin-pool-1",
+					ChunkSize: ptr.To(resource.MustParse("512Ki")),
 				}},
 			}},
 			wantErr: assert.NoError,
+		},
+		{
+			name: "Invalid LV due to Chunk Size",
+			fields: fields{
+				executor: mockExecutorForLVSOutput(mockLvsOutputRAID),
+			},
+			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+					Name:      "thin-pool-1",
+					ChunkSize: ptr.To(resource.MustParse("1Ki")),
+				}},
+			}},
+			wantErr: assert.Error,
 		},
 		{
 			name: "Invalid LV due to Type not being Thin Pool",
