@@ -23,8 +23,10 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -53,7 +55,7 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	logger := log.FromContext(ctx).WithValues("resourceManager", v.GetName())
 
 	// get desired daemonset spec
-	dsTemplate := newVGManagerDaemonset(
+	dsTemplate := templateVGManagerDaemonset(
 		lvmCluster,
 		v.clusterType,
 		r.GetNamespace(),
@@ -131,9 +133,36 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	return nil
 }
 
-// ensureDeleted is a noop. Deletion will be handled by ownerref
-func (v vgManager) EnsureDeleted(_ Reconciler, _ context.Context, _ *lvmv1alpha1.LVMCluster) error {
-	return nil
+// EnsureDeleted makes sure that the driver is removed from the cluster and the daemonset is gone.
+// Deletion will be triggered again even though we also have an owner reference
+func (v vgManager) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", v.GetName())
+
+	// delete the daemonset
+	ds := templateVGManagerDaemonset(
+		lvmCluster,
+		v.clusterType,
+		r.GetNamespace(),
+		r.GetImageName(),
+		r.GetVGManagerCommand(),
+		r.GetLogPassthroughOptions().VGManager.AsArgs(),
+	)
+
+	if err := r.Delete(ctx, &ds); errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to delete %s daemonset %q: %w", v.GetName(), ds.Name, err)
+	}
+
+	logger.Info("initiated DaemonSet deletion", "DaemonSet", ds.Name)
+
+	if err := r.Get(ctx, client.ObjectKeyFromObject(&ds), &ds); errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to verify deletion of %s daemonset %q: %w", v.GetName(), ds.Name, err)
+	} else {
+		return fmt.Errorf("%s daemonset %q still has to be removed", v.GetName(), ds.Name)
+	}
 }
 
 func initMapIfNil(m *map[string]string) {

@@ -205,8 +205,8 @@ var (
 	}
 )
 
-// newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(
+// templateVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
+func templateVGManagerDaemonset(
 	lvmCluster *lvmv1alpha1.LVMCluster,
 	clusterType cluster.Type,
 	namespace, vgImage string,

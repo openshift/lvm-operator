@@ -178,7 +178,8 @@ func validatePodData(ctx context.Context, pod *k8sv1.Pod, expectedData string, c
 
 func validateCSINodeInfo(ctx context.Context, lvmCluster *v1alpha1.LVMCluster, shouldBePresent bool) bool {
 	GinkgoHelper()
-	By("validating the CSINode(s) for the Cluster to have the driver registered")
+	By(fmt.Sprintf("validating the CSINode(s) for the Cluster to  %s have the driver registered",
+		map[bool]string{true: "", false: "NOT "}[shouldBePresent]))
 	return Eventually(func(ctx context.Context) error {
 		var nodes []k8sv1.Node
 
@@ -214,7 +215,7 @@ func validateCSINodeInfo(ctx context.Context, lvmCluster *v1alpha1.LVMCluster, s
 			if exists != shouldBePresent {
 				return fmt.Errorf("CSINode %q should %scontain the driver %q",
 					node.Name,
-					map[bool]string{true: "", false: "not "}[shouldBePresent],
+					map[bool]string{true: "", false: "NOT "}[shouldBePresent],
 					csiDriverName,
 				)
 			}
