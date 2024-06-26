@@ -19,6 +19,8 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"time"
 
@@ -178,7 +180,7 @@ func validatePodData(ctx context.Context, pod *k8sv1.Pod, expectedData string, c
 
 func validateCSINodeInfo(ctx context.Context, lvmCluster *v1alpha1.LVMCluster, shouldBePresent bool) bool {
 	GinkgoHelper()
-	By(fmt.Sprintf("validating the CSINode(s) for the Cluster to  %s have the driver registered",
+	By(fmt.Sprintf("validating the CSINode(s) for the Cluster to %shave the driver registered",
 		map[bool]string{true: "", false: "NOT "}[shouldBePresent]))
 	return Eventually(func(ctx context.Context) error {
 		var nodes []k8sv1.Node
@@ -233,26 +235,40 @@ func SummaryOnFailure(ctx context.Context) {
 		GinkgoLogr.Info("generating test namespace summary right after test failure")
 	}
 
-	// list and encode all k8s objects in the test namespace
-	listAndEncodeToWriter(
-		ctx,
-		&client.ListOptions{Namespace: installNamespace},
-		&v1alpha1.LVMClusterList{},
-		&v1alpha1.LVMVolumeGroupList{},
-		&v1alpha1.LVMVolumeGroupNodeStatusList{},
-		&k8sv1.PodList{},
-		&k8sv1.PersistentVolumeClaimList{},
-	)
-	listAndEncodeToWriter(
-		ctx,
-		&client.ListOptions{Namespace: testNamespace},
-		&v1alpha1.LVMClusterList{},
-		&v1alpha1.LVMVolumeGroupList{},
-		&v1alpha1.LVMVolumeGroupNodeStatusList{},
-		&k8sv1.PodList{},
-		&k8sv1.PersistentVolumeClaimList{},
-	)
+	var writer io.Writer
+	if summaryFile != "" {
+		GinkgoLogr.Info("writing test summary to file", "file", summaryFile)
+		file, err := os.OpenFile(summaryFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			GinkgoLogr.Error(err, "Failed to open file for test summary")
+			return
+		}
+		defer func() {
+			if err := file.Close(); err != nil {
+				GinkgoLogr.Error(err, "Failed to close file for test summary")
+			}
+		}()
+		writer = file
+	} else {
+		writer = GinkgoWriter
+	}
+
+	namespaces := []string{installNamespace, testNamespace}
+	for _, ns := range namespaces {
+		// list and encode all k8s objects in the test namespace
+		listAndEncodeToWriter(
+			ctx,
+			writer,
+			&client.ListOptions{Namespace: ns},
+			&v1alpha1.LVMClusterList{},
+			&v1alpha1.LVMVolumeGroupList{},
+			&v1alpha1.LVMVolumeGroupNodeStatusList{},
+			&k8sv1.PodList{},
+			&k8sv1.PersistentVolumeClaimList{},
+		)
+	}
 	listAndEncodeToWriter(ctx,
+		writer,
 		&client.ListOptions{},
 		&storagev1.StorageClassList{},
 		&snapapi.VolumeSnapshotList{},
@@ -260,13 +276,16 @@ func SummaryOnFailure(ctx context.Context) {
 		&k8sv1.PersistentVolumeList{},
 		&topolvmv1.LogicalVolumeList{},
 		&k8sv1.NodeList{},
+		&storagev1.CSINodeList{},
 	)
 	listAndEncodeToWriter(ctx,
+		writer,
 		&client.ListOptions{FieldSelector: fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", "PersistentVolumeClaim"),
 		), Namespace: testNamespace},
 		&k8sv1.EventList{})
 	listAndEncodeToWriter(ctx,
+		writer,
 		&client.ListOptions{FieldSelector: fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", "Pod"),
 		), Namespace: testNamespace},
@@ -290,7 +309,7 @@ var (
 // This function is used to print the summary of the test namespace.
 // The generic yaml/json encoder is not used because it does not handle the output as kubernetes would
 // (e.g. it does not include the apiVersion and kind fields in the right formats).
-func listAndEncodeToWriter(ctx context.Context, options *client.ListOptions, typs ...client.ObjectList) {
+func listAndEncodeToWriter(ctx context.Context, writer io.Writer, options *client.ListOptions, typs ...client.ObjectList) {
 	for _, list := range typs {
 		if err := crClient.List(ctx, list, options); err != nil {
 			GinkgoLogr.Error(err, "Failed to list LVMClusters in test namespace")
@@ -300,8 +319,10 @@ func listAndEncodeToWriter(ctx context.Context, options *client.ListOptions, typ
 			GinkgoLogr.Error(err, "Failed to get LVMClusters from list")
 		}
 		for _, item := range objs {
-			GinkgoWriter.Println("---")
-			if err := summaryEncoder.Encode(item, GinkgoWriter); err != nil {
+			if _, err := writer.Write([]byte("---\n")); err != nil {
+				GinkgoLogr.Error(err, "Failed to write separator in test summary")
+			}
+			if err := summaryEncoder.Encode(item, writer); err != nil {
 				GinkgoLogr.Error(err, "Failed to encode item in test summary")
 			}
 		}
