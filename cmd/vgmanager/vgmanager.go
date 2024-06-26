@@ -48,6 +48,7 @@ import (
 	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
 	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -55,8 +56,6 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,6 +74,7 @@ const (
 
 var ErrConfigModified = errors.New("lvmd config file is modified")
 var ErrNoDeviceClassesAvailable = errors.New("no device classes in lvmd.yaml configured, can not startup correctly")
+var ErrCSIPluginNotYetRegistered = errors.New("CSI plugin not yet registered")
 
 type Options struct {
 	Scheme   *runtime.Scheme
@@ -152,6 +152,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
+	registrationServer := internalCSI.NewRegistrationServer(
+		cancelWithCause,
+		constants.TopolvmCSIDriverName,
+		registrationPath(),
+		[]string{"1.0.0"},
+	)
 	lvmdConfig := &lvmd.Config{}
 	if err := loadConfFile(ctx, lvmdConfig, lvmd.DefaultFileConfigPath); err != nil {
 		opts.SetupLog.Error(err, "lvmd config could not be loaded, starting without topolvm components and attempting bootstrap")
@@ -170,30 +176,26 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		if err := os.MkdirAll(topolvm.DeviceDirectory, 0755); err != nil {
 			return err
 		}
-		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
-			grpc.SharedWriteBuffer(true),
-			grpc.MaxConcurrentStreams(2),
-			grpc.NumStreamWorkers(2))
+		csiGrpcServer := newGRPCServer()
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
 		})
-		csi.RegisterIdentityServer(grpcServer, identityServer)
-
-		registrationServer := internalCSI.NewRegistrationServer(
-			constants.TopolvmCSIDriverName, registrationPath(), []string{"1.0.0"})
-		registerapi.RegisterRegistrationServer(grpcServer, registrationServer)
-		if err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, pluginRegistrationSocketPath(), false)); err != nil {
-			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
-		}
+		csi.RegisterIdentityServer(csiGrpcServer, identityServer)
 
 		nodeServer, err := driver.NewNodeServer(nodeName, vgclnt, lvclnt, mgr) // adjusted signature
 		if err != nil {
 			return fmt.Errorf("could not setup topolvm node server: %w", err)
 		}
-		csi.RegisterNodeServer(grpcServer, nodeServer)
-		err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
+		csi.RegisterNodeServer(csiGrpcServer, nodeServer)
+		err = mgr.Add(internalCSI.NewGRPCRunner(csiGrpcServer, constants.DefaultCSISocket, false))
 		if err != nil {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
+		}
+
+		registrationGrpcServer := newGRPCServer()
+		registerapi.RegisterRegistrationServer(registrationGrpcServer, registrationServer)
+		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, pluginRegistrationSocketPath(), false)); err != nil {
+			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
 		}
 	}
 
@@ -223,6 +225,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				"available_device_classes", lvmdConfig.DeviceClasses)
 			return ErrNoDeviceClassesAvailable
 		}
+		if !registrationServer.Registered() {
+			log.FromContext(req.Context()).Error(ErrCSIPluginNotYetRegistered, "not healthy")
+			return ErrCSIPluginNotYetRegistered
+		}
 		return nil
 	}); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
@@ -244,6 +250,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if errors.Is(context.Cause(ctx), ErrConfigModified) {
 		opts.SetupLog.Info("restarting controller due to modified configuration")
+		return run(cmd, nil, opts)
+	} else if errors.Is(context.Cause(ctx), internalCSI.ErrPluginRegistrationFailed) {
+		opts.SetupLog.Error(context.Cause(ctx), "restarting due to failed plugin registration")
 		return run(cmd, nil, opts)
 	} else if err := ctx.Err(); err != nil {
 		opts.SetupLog.Error(err, "exiting abnormally")
@@ -342,4 +351,11 @@ func readyCheck(mgr manager.Manager) healthz.Checker {
 		}
 		return nil
 	}
+}
+
+func newGRPCServer() *grpc.Server {
+	return grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
+		grpc.SharedWriteBuffer(true),
+		grpc.MaxConcurrentStreams(2),
+		grpc.NumStreamWorkers(2))
 }
