@@ -221,8 +221,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if err := mgr.AddHealthzCheck("healthz", func(req *http.Request) error {
 		if len(lvmdConfig.DeviceClasses) == 0 {
-			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy",
-				"available_device_classes", lvmdConfig.DeviceClasses)
+			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy")
 			return ErrNoDeviceClassesAvailable
 		}
 		if !registrationServer.Registered() {
@@ -353,9 +352,17 @@ func readyCheck(mgr manager.Manager) healthz.Checker {
 	}
 }
 
+// newGRPCServer returns a new grpc.Server with the following settings:
+// UnaryInterceptor: ErrorLoggingInterceptor, to log errors on grpc calls
+// SharedWriteBuffer: true, to share write buffer between all connections, saving memory
+// 2 streams for one core each (vgmanager is optimized for 1 hyperthreaded core)
+// 2 workers for one core each (vgmanager is optimized for 1 hyperthreaded core)
+// We technically could use 1 worker / 1 stream, but that would make the goroutine
+// switch threads more often, which is less efficient.
 func newGRPCServer() *grpc.Server {
 	return grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
 		grpc.SharedWriteBuffer(true),
 		grpc.MaxConcurrentStreams(2),
-		grpc.NumStreamWorkers(2))
+		grpc.NumStreamWorkers(2),
+	)
 }
