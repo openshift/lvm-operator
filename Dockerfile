@@ -23,7 +23,7 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.3
+FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.4-1134
 
 # We use CentOS Stream 9 as our source for e2fsprogs here so that we can offer a fully open source version for development here.
 # This allows users without Red Hat Subscriptions (e.g. on a Fedora Workstation) to build and test LVMS.
