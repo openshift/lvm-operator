@@ -149,6 +149,7 @@ vet: ## Run go vet against code.
 
 godeps-update: ## Run go mod tidy and go mod vendor.
 	go mod tidy && go mod vendor
+	patch -p1 -d $(SELF_DIR)vendor/github.com/kubernetes-csi/external-provisioner < $(SELF_DIR)hack/external-provisioner.patch
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh

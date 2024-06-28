@@ -1,6 +1,6 @@
 module github.com/openshift/lvm-operator
 
-go 1.22.0
+go 1.22.3
 
 require (
 	github.com/aws/aws-sdk-go v1.54.0
@@ -9,11 +9,11 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.6.0
-	github.com/kubernetes-csi/csi-lib-utils v0.17.0
-	github.com/kubernetes-csi/external-provisioner v1.6.1-0.20231109010946-e7c0bcc89c20
-	github.com/kubernetes-csi/external-resizer v1.10.0
-	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
-	github.com/kubernetes-csi/external-snapshotter/v6 v6.3.4
+	github.com/kubernetes-csi/csi-lib-utils v0.18.1
+	github.com/kubernetes-csi/external-provisioner v1.6.1-0.20240604075659-e45cf2700084
+	github.com/kubernetes-csi/external-resizer v1.11.1
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0
+	github.com/kubernetes-csi/external-snapshotter/v8 v8.0.1
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240611134040-5c2b46e4709a
@@ -33,16 +33,21 @@ require (
 	k8s.io/apiextensions-apiserver v0.30.2
 	k8s.io/apimachinery v0.30.2
 	k8s.io/apiserver v0.30.2
-	k8s.io/client-go v0.30.2
+	k8s.io/client-go v1.5.2
 	k8s.io/component-helpers v0.30.2
 	k8s.io/csi-translation-lib v0.30.2
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kubelet v0.30.2
 	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
 	sigs.k8s.io/controller-runtime v0.18.4
-	sigs.k8s.io/sig-storage-lib-external-provisioner/v9 v9.1.0-rc.0.0.20231129150350-3b3bde60df73
+	sigs.k8s.io/sig-storage-lib-external-provisioner/v10 v10.0.0
 	sigs.k8s.io/yaml v1.4.0
 )
+
+// necessary due to https://github.com/kubernetes-csi/external-provisioner/blob/master/go.mod#L23
+// This is a redacted version in the go.mod file with a replace in their go.mod that is not respected by us
+// if we do not do our own version of replace
+replace k8s.io/client-go v1.5.2 => k8s.io/client-go v0.30.2
 
 replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240628112221-aae75a859ac5
 
@@ -53,7 +58,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/emicklei/go-restful/v3 v3.12.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -77,6 +82,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/miekg/dns v1.1.59 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
@@ -89,18 +95,18 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.53.0 // indirect
-	github.com/prometheus/procfs v0.15.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.51.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
-	go.opentelemetry.io/otel v1.26.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.26.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.26.0 // indirect
-	go.opentelemetry.io/otel/metric v1.26.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.26.0 // indirect
-	go.opentelemetry.io/otel/trace v1.26.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.52.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.52.0 // indirect
+	go.opentelemetry.io/otel v1.27.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.27.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0 // indirect
+	go.opentelemetry.io/otel/metric v1.27.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.27.0 // indirect
+	go.opentelemetry.io/otel/trace v1.27.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.2.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 // indirect
@@ -114,8 +120,8 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240513163218-0867130af1f8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240513163218-0867130af1f8 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

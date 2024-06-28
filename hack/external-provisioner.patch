@@ -1,0 +1,18 @@
+Index: pkg/controller/controller.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pkg/controller/controller.go b/pkg/controller/controller.go
+--- a/pkg/controller/controller.go	(revision HEAD)
++++ b/pkg/controller/controller.go	(revision Staged)
+@@ -57,8 +57,8 @@
+ 	"github.com/kubernetes-csi/csi-lib-utils/connection"
+ 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
+ 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
+-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+-	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned"
++	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
++	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
+ 	referenceGrantv1beta1 "sigs.k8s.io/gateway-api/pkg/client/listers/apis/v1beta1"
+ )
