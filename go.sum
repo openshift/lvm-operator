@@ -107,8 +107,8 @@ github.com/kubernetes-csi/csi-lib-utils v0.17.0 h1:xEpJ3WYgMyyYF6fvcKHh4cDRtknuT
 github.com/kubernetes-csi/csi-lib-utils v0.17.0/go.mod h1:2Ba5/aQgUjbpqyC2uCcFwMF3rnPVs5jhZXm8jAzcT9Q=
 github.com/kubernetes-csi/csi-test/v4 v4.4.0 h1:r0mnAwDURI24Vw3a/LyA/ga11yD5ZGuU7+REO35Na9s=
 github.com/kubernetes-csi/csi-test/v4 v4.4.0/go.mod h1:t1RzseMZJKy313nezI/d7TolbbiKpUZM3SXQvXxOX0w=
-github.com/kubernetes-csi/csi-test/v5 v5.0.0 h1:GJ0M+ppcKgWhafXH3B2Ssfw1Egzly9GlMx3JOQApekM=
-github.com/kubernetes-csi/csi-test/v5 v5.0.0/go.mod h1:jVEIqf8Nv1roo/4zhl/r6Tc68MAgRX/OQSQK0azTHyo=
+github.com/kubernetes-csi/csi-test/v5 v5.2.0 h1:Z+sdARWC6VrONrxB24clCLCmnqCnZF7dzXtzx8eM35o=
+github.com/kubernetes-csi/csi-test/v5 v5.2.0/go.mod h1:o/c5w+NU3RUNE+DbVRhEUTmkQVBGk+tFOB2yPXT8teo=
 github.com/kubernetes-csi/external-provisioner v1.6.1-0.20231109010946-e7c0bcc89c20 h1:ZEASkJH9zU6MRcDEkahTuGhbN9eETrwmqrPzPqXOr+I=
 github.com/kubernetes-csi/external-provisioner v1.6.1-0.20231109010946-e7c0bcc89c20/go.mod h1:P44Onaq580ZzbkGDgnxIjvm5/P8dYPunqca7199+5WQ=
 github.com/kubernetes-csi/external-resizer v1.10.0 h1:m/9UaG8kcme6Xt/rGfCpkjwxUsHIc8R4h6CWtxK+Z6o=
@@ -150,8 +150,8 @@ github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87 h1:JtLhaGpSEco
 github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87/go.mod h1:3IPD4U0qyovZS4EFady2kqY32m8lGcbs/Wx+yprg9z8=
 github.com/openshift/library-go v0.0.0-20240607134135-aed018c215a1 h1:jLERUXwvYY9+9oCz66oQ/XTZzeyH8RmCpxiImYVYnmA=
 github.com/openshift/library-go v0.0.0-20240607134135-aed018c215a1/go.mod h1:PdASVamWinll2BPxiUpXajTwZxV8A1pQbWEsCN1od7I=
-github.com/openshift/topolvm v0.15.3-0.20240417074211-92e1e0e34402 h1:uDiTFjv2qNyUabXnGY42Xs0KCBZ7QpVosiJkirimkhw=
-github.com/openshift/topolvm v0.15.3-0.20240417074211-92e1e0e34402/go.mod h1:u0vVch0v8O6WVJaE2q1jNdrlD4taYgagy64t2MjPzyk=
+github.com/openshift/topolvm v0.15.3-0.20240628112221-aae75a859ac5 h1:9fqt2XyudZ1jruKVpcQ1TuDnijxN4hluwrrQbDXl/ws=
+github.com/openshift/topolvm v0.15.3-0.20240628112221-aae75a859ac5/go.mod h1:D219qBx88Bp0WCny5d0afrCeq7hNZYuAEeKqRhu1lGk=
 github.com/operator-framework/api v0.25.0 h1:pSQwFSoPmZaTIERadawxtCwicehLkC7i9n3w3+70SVI=
 github.com/operator-framework/api v0.25.0/go.mod h1:PvyCQb0x53ytIqdTECH5e+iqv+am3uZ0qGsZWmL35gQ=
 github.com/pelletier/go-toml/v2 v2.2.2 h1:aYUidT7k73Pcl9nb2gScu7NSrKCSHIDE89b3+6Wq+LM=
