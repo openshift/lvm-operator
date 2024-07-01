@@ -25,7 +25,7 @@ var (
 
 const (
 	DefaultFileConfigDir     = "/etc/topolvm"
-	MicroShiftFileConfigDir  = "/etc/microshift"
+	MicroShiftFileConfigDir  = "/var/lib/microshift/lvms"
 	DefaultFileConfigPath    = DefaultFileConfigDir + "/lvmd.yaml"
 	MicroShiftFileConfigPath = MicroShiftFileConfigDir + "/lvmd.yaml"
 	maxReadLength            = 2 * 1 << 20 // 2MB
