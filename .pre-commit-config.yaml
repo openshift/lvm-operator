@@ -1,3 +1,4 @@
+exclude: ^vendor/
 repos:
   - repo: local
     hooks:
@@ -15,9 +16,7 @@ repos:
       - id: fix-byte-order-marker
       - id: check-case-conflict
       - id: check-executables-have-shebangs
-        exclude: ^vendor
       - id: check-shebang-scripts-are-executable
-        exclude: ^vendor
       - id: check-merge-conflict
       - id: mixed-line-ending
       - id: check-yaml
@@ -25,12 +24,9 @@ repos:
         exclude: ^test/e2e/testdata|^vendor
       - id: check-json
       - id: detect-private-key
-        exclude: ^vendor
       - id: end-of-file-fixer
-        exclude: ^vendor
       - id: no-commit-to-branch
       - id: trailing-whitespace
-        exclude: ^vendor
 
   - repo: https://github.com/openstack/bashate.git
     rev: 2.1.1
@@ -47,10 +43,9 @@ repos:
         # E011: Then keyword is not on same line as if or elif keyword
         # E012: here doc didn't end before EOF
         entry: bashate --error . --ignore=E006,E040,E020,E012,E011
-        exclude: ^vendor/
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.56.0
+    rev: v1.59.1
     hooks:
       - id: golangci-lint
         entry: golangci-lint run --fix
@@ -73,7 +68,6 @@ repos:
           "-S",
           "test/e2e/testdata/*,go.sum,go.mod",
         ]
-        exclude: ^vendor/
         pass_filenames: true
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
     rev: v9.5.0

@@ -19,7 +19,7 @@ package lvmcluster
 import (
 	"context"
 
-	snapapiv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	snapapiv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/openshift/lvm-operator/internal/controllers/labels"
 	internalselector "github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
 	v1 "k8s.io/api/core/v1"

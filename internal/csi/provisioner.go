@@ -16,7 +16,7 @@ import (
 	provisionctrl "github.com/kubernetes-csi/external-provisioner/pkg/controller"
 	"github.com/kubernetes-csi/external-provisioner/pkg/features"
 	"github.com/kubernetes-csi/external-provisioner/pkg/owner"
-	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned"
+	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	"github.com/prometheus/client_golang/prometheus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller"
-	libmetrics "sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller/metrics"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller"
+	libmetrics "sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller/metrics"
 )
 
 const (
@@ -57,13 +57,14 @@ func (p *Provisioner) NeedLeaderElection() bool {
 }
 
 func init() {
+	metrics := libmetrics.New("csi-provisioner")
 	ctrlRuntimeMetrics.Registry.MustRegister([]prometheus.Collector{
-		libmetrics.PersistentVolumeClaimProvisionTotal,
-		libmetrics.PersistentVolumeClaimProvisionFailedTotal,
-		libmetrics.PersistentVolumeClaimProvisionDurationSeconds,
-		libmetrics.PersistentVolumeDeleteTotal,
-		libmetrics.PersistentVolumeDeleteFailedTotal,
-		libmetrics.PersistentVolumeDeleteDurationSeconds,
+		metrics.PersistentVolumeClaimProvisionTotal,
+		metrics.PersistentVolumeClaimProvisionFailedTotal,
+		metrics.PersistentVolumeClaimProvisionDurationSeconds,
+		metrics.PersistentVolumeDeleteTotal,
+		metrics.PersistentVolumeDeleteFailedTotal,
+		metrics.PersistentVolumeDeleteDurationSeconds,
 	}...)
 }
 
@@ -81,11 +82,12 @@ func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisione
 func (p *Provisioner) Start(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
-	onLostConnection := func() bool {
-		logger.Info("lost connection to csi driver, attempting to reconnect due to in tree provisioning...")
+	onLostConnection := func(ctx context.Context) bool {
+		log.FromContext(ctx).Info("lost connection to csi driver, attempting to reconnect due to in tree provisioning...")
 		return true
 	}
-	grpcClient, err := connection.Connect(p.options.CSIEndpoint, nil,
+	grpcClient, err := connection.Connect(ctx, p.options.CSIEndpoint, nil,
+		nil,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
 	defer grpcClient.Close() //nolint:errcheck,staticcheck
@@ -229,6 +231,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	claimInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
 
 	provisionController := controller.NewProvisionController(
+		logger,
 		clientset,
 		p.options.DriverName,
 		provisioner,
@@ -264,7 +267,6 @@ func (p *Provisioner) Start(ctx context.Context) error {
 
 	var wg sync.WaitGroup
 	wg.Add(4)
-
 	go func() {
 		defer wg.Done()
 		topologyInformer.RunWorker(ctx)

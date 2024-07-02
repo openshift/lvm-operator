@@ -160,10 +160,6 @@ func (s controllerServerNoLocked) CreateVolume(ctx context.Context, req *csi.Cre
 		capabilities,
 	)
 
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to calculate minimum/maximum allocation bytes: %v", err)
-	}
-
 	// check required volume capabilities
 	for _, capability := range capabilities {
 		if block := capability.GetBlock(); block != nil {
@@ -628,11 +624,12 @@ func (s controllerServerNoLocked) ControllerGetCapabilities(context.Context, *cs
 
 func (s controllerServerNoLocked) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	volumeID := req.GetVolumeId()
-	ctrlLogger.Info("ControllerExpandVolume called",
-		"volumeID", volumeID,
+	logger := ctrlLogger.WithValues("volumeID", volumeID,
 		"required", req.GetCapacityRange().GetRequiredBytes(),
 		"limit", req.GetCapacityRange().GetLimitBytes(),
 		"num_secrets", len(req.GetSecrets()))
+
+	logger.Info("ControllerExpandVolume called")
 
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "volume id is nil")
@@ -661,6 +658,7 @@ func (s controllerServerNoLocked) ControllerExpandVolume(ctx context.Context, re
 	}
 
 	if requestCapacityBytes <= currentSize.Value() {
+		logger.Info("ControllerExpandVolume is waiting for node expansion to complete")
 		// "NodeExpansionRequired" is still true because it is unknown
 		// whether node expansion is completed or not.
 		return &csi.ControllerExpandVolumeResponse{
@@ -677,6 +675,7 @@ func (s controllerServerNoLocked) ControllerExpandVolume(ctx context.Context, re
 		return nil, status.Error(codes.Internal, "not enough space")
 	}
 
+	logger.Info("ControllerExpandVolume triggering lvService.ExpandVolume")
 	err = s.lvService.ExpandVolume(ctx, volumeID, requestCapacityBytes)
 	if err != nil {
 		_, ok := status.FromError(err)
@@ -685,6 +684,9 @@ func (s controllerServerNoLocked) ControllerExpandVolume(ctx context.Context, re
 		}
 		return nil, err
 	}
+
+	logger.Info("ControllerExpandVolume has succeeded")
+
 	return &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         requestCapacityBytes,
 		NodeExpansionRequired: true,
