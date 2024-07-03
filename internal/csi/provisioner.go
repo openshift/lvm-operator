@@ -17,8 +17,6 @@ import (
 	"github.com/kubernetes-csi/external-provisioner/pkg/features"
 	"github.com/kubernetes-csi/external-provisioner/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
-	"github.com/prometheus/client_golang/prometheus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,9 +29,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	ctrlRuntimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller"
-	libmetrics "sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller/metrics"
 )
 
 const (
@@ -44,6 +40,7 @@ type ProvisionerOptions struct {
 	DriverName          string
 	CSIEndpoint         string
 	CSIOperationTimeout time.Duration
+	Metrics             *connection.ExtendedCSIMetricsManager
 }
 
 type Provisioner struct {
@@ -54,18 +51,6 @@ type Provisioner struct {
 
 func (p *Provisioner) NeedLeaderElection() bool {
 	return true
-}
-
-func init() {
-	metrics := libmetrics.New("csi_provisioner")
-	ctrlRuntimeMetrics.Registry.MustRegister([]prometheus.Collector{
-		metrics.PersistentVolumeClaimProvisionTotal,
-		metrics.PersistentVolumeClaimProvisionFailedTotal,
-		metrics.PersistentVolumeClaimProvisionDurationSeconds,
-		metrics.PersistentVolumeDeleteTotal,
-		metrics.PersistentVolumeDeleteFailedTotal,
-		metrics.PersistentVolumeDeleteDurationSeconds,
-	}...)
 }
 
 var _ manager.Runnable = &Provisioner{}
@@ -86,8 +71,9 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		log.FromContext(ctx).Info("lost connection to csi driver, attempting to reconnect due to in tree provisioning...")
 		return true
 	}
-	grpcClient, err := connection.Connect(ctx, p.options.CSIEndpoint, nil,
-		nil,
+
+	grpcClient, err := connection.Connect(ctx, p.options.CSIEndpoint,
+		p.options.Metrics,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
 	defer grpcClient.Close() //nolint:errcheck,staticcheck

@@ -5,12 +5,16 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/kubernetes-csi/csi-lib-utils/connection"
+	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/cmd/operator"
 	"github.com/openshift/lvm-operator/cmd/vgmanager"
+	"github.com/openshift/lvm-operator/internal/controllers/constants"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlRuntimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 func main() {
@@ -69,6 +74,7 @@ func NewCmd(setupLog logr.Logger) *cobra.Command {
 		operator.NewCmd(&operator.Options{
 			Scheme:   scheme,
 			SetupLog: setupLog,
+			Metrics:  InitializeMetricsManager(),
 		}),
 		vgmanager.NewCmd(&vgmanager.Options{
 			Scheme:   scheme,
@@ -77,4 +83,22 @@ func NewCmd(setupLog logr.Logger) *cobra.Command {
 	)
 
 	return cmd
+}
+
+// InitializeMetricsManager initializes the metrics manager for the operator
+// and overwrites the controller runtime metrics registry with the metrics manager's registry of CSI libs
+// This is needed to expose the metrics of the CSI libs to the operator's metrics endpoint.
+func InitializeMetricsManager() *connection.ExtendedCSIMetricsManager {
+	metricsManager := &connection.ExtendedCSIMetricsManager{
+		CSIMetricsManager: metrics.NewCSIMetricsManagerForPlugin(constants.TopolvmCSIDriverName),
+	}
+	type managerCustom struct {
+		prometheus.Gatherer
+		prometheus.Registerer
+	}
+	ctrlRuntimeMetrics.Registry = managerCustom{
+		metricsManager.GetRegistry(),
+		metricsManager.GetRegistry().Registerer(),
+	}
+	return metricsManager
 }

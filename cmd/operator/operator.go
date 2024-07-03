@@ -27,6 +27,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
@@ -84,6 +85,7 @@ type Options struct {
 	LogPassthroughOptions *logpassthrough.Options
 
 	vgManagerCommand []string
+	Metrics          *connection.ExtendedCSIMetricsManager
 }
 
 // NewCmd creates a new CLI command
@@ -285,6 +287,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		DriverName:          constants.TopolvmCSIDriverName,
 		CSIEndpoint:         constants.DefaultCSISocket,
 		CSIOperationTimeout: 10 * time.Second,
+		Metrics:             opts.Metrics,
 	})); err != nil {
 		return fmt.Errorf("unable to create CSI Provisioner: %w", err)
 	}
