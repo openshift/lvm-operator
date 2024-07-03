@@ -57,7 +57,7 @@ func (p *Provisioner) NeedLeaderElection() bool {
 }
 
 func init() {
-	metrics := libmetrics.New("csi-provisioner")
+	metrics := libmetrics.New("csi_provisioner")
 	ctrlRuntimeMetrics.Registry.MustRegister([]prometheus.Collector{
 		metrics.PersistentVolumeClaimProvisionTotal,
 		metrics.PersistentVolumeClaimProvisionFailedTotal,
