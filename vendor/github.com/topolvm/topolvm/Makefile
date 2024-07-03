@@ -253,7 +253,7 @@ install-kind: | $(BINDIR)
 .PHONY: install-container-structure-test
 install-container-structure-test: | $(BINDIR)
 	$(CURL) -o $(CONTAINER_STRUCTURE_TEST) \
-		https://storage.googleapis.com/container-structure-test/v$(CONTAINER_STRUCTURE_TEST_VERSION)/container-structure-test-linux-amd64 \
+		https://github.com/GoogleContainerTools/container-structure-test/releases/download/v$(CONTAINER_STRUCTURE_TEST_VERSION)/container-structure-test-linux-amd64 \
     && chmod +x $(CONTAINER_STRUCTURE_TEST)
 
 .PHONY: install-helm
@@ -269,7 +269,7 @@ install-helm-docs: | $(BINDIR)
 tools: install-kind install-container-structure-test install-helm install-helm-docs | $(BINDIR) ## Install development tools.
 	GOBIN=$(BINDIR) go install honnef.co/go/tools/cmd/staticcheck@latest
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell dirname $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION)
-	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
+	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH)
 	GOBIN=$(BINDIR) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION)
 
 	$(CURL) -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-linux-x86_64.zip

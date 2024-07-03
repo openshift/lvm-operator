@@ -50,15 +50,15 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/v9/controller"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/v9/util"
+	klog "k8s.io/klog/v2"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/util"
 
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	referenceGrantv1beta1 "sigs.k8s.io/gateway-api/pkg/client/listers/apis/v1beta1"
 )
 
@@ -217,8 +217,9 @@ type ProvisionerCSITranslator interface {
 
 // requiredCapabilities provides a set of extra capabilities required for special/optional features provided by a plugin
 type requiredCapabilities struct {
-	snapshot bool
-	clone    bool
+	snapshot     bool
+	clone        bool
+	modifyVolume bool
 }
 
 // NodeDeployment contains additional parameters for running external-provisioner alongside a
@@ -287,12 +288,12 @@ var (
 // identify string will be added in PV annotations under this key.
 var provisionerIDKey = "storage.kubernetes.io/csiProvisionerIdentity"
 
-func Connect(address string, metricsManager metrics.CSIMetricsManager) (*grpc.ClientConn, error) {
-	return connection.Connect(address, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+func Connect(ctx context.Context, address string, metricsManager metrics.CSIMetricsManager) (*grpc.ClientConn, error) {
+	return connection.Connect(ctx, address, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 }
 
-func Probe(conn *grpc.ClientConn, singleCallTimeout time.Duration) error {
-	return rpc.ProbeForever(conn, singleCallTimeout)
+func Probe(ctx context.Context, conn *grpc.ClientConn, singleCallTimeout time.Duration) error {
+	return rpc.ProbeForever(ctx, conn, singleCallTimeout)
 }
 
 func GetDriverName(conn *grpc.ClientConn, timeout time.Duration) (string, error) {
@@ -438,6 +439,13 @@ func (p *csiProvisioner) checkDriverCapabilities(rc *requiredCapabilities) error
 		// If not, create volume from pvc cannot proceed
 		if !p.controllerCapabilities[csi.ControllerServiceCapability_RPC_CLONE_VOLUME] {
 			return fmt.Errorf("CSI driver does not support clone operations: controller CLONE_VOLUME capability is not reported")
+		}
+	}
+	if rc.modifyVolume {
+		// Check whether plugin supports modifying volumes
+		// If not, PVCs with an associated VolumeAttributesClass cannot be created
+		if !p.controllerCapabilities[csi.ControllerServiceCapability_RPC_MODIFY_VOLUME] {
+			return fmt.Errorf("CSI driver does not support VolumeAttributesClass: controller MODIFY_VOLUME capability is not reported")
 		}
 	}
 
@@ -596,6 +604,17 @@ func (p *csiProvisioner) prepareProvision(ctx context.Context, claim *v1.Persist
 		}
 	}
 
+	var vacName string
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if claim.Spec.VolumeAttributesClassName != nil {
+			vacName = *claim.Spec.VolumeAttributesClassName
+		}
+	}
+
+	if vacName != "" {
+		rc.modifyVolume = true
+	}
+
 	if err := p.checkDriverCapabilities(rc); err != nil {
 		return nil, controller.ProvisioningFinished, err
 	}
@@ -678,12 +697,7 @@ func (p *csiProvisioner) prepareProvision(ctx context.Context, claim *v1.Persist
 	}
 
 	// Resolve provision secret credentials.
-	provisionerSecretRef, err := getSecretReference(provisionerSecretParams, sc.Parameters, pvName, &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      claim.Name,
-			Namespace: claim.Namespace,
-		},
-	})
+	provisionerSecretRef, err := getSecretReference(provisionerSecretParams, sc.Parameters, pvName, claim)
 	if err != nil {
 		return nil, controller.ProvisioningNoChange, err
 	}
@@ -740,6 +754,19 @@ func (p *csiProvisioner) prepareProvision(ctx context.Context, claim *v1.Persist
 	if provisionerSecretRef != nil {
 		deletionAnnSecrets.name = provisionerSecretRef.Name
 		deletionAnnSecrets.namespace = provisionerSecretRef.Namespace
+	}
+
+	if vacName != "" {
+		vac, err := p.client.StorageV1alpha1().VolumeAttributesClasses().Get(ctx, vacName, metav1.GetOptions{})
+		if err != nil {
+			return nil, controller.ProvisioningNoChange, err
+		}
+
+		if vac.DriverName != p.driverName {
+			return nil, controller.ProvisioningFinished, fmt.Errorf("VAC %s referenced in PVC is for driver %s which does not match driver name %s", vacName, vac.DriverName, p.driverName)
+		}
+
+		req.MutableParameters = vac.Parameters
 	}
 
 	return &prepareProvisionResult{
@@ -920,6 +947,11 @@ func (p *csiProvisioner) Provision(ctx context.Context, options controller.Provi
 		pv.Spec.PersistentVolumeSource.CSI.FSType = result.fsType
 	}
 
+	vacName := claim.Spec.VolumeAttributesClassName
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) && vacName != nil && *vacName != "" {
+		pv.Spec.VolumeAttributesClassName = vacName
+	}
+
 	klog.V(2).Infof("successfully created PV %v for PVC %v and csi volume name %v", pv.Name, options.PVC.Name, pv.Spec.CSI.VolumeHandle)
 
 	if result.migratedVolume {
@@ -946,9 +978,10 @@ func (p *csiProvisioner) setCloneFinalizer(ctx context.Context, pvc *v1.Persiste
 		return err
 	}
 
-	if !checkFinalizer(claim, pvcCloneFinalizer) {
-		claim.Finalizers = append(claim.Finalizers, pvcCloneFinalizer)
-		_, err := p.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+	clone := claim.DeepCopy()
+	if !checkFinalizer(clone, pvcCloneFinalizer) {
+		clone.Finalizers = append(clone.Finalizers, pvcCloneFinalizer)
+		_, err := p.client.CoreV1().PersistentVolumeClaims(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
 		return err
 	}
 

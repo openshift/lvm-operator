@@ -30,6 +30,7 @@ const (
 	// owner: @deepakkinni @xing-yang
 	// kep: http://kep.k8s.io/2680
 	// alpha: v1.23
+	// beta: v1.31
 	//
 	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
 	// deletion ordering.
@@ -41,6 +42,13 @@ const (
 	//
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
+
+	// owner: @sunnylovestiramisu @ConnorJC3
+	// kep: https://kep.k8s.io/3751
+	// alpha: v1.29
+	//
+	// Pass VolumeAttributesClass parameters to supporting CSI drivers during CreateVolume
+	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
 )
 
 func init() {
@@ -50,7 +58,8 @@ func init() {
 // defaultKubernetesFeatureGates consists of all known feature keys specific to external-provisioner.
 // To add a new feature, define a key for it above and add it here.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	Topology:                       {Default: false, PreRelease: featuregate.GA},
-	HonorPVReclaimPolicy:           {Default: false, PreRelease: featuregate.Alpha},
+	Topology:                       {Default: true, PreRelease: featuregate.GA},
+	HonorPVReclaimPolicy:           {Default: true, PreRelease: featuregate.Beta},
 	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
+	VolumeAttributesClass:          {Default: false, PreRelease: featuregate.Alpha},
 }
