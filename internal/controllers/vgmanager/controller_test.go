@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
@@ -26,6 +27,7 @@ import (
 	wipefsmocks "github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs/mocks"
 	"github.com/stretchr/testify/mock"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +50,28 @@ func TestVGManager(t *testing.T) {
 
 var _ = Describe("vgmanager controller", func() {
 	Context("verifying standard behavior with node selector", func() {
-		It("should be reconciled successfully with a mocked block device", testMockedBlockDeviceOnHost)
+		It("thin provisioned volume group", func(ctx SpecContext) {
+			testVGWithLocalDevice(ctx, lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+						Name:               "thin-pool-1",
+						SizePercent:        90,
+						OverprovisionRatio: 10,
+					},
+				},
+			})
+		})
+		It("thick provisioned volume group", func(ctx SpecContext) {
+			testVGWithLocalDevice(ctx, lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{},
+			})
+		})
 		Context("edge cases during reconciliation", func() {
 			Context("failure in LVM or LSBLK", func() {
 				It("reconcile failure because of external errors", testReconcileFailure)
@@ -157,7 +180,7 @@ func setupInstances() testInstances {
 	}
 }
 
-func testMockedBlockDeviceOnHost(ctx context.Context) {
+func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolumeGroup) {
 	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	ctx = log.IntoContext(ctx, logger)
 
@@ -166,37 +189,39 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 
 	var blockDevice lsblk.BlockDevice
 	device := getKNameFromDevice(filepath.Join(GinkgoT().TempDir(), "mock0"))
-	By("setting up the disk as a block device with losetup", func() {
+	By("setting up the disk as a mocked block device with losetup", func() {
 		// required create to survive valid device check
 		_, err := os.Create(device)
 		Expect(err).To(Succeed())
-		blockDevice = lsblk.BlockDevice{
-			Name:       "mock0",
-			KName:      device,
-			Type:       "mocked",
-			Model:      "mocked",
-			Vendor:     "mocked",
-			State:      "live",
-			FSType:     "",
-			Size:       "1G",
-			Children:   nil,
-			Serial:     "MOCK",
-			DevicePath: device,
-		}
+		blockDevice = createMockedBlockDevice(device)
 	})
 
-	vg := &lvmv1alpha1.LVMVolumeGroup{}
+	vg := &vgTemplate
+	if vg.Spec.DeviceSelector == nil {
+		By("defaulting volume group device selector to the temporary device", func() {
+			vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{device}}
+		})
+	}
+	if vg.GetNamespace() == "" {
+		By("defaulting the volume group namespace to the test instance", func() {
+			vg.SetNamespace(instances.namespace.GetName())
+		})
+	}
+	if vg.Spec.NodeSelector == nil {
+		By("defaulting the volume group node selector to the test instance", func() {
+			vg.Spec.NodeSelector = instances.nodeSelector.DeepCopy()
+		})
+	}
+
 	By("creating the LVMVolumeGroup with the temporary device", func() {
-		vg.SetName("vg1")
-		vg.SetNamespace(instances.namespace.GetName())
-		vg.Spec.NodeSelector = instances.nodeSelector.DeepCopy()
-		vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{device}}
-		vg.Spec.ThinPoolConfig = &lvmv1alpha1.ThinPoolConfig{
-			Name:               "thin-pool-1",
-			SizePercent:        90,
-			OverprovisionRatio: 10,
-		}
 		Expect(instances.client.Create(ctx, vg)).To(Succeed())
+	})
+
+	By("creating the LVMVolumeGroupNodeStatus", func() {
+		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+		nodeStatus.SetName(instances.node.GetName())
+		nodeStatus.SetNamespace(instances.namespace.GetName())
+		Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
 	})
 
 	By("triggering the Reconciliation after the VG was created", func() {
@@ -224,13 +249,11 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		GinkgoHelper()
 		Eventually(instances.recorder.Events).WithContext(ctx).WithTimeout(timeout).Should(Receive(SatisfyAll(
 			ContainSubstring(msg),
-			ContainSubstring(eventType)),
-			ContainSubstring("LVMVolumeGroupNodeStatus")))
+			ContainSubstring(eventType))))
 		Eventually(instances.recorder.Events).WithContext(ctx).WithTimeout(timeout).Should(Receive(SatisfyAll(
 			ContainSubstring(fmt.Sprintf("update on node %s", client.ObjectKeyFromObject(nodeStatus))),
 			ContainSubstring(msg),
-			ContainSubstring(eventType)),
-			ContainSubstring("LVMVolumeGroup")))
+			ContainSubstring(eventType))))
 	}
 
 	By("triggering the second reconciliation after the initial setup", func() {
@@ -250,8 +273,9 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
-			Name:   vg.GetName(),
-			Status: lvmv1alpha1.VGStatusProgressing,
+			Name:                  vg.GetName(),
+			Status:                lvmv1alpha1.VGStatusProgressing,
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 	})
 
@@ -273,43 +297,48 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 	})
 
 	// addThinPoolToVG
-	By("mocking the creation of the thin pool in the vg", func() {
-		instances.LVM.EXPECT().ListLVs(ctx, lvmVG.Name).Return(&lvm.LVReport{Report: make([]lvm.LVReportItem, 0)}, nil).Once()
-		instances.LVM.EXPECT().CreateLV(ctx, vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent).Return(nil).Once()
-	})
-
 	var createdVG lvm.VolumeGroup
 	var thinPool lvm.LogicalVolume
-	By("mocking the report of LVs to now contain the thin pool", func() {
-		// validateLVs
-		thinPool = lvm.LogicalVolume{
-			Name:            vg.Spec.ThinPoolConfig.Name,
-			VgName:          vg.GetName(),
-			LvAttr:          "twi---tz--",
-			LvSize:          "1.0G",
-			MetadataPercent: "10.0",
-		}
+
+	if vg.Spec.ThinPoolConfig != nil {
+		By("mocking the creation of the thin pool in the vg", func() {
+			instances.LVM.EXPECT().ListLVs(ctx, lvmVG.Name).Return(&lvm.LVReport{Report: make([]lvm.LVReportItem, 0)}, nil).Once()
+			instances.LVM.EXPECT().CreateLV(ctx, vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent,
+				calculateExpectedChunkSize(vg.Spec.ThinPoolConfig.ChunkSize)).Return(nil).Once()
+		})
+		By("mocking the report of LVs to now contain the thin pool", func() {
+			// validateLVs
+			thinPool = lvm.LogicalVolume{
+				Name:            vg.Spec.ThinPoolConfig.Name,
+				VgName:          vg.GetName(),
+				LvAttr:          "twi---tz--",
+				LvSize:          "1.0G",
+				MetadataPercent: "10.0",
+				ChunkSize:       strconv.FormatInt(ptr.To(resource.MustParse("128Ki")).Value(), 10),
+			}
+			createdVG = lvm.VolumeGroup{
+				Name:   vg.GetName(),
+				VgSize: thinPool.LvSize,
+				PVs:    []lvm.PhysicalVolume{lvmPV},
+			}
+			instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
+				Lv: []lvm.LogicalVolume{thinPool},
+			}}}, nil).Once()
+			instances.LVM.EXPECT().ActivateLV(ctx, thinPool.Name, vg.GetName()).Return(nil).Once()
+		})
+	} else {
+		By("ignoring the thin pool creation as it is not present in the VG spec")
 		createdVG = lvm.VolumeGroup{
 			Name:   vg.GetName(),
-			VgSize: thinPool.LvSize,
+			VgSize: "1.0G",
 			PVs:    []lvm.PhysicalVolume{lvmPV},
 		}
-		instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
-			Lv: []lvm.LogicalVolume{thinPool},
-		}}}, nil).Once()
-		instances.LVM.EXPECT().ActivateLV(ctx, thinPool.Name, vg.GetName()).Return(nil).Once()
-		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
-	})
+	}
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
-		cancelled := false
-		cancelable := func() {
-			cancelled = true
-		}
-		instances.Reconciler.Shutdown = cancelable
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(ctx, func() bool { return cancelled }).Should(BeTrue())
 	})
 
 	By("verifying the lvmd config generation", func() {
@@ -320,15 +349,24 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(lvmdConfig).ToNot(BeNil())
 		Expect(lvmdConfig.DeviceClasses).ToNot(BeNil())
 		Expect(lvmdConfig.DeviceClasses).To(HaveLen(1))
-		Expect(lvmdConfig.DeviceClasses).To(ContainElement(&lvmd.DeviceClass{
-			Name:        vg.GetName(),
-			VolumeGroup: vg.GetName(),
-			Type:        lvmd.TypeThin,
-			ThinPoolConfig: &lvmd.ThinPoolConfig{
-				Name:               vg.Spec.ThinPoolConfig.Name,
-				OverprovisionRatio: float64(vg.Spec.ThinPoolConfig.OverprovisionRatio),
-			},
-		}))
+		if vg.Spec.ThinPoolConfig != nil {
+			Expect(lvmdConfig.DeviceClasses).To(ContainElement(&lvmd.DeviceClass{
+				Name:        vg.GetName(),
+				VolumeGroup: vg.GetName(),
+				Type:        lvmd.TypeThin,
+				ThinPoolConfig: &lvmd.ThinPoolConfig{
+					Name:               vg.Spec.ThinPoolConfig.Name,
+					OverprovisionRatio: float64(vg.Spec.ThinPoolConfig.OverprovisionRatio),
+				},
+			}))
+		} else {
+			Expect(lvmdConfig.DeviceClasses).To(ContainElement(&lvmd.DeviceClass{
+				Name:        vg.GetName(),
+				VolumeGroup: vg.GetName(),
+				Type:        lvmd.TypeThick,
+				SpareGB:     ptr.To(uint64(0)),
+			}))
+		}
 	})
 
 	var oldReadyGeneration int64
@@ -337,45 +375,54 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
-			Name:    vg.GetName(),
-			Status:  lvmv1alpha1.VGStatusReady,
-			Devices: []string{device},
+			Name:                  vg.GetName(),
+			Status:                lvmv1alpha1.VGStatusReady,
+			Devices:               []string{device},
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		oldReadyGeneration = nodeStatus.GetGeneration()
 	})
 
 	By("mocking the now created children in the block device", func() {
 		blockDevice.FSType = filter.FSTypeLVM2Member
-		blockDevice.Children = []lsblk.BlockDevice{
-			{
-				Name:   fmt.Sprintf("/dev/mapper/%s-%s_tdata", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
-				KName:  "/dev/dm-1",
-				FSType: "lvm",
-				Children: []lsblk.BlockDevice{{
-					Name:  fmt.Sprintf("/dev/mapper/%s-%s", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
-					KName: "/dev/dm-2",
-				}},
-			},
-			{
-				Name:   fmt.Sprintf("/dev/mapper/%s-%s_tmeta", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
-				KName:  "/dev/dm-0",
-				FSType: "lvm",
-				Children: []lsblk.BlockDevice{{
-					Name:  fmt.Sprintf("/dev/mapper/%s-%s", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
-					KName: "/dev/dm-2",
-				}},
-			},
+		if vg.Spec.ThinPoolConfig != nil {
+			blockDevice.Children = []lsblk.BlockDevice{
+				{
+					Name:   fmt.Sprintf("/dev/mapper/%s-%s_tdata", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					KName:  "/dev/dm-1",
+					FSType: "lvm",
+					Children: []lsblk.BlockDevice{{
+						Name:  fmt.Sprintf("/dev/mapper/%s-%s", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						KName: "/dev/dm-2",
+					}},
+				},
+				{
+					Name:   fmt.Sprintf("/dev/mapper/%s-%s_tmeta", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					KName:  "/dev/dm-0",
+					FSType: "lvm",
+					Children: []lsblk.BlockDevice{{
+						Name:  fmt.Sprintf("/dev/mapper/%s-%s", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						KName: "/dev/dm-2",
+					}},
+				},
+			}
 		}
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 	})
 
-	By("mocking the now created vg and thin pool", func() {
+	By("mocking the now created vg in the next fetch", func() {
 		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
-		instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
-			Lv: []lvm.LogicalVolume{thinPool},
-		}}}, nil).Once()
-		instances.LVM.EXPECT().ActivateLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
 	})
+
+	if vg.Spec.ThinPoolConfig != nil {
+		By("mocking the lv activation and verification of the created thin pool", func() {
+			report := &lvm.LVReport{Report: []lvm.LVReportItem{{
+				Lv: []lvm.LogicalVolume{thinPool},
+			}}}
+			instances.LVM.EXPECT().ActivateLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
+			instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(report, nil).Once()
+		})
+	}
 
 	By("triggering the verification reconcile that should confirm the ready state", func() {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
@@ -386,9 +433,10 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
-			Name:    vg.GetName(),
-			Status:  lvmv1alpha1.VGStatusReady,
-			Devices: []string{device},
+			Name:                  vg.GetName(),
+			Status:                lvmv1alpha1.VGStatusReady,
+			Devices:               []string{device},
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		Expect(oldReadyGeneration).To(Equal(nodeStatus.GetGeneration()))
 	})
@@ -399,8 +447,12 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(vg.Finalizers).ToNot(BeEmpty())
 		Expect(vg.DeletionTimestamp).ToNot(BeNil())
 		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
-		instances.LVM.EXPECT().LVExists(ctx, thinPool.Name, createdVG.Name).Return(true, nil).Once()
-		instances.LVM.EXPECT().DeleteLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
+
+		if vg.Spec.ThinPoolConfig != nil {
+			instances.LVM.EXPECT().LVExists(ctx, thinPool.Name, createdVG.Name).Return(true, nil).Once()
+			instances.LVM.EXPECT().DeleteLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
+		}
+
 		instances.LVM.EXPECT().DeleteVG(ctx, lvm.VolumeGroup{Name: createdVG.Name}).Return(nil).Once()
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
@@ -409,6 +461,22 @@ func testMockedBlockDeviceOnHost(ctx context.Context) {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(lvmdConfig).To(Not(BeNil()), "cached lvmd config is still present")
 	})
+}
+
+func createMockedBlockDevice(device string) lsblk.BlockDevice {
+	return lsblk.BlockDevice{
+		Name:       "mock0",
+		KName:      device,
+		Type:       "mocked",
+		Model:      "mocked",
+		Vendor:     "mocked",
+		State:      "live",
+		FSType:     "",
+		Size:       "1G",
+		Children:   nil,
+		Serial:     "MOCK",
+		DevicePath: device,
+	}
 }
 
 func testNodeSelector(ctx context.Context) {
@@ -442,10 +510,22 @@ func testNodeSelector(ctx context.Context) {
 		"kubernetes.io/hostname": "test-node-2",
 	}}}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
-		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(matchingNode.GetName())
+	nodeStatus.SetNamespace(volumeGroup.GetNamespace())
+
+	schema := scheme.Scheme
+	schema.AddKnownTypes(lvmv1alpha1.GroupVersion)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(schema).
+		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup, nodeStatus).
 		Build()
-	r := &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	r := &Reconciler{
+		Client:    fakeClient,
+		Scheme:    schema,
+		NodeName:  matchingNode.GetName(),
+		Namespace: volumeGroup.GetNamespace(),
+	}
 	By("first verifying correct node resolution")
 	res, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
 	Expect(err).ToNot(HaveOccurred(), "should not error on valid node selector")
@@ -549,7 +629,7 @@ func testEvents(ctx context.Context) {
 }
 
 func testLVMD(ctx context.Context) {
-	r := &Reconciler{Scheme: scheme.Scheme}
+	r := &Reconciler{Scheme: scheme.Scheme, NodeName: "test", Namespace: "test"}
 	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	ctx = log.IntoContext(ctx, logger)
 
@@ -668,14 +748,14 @@ func testThinPoolCreation(ctx context.Context) {
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(fmt.Errorf("mocked error"))
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize)).Once().Return(fmt.Errorf("mocked error"))
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).To(HaveOccurred(), "should create thin pool if it does not exist, but should fail if that does not work")
 
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).Once().Return(nil)
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize)).Once().Return(nil)
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should create thin pool if it does not exist")
 
@@ -698,6 +778,13 @@ func testReconcileFailure(ctx context.Context) {
 	instances := setupInstances()
 	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
 	instances.LVMD = mockLVMD
+
+	By("creating the LVMVolumeGroupNodeStatus", func() {
+		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+		nodeStatus.SetName(instances.node.GetName())
+		nodeStatus.SetNamespace(instances.namespace.GetName())
+		Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+	})
 
 	vg := &lvmv1alpha1.LVMVolumeGroup{}
 	By("creating the LVMVolumeGroup with the mocked device", func() {
@@ -831,4 +918,11 @@ func testReconcileFailure(ctx context.Context) {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(MatchError(expectedError))
 	})
+}
+
+func calculateExpectedChunkSize(chunkSize *resource.Quantity) int64 {
+	if chunkSize == nil {
+		return lvmv1alpha1.ChunkSizeDefault.Value()
+	}
+	return chunkSize.Value()
 }

@@ -9,8 +9,9 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/lvm-operator/internal/cluster"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -46,7 +47,7 @@ var _ = Describe("webhook acceptance tests", func() {
 	defaultLVMClusterInUniqueNamespace := func(ctx SpecContext) *LVMCluster {
 		generatedName := generateUniqueNameForTestCase(ctx)
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, generatedName)
-		namespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
@@ -60,13 +61,26 @@ var _ = Describe("webhook acceptance tests", func() {
 	It("minimum viable create", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
+			To(Equal(ChunkSizeCalculationPolicyStatic))
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).To(BeNil())
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("minimum viable create for ReadWriteMany configuration", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
 	It("duplicate LVMClusters get rejected", func(ctx SpecContext) {
 		generatedName := generateUniqueNameForTestCase(ctx)
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, generatedName)
-		namespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
@@ -91,11 +105,16 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrDuplicateLVMCluster.Error()))
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-	})
+	},
+		// It can happen that the creation of the LVMCluster is not yet visible to the webhook, so we retry a few times.
+		// This is a workaround for the fact that the informer cache is not yet updated when the webhook is called.
+		// This is faster / more efficient than waiting for the informer cache to be updated with a set interval.
+		FlakeAttempts(3),
+	)
 
 	It("namespace cannot be looked up via ENV", func(ctx SpecContext) {
 		generatedName := generateUniqueNameForTestCase(ctx)
-		inacceptableNamespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		inacceptableNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, inacceptableNamespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, inacceptableNamespace)).To(Succeed())
@@ -119,7 +138,7 @@ var _ = Describe("webhook acceptance tests", func() {
 		acceptableNamespace := "openshift-storage"
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, acceptableNamespace)
 		generatedName := generateUniqueNameForTestCase(ctx)
-		inacceptableNamespace := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
+		inacceptableNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
 		Expect(k8sClient.Create(ctx, inacceptableNamespace)).To(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, inacceptableNamespace)).To(Succeed())
@@ -136,19 +155,6 @@ var _ = Describe("webhook acceptance tests", func() {
 		statusError := &k8serrors.StatusError{}
 		Expect(errors.As(err, &statusError)).To(BeTrue())
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrInvalidNamespace.Error()))
-	})
-
-	It("no device classes are not allowed", func(ctx SpecContext) {
-		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses = nil
-
-		err := k8sClient.Create(ctx, resource)
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(Satisfy(k8serrors.IsForbidden))
-
-		statusError := &k8serrors.StatusError{}
-		Expect(errors.As(err, &statusError)).To(BeTrue())
-		Expect(statusError.Status().Message).To(ContainSubstring(ErrAtLeastOneDeviceClassRequired.Error()))
 	})
 
 	It("device classes cannot be removed in update", func(ctx SpecContext) {
@@ -348,6 +354,34 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	It("updating NodeSelector is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].NodeSelector = &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{
+			{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: "In",
+						Values:   []string{"some-node"},
+					},
+				},
+			},
+		}}
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrNodeSelectorCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 	It("updating ThinPoolConfig.Name is not allowed", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
@@ -391,6 +425,42 @@ var _ = Describe("webhook acceptance tests", func() {
 		updated := resource.DeepCopy()
 
 		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.OverprovisionRatio--
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating ThinPoolConfig.ChunkSizeCalculationPolicy is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy = ChunkSizeCalculationPolicyHost
+
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("updating ThinPoolConfig.ChunkSize is not allowed", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("500Ki"))
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
@@ -507,4 +577,61 @@ var _ = Describe("webhook acceptance tests", func() {
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
+
+	It("chunk size change before create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("256Ki"))
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
+			To(Equal(ChunkSizeCalculationPolicyStatic))
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize.String()).To(Equal("256Ki"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("host chunk policy with chunk size is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy = ChunkSizeCalculationPolicyHost
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("256Ki"))
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+	})
+
+	It("thin pool chunk size <64KiB is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("32Ki"))
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+	})
+
+	It("thin pool chunk size >1Gi is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize = ptr.To(k8sresource.MustParse("2Gi"))
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+	})
+
+	It("host chunk policy without chunk size is ok", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy = ChunkSizeCalculationPolicyHost
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
+			To(Equal(ChunkSizeCalculationPolicyHost))
+		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).To(BeNil())
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 })

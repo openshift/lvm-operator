@@ -3,6 +3,7 @@ package csi
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
@@ -12,13 +13,14 @@ func NewMockClient(
 	name string,
 	supportsNodeResize bool,
 	supportsControllerResize bool,
+	supportsControllerModify bool,
 	supportsPluginControllerService bool,
 	supportsControllerSingleNodeMultiWriter bool) *MockClient {
 	return &MockClient{
 		name:                                    name,
 		supportsNodeResize:                      supportsNodeResize,
 		supportsControllerResize:                supportsControllerResize,
-		expandCalled:                            0,
+		supportsControllerModify:                supportsControllerModify,
 		supportsPluginControllerService:         supportsPluginControllerService,
 		supportsControllerSingleNodeMultiWriter: supportsControllerSingleNodeMultiWriter,
 	}
@@ -28,13 +30,16 @@ type MockClient struct {
 	name                                    string
 	supportsNodeResize                      bool
 	supportsControllerResize                bool
+	supportsControllerModify                bool
 	supportsPluginControllerService         bool
 	supportsControllerSingleNodeMultiWriter bool
-	expandCalled                            int
-	expansionFailed                         bool
+	expandCalled                            atomic.Int32
+	modifyCalled                            atomic.Int32
+	expansionError                          error
+	modifyFailed                            bool
 	checkMigratedLabel                      bool
-	usedSecrets                             map[string]string
-	usedCapability                          *csi.VolumeCapability
+	usedSecrets                             atomic.Pointer[map[string]string]
+	usedCapability                          atomic.Pointer[csi.VolumeCapability]
 }
 
 func (c *MockClient) GetDriverName(context.Context) (string, error) {
@@ -49,6 +54,10 @@ func (c *MockClient) SupportsControllerResize(context.Context) (bool, error) {
 	return c.supportsControllerResize, nil
 }
 
+func (c *MockClient) SupportsControllerModify(context.Context) (bool, error) {
+	return c.supportsControllerModify, nil
+}
+
 func (c *MockClient) SupportsNodeResize(context.Context) (bool, error) {
 	return c.supportsNodeResize, nil
 }
@@ -57,8 +66,12 @@ func (c *MockClient) SupportsControllerSingleNodeMultiWriter(context.Context) (b
 	return c.supportsControllerSingleNodeMultiWriter, nil
 }
 
-func (c *MockClient) SetExpansionFailed() {
-	c.expansionFailed = true
+func (c *MockClient) SetExpansionError(err error) {
+	c.expansionError = err
+}
+
+func (c *MockClient) SetModifyFailed() {
+	c.modifyFailed = true
 }
 
 func (c *MockClient) SetCheckMigratedLabel() {
@@ -72,9 +85,9 @@ func (c *MockClient) Expand(
 	secrets map[string]string,
 	capability *csi.VolumeCapability) (int64, bool, error) {
 	// TODO: Determine whether the operation succeeds or fails by parameters.
-	if c.expansionFailed {
-		c.expandCalled++
-		return requestBytes, c.supportsNodeResize, fmt.Errorf("expansion failed")
+	if c.expansionError != nil {
+		c.expandCalled.Add(1)
+		return requestBytes, c.supportsNodeResize, c.expansionError
 	}
 	if c.checkMigratedLabel {
 		additionalInfo := ctx.Value(connection.AdditionalInfoKey)
@@ -85,25 +98,41 @@ func (c *MockClient) Expand(
 			return requestBytes, c.supportsNodeResize, err
 		}
 	}
-	c.expandCalled++
-	c.usedSecrets = secrets
-	c.usedCapability = capability
+	c.expandCalled.Add(1)
+	c.usedSecrets.Store(&secrets)
+	c.usedCapability.Store(capability)
 	return requestBytes, c.supportsNodeResize, nil
 }
 
 func (c *MockClient) GetExpandCount() int {
-	return c.expandCalled
+	return int(c.expandCalled.Load())
+}
+
+func (c *MockClient) GetModifyCount() int {
+	return int(c.modifyCalled.Load())
 }
 
 func (c *MockClient) GetCapability() *csi.VolumeCapability {
-	return c.usedCapability
+	return c.usedCapability.Load()
 }
 
 // GetSecrets returns secrets used for volume expansion
 func (c *MockClient) GetSecrets() map[string]string {
-	return c.usedSecrets
+	return *c.usedSecrets.Load()
 }
 
 func (c *MockClient) CloseConnection() {
 
+}
+
+func (c *MockClient) Modify(
+	ctx context.Context,
+	volumeID string,
+	secrets map[string]string,
+	mutableParameters map[string]string) error {
+	c.modifyCalled.Add(1)
+	if c.modifyFailed {
+		return fmt.Errorf("modify failed")
+	}
+	return nil
 }

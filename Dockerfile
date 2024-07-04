@@ -3,7 +3,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
 # Build the manager binary
-FROM golang:1.21 as builder
+FROM golang:1.22 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -23,27 +23,15 @@ COPY internal/ internal/
 # Build
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.3
+FROM --platform=$TARGETPLATFORM fedora:latest
 
-# We use CentOS Stream 9 as our source for e2fsprogs here so that we can offer a fully open source version for development here.
-# This allows users without Red Hat Subscriptions (e.g. on a Fedora Workstation) to build and test LVMS.
-# Note that we do NOT provide Support for any images built from this Dockerfile. The authoritative source for LVMS is the
-# official Red Hat Container Catalog at https://catalog.redhat.com/software/containers/search?gs&q=lvms4%20operator
-# which are built with Red Hat builds of the e2fsprogs package which is only available via Red Hat Subscription.
-RUN curl https://mirror.stream.centos.org/9-stream/BaseOS/$(arch)/os/Packages/centos-gpg-keys-9.0-23.el9.noarch.rpm > centos-gpg-keys-9.0-23.el9.noarch.rpm && \
-    rpm -i centos-gpg-keys-9.0-23.el9.noarch.rpm && \
-    rm -f centos-gpg-keys-9.0-23.el9.noarch.rpm
-RUN curl https://mirror.stream.centos.org/9-stream/BaseOS/$(arch)/os/Packages/centos-stream-repos-9.0-23.el9.noarch.rpm > centos-stream-repos-9.0-23.el9.noarch.rpm && \
-    rpm -i centos-stream-repos-9.0-23.el9.noarch.rpm && \
-    rm -f centos-stream-repos-9.0-23.el9.noarch.rpm
-
-RUN microdnf update -y && \
-    microdnf install --nodocs --noplugins -y \
+RUN dnf update -y && \
+    dnf install --nodocs --noplugins -y \
         util-linux \
         e2fsprogs \
         xfsprogs \
         glibc && \
-    microdnf clean all
+    dnf clean all
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .

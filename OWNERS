@@ -1,12 +1,6 @@
 # approval == this is a good idea /approve
 approvers:
-  - suleymanakbas91
-  - jeff-roche
-  - jakobmoellerdev
+  - edge-enablement-approvers
 # review == this code is good /lgtm
 reviewers:
-  - suleymanakbas91
-  - brandisher
-  - jeff-roche
-  - jerpeter1
-  - jakobmoellerdev
+  - edge-enablement-reviewers

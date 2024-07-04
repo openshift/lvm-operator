@@ -29,15 +29,10 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
-
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
-
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	corev1helper "k8s.io/component-helpers/scheduling/corev1"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -168,26 +163,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("failed to introspect running pod image: %w", err)
 	}
 
-	result, reconcileError := r.reconcile(ctx, lvmCluster)
-
-	statusError := r.updateLVMClusterStatus(ctx, lvmCluster)
-
-	// Reconcile errors have higher priority than status update errors
-	if reconcileError != nil {
-		return result, reconcileError
-	} else if statusError != nil && !k8serrors.IsNotFound(statusError) {
-		return result, fmt.Errorf("failed to update LVMCluster status: %w", statusError)
-	} else {
-		return result, nil
-	}
-}
-
-// errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
-func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	// The resource was deleted
-	if !instance.DeletionTimestamp.IsZero() {
+	if !lvmCluster.DeletionTimestamp.IsZero() {
 		// Check for existing LogicalVolumes
 		lvsExist, err := r.logicalVolumesExist(ctx)
 		if err != nil {
@@ -197,18 +174,28 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		if lvsExist {
 			waitForLVRemoval := time.Second * 10
 			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion", waitForLVRemoval)
-			r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
+			r.WarningEvent(ctx, lvmCluster, EventReasonErrorDeletionPending, err)
 			// check every 10 seconds if there are still PVCs present
 			return ctrl.Result{RequeueAfter: waitForLVRemoval}, nil
 		}
 
 		logger.Info("processing LVMCluster deletion")
-		if err := r.processDelete(ctx, instance); err != nil {
-			// check every 10 seconds if there are still PVCs present or the LogicalVolumes are removed
-			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
+		if err := r.processDelete(ctx, lvmCluster); err != nil {
+			// check in backing off intervals if there are still PVCs present or the LogicalVolumes are removed
+			return ctrl.Result{}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
 		}
 		return reconcile.Result{}, nil
 	}
+
+	return r.reconcile(ctx, lvmCluster)
+}
+
+// errors returned by this will be updated in the reconcileSucceeded condition of the LVMCluster
+func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	setResourcesAvailableConditionInProgress(instance)
+	setVolumeGroupsReadyConditionInProgress(instance)
 
 	if updated := controllerutil.AddFinalizer(instance, lvmClusterFinalizer); updated {
 		if err := r.Client.Update(ctx, instance); err != nil {
@@ -219,8 +206,9 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 
 	resources := []resource.Manager{
 		resource.CSIDriver(),
-		resource.VGManager(),
+		resource.VGManager(r.ClusterType),
 		resource.LVMVGs(),
+		resource.LVMVGNodeStatus(),
 		resource.TopoLVMStorageClass(),
 	}
 
@@ -253,12 +241,22 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 	if len(errs) > 0 {
 		err := fmt.Errorf("failed to reconcile resources managed by LVMCluster: %w", errors.Join(errs...))
 		r.WarningEvent(ctx, instance, EventReasonErrorResourceReconciliationFailed, err)
+		setResourcesAvailableConditionFalse(instance, err)
+		statusErr := r.updateLVMClusterStatus(ctx, instance)
+		if statusErr != nil {
+			logger.Error(statusErr, "failed to update LVMCluster status")
+		}
 		return ctrl.Result{}, err
 	}
 
 	msg := "successfully reconciled LVMCluster"
 	logger.Info(msg, "resourceSyncElapsedTime", resourceSyncElapsedTime)
 	r.NormalEvent(ctx, instance, EventReasonResourceReconciliationSuccess, msg)
+	setResourcesAvailableConditionTrue(instance)
+	statusErr := r.updateLVMClusterStatus(ctx, instance)
+	if statusErr != nil {
+		return ctrl.Result{}, statusErr
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -266,115 +264,32 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx)
 
-	vgNodeMap := make(map[string][]lvmv1alpha1.NodeStatus)
-
-	vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
-	if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
-		return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
-	}
-
-	expectedVGCount, err := r.getExpectedVGCount(ctx, instance)
-	if err != nil {
-		return fmt.Errorf("failed to calculate expected VG count: %w", err)
-	}
-
-	var readyVGCount int
-	var isReady, isDegraded, isFailed bool
-
-	for _, nodeItem := range vgNodeStatusList.Items {
-		for _, item := range nodeItem.Spec.LVMVGStatus {
-			if item.Status == lvmv1alpha1.VGStatusReady {
-				readyVGCount++
-				isReady = true
-			} else if item.Status == lvmv1alpha1.VGStatusDegraded {
-				isDegraded = true
-			} else if item.Status == lvmv1alpha1.VGStatusFailed {
-				isFailed = true
-			}
-
-			vgNodeMap[item.Name] = append(vgNodeMap[item.Name],
-				lvmv1alpha1.NodeStatus{
-					Node:     nodeItem.Name,
-					VGStatus: *item.DeepCopy(),
-				},
-			)
+	if len(instance.Spec.Storage.DeviceClasses) == 0 {
+		// technically we only need to check for the vgmanager daemonset, and we can
+		// assume that if the vgmanager is running, the VGs are ready to be processed.
+		setVolumeGroupsReadyConditionUnmanaged(instance)
+	} else {
+		vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
+		if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
+			return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
 		}
+		nodes := &corev1.NodeList{}
+		if err := r.Client.List(ctx, nodes); err != nil {
+			return fmt.Errorf("failed to list Nodes: %w", err)
+		}
+		setVolumeGroupsReadyCondition(ctx, instance, nodes, vgNodeStatusList)
+		instance.Status.DeviceClassStatuses = computeDeviceClassStatuses(vgNodeStatusList)
 	}
 
-	instance.Status.State = lvmv1alpha1.LVMStatusProgressing
-	instance.Status.Ready = false
+	instance.Status.State, instance.Status.Ready = computeLVMClusterReadiness(instance.Status.Conditions)
 
-	logger.V(2).Info("calculating readiness of LVMCluster", "expectedVGCount", expectedVGCount, "readyVGCount", readyVGCount)
-
-	if isFailed {
-		instance.Status.State = lvmv1alpha1.LVMStatusFailed
-	} else if isDegraded {
-		instance.Status.State = lvmv1alpha1.LVMStatusDegraded
-	} else if isReady && expectedVGCount == readyVGCount {
-		instance.Status.State = lvmv1alpha1.LVMStatusReady
-		instance.Status.Ready = true
-	}
-
-	var allVgStatuses []lvmv1alpha1.DeviceClassStatus
-	for key, val := range vgNodeMap {
-		allVgStatuses = append(allVgStatuses,
-			lvmv1alpha1.DeviceClassStatus{
-				Name:       key,
-				NodeStatus: val,
-			},
-		)
-	}
-
-	instance.Status.DeviceClassStatuses = allVgStatuses
 	// Apply status changes
-	if err = r.Client.Status().Update(ctx, instance); err != nil {
+	if err := r.Client.Status().Update(ctx, instance); err != nil {
 		return fmt.Errorf("failed to update LVMCluster status: %w", err)
 	}
 	logger.V(2).Info("successfully updated the LVMCluster status")
+
 	return nil
-}
-
-func (r *Reconciler) getExpectedVGCount(ctx context.Context, instance *lvmv1alpha1.LVMCluster) (int, error) {
-	logger := log.FromContext(ctx)
-	var vgCount int
-
-	nodeList := &corev1.NodeList{}
-	if err := r.Client.List(ctx, nodeList); err != nil {
-		return 0, fmt.Errorf("failed to list Nodes: %w", err)
-	}
-
-	for _, deviceClass := range instance.Spec.Storage.DeviceClasses {
-		for _, node := range nodeList.Items {
-			ignoreDueToTaint := false
-			for _, taint := range node.Spec.Taints {
-				if !corev1helper.TolerationsTolerateTaint(instance.Spec.Tolerations, &taint) {
-					logger.V(1).Info("node is ignored because of the taint",
-						"node", node.GetName(), "taint", taint)
-					ignoreDueToTaint = true
-					break
-				}
-			}
-			if ignoreDueToTaint {
-				continue
-			}
-
-			if deviceClass.NodeSelector == nil {
-				vgCount++
-				continue
-			}
-
-			matches, err := corev1helper.MatchNodeSelectorTerms(&node, deviceClass.NodeSelector)
-			if err != nil {
-				return 0, fmt.Errorf("failed to match node selector: %w", err)
-			}
-
-			if matches {
-				vgCount++
-			}
-		}
-	}
-
-	return vgCount, nil
 }
 
 // getRunningPodImage gets the operator image and set it in reconciler struct
@@ -421,8 +336,9 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 		resourceDeletionList := []resource.Manager{
 			resource.TopoLVMStorageClass(),
 			resource.LVMVGs(),
+			resource.LVMVGNodeStatus(),
 			resource.CSIDriver(),
-			resource.VGManager(),
+			resource.VGManager(r.ClusterType),
 		}
 
 		if r.ClusterType == cluster.TypeOCP {

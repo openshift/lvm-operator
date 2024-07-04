@@ -21,18 +21,26 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func VGManager() Manager {
-	return vgManager{}
+func VGManager(clusterType cluster.Type) Manager {
+	return vgManager{
+		clusterType: clusterType,
+	}
 }
 
-type vgManager struct{}
+type vgManager struct {
+	clusterType cluster.Type
+}
 
 var _ Manager = vgManager{}
 
@@ -48,13 +56,17 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	logger := log.FromContext(ctx).WithValues("resourceManager", v.GetName())
 
 	// get desired daemonset spec
-	dsTemplate := newVGManagerDaemonset(
+	dsTemplate := templateVGManagerDaemonset(
 		lvmCluster,
+		v.clusterType,
 		r.GetNamespace(),
 		r.GetImageName(),
 		r.GetVGManagerCommand(),
 		r.GetLogPassthroughOptions().VGManager.AsArgs(),
 	)
+	if err := ctrl.SetControllerReference(lvmCluster, &dsTemplate, r.Scheme()); err != nil {
+		return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
+	}
 
 	// create desired daemonset or update mutable fields on existing one
 	ds := &appsv1.DaemonSet{
@@ -66,14 +78,16 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 	// the anonymous mutate function modifies the daemonset object after fetching it.
 	// if the daemonset does not already exist, it creates it, otherwise, it updates it
 	result, err := ctrl.CreateOrUpdate(ctx, r, ds, func() error {
-		if err := ctrl.SetControllerReference(lvmCluster, ds, r.Scheme()); err != nil {
-			return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
-		}
 		// at creation, deep copy the whole daemonset
 		if ds.CreationTimestamp.IsZero() {
 			dsTemplate.DeepCopyInto(ds)
 			return nil
 		}
+
+		if err := ctrl.SetControllerReference(lvmCluster, ds, r.Scheme()); err != nil {
+			return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)
+		}
+
 		// if update, update only mutable fields
 		initMapIfNil(&ds.ObjectMeta.Labels)
 		initMapIfNil(&ds.Spec.Template.ObjectMeta.Labels)
@@ -113,15 +127,54 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 		logger.V(2).Info("DaemonSet applied to cluster", "operation", result, "name", ds.Name)
 	}
 
-	if err := verifyDaemonSetReadiness(ds); err != nil {
+	if err := VerifyDaemonSetReadiness(ds); err != nil {
 		return fmt.Errorf("DaemonSet is not considered ready: %w", err)
 	}
 
 	return nil
 }
 
-// ensureDeleted is a noop. Deletion will be handled by ownerref
-func (v vgManager) EnsureDeleted(_ Reconciler, _ context.Context, _ *lvmv1alpha1.LVMCluster) error {
+// EnsureDeleted makes sure that the driver is removed from the cluster and the daemonset is gone.
+// Deletion will be triggered again even though we also have an owner reference
+func (v vgManager) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", v.GetName())
+
+	// delete the daemonset
+	ds := templateVGManagerDaemonset(
+		lvmCluster,
+		v.clusterType,
+		r.GetNamespace(),
+		r.GetImageName(),
+		r.GetVGManagerCommand(),
+		r.GetLogPassthroughOptions().VGManager.AsArgs(),
+	)
+
+	if err := r.Delete(ctx, &ds); errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to delete %s daemonset %q: %w", v.GetName(), ds.Name, err)
+	}
+
+	logger.Info("initiated DaemonSet deletion", "DaemonSet", ds.Name)
+
+	if err := r.Get(ctx, client.ObjectKeyFromObject(&ds), &ds); err == nil {
+		return fmt.Errorf("%s daemonset %q still has to be removed", v.GetName(), ds.Name)
+	} else if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to verify deletion of %s daemonset %q: %w", v.GetName(), ds.Name, err)
+	}
+
+	// because we have background deletion, we also have to check the pods
+	// if there are still pods, we have to wait for them to be removed
+	// if there are no pods, we can consider the daemonset deleted
+	podList := &v1.PodList{}
+	if err := r.List(ctx, podList, client.InNamespace(r.GetNamespace()),
+		client.MatchingLabels(ds.Spec.Selector.MatchLabels),
+	); err != nil {
+		return fmt.Errorf("failed to list pods for DaemonSet %q: %w", ds.Name, err)
+	} else if len(podList.Items) > 0 {
+		return fmt.Errorf("DaemonSet %q still has %d pods running", ds.Name, len(podList.Items))
+	}
+
 	return nil
 }
 

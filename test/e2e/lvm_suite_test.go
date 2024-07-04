@@ -19,6 +19,7 @@ package e2e
 import (
 	"context"
 	"flag"
+	"sync/atomic"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	ctrlZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
+
+var skipSuiteCleanup = atomic.Bool{}
 
 func TestLvm(t *testing.T) {
 	flag.Parse()
@@ -54,11 +57,21 @@ var _ = BeforeSuite(func(ctx context.Context) {
 })
 
 var _ = AfterSuite(func(ctx context.Context) {
+	if skipSuiteCleanup.Load() {
+		Skip("Skipping cleanup of Namespace and Operator")
+	}
+
 	lvmNamespaceCleanup(ctx)
 	afterTestSuiteCleanup(ctx)
 })
 
 var _ = Describe("LVM Operator e2e tests", func() {
+	JustAfterEach(func(ctx SpecContext) {
+		SummaryOnFailure(ctx)
+	})
 	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
-	Describe("PVC", Serial, Ordered, pvcTest)
+	Describe("PVC", Serial, Ordered, func() {
+		Describe("Thin", Serial, Ordered, pvcTestThinProvisioning)
+		Describe("Thick", Serial, Ordered, pvcTestThickProvisioning)
+	})
 })

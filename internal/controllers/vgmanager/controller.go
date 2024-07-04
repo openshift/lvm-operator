@@ -30,9 +30,9 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -95,7 +95,6 @@ type Reconciler struct {
 	NodeName  string
 	Namespace string
 	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
-	Shutdown  context.CancelFunc
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -125,13 +124,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err != nil {
-		if k8serrors.IsNotFound(err) {
-			if err := r.Create(ctx, nodeStatus); err != nil {
-				return ctrl.Result{}, fmt.Errorf("could not create previously non-existing LVMVolumeGroupNodeStatus: %w", err)
-			}
-		} else {
-			return ctrl.Result{}, fmt.Errorf("could not determine if LVMVolumeGroupNodeStatus still needs to be created: %w", err)
-		}
+		return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus: %w", err)
 	}
 
 	return r.reconcile(ctx, volumeGroup, nodeStatus)
@@ -228,14 +221,17 @@ func (r *Reconciler) reconcile(
 
 		logger.V(1).Info("no new available devices discovered, verifying existing setup")
 
-		// since the last reconciliation there could have been corruption on the LVs, so we need to verify them again
-		if err := r.validateLVs(ctx, volumeGroup); err != nil {
-			err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
-			r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
-				logger.Error(err, "failed to set status to failed")
+		// If we are provisioning a thin pool, we need to verify that the thin pool and its LVs are in a consistent state
+		if volumeGroup.Spec.ThinPoolConfig != nil {
+			// since the last reconciliation there could have been corruption on the LVs, so we need to verify them again
+			if err := r.validateLVs(ctx, volumeGroup); err != nil {
+				err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
+				r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
+				if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+					logger.Error(err, "failed to set status to failed")
+				}
+				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, err
 		}
 
 		if err := r.applyLVMDConfig(ctx, volumeGroup, vgs, devices); err != nil {
@@ -273,23 +269,24 @@ func (r *Reconciler) reconcile(
 	}
 
 	// Create thin pool
-	if err = r.addThinPoolToVG(ctx, volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig); err != nil {
-		err := fmt.Errorf("failed to create thin pool %s for volume group %s: %w", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err)
-		r.WarningEvent(ctx, volumeGroup, EventReasonErrorThinPoolCreateOrExtendFailed, err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
-			logger.Error(err, "failed to set status to failed")
+	if volumeGroup.Spec.ThinPoolConfig != nil {
+		if err = r.addThinPoolToVG(ctx, volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig); err != nil {
+			err := fmt.Errorf("failed to create thin pool %s for volume group %s: %w", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err)
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorThinPoolCreateOrExtendFailed, err)
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
-	}
-
-	// Validate the LVs created from the Thin-Pool to make sure the adding went as planned.
-	if err := r.validateLVs(ctx, volumeGroup); err != nil {
-		err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
-		r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
-			logger.Error(err, "failed to set status to failed")
+		// Validate the LVs created from the Thin-Pool to make sure the adding went as planned.
+		if err := r.validateLVs(ctx, volumeGroup); err != nil {
+			err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
 	}
 
 	// refresh list of vgs to be used in status
@@ -348,16 +345,21 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 	}
 	if !found {
 		dc := &lvmd.DeviceClass{
-			Name:           volumeGroup.Name,
-			VolumeGroup:    volumeGroup.Name,
-			Default:        volumeGroup.Spec.Default,
-			ThinPoolConfig: &lvmd.ThinPoolConfig{},
+			Name:        volumeGroup.Name,
+			VolumeGroup: volumeGroup.Name,
+			Default:     volumeGroup.Spec.Default,
 		}
 
 		if volumeGroup.Spec.ThinPoolConfig != nil {
 			dc.Type = lvmd.TypeThin
-			dc.ThinPoolConfig.Name = volumeGroup.Spec.ThinPoolConfig.Name
-			dc.ThinPoolConfig.OverprovisionRatio = float64(volumeGroup.Spec.ThinPoolConfig.OverprovisionRatio)
+			dc.ThinPoolConfig = &lvmd.ThinPoolConfig{
+				Name:               volumeGroup.Spec.ThinPoolConfig.Name,
+				OverprovisionRatio: float64(volumeGroup.Spec.ThinPoolConfig.OverprovisionRatio),
+			}
+		} else {
+			dc.Type = lvmd.TypeThick
+			// set SpareGB to 0 to avoid automatic default to 10GiB
+			dc.SpareGB = ptr.To(uint64(0))
 		}
 
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
@@ -392,11 +394,9 @@ func (r *Reconciler) updateLVMDConfigAfterReconcile(
 		if err := r.LVMD.Save(ctx, newCFG); err != nil {
 			return fmt.Errorf("failed to update lvmd config file to update volume group %s: %w", volumeGroup.GetName(), err)
 		}
-		msg := "updated lvmd config with new deviceClasses, now restarting.."
+		msg := "updated lvmd config with new deviceClasses"
 		logger.Info(msg)
 		r.NormalEvent(ctx, volumeGroup, EventReasonLVMDConfigUpdated, msg)
-
-		r.Shutdown()
 	}
 	return nil
 }
@@ -569,6 +569,10 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 					"you should manually extend the metadata_partition or you will risk data loss: metadata_percent: %v", metadataPercentage, lv.MetadataPercent)
 			}
 
+			if err := verifyChunkSizeForPolicy(volumeGroup.Spec.ThinPoolConfig, lv); err != nil {
+				return err
+			}
+
 			logger.V(1).Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
 		}
 		if !thinPoolExists {
@@ -610,12 +614,24 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	}
 
 	logger.Info("creating lvm thinpool")
-	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent); err != nil {
+	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config)); err != nil {
 		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
 	logger.Info("successfully created thinpool")
 
 	return nil
+}
+
+// convertChunkSize converts the chunk size from the ThinPoolConfig to the correct value for the LVM API
+// if the ChunkSizeCalculationPolicy is set to Host, it will return -1, signaling the LVM API to use the Host value.
+func convertChunkSize(config *lvmv1alpha1.ThinPoolConfig) int64 {
+	if config.ChunkSizeCalculationPolicy == lvmv1alpha1.ChunkSizeCalculationPolicyHost {
+		return -1
+	}
+	if config.ChunkSize == nil {
+		return lvmv1alpha1.ChunkSizeDefault.Value()
+	}
+	return config.ChunkSize.Value()
 }
 
 func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
@@ -732,4 +748,21 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolume
 	}
 	r.Event(obj, corev1.EventTypeNormal, string(reason),
 		fmt.Sprintf("update on node %s: %s", client.ObjectKeyFromObject(nodeStatus), message))
+}
+
+func verifyChunkSizeForPolicy(config *lvmv1alpha1.ThinPoolConfig, lv lvm.LogicalVolume) error {
+	if config.ChunkSizeCalculationPolicy == lvmv1alpha1.ChunkSizeCalculationPolicyHost {
+		// Host policy means that the chunk size is not set by the user, but by the host and cannot be validated
+		// against the spec
+		return nil
+	}
+	if chunkSizeBytes, err := strconv.ParseInt(lv.ChunkSize, 10, 64); err == nil {
+		if chunkSizeBytes != convertChunkSize(config) {
+			return fmt.Errorf("chunk size of logical volume %s does not match the static policy: %w", lv.Name, err)
+		}
+	} else {
+		return fmt.Errorf("could not parse chunk size from logical volume %s to verify against static policy: %w", lv.Name, err)
+	}
+
+	return nil
 }

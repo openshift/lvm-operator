@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/labels"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,12 +82,21 @@ func (c csiDriver) EnsureDeleted(r Reconciler, ctx context.Context, _ *lvmv1alph
 		return fmt.Errorf("the CSIDriver %s is still present, waiting for deletion", constants.TopolvmCSIDriverName)
 	}
 
-	if err := r.Delete(ctx, csiDriverResource); err != nil {
+	if err := r.Delete(ctx, csiDriverResource); errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
 		return fmt.Errorf("failed to delete topolvm csi driver %s: %w", csiDriverResource.GetName(), err)
 	}
-	logger.Info("initiated topolvm csi driver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
 
-	return nil
+	logger.Info("initiated CSIDriver deletion", "TopolvmCSIDriverName", csiDriverResource.Name)
+
+	if err := r.Get(ctx, name, csiDriverResource); errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to verify deletion of topolvm csi driver %s: %w", csiDriverResource.GetName(), err)
+	} else {
+		return fmt.Errorf("topolvm csi driver %s still has to be removed", csiDriverResource.Name)
+	}
 }
 
 func getCSIDriverResource() *storagev1.CSIDriver {

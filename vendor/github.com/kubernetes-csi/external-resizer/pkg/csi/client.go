@@ -46,7 +46,11 @@ type Client interface {
 	// in NodeGetCapabilities() gRPC call.
 	SupportsNodeResize(ctx context.Context) (bool, error)
 
-	// SupportsControllerResize returns whether the CSI driver reports
+	// SupportsControllerModify returns whether the CSI driver reports MODIFY_VOLUME
+	// in ControllerGetCapabilities() gRPC call.
+	SupportsControllerModify(ctx context.Context) (bool, error)
+
+	// SupportsControllerSingleNodeMultiWriter returns whether the CSI driver reports
 	// SINGLE_NODE_MULTI_WRITER in ControllerGetCapabilities() gRPC call.
 	SupportsControllerSingleNodeMultiWriter(ctx context.Context) (bool, error)
 
@@ -56,16 +60,19 @@ type Client interface {
 
 	//CloseConnection closes the gRPC connection established by the client
 	CloseConnection()
+
+	// Modify modifies the volume's mutable parameters
+	Modify(ctx context.Context, volumeID string, secrets map[string]string, mutableParameters map[string]string) error
 }
 
 // New creates a new CSI client.
-func New(address string, timeout time.Duration, metricsManager metrics.CSIMetricsManager) (Client, error) {
-	conn, err := connection.Connect(address, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+func New(ctx context.Context, address string, timeout time.Duration, metricsManager metrics.CSIMetricsManager) (Client, error) {
+	conn, err := connection.Connect(ctx, address, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to CSI driver: %v", err)
 	}
 
-	err = csirpc.ProbeForever(conn, timeout)
+	err = csirpc.ProbeForever(ctx, conn, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed probing CSI driver: %v", err)
 	}
@@ -123,6 +130,14 @@ func (c *client) SupportsNodeResize(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (c *client) SupportsControllerModify(ctx context.Context) (bool, error) {
+	caps, err := csirpc.GetControllerCapabilities(ctx, c.conn)
+	if err != nil {
+		return false, fmt.Errorf("error getting controller capabilities: %v", err)
+	}
+	return caps[csi.ControllerServiceCapability_RPC_MODIFY_VOLUME], nil
+}
+
 func (c *client) SupportsControllerSingleNodeMultiWriter(ctx context.Context) (bool, error) {
 	caps, err := csirpc.GetControllerCapabilities(ctx, c.conn)
 	if err != nil {
@@ -148,6 +163,24 @@ func (c *client) Expand(
 		return 0, false, err
 	}
 	return resp.CapacityBytes, resp.NodeExpansionRequired, nil
+}
+
+func (c *client) Modify(
+	ctx context.Context,
+	volumeID string,
+	secrets map[string]string,
+	mutableParameters map[string]string) error {
+	req := &csi.ControllerModifyVolumeRequest{
+		VolumeId:          volumeID,
+		Secrets:           secrets,
+		MutableParameters: mutableParameters,
+	}
+
+	_, err := c.ctrlClient.ControllerModifyVolume(ctx, req)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *client) CloseConnection() {

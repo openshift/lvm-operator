@@ -22,6 +22,15 @@ import (
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type DeviceDiscoveryPolicy string
+
+const (
+	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
+	DeviceDiscoveryPolicyPreconfigured DeviceDiscoveryPolicy = "Preconfigured"
+	// DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
+	DeviceDiscoveryPolicyRuntimeDynamic DeviceDiscoveryPolicy = "RuntimeDynamic"
+)
+
 // LVMVolumeGroupNodeStatusSpec defines the desired state of LVMVolumeGroupNodeStatus
 type LVMVolumeGroupNodeStatusSpec struct {
 	// NodeStatus contains the per node status of the VG
@@ -53,6 +62,15 @@ type VGStatus struct {
 	// Excluded contains the per node status of applied device exclusions that were picked up via selector,
 	// but were not used for other reasons.
 	Excluded []ExcludedDevice `json:"excluded,omitempty"`
+	// DeviceDiscoveryPolicy is a field to indicate whether the devices are discovered
+	// at runtime or preconfigured through a DeviceSelector
+	// Setting this to DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
+	// Setting this to DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
+	// By default, the value is set to RuntimeDynamic.
+	// +kubebuilder:validation:Enum=Preconfigured;RuntimeDynamic
+	// +kubebuilder:default=RuntimeDynamic
+	// +kubebuilder:validation:Required
+	DeviceDiscoveryPolicy DeviceDiscoveryPolicy `json:"deviceDiscoveryPolicy,omitempty"`
 }
 
 type ExcludedDevice struct {

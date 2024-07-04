@@ -23,10 +23,11 @@ import (
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -57,14 +58,26 @@ const (
 	pvcTypeStatic    pvcType = "static"
 )
 
-func pvcTest() {
+type pvcTestOptions struct {
+	k8sv1.PersistentVolumeMode
+	pvcType
+	snapshot bool
+}
+
+func pvcTestThinProvisioning() {
 	var cluster *v1alpha1.LVMCluster
 	BeforeAll(func(ctx SpecContext) {
 		cluster = GetDefaultTestLVMClusterTemplate()
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
 		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
+				By("Test failed, skipping cluster cleanup")
+				skipSuiteCleanup.Store(true)
+				return
+			}
 			DeleteResource(ctx, cluster)
+			validateCSINodeInfo(ctx, cluster, false)
 		})
 	})
 
@@ -82,16 +95,70 @@ func pvcTest() {
 		Context(fmt.Sprintf("PersistentVolumeMode: %s", string(pvMode)), func() {
 			for _, pvcType := range pvcTypes {
 				Context(fmt.Sprintf("PVC Type: %s", pvcType), func() {
-					pvcTestsForMode(pvMode, pvcType)
+					pvcTestsForMode(pvcTestOptions{
+						PersistentVolumeMode: pvMode,
+						pvcType:              pvcType,
+						// Thick provisioning does not support Snapshot
+						snapshot: true,
+					})
 				})
 			}
 		})
 	}
 }
 
-func pvcTestsForMode(volumeMode k8sv1.PersistentVolumeMode, pvcType pvcType) {
+func pvcTestThickProvisioning() {
+	var cluster *v1alpha1.LVMCluster
+	BeforeAll(func(ctx SpecContext) {
+		cluster = GetDefaultTestLVMClusterTemplate()
+
+		// set ThinPoolConfig to nil
+		for _, dc := range cluster.Spec.Storage.DeviceClasses {
+			dc.ThinPoolConfig = nil
+		}
+
+		CreateResource(ctx, cluster)
+		VerifyLVMSSetup(ctx, cluster)
+		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
+				By("Test failed, skipping cluster cleanup")
+				skipSuiteCleanup.Store(true)
+				return
+			}
+			DeleteResource(ctx, cluster)
+			validateCSINodeInfo(ctx, cluster, false)
+		})
+	})
+
+	volumeModes := []k8sv1.PersistentVolumeMode{
+		k8sv1.PersistentVolumeBlock,
+		k8sv1.PersistentVolumeFilesystem,
+	}
+
+	pvcTypes := []pvcType{
+		pvcTypeEphemeral,
+		pvcTypeStatic,
+	}
+
+	for _, pvMode := range volumeModes {
+		Context(fmt.Sprintf("PersistentVolumeMode: %s", string(pvMode)), func() {
+			for _, pvcType := range pvcTypes {
+				Context(fmt.Sprintf("PVC Type: %s", pvcType), func() {
+					pvcTestsForMode(pvcTestOptions{
+						PersistentVolumeMode: pvMode,
+						pvcType:              pvcType,
+						// Thick provisioning does not support Snapshot
+						snapshot: false,
+					})
+				})
+			}
+		})
+	}
+}
+
+func pvcTestsForMode(options pvcTestOptions) {
 	var contentMode ContentMode
-	switch volumeMode {
+	switch options.PersistentVolumeMode {
 	case k8sv1.PersistentVolumeBlock:
 		contentMode = ContentModeBlock
 	case k8sv1.PersistentVolumeFilesystem:
@@ -100,24 +167,24 @@ func pvcTestsForMode(volumeMode k8sv1.PersistentVolumeMode, pvcType pvcType) {
 
 	var pod *k8sv1.Pod
 	var pvc *k8sv1.PersistentVolumeClaim
-	switch pvcType {
+	switch options.pvcType {
 	case pvcTypeStatic:
-		pvc = generatePVC(volumeMode)
+		pvc = generatePVC(options.PersistentVolumeMode)
 		pod = generatePodConsumingPVC(pvc)
 	case pvcTypeEphemeral:
-		pod = generatePodWithEphemeralVolume(volumeMode)
+		pod = generatePodWithEphemeralVolume(options.PersistentVolumeMode)
 		// recreates locally what will be created as an ephemeral volume
 		pvc = &k8sv1.PersistentVolumeClaim{}
 		pvc.SetName(fmt.Sprintf("%s-%s", pod.GetName(), pod.Spec.Volumes[0].Name))
 		pvc.SetNamespace(pod.GetNamespace())
-		pvc.Spec.VolumeMode = &volumeMode
+		pvc.Spec.VolumeMode = &options.PersistentVolumeMode
 	}
 
 	clonePVC := generatePVCCloneFromPVC(pvc)
 	clonePod := generatePodConsumingPVC(clonePVC)
 
 	snapshot := generateVolumeSnapshot(pvc, snapshotClass)
-	snapshotPVC := generatePVCFromSnapshot(volumeMode, snapshot)
+	snapshotPVC := generatePVCFromSnapshot(options.PersistentVolumeMode, snapshot)
 	snapshotPod := generatePodConsumingPVC(snapshotPVC)
 
 	AfterAll(DeleteResources([][]client.Object{
@@ -128,7 +195,7 @@ func pvcTestsForMode(volumeMode k8sv1.PersistentVolumeMode, pvcType pvcType) {
 
 	expectedData := "TESTDATA"
 	It("PVC and Pod", func(ctx SpecContext) {
-		if pvcType == pvcTypeStatic {
+		if options.pvcType == pvcTypeStatic {
 			CreateResource(ctx, pvc)
 		}
 		CreateResource(ctx, pod)
@@ -148,17 +215,20 @@ func pvcTestsForMode(volumeMode k8sv1.PersistentVolumeMode, pvcType pvcType) {
 		validatePodData(ctx, clonePod, expectedData, contentMode)
 	})
 
-	It("Snapshots", func(ctx SpecContext) {
-		createVolumeSnapshotFromPVCOrSkipIfUnsupported(ctx, snapshot)
-		validateSnapshotReadyToUse(ctx, client.ObjectKeyFromObject(snapshot))
+	if options.snapshot {
+		It("Snapshots", func(ctx SpecContext) {
+			createVolumeSnapshotFromPVCOrSkipIfUnsupported(ctx, snapshot)
+			validateSnapshotReadyToUse(ctx, client.ObjectKeyFromObject(snapshot))
 
-		CreateResource(ctx, snapshotPVC)
-		CreateResource(ctx, snapshotPod)
+			CreateResource(ctx, snapshotPVC)
+			CreateResource(ctx, snapshotPod)
 
-		validatePodIsRunning(ctx, client.ObjectKeyFromObject(snapshotPod))
-		validatePVCIsBound(ctx, client.ObjectKeyFromObject(snapshotPVC))
-		validatePodData(ctx, snapshotPod, expectedData, contentMode)
-	})
+			validatePodIsRunning(ctx, client.ObjectKeyFromObject(snapshotPod))
+			validatePVCIsBound(ctx, client.ObjectKeyFromObject(snapshotPVC))
+			validatePodData(ctx, snapshotPod, expectedData, contentMode)
+		})
+	}
+
 }
 
 func generatePVCSpec(mode k8sv1.PersistentVolumeMode) k8sv1.PersistentVolumeClaimSpec {
@@ -232,12 +302,12 @@ func generateContainer(mode k8sv1.PersistentVolumeMode) k8sv1.Container {
 func generatePodConsumingPVC(pvc *k8sv1.PersistentVolumeClaim) *k8sv1.Pod {
 	return &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:                       fmt.Sprintf("%s-consumer", pvc.GetName()),
-			Namespace:                  testNamespace,
-			DeletionGracePeriodSeconds: ptr.To(int64(1)),
+			Name:      fmt.Sprintf("%s-consumer", pvc.GetName()),
+			Namespace: testNamespace,
 		},
 		Spec: k8sv1.PodSpec{
-			Containers: []k8sv1.Container{generateContainer(*pvc.Spec.VolumeMode)},
+			TerminationGracePeriodSeconds: ptr.To(int64(1)),
+			Containers:                    []k8sv1.Container{generateContainer(*pvc.Spec.VolumeMode)},
 			Volumes: []k8sv1.Volume{{
 				Name: VolumeNameForPVCTests,
 				VolumeSource: k8sv1.VolumeSource{
@@ -251,12 +321,12 @@ func generatePodConsumingPVC(pvc *k8sv1.PersistentVolumeClaim) *k8sv1.Pod {
 func generatePodWithEphemeralVolume(mode k8sv1.PersistentVolumeMode) *k8sv1.Pod {
 	return &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:                       fmt.Sprintf("%s-ephemeral", strings.ToLower(string(mode))),
-			Namespace:                  testNamespace,
-			DeletionGracePeriodSeconds: ptr.To(int64(1)),
+			Name:      fmt.Sprintf("%s-ephemeral", strings.ToLower(string(mode))),
+			Namespace: testNamespace,
 		},
 		Spec: k8sv1.PodSpec{
-			Containers: []k8sv1.Container{generateContainer(mode)},
+			TerminationGracePeriodSeconds: ptr.To(int64(1)),
+			Containers:                    []k8sv1.Container{generateContainer(mode)},
 			Volumes: []k8sv1.Volume{{
 				Name: VolumeNameForPVCTests,
 				VolumeSource: k8sv1.VolumeSource{

@@ -20,12 +20,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/resource"
 	"gotest.tools/v3/assert"
 
 	"github.com/go-logr/logr/testr"
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -95,7 +96,7 @@ func TestVGManagerEnsureCreated(t *testing.T) {
 			Spec: testCase.lvmclusterSpec,
 		}
 		r := newFakeReconciler(t, lvmcluster)
-		var unit = resource.VGManager()
+		var unit = resource.VGManager(cluster.TypeOCP)
 		err := unit.EnsureCreated(r, log.IntoContext(context.Background(), testr.New(t)), lvmcluster)
 		assert.NilError(t, err, "running EnsureCreated")
 		ds := &appsv1.DaemonSet{}

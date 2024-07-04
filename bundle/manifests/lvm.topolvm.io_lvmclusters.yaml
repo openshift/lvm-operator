@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   creationTimestamp: null
   name: lvmclusters.lvm.topolvm.io
 spec:
@@ -44,42 +44,39 @@ spec:
             description: LVMClusterSpec defines the desired state of LVMCluster
             properties:
               storage:
-                description: Storage describes the deviceClass configuration for local
-                  storage devices
+                description: Storage contains the device class configuration for local
+                  storage devices.
                 properties:
                   deviceClasses:
-                    description: DeviceClasses are a rules that assign local storage
-                      devices to volumegroups that are used for creating lvm based
-                      PVs
+                    description: DeviceClasses contains the configuration to assign
+                      the local storage devices to the LVM volume groups that you
+                      can use to provision persistent volume claims (PVCs).
                     items:
                       properties:
                         default:
-                          description: Default is a flag to indicate whether the device-class
-                            is the default
+                          description: Default is a flag to indicate that a device
+                            class is the default. You can configure only a single
+                            default device class.
                           type: boolean
                         deviceSelector:
-                          description: DeviceSelector is a set of rules that should
-                            match for a device to be included in the LVMCluster
+                          description: DeviceSelector contains the configuration to
+                            specify paths to the devices that you want to add to the
+                            LVM volume group, and force wipe the selected devices.
                           properties:
                             forceWipeDevicesAndDestroyAllData:
                               description: |-
-                                ForceWipeDevicesAndDestroyAllData runs wipefs to wipe the devices.
-                                This can lead to data lose. Enable this only when you know that the disk
-                                does not contain any important data.
+                                ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
+                                This wipes the file signatures on the devices. Use this feature with caution.
+                                Force wipe the devices only when you know that they do not contain any important data.
                               type: boolean
                             optionalPaths:
-                              description: |-
-                                A list of device paths which could be chosen for creating Volume Group.
-                                For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
-                                We discourage using the device names as they can change over node restarts.
+                              description: OptionalPaths specify the optional device
+                                paths.
                               items:
                                 type: string
                               type: array
                             paths:
-                              description: |-
-                                A list of device paths which would be chosen for creating Volume Group.
-                                For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
-                                We discourage using the device names as they can change over node restarts.
+                              description: Paths specify the device paths.
                               items:
                                 type: string
                               type: array
@@ -87,24 +84,23 @@ spec:
                         fstype:
                           default: xfs
                           description: FilesystemType sets the filesystem the device
-                            should use
+                            should use. Select either `ext4` or `xfs`.
                           enum:
                           - xfs
                           - ext4
                           - ""
                           type: string
                         name:
-                          description: |-
-                            Name of the class, the VG and possibly the storageclass.
-                            Validations to confirm that this field can be used as metadata.name field in storageclass
-                            ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209
+                          description: Name specifies a name for the device class
                           maxLength: 245
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                           type: string
                         nodeSelector:
-                          description: NodeSelector chooses nodes on which to create
-                            the deviceclass
+                          description: NodeSelector contains the configuration to
+                            choose the nodes on which you want to create the LVM volume
+                            group. If this field is not configured, all nodes without
+                            no-schedule taints are considered.
                           properties:
                             nodeSelectorTerms:
                               description: Required. A list of node selector terms.
@@ -142,11 +138,13 @@ spec:
                                           items:
                                             type: string
                                           type: array
+                                          x-kubernetes-list-type: atomic
                                       required:
                                       - key
                                       - operator
                                       type: object
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                   matchFields:
                                     description: A list of node selector requirements
                                       by node's fields.
@@ -174,36 +172,63 @@ spec:
                                           items:
                                             type: string
                                           type: array
+                                          x-kubernetes-list-type: atomic
                                       required:
                                       - key
                                       - operator
                                       type: object
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                 type: object
                                 x-kubernetes-map-type: atomic
                               type: array
+                              x-kubernetes-list-type: atomic
                           required:
                           - nodeSelectorTerms
                           type: object
                           x-kubernetes-map-type: atomic
                         thinPoolConfig:
-                          description: ThinPoolConfig contains configurations for
-                            the thin-pool
+                          description: ThinPoolConfig contains the configuration to
+                            create a thin pool in the LVM volume group. If you exclude
+                            this field, logical volumes are thick provisioned.
                           properties:
+                            chunkSize:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                ChunkSize specifies the statically calculated chunk size for the thin pool.
+                                Thus, It is only used when the ChunkSizeCalculationPolicy is set to Static.
+                                No ChunkSize with a ChunkSizeCalculationPolicy set to Static will result in a default chunk size of 128Ki.
+                                It can be between 64Ki and 1Gi due to the underlying limitations of lvm2.
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            chunkSizeCalculationPolicy:
+                              default: Static
+                              description: |-
+                                ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
+                                When set to Host, the chunk size is calculated based on the lvm2 host setting on the node.
+                                When set to Static, the chunk size is calculated based on the static size attribute provided within ChunkSize.
+                              enum:
+                              - Host
+                              - Static
+                              type: string
                             name:
-                              description: Name of the thin pool to be created
+                              description: Name specifies a name for the thin pool.
                               type: string
                             overprovisionRatio:
-                              description: |-
-                                OverProvisionRatio is the factor by which additional storage can be provisioned compared to
-                                the available storage in the thin pool.
+                              description: OverProvisionRatio specifies a factor by
+                                which you can provision additional storage based on
+                                the available storage in the thin pool. To prevent
+                                over-provisioning through validation, set this field
+                                to 1.
                               minimum: 1
                               type: integer
                             sizePercent:
                               default: 90
-                              description: |-
-                                SizePercent represents percentage of remaining space in the volume group that should be used
-                                for creating the thin pool.
+                              description: SizePercent specifies the percentage of
+                                space in the LVM volume group for creating the thin
+                                pool.
                               maximum: 90
                               minimum: 10
                               type: integer
@@ -211,8 +236,6 @@ spec:
                           - name
                           - overprovisionRatio
                           type: object
-                      required:
-                      - thinPoolConfig
                       type: object
                     type: array
                 type: object
@@ -262,27 +285,69 @@ spec:
               conditions:
                 description: Conditions describes the state of the resource.
                 items:
-                  description: |-
-                    Condition represents the state of the operator's
-                    reconciliation functionality.
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
                   properties:
-                    lastHeartbeatTime:
-                      format: date-time
-                      type: string
                     lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
                       type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
                     reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                       type: string
                     status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
                       type: string
                     type:
-                      description: ConditionType is the state of the operator's reconciliation
-                        functionality.
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
                   required:
+                  - lastTransitionTime
+                  - message
+                  - reason
                   - status
                   - type
                   type: object
@@ -303,6 +368,18 @@ spec:
                         description: NodeStatus defines the observed state of the
                           deviceclass on the node
                         properties:
+                          deviceDiscoveryPolicy:
+                            default: RuntimeDynamic
+                            description: |-
+                              DeviceDiscoveryPolicy is a field to indicate whether the devices are discovered
+                              at runtime or preconfigured through a DeviceSelector
+                              Setting this to DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
+                              Setting this to DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
+                              By default, the value is set to RuntimeDynamic.
+                            enum:
+                            - Preconfigured
+                            - RuntimeDynamic
+                            type: string
                           devices:
                             description: Devices is the list of devices used by the
                               volume group

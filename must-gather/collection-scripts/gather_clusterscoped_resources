@@ -1,4 +1,8 @@
 #!/bin/bash
+
+source gather_common
+get_log_collection_args
+
 # Expect base collection path as an argument
 BASE_COLLECTION_PATH=$1
 
@@ -6,9 +10,6 @@ BASE_COLLECTION_PATH=$1
 if [ "${BASE_COLLECTION_PATH}" = "" ]; then
     BASE_COLLECTION_PATH=$(pwd)
 fi
-
-# Expect time option as an argument
-SINCE_TIME=$2
 
 # Command List
 commands_get=()
@@ -67,7 +68,7 @@ done
 
 # Run the Collection of Resources oc yaml to list
 for oc_yaml in "${oc_yamls[@]}"; do
-    { oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect "${oc_yaml}" --"${SINCE_TIME}"; } >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
+    { oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect "${oc_yaml}" ${log_collection_args}; } >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
 done
 
 # Run the Collection of Resources oc describe to list

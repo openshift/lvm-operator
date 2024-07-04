@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -33,11 +34,16 @@ func lvmClusterTest() {
 		cluster = GetDefaultTestLVMClusterTemplate()
 	})
 	AfterEach(func(ctx SpecContext) {
+		if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
+			By("Test failed, skipping cluster cleanup")
+			skipSuiteCleanup.Store(true)
+			return
+		}
 		DeleteResource(ctx, cluster)
+		validateCSINodeInfo(ctx, cluster, false)
 	})
 
 	Describe("Filesystem Type", Serial, func() {
-
 		It("should default to xfs", func(ctx SpecContext) {
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
@@ -70,6 +76,16 @@ func lvmClusterTest() {
 				dc.Default = false
 			}
 
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+		})
+	})
+
+	Describe("Thick Provisioning", Serial, func() {
+		It("should become ready if ThinPoolConfig is empty (thick provisioning)", func(ctx SpecContext) {
+			for _, dc := range cluster.Spec.Storage.DeviceClasses {
+				dc.ThinPoolConfig = nil
+			}
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
 		})

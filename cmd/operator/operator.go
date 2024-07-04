@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/logpassthrough"
@@ -35,10 +37,12 @@ import (
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
 	"github.com/openshift/lvm-operator/internal/migration/microlvms"
 	"github.com/spf13/cobra"
-	topolvmcontrollers "github.com/topolvm/topolvm/controllers"
-	"github.com/topolvm/topolvm/driver"
+	topolvmcontrollers "github.com/topolvm/topolvm/pkg/controller"
+	"github.com/topolvm/topolvm/pkg/driver"
 	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -56,7 +60,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
 	"github.com/openshift/lvm-operator/internal/cluster"
 	//+kubebuilder:scaffold:imports
@@ -81,6 +85,7 @@ type Options struct {
 	LogPassthroughOptions *logpassthrough.Options
 
 	vgManagerCommand []string
+	Metrics          *connection.ExtendedCSIMetricsManager
 }
 
 // NewCmd creates a new CLI command
@@ -115,6 +120,18 @@ func NewCmd(opts *Options) *cobra.Command {
 	)
 
 	return cmd
+}
+
+// NoManagedFields removes the managedFields from the object.
+// This is used to reduce memory usage of the objects in the cache.
+// This MUST NOT be used for SSA.
+func NoManagedFields(i any) (any, error) {
+	it, ok := i.(client.Object)
+	if !ok {
+		return nil, fmt.Errorf("unexpected object type: %T", i)
+	}
+	it.SetManagedFields(nil)
+	return it, nil
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
@@ -174,6 +191,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			Port: 9443,
 		}},
 		Cache: cache.Options{
+			DefaultTransform: NoManagedFields,
 			ByObject: map[client.Object]cache.ByObject{
 				&lvmv1alpha1.LVMCluster{}:               {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 				&lvmv1alpha1.LVMVolumeGroup{}:           {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
@@ -231,13 +249,11 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	// register TopoLVM controllers
-	topolvmNodeController := topolvmcontrollers.NewNodeReconciler(mgr.GetClient(), false)
-	if err := topolvmNodeController.SetupWithManager(mgr); err != nil {
+	if err := topolvmcontrollers.SetupNodeReconciler(mgr, mgr.GetClient(), false); err != nil {
 		return fmt.Errorf("unable to create TopoLVM Node controller: %w", err)
 	}
 
-	topolvmPVCController := topolvmcontrollers.NewPersistentVolumeClaimReconciler(mgr.GetClient(), mgr.GetAPIReader())
-	if err := topolvmPVCController.SetupWithManager(mgr); err != nil {
+	if err := topolvmcontrollers.SetupPersistentVolumeClaimReconciler(mgr, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
 		return fmt.Errorf("unable to create TopoLVM PVC controller: %w", err)
 	}
 
@@ -249,7 +265,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return true, nil
 	})
 	csi.RegisterIdentityServer(grpcServer, identityServer)
-	controllerSever, err := driver.NewControllerServer(mgr)
+	controllerSever, err := driver.NewControllerServer(mgr, driver.ControllerServerSettings{
+		MinimumAllocationSettings: driver.MinimumAllocationSettings{
+			Filesystem: map[string]driver.Quantity{
+				string(lvmv1alpha1.FilesystemTypeExt4): driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeExt4)),
+				string(lvmv1alpha1.FilesystemTypeXFS):  driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeXFS)),
+			},
+			Block: driver.Quantity(resource.MustParse(constants.DefaultMinimumAllocationSizeBlock)),
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -263,6 +287,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		DriverName:          constants.TopolvmCSIDriverName,
 		CSIEndpoint:         constants.DefaultCSISocket,
 		CSIOperationTimeout: 10 * time.Second,
+		Metrics:             opts.Metrics,
 	})); err != nil {
 		return fmt.Errorf("unable to create CSI Provisioner: %w", err)
 	}
@@ -289,6 +314,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 
+	if err := mgr.AddReadyzCheck("readyz", func(req *http.Request) error {
+		if err := readyCheck(mgr)(req); err != nil {
+			return err
+		}
+		return mgr.GetWebhookServer().StartedChecker()(req)
+	}); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
+	}
+
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, []os.Signal{os.Interrupt, syscall.SIGTERM}...)
 	go func() {
@@ -304,4 +338,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	return nil
+}
+
+// readyCheck returns a healthz.Checker that verifies the operator is ready
+func readyCheck(mgr manager.Manager) healthz.Checker {
+	return func(req *http.Request) error {
+		// Perform various checks here to determine if the operator is ready
+		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
+			return fmt.Errorf("informer cache not synced and thus not ready")
+		}
+		return nil
+	}
 }

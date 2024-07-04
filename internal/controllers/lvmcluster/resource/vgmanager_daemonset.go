@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/internal/cluster"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/lvmcluster/selector"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
@@ -204,16 +205,26 @@ var (
 	}
 )
 
-// newVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
-func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImage string, command, args []string) appsv1.DaemonSet {
+// templateVGManagerDaemonset returns the desired vgmanager daemonset for a given LVMCluster
+func templateVGManagerDaemonset(
+	lvmCluster *lvmv1alpha1.LVMCluster,
+	clusterType cluster.Type,
+	namespace, vgImage string,
+	command, args []string,
+) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
+	confMapVolume := LVMDConfMapVol
+	if clusterType == cluster.TypeMicroShift {
+		confMapVolume.VolumeSource.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
+	}
+
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{
 		RegistrationVol,
 		NodePluginVol,
 		CSIPluginVol,
 		PodVol,
-		LVMDConfMapVol,
+		confMapVolume,
 		DevHostDirVol,
 		UDevHostDirVol,
 		SysHostDirVol,
@@ -252,9 +263,19 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				Privileged: ptr.To(true),
 				RunAsUser:  ptr.To(int64(0)),
 			},
-			Ports: []corev1.ContainerPort{{Name: constants.TopolvmNodeContainerHealthzName,
-				ContainerPort: 8081,
-				Protocol:      corev1.ProtocolTCP}},
+			Ports: []corev1.ContainerPort{
+				{Name: constants.TopolvmNodeContainerHealthzName,
+					ContainerPort: 8081,
+					Protocol:      corev1.ProtocolTCP},
+			},
+			StartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
+						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
+				FailureThreshold:    10,
+				InitialDelaySeconds: 0,
+				TimeoutSeconds:      2,
+				PeriodSeconds:       2},
 			LivenessProbe: &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
@@ -262,7 +283,15 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				FailureThreshold:    3,
 				InitialDelaySeconds: 1,
 				TimeoutSeconds:      1,
-				PeriodSeconds:       10},
+				PeriodSeconds:       30},
+			ReadinessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{Path: "/readyz",
+						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
+				FailureThreshold:    3,
+				InitialDelaySeconds: 1,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       60},
 			VolumeMounts: volumeMounts,
 			Resources:    resourceRequirements,
 			Env: []corev1.EnvVar{
@@ -329,12 +358,13 @@ func newVGManagerDaemonset(lvmCluster *lvmv1alpha1.LVMCluster, namespace, vgImag
 				},
 
 				Spec: corev1.PodSpec{
-					PriorityClassName:  constants.PriorityClassNameUserCritical,
-					Volumes:            volumes,
-					Containers:         containers,
-					HostPID:            true,
-					Tolerations:        tolerations,
-					ServiceAccountName: constants.VGManagerServiceAccount,
+					TerminationGracePeriodSeconds: ptr.To(int64(30)),
+					PriorityClassName:             constants.PriorityClassNameUserCritical,
+					Volumes:                       volumes,
+					Containers:                    containers,
+					HostPID:                       true,
+					Tolerations:                   tolerations,
+					ServiceAccountName:            constants.VGManagerServiceAccount,
 				},
 			},
 		},

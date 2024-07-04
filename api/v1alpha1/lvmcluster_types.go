@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,31 +29,61 @@ type LVMClusterSpec struct {
 	// Tolerations to apply to nodes to act on
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-	// Storage describes the deviceClass configuration for local storage devices
+	// Storage contains the device class configuration for local storage devices.
 	// +Optional
 	Storage Storage `json:"storage,omitempty"`
 }
 
 type ThinPoolConfig struct {
-	// Name of the thin pool to be created
+	// Name specifies a name for the thin pool.
 	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
 
-	// SizePercent represents percentage of remaining space in the volume group that should be used
-	// for creating the thin pool.
+	// SizePercent specifies the percentage of space in the LVM volume group for creating the thin pool.
 	// +kubebuilder:default=90
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=90
 	SizePercent int `json:"sizePercent,omitempty"`
 
-	// OverProvisionRatio is the factor by which additional storage can be provisioned compared to
-	// the available storage in the thin pool.
+	// OverProvisionRatio specifies a factor by which you can provision additional storage based on the available storage in the thin pool. To prevent over-provisioning through validation, set this field to 1.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Required
 	// +required
 	OverprovisionRatio int `json:"overprovisionRatio"`
+
+	// ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
+	// When set to Host, the chunk size is calculated based on the lvm2 host setting on the node.
+	// When set to Static, the chunk size is calculated based on the static size attribute provided within ChunkSize.
+	// +kubebuilder:default=Static
+	// +kubebuilder:validation:Enum=Host;Static
+	// +required
+	ChunkSizeCalculationPolicy ChunkSizeCalculationPolicy `json:"chunkSizeCalculationPolicy,omitempty"`
+
+	// ChunkSize specifies the statically calculated chunk size for the thin pool.
+	// Thus, It is only used when the ChunkSizeCalculationPolicy is set to Static.
+	// No ChunkSize with a ChunkSizeCalculationPolicy set to Static will result in a default chunk size of 128Ki.
+	// It can be between 64Ki and 1Gi due to the underlying limitations of lvm2.
+	// +optional
+	ChunkSize *resource.Quantity `json:"chunkSize,omitempty"`
 }
+
+// ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
+// for more information, see man lvm.
+type ChunkSizeCalculationPolicy string
+
+const (
+	// ChunkSizeCalculationPolicyHost calculates the chunk size based on the lvm2 host setting on the node.
+	ChunkSizeCalculationPolicyHost ChunkSizeCalculationPolicy = "Host"
+	// ChunkSizeCalculationPolicyStatic calculates the chunk size based on a static size attribute.
+	ChunkSizeCalculationPolicyStatic ChunkSizeCalculationPolicy = "Static"
+)
+
+var (
+	ChunkSizeMinimum = resource.MustParse("64Ki")
+	ChunkSizeDefault = resource.MustParse("128Ki")
+	ChunkSizeMaximum = resource.MustParse("1Gi")
+)
 
 type DeviceFilesystemType string
 
@@ -62,32 +93,29 @@ const (
 )
 
 type DeviceClass struct {
-	// Name of the class, the VG and possibly the storageclass.
-	// Validations to confirm that this field can be used as metadata.name field in storageclass
-	// ref: https://github.com/kubernetes/apimachinery/blob/de7147/pkg/util/validation/validation.go#L209
+	// Name specifies a name for the device class
 	// +kubebuilder:validation:MaxLength=245
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
 	Name string `json:"name,omitempty"`
 
-	// DeviceSelector is a set of rules that should match for a device to be included in the LVMCluster
+	// DeviceSelector contains the configuration to specify paths to the devices that you want to add to the LVM volume group, and force wipe the selected devices.
 	// +optional
 	DeviceSelector *DeviceSelector `json:"deviceSelector,omitempty"`
 
-	// NodeSelector chooses nodes on which to create the deviceclass
+	// NodeSelector contains the configuration to choose the nodes on which you want to create the LVM volume group. If this field is not configured, all nodes without no-schedule taints are considered.
 	// +optional
 	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
-	// ThinPoolConfig contains configurations for the thin-pool
-	// +kubebuilder:validation:Required
-	// +required
-	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig"`
+	// ThinPoolConfig contains the configuration to create a thin pool in the LVM volume group. If you exclude this field, logical volumes are thick provisioned.
+	// +optional
+	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
 
-	// Default is a flag to indicate whether the device-class is the default
+	// Default is a flag to indicate that a device class is the default. You can configure only a single default device class.
 	// +optional
 	Default bool `json:"default,omitempty"`
 
-	// FilesystemType sets the filesystem the device should use
+	// FilesystemType sets the filesystem the device should use. Select either `ext4` or `xfs`.
 	// +kubebuilder:validation:Enum=xfs;ext4;""
 	// +kubebuilder:default=xfs
 	// +optional
@@ -100,21 +128,17 @@ type DeviceSelector struct {
 	// +optional
 	// MinSize *resource.Quantity `json:"minSize,omitempty"`
 
-	// A list of device paths which would be chosen for creating Volume Group.
-	// For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
-	// We discourage using the device names as they can change over node restarts.
+	// Paths specify the device paths.
 	// +optional
 	Paths []string `json:"paths,omitempty"`
 
-	// A list of device paths which could be chosen for creating Volume Group.
-	// For example "/dev/disk/by-path/pci-0000:04:00.0-nvme-1"
-	// We discourage using the device names as they can change over node restarts.
+	// OptionalPaths specify the optional device paths.
 	// +optional
 	OptionalPaths []string `json:"optionalPaths,omitempty"`
 
-	// ForceWipeDevicesAndDestroyAllData runs wipefs to wipe the devices.
-	// This can lead to data lose. Enable this only when you know that the disk
-	// does not contain any important data.
+	// ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
+	// This wipes the file signatures on the devices. Use this feature with caution.
+	// Force wipe the devices only when you know that they do not contain any important data.
 	// +optional
 	ForceWipeDevicesAndDestroyAllData *bool `json:"forceWipeDevicesAndDestroyAllData,omitempty"`
 }
@@ -130,6 +154,8 @@ const (
 	LVMStatusFailed LVMStateType = "Failed"
 	// LVMStatusDegraded means that the lvmcluster has been created but is not using the specified config
 	LVMStatusDegraded LVMStateType = "Degraded"
+	// LVMStatusUnknown means that the lvmcluster has been in an unknown state
+	LVMStatusUnknown LVMStateType = "Unknown"
 )
 
 // LVMClusterStatus defines the observed state of LVMCluster
@@ -147,55 +173,18 @@ type LVMClusterStatus struct {
 
 	// Conditions describes the state of the resource.
 	// +optional
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// DeviceClassStatuses describes the status of all deviceClasses
 	DeviceClassStatuses []DeviceClassStatus `json:"deviceClassStatuses,omitempty"`
 }
 
-// Condition represents the state of the operator's
-// reconciliation functionality.
-// +k8s:deepcopy-gen=true
-type Condition struct {
-	Type ConditionType `json:"type" description:"type of condition ie. Available|Progressing|Degraded."`
-
-	Status corev1.ConditionStatus `json:"status" description:"status of the condition, one of True, False, Unknown"`
-
-	// +optional
-	Reason string `json:"reason,omitempty" description:"one-word CamelCase reason for the condition's last transition"`
-
-	// +optional
-	Message string `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
-
-	// +optional
-	LastHeartbeatTime metav1.Time `json:"lastHeartbeatTime" description:"last time we got an update on a given condition"`
-
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime" description:"last time the condition transit from one status to another"`
-}
-
-// ConditionType is the state of the operator's reconciliation functionality.
-type ConditionType string
-
 const (
-	// ConditionAvailable indicates that the resources maintained by the operator,
-	// is functional and available in the cluster.
-	ConditionAvailable ConditionType = "Available"
+	// ResourcesAvailable indicates whether the resources maintained by the operator are reconciled without any issues.
+	ResourcesAvailable = "ResourcesAvailable"
 
-	// ConditionProgressing indicates that the operator is actively making changes to the resources maintained by the
-	// operator
-	ConditionProgressing ConditionType = "Progressing"
-
-	// ConditionDegraded indicates that the resources maintained by the operator are not functioning completely.
-	// An example of a degraded state would be if not all pods in a deployment were running.
-	// It may still be available, but it is degraded
-	ConditionDegraded ConditionType = "Degraded"
-
-	// ConditionUpgradeable indicates whether the resources maintained by the operator are in a state that is safe to upgrade.
-	// When `False`, the resources maintained by the operator should not be upgraded and the
-	// message field should contain a human readable description of what the administrator should do to
-	// allow the operator to successfully update the resources maintained by the operator.
-	ConditionUpgradeable ConditionType = "Upgradeable"
+	// VolumeGroupsReady indicates whether the volume groups maintained by the operator are in a ready state.
+	VolumeGroupsReady = "VolumeGroupsReady"
 )
 
 // DeviceClassStatus defines the observed status of the deviceclass across all nodes
@@ -207,7 +196,7 @@ type DeviceClassStatus struct {
 }
 
 type Storage struct {
-	// DeviceClasses are a rules that assign local storage devices to volumegroups that are used for creating lvm based PVs
+	// DeviceClasses contains the configuration to assign the local storage devices to the LVM volume groups that you can use to provision persistent volume claims (PVCs).
 	// +Optional
 	DeviceClasses []DeviceClass `json:"deviceClasses,omitempty"`
 }

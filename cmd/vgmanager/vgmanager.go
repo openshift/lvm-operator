@@ -18,7 +18,9 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -38,25 +40,23 @@ import (
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/wipefs"
 	internalCSI "github.com/openshift/lvm-operator/internal/csi"
-	"github.com/openshift/lvm-operator/internal/migration/tagging"
 	"github.com/spf13/cobra"
-	topolvmClient "github.com/topolvm/topolvm/client"
-	"github.com/topolvm/topolvm/controllers"
-	"github.com/topolvm/topolvm/driver"
-	topoLVMD "github.com/topolvm/topolvm/lvmd"
-	"github.com/topolvm/topolvm/lvmd/command"
-	"github.com/topolvm/topolvm/runners"
+	"github.com/topolvm/topolvm"
+	"github.com/topolvm/topolvm/pkg/controller"
+	"github.com/topolvm/topolvm/pkg/driver"
+	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
+	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -67,8 +67,12 @@ import (
 
 const (
 	DefaultDiagnosticsAddr = ":8443"
-	DefaultProbeAddr       = ":8081"
+	DefaultHealthProbeAddr = ":8081"
 )
+
+var ErrConfigModified = errors.New("lvmd config file is modified")
+var ErrNoDeviceClassesAvailable = errors.New("no device classes in lvmd.yaml configured, can not startup correctly")
+var ErrCSIPluginNotYetRegistered = errors.New("CSI plugin not yet registered")
 
 type Options struct {
 	Scheme   *runtime.Scheme
@@ -95,30 +99,22 @@ func NewCmd(opts *Options) *cobra.Command {
 		&opts.diagnosticsAddr, "diagnosticsAddr", DefaultDiagnosticsAddr, "The address the diagnostics endpoint binds to.",
 	)
 	cmd.Flags().StringVar(
-		&opts.healthProbeAddr, "health-probe-bind-address", DefaultProbeAddr, "The address the probe endpoint binds to.",
+		&opts.healthProbeAddr, "health-probe-bind-address", DefaultHealthProbeAddr, "The address the probe endpoint binds to.",
 	)
 	return cmd
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
-	ctx, cancel := context.WithCancel(cmd.Context())
+	ctx, cancelWithCause := context.WithCancelCause(cmd.Context())
+	defer cancelWithCause(nil)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	lvm := lvm.NewDefaultHostLVM()
 	nodeName := os.Getenv("NODE_NAME")
 
 	operatorNamespace, err := cluster.GetOperatorNamespace()
 	if err != nil {
 		return fmt.Errorf("unable to get operatorNamespace: %w", err)
-	}
-
-	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: opts.Scheme})
-	if err != nil {
-		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
-	}
-
-	if err := tagging.AddTagToVGs(ctx, setupClient, lvm, nodeName, operatorNamespace); err != nil {
-		opts.SetupLog.Error(err, "failed to tag existing volume groups")
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -138,61 +134,55 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 				operatorNamespace: {},
 			},
 		},
+		GracefulShutdownTimeout: ptr.To(time.Duration(-1)),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
+	registrationServer := internalCSI.NewRegistrationServer(
+		cancelWithCause,
+		constants.TopolvmCSIDriverName,
+		registrationPath(),
+		[]string{"1.0.0"},
+	)
 	lvmdConfig := &lvmd.Config{}
 	if err := loadConfFile(ctx, lvmdConfig, lvmd.DefaultFileConfigPath); err != nil {
 		opts.SetupLog.Error(err, "lvmd config could not be loaded, starting without topolvm components and attempting bootstrap")
-		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-			return fmt.Errorf("unable to set up ready check: %w", err)
-		}
 	} else {
-		topoClient := topolvmClient.NewWrappedClient(mgr.GetClient())
-		command.Containerized = true
-		dcm := topoLVMD.NewDeviceClassManager(lvmdConfig.DeviceClasses)
-		ocm := topoLVMD.NewLvcreateOptionClassManager(lvmdConfig.LvcreateOptionClasses)
-		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, dcm, ocm)
+		lvclnt, vgclnt := topoLVMD.NewEmbeddedServiceClients(ctx, lvmdConfig.DeviceClasses, lvmdConfig.LvcreateOptionClasses)
 
-		lvController := controllers.NewLogicalVolumeReconcilerWithServices(topoClient, nodeName, vgclnt, lvclnt)
-
-		if err := lvController.SetupWithManager(mgr); err != nil {
+		if err := controller.SetupLogicalVolumeReconcilerWithServices(mgr, mgr.GetClient(), nodeName, vgclnt, lvclnt); err != nil {
 			return fmt.Errorf("unable to create LogicalVolumeReconciler: %w", err)
 		}
 
-		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, topoClient, nodeName)); err != nil { // adjusted signature
+		if err := mgr.Add(runners.NewMetricsExporter(vgclnt, mgr.GetClient(), nodeName)); err != nil { // adjusted signature
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
-		if err := os.MkdirAll(driver.DeviceDirectory, 0755); err != nil {
+		if err := os.MkdirAll(topolvm.DeviceDirectory, 0755); err != nil {
 			return err
 		}
-		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
-			grpc.SharedWriteBuffer(true),
-			grpc.MaxConcurrentStreams(1),
-			grpc.NumStreamWorkers(1))
+		csiGrpcServer := newGRPCServer()
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
 		})
-		csi.RegisterIdentityServer(grpcServer, identityServer)
-
-		registrationServer := internalCSI.NewRegistrationServer(
-			constants.TopolvmCSIDriverName, registrationPath(), []string{"1.0.0"})
-		registerapi.RegisterRegistrationServer(grpcServer, registrationServer)
-		if err = mgr.Add(runners.NewGRPCRunner(grpcServer, pluginRegistrationSocketPath(), false)); err != nil {
-			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
-		}
+		csi.RegisterIdentityServer(csiGrpcServer, identityServer)
 
 		nodeServer, err := driver.NewNodeServer(nodeName, vgclnt, lvclnt, mgr) // adjusted signature
 		if err != nil {
 			return fmt.Errorf("could not setup topolvm node server: %w", err)
 		}
-		csi.RegisterNodeServer(grpcServer, nodeServer)
-		err = mgr.Add(runners.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false))
+		csi.RegisterNodeServer(csiGrpcServer, nodeServer)
+		err = mgr.Add(internalCSI.NewGRPCRunner(csiGrpcServer, constants.DefaultCSISocket, false))
 		if err != nil {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
+		}
+
+		registrationGrpcServer := newGRPCServer()
+		registerapi.RegisterRegistrationServer(registrationGrpcServer, registrationServer)
+		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, pluginRegistrationSocketPath(), false)); err != nil {
+			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
 		}
 	}
 
@@ -204,27 +194,31 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LSBLK:         lsblk.NewDefaultHostLSBLK(),
 		Wipefs:        wipefs.NewDefaultHostWipefs(),
 		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
-		LVM:           lvm,
+		LVM:           lvm.NewDefaultHostLVM(),
 		NodeName:      nodeName,
 		Namespace:     operatorNamespace,
 		Filters:       filter.DefaultFilters,
-		Shutdown:      cancel,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		return fmt.Errorf("unable to set up health check: %w", err)
+	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr)); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, []os.Signal{os.Interrupt, syscall.SIGTERM}...)
-	go func() {
-		<-c
-		cancel()
-		<-c
-		os.Exit(1) // second signal. Exit directly.
-	}()
+	if err := mgr.AddHealthzCheck("healthz", func(req *http.Request) error {
+		if len(lvmdConfig.DeviceClasses) == 0 {
+			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy")
+			return ErrNoDeviceClassesAvailable
+		}
+		if !registrationServer.Registered() {
+			log.FromContext(req.Context()).Error(ErrCSIPluginNotYetRegistered, "not healthy")
+			return ErrCSIPluginNotYetRegistered
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
+	}
 
 	// Create new watcher.
 	watcher, err := fsnotify.NewWatcher()
@@ -232,57 +226,74 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to set up file watcher: %w", err)
 	}
 	defer watcher.Close()
-
-	// Start listening for events.
-	go func() {
-		fileNotExist := false
-		for {
-			// check if file exists, otherwise the watcher errors
-			_, err := os.Lstat(lvmd.DefaultFileConfigPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					time.Sleep(100 * time.Millisecond)
-					fileNotExist = true
-				} else {
-					opts.SetupLog.Error(err, "unable to check if lvmd config file exists")
-				}
-			} else {
-				// This handles the first time the file is created through the configmap
-				if fileNotExist {
-					cancel()
-				}
-				err = watcher.Add(lvmd.DefaultFileConfigPath)
-				if err != nil {
-					opts.SetupLog.Error(err, "unable to add file path to watcher")
-				}
-				break
-			}
-		}
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if event.Has(fsnotify.Write) || event.Has(fsnotify.Remove) || event.Has(fsnotify.Chmod) {
-					opts.SetupLog.Info("lvmd config file is modified", "eventName", event.Name)
-					cancel()
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				opts.SetupLog.Error(err, "file watcher error")
-			}
-		}
-	}()
+	// Start listening for events on TopoLVM files.
+	go watchTopoLVMAndNotify(opts, cancelWithCause, watcher)
 
 	opts.SetupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
 	}
 
+	if errors.Is(context.Cause(ctx), ErrConfigModified) {
+		opts.SetupLog.Info("restarting controller due to modified configuration")
+		return run(cmd, nil, opts)
+	} else if errors.Is(context.Cause(ctx), internalCSI.ErrPluginRegistrationFailed) {
+		opts.SetupLog.Error(context.Cause(ctx), "restarting due to failed plugin registration")
+		return run(cmd, nil, opts)
+	} else if err := ctx.Err(); err != nil {
+		opts.SetupLog.Error(err, "exiting abnormally")
+		os.Exit(1)
+	}
+
 	return nil
+}
+
+// watchTopoLVMAndNotify watches for changes to the lvmd config file and cancels the context if it changes.
+// This is used to restart the manager when the lvmd config file changes.
+// This is a blocking function and should be run in a goroutine.
+// If the directory does not exist, it will be created to make it possible to watch for changes.
+// If the watch determines that the lvmd config file has been modified, it will cancel the context with the ErrConfigModified error.
+func watchTopoLVMAndNotify(opts *Options, cancelWithCause context.CancelCauseFunc, watcher *fsnotify.Watcher) {
+	// check if file exists, otherwise the watcher errors
+	fi, err := os.Stat(lvmd.DefaultFileConfigDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(lvmd.DefaultFileConfigDir, 0755); err != nil {
+				opts.SetupLog.Error(err, "unable to create lvmd config directory when it did not exist before")
+			}
+		} else {
+			opts.SetupLog.Error(err, "unable to check if lvmd config directory exists")
+			cancelWithCause(err)
+		}
+	} else if !fi.IsDir() {
+		opts.SetupLog.Error(err, "expected lvmd config directory is not a directory")
+		cancelWithCause(err)
+	}
+
+	err = watcher.Add(lvmd.DefaultFileConfigDir)
+	if err != nil {
+		opts.SetupLog.Error(err, "unable to add file path to watcher")
+	}
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Name != lvmd.DefaultFileConfigPath {
+				continue
+			}
+			if event.Has(fsnotify.Write) || event.Has(fsnotify.Remove) || event.Has(fsnotify.Chmod) {
+				opts.SetupLog.Info("lvmd config file is modified", "eventName", event.Name)
+				cancelWithCause(fmt.Errorf("%w: %s", ErrConfigModified, event.Name))
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			opts.SetupLog.Error(err, "file watcher error")
+		}
+	}
 }
 
 func loadConfFile(ctx context.Context, config *lvmd.Config, cfgFilePath string) error {
@@ -315,4 +326,30 @@ func registrationPath() string {
 
 func pluginRegistrationSocketPath() string {
 	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.TopolvmCSIDriverName)
+}
+
+// readyCheck returns a healthz.Checker that verifies the operator is ready
+func readyCheck(mgr manager.Manager) healthz.Checker {
+	return func(req *http.Request) error {
+		// Perform various checks here to determine if the operator is ready
+		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
+			return fmt.Errorf("informer cache not synced and thus not ready")
+		}
+		return nil
+	}
+}
+
+// newGRPCServer returns a new grpc.Server with the following settings:
+// UnaryInterceptor: ErrorLoggingInterceptor, to log errors on grpc calls
+// SharedWriteBuffer: true, to share write buffer between all connections, saving memory
+// 2 streams for one core each (vgmanager is optimized for 1 hyperthreaded core)
+// 2 workers for one core each (vgmanager is optimized for 1 hyperthreaded core)
+// We technically could use 1 worker / 1 stream, but that would make the goroutine
+// switch threads more often, which is less efficient.
+func newGRPCServer() *grpc.Server {
+	return grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
+		grpc.SharedWriteBuffer(true),
+		grpc.MaxConcurrentStreams(2),
+		grpc.NumStreamWorkers(2),
+	)
 }

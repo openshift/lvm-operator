@@ -20,9 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/openshift/lvm-operator/internal/cluster"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,13 +46,14 @@ var _ webhook.CustomValidator = &lvmClusterValidator{}
 var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
 	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
+	ErrNodeSelectorNotSet                                    = errors.New("NodeSelector is not set for the DeviceClass")
 	ErrInvalidNamespace                                      = errors.New("invalid namespace was supplied")
-	ErrAtLeastOneDeviceClassRequired                         = errors.New("at least one deviceClass is required")
 	ErrOnlyOneDefaultDeviceClassAllowed                      = errors.New("only one default deviceClass is allowed")
 	ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector = errors.New("either paths or optionalPaths must be specified when DeviceSelector is specified")
 	ErrEmptyPathsWithMultipleDeviceClasses                   = errors.New("path list should not be empty when there are multiple deviceClasses")
 	ErrDuplicateLVMCluster                                   = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
 	ErrThinPoolConfigCannotBeChanged                         = errors.New("ThinPoolConfig can not be changed")
+	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
 )
@@ -93,7 +97,8 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 
-	err = v.verifyPathsAreNotEmpty(l)
+	pathWarnings, err := v.verifyPathsAreNotEmpty(l)
+	warnings = append(warnings, pathWarnings...)
 	if err != nil {
 		return warnings, err
 	}
@@ -109,6 +114,11 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 	}
 
 	err = v.verifyFstype(l)
+	if err != nil {
+		return warnings, err
+	}
+
+	err = v.verifyChunkSize(l)
 	if err != nil {
 		return warnings, err
 	}
@@ -129,7 +139,8 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		return warnings, err
 	}
 
-	err = v.verifyPathsAreNotEmpty(l)
+	pathWarnings, err := v.verifyPathsAreNotEmpty(l)
+	warnings = append(warnings, pathWarnings...)
 	if err != nil {
 		return warnings, err
 	}
@@ -170,7 +181,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 
 		if (newThinPoolConfig != nil && oldThinPoolConfig == nil && !errors.Is(err, ErrDeviceClassNotFound)) ||
 			(newThinPoolConfig == nil && oldThinPoolConfig != nil) {
-			return warnings, fmt.Errorf("ThinPoolConfig can not be changed")
+			return warnings, ErrThinPoolConfigCannotBeChanged
 		}
 
 		if newThinPoolConfig != nil && oldThinPoolConfig != nil {
@@ -180,7 +191,19 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 				return warnings, fmt.Errorf("ThinPoolConfig.SizePercent is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if newThinPoolConfig.OverprovisionRatio != oldThinPoolConfig.OverprovisionRatio {
 				return warnings, fmt.Errorf("ThinPoolConfig.OverprovisionRatio is invalid: %w", ErrThinPoolConfigCannotBeChanged)
+			} else if newThinPoolConfig.ChunkSizeCalculationPolicy != oldThinPoolConfig.ChunkSizeCalculationPolicy {
+				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSizeCalculationPolicy is invalid: %w", ErrThinPoolConfigCannotBeChanged)
+			} else if !reflect.DeepEqual(newThinPoolConfig.ChunkSize, oldThinPoolConfig.ChunkSize) {
+				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSize is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			}
+		}
+
+		newNodeSelector := deviceClass.NodeSelector
+		oldNodeSelector, err := v.getNodeSelectorOfDeviceClass(oldLVMCluster, deviceClass.Name)
+		if (newNodeSelector != nil && oldNodeSelector == nil && !errors.Is(err, ErrDeviceClassNotFound)) ||
+			(newNodeSelector == nil && oldNodeSelector != nil) ||
+			(newNodeSelector != nil && oldNodeSelector != nil && !reflect.DeepEqual(newNodeSelector, oldNodeSelector)) {
+			return warnings, ErrNodeSelectorCannotBeChanged
 		}
 
 		if deviceClass.DeviceSelector != nil {
@@ -214,17 +237,14 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
-		// Validate all the old paths still exist
-		err := validateDevicePathsStillExist(oldDevices, newDevices)
-		if err != nil {
+		if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
 			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
 		}
 
-		// Validate all the old optional paths still exist
-		err = validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices)
-		if err != nil {
+		if err := validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
 			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
 		}
+
 	}
 
 	return warnings, nil
@@ -279,9 +299,6 @@ func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Ob
 
 func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnings, error) {
 	deviceClasses := l.Spec.Storage.DeviceClasses
-	if len(deviceClasses) < 1 {
-		return nil, ErrAtLeastOneDeviceClassRequired
-	}
 	countDefault := 0
 	for _, deviceClass := range deviceClasses {
 		if deviceClass.Default {
@@ -292,29 +309,31 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 		return nil, fmt.Errorf("%w. Currently, there are %d default deviceClasses", ErrOnlyOneDefaultDeviceClassAllowed, countDefault)
 	}
 	if countDefault == 0 {
-		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly"}, nil
+		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly or you will have to declare another default StorageClass"}, nil
 	}
 
 	return nil, nil
 }
 
-func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) error {
+func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.Warnings, error) {
 
 	var deviceClassesWithoutPaths []string
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			if len(deviceClass.DeviceSelector.Paths) == 0 && len(deviceClass.DeviceSelector.OptionalPaths) == 0 {
-				return ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector
+				return nil, ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector
 			}
 		} else {
 			deviceClassesWithoutPaths = append(deviceClassesWithoutPaths, deviceClass.Name)
 		}
 	}
 	if len(l.Spec.Storage.DeviceClasses) > 1 && len(deviceClassesWithoutPaths) > 0 {
-		return fmt.Errorf("%w. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", ErrEmptyPathsWithMultipleDeviceClasses, strings.Join(deviceClassesWithoutPaths, `,`))
+		return nil, fmt.Errorf("%w. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", ErrEmptyPathsWithMultipleDeviceClasses, strings.Join(deviceClassesWithoutPaths, `,`))
+	} else if len(l.Spec.Storage.DeviceClasses) == 1 && len(deviceClassesWithoutPaths) == 1 {
+		return admission.Warnings{fmt.Sprintf("no device path(s) under deviceSelector.paths was specified for the %s deviceClass, LVMS will actively monitor and dynamically utilize any supported unused devices. This is not recommended for production environments. Please refer to the limitations outlined in the product documentation for further details.", deviceClassesWithoutPaths[0])}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
@@ -420,6 +439,20 @@ func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassNa
 	return
 }
 
+func (v *lvmClusterValidator) getNodeSelectorOfDeviceClass(l *LVMCluster, deviceClassName string) (*corev1.NodeSelector, error) {
+
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.Name == deviceClassName {
+			if deviceClass.NodeSelector != nil {
+				return deviceClass.NodeSelector, nil
+			}
+			return nil, ErrNodeSelectorNotSet
+		}
+	}
+
+	return nil, ErrDeviceClassNotFound
+}
+
 func (v *lvmClusterValidator) getThinPoolsConfigOfDeviceClass(l *LVMCluster, deviceClassName string) (*ThinPoolConfig, error) {
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -438,6 +471,28 @@ func (v *lvmClusterValidator) verifyFstype(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.FilesystemType != FilesystemTypeExt4 && deviceClass.FilesystemType != FilesystemTypeXFS {
 			return fmt.Errorf("fstype '%s' is not a supported filesystem type", deviceClass.FilesystemType)
+		}
+	}
+
+	return nil
+}
+
+func (v *lvmClusterValidator) verifyChunkSize(l *LVMCluster) error {
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.ThinPoolConfig == nil {
+			continue
+		}
+		if dc.ThinPoolConfig.ChunkSizeCalculationPolicy == ChunkSizeCalculationPolicyHost && dc.ThinPoolConfig.ChunkSize != nil {
+			return fmt.Errorf("chunk size can not be set when chunk size calculation policy is set to Host")
+		}
+
+		if dc.ThinPoolConfig.ChunkSize != nil {
+			if dc.ThinPoolConfig.ChunkSize.Cmp(ChunkSizeMinimum) < 0 {
+				return fmt.Errorf("chunk size must be greater than or equal to %s", ChunkSizeMinimum.String())
+			}
+			if dc.ThinPoolConfig.ChunkSize.Cmp(ChunkSizeMaximum) > 0 {
+				return fmt.Errorf("chunk size must be less than or equal to %s", ChunkSizeMaximum.String())
+			}
 		}
 	}
 

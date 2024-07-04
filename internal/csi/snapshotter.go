@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
-	clientset "github.com/kubernetes-csi/external-snapshotter/client/v6/clientset/versioned"
-	informers "github.com/kubernetes-csi/external-snapshotter/client/v6/informers/externalversions"
-	controller "github.com/kubernetes-csi/external-snapshotter/v6/pkg/sidecar-controller"
-	"github.com/kubernetes-csi/external-snapshotter/v6/pkg/snapshotter"
+	clientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
+	informers "github.com/kubernetes-csi/external-snapshotter/client/v8/informers/externalversions"
+	controller "github.com/kubernetes-csi/external-snapshotter/v8/pkg/sidecar-controller"
+	"github.com/kubernetes-csi/external-snapshotter/v8/pkg/snapshotter"
 	coreinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -50,12 +50,11 @@ func NewSnapshotter(mgr manager.Manager, options SnapshotterOptions) *Snapshotte
 }
 
 func (s *Snapshotter) Start(ctx context.Context) error {
-	logger := log.FromContext(ctx)
-	onLostConnection := func() bool {
-		logger.Info("lost connection to csi driver, attempting to reconnect due to in tree provisioning...")
+	onLostConnection := func(ctx context.Context) bool {
+		log.FromContext(ctx).Info("lost connection to csi driver, attempting to reconnect due to in tree provisioning...")
 		return true
 	}
-	grpcClient, err := connection.Connect(s.options.CSIEndpoint, nil,
+	grpcClient, err := connection.Connect(ctx, s.options.CSIEndpoint, nil,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(s.options.CSIOperationTimeout))
 	defer grpcClient.Close() //nolint:errcheck,staticcheck

@@ -8,7 +8,6 @@ import (
 	"github.com/kubernetes-csi/external-resizer/pkg/controller"
 	"github.com/kubernetes-csi/external-resizer/pkg/csi"
 	"github.com/kubernetes-csi/external-resizer/pkg/resizer"
-
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -53,7 +52,7 @@ func NewResizer(mgr manager.Manager, options ProvisionerOptions) *Resizer {
 }
 
 func (r *Resizer) Start(ctx context.Context) error {
-	csiClient, err := csi.New(r.options.CSIEndpoint, r.options.CSIOperationTimeout, nil)
+	csiClient, err := csi.New(ctx, r.options.CSIEndpoint, r.options.CSIOperationTimeout, nil)
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,6 @@ func (r *Resizer) Start(ctx context.Context) error {
 		csiClient,
 		r.options.CSIOperationTimeout,
 		clientset,
-		factory,
 		r.options.DriverName)
 	if err != nil {
 		return err

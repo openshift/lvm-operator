@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/openshift/lvm-operator/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/internal/controllers/labels"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -104,6 +104,9 @@ func getTopolvmSnapshotClasses(lvmCluster *lvmv1alpha1.LVMCluster) []*snapapi.Vo
 	var vsc []*snapapi.VolumeSnapshotClass
 
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
+		if deviceClass.ThinPoolConfig == nil {
+			continue
+		}
 		snapshotClass := &snapapi.VolumeSnapshotClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: GetVolumeSnapshotClassName(deviceClass.Name),
