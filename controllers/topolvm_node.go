@@ -265,6 +265,11 @@ func getLvmdContainer() *corev1.Container {
 		"--container=true",
 	}
 
+	healthCommand := []string{
+		"/lvmd",
+		"health",
+	}
+
 	resourceRequirements := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(TopolvmdCPURequest),
@@ -289,7 +294,30 @@ func getLvmdContainer() *corev1.Container {
 		Command:      command,
 		Resources:    resourceRequirements,
 		VolumeMounts: volumeMounts,
+		StartupProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: healthCommand,
+				},
+			},
+			FailureThreshold:    10,
+			InitialDelaySeconds: 1,
+			TimeoutSeconds:      2,
+			PeriodSeconds:       2,
+		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: healthCommand,
+				},
+			},
+			FailureThreshold:    3,
+			InitialDelaySeconds: 1,
+			TimeoutSeconds:      2,
+			PeriodSeconds:       30,
+		},
 	}
+
 	return lvmd
 }
 
