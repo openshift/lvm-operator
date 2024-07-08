@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
-	persistentvolume "github.com/openshift/lvm-operator/internal/controllers/persistent-volume"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	persistentvolume "github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

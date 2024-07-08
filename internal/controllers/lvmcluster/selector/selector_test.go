@@ -1,10 +1,11 @@
 package selector
 
 import (
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	"testing"
+
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	"testing"
 )
 
 func TestExtractNodeSelectorAndTolerations(t *testing.T) {

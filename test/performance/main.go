@@ -28,7 +28,7 @@ import (
 	routesv1 "github.com/openshift/api/route/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/client-go/route/clientset/versioned/scheme"
-	lvmv1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	lvmv1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	operatorv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/spf13/cobra"

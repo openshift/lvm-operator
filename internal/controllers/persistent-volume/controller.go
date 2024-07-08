@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
