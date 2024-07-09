@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/lvm-operator/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/topolvm/topolvm"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/storage/v1"

@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/openshift/lvm-operator/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 )
 
 func lvmClusterTest() {

@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
-	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/filter"
-	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
-	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/lvm"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 

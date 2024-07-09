@@ -5,7 +5,7 @@ package lsblk
 import (
 	context "context"
 
-	lsblk "github.com/openshift/lvm-operator/internal/controllers/vgmanager/lsblk"
+	lsblk "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	mock "github.com/stretchr/testify/mock"
 )
 

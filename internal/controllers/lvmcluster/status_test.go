@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/api/v1alpha1"
+	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
