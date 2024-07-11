@@ -18,6 +18,7 @@ package lvmcluster
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -26,17 +27,22 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/selector"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/node/removal"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -139,6 +145,10 @@ var _ = BeforeSuite(func() {
 		}
 	}
 
+	Expect((&csiNodeReconciler{
+		Client: k8sManager.GetClient(),
+	}).SetupWithManager(ctx, k8sManager)).To(Succeed())
+
 	err = (&Reconciler{
 		Client:                k8sManager.GetClient(),
 		EventRecorder:         k8sManager.GetEventRecorderFor("LVMClusterReconciler"),
@@ -166,3 +176,83 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	Expect(testEnv.Stop()).To(Succeed())
 })
+
+// csiNodeReconciler reconciles Nodes to create or delete CSINode objects with a driver for the TopoLVM CSI driver
+// based on LVMCluster existence which mocks the kubelet CSI registration behavior.
+type csiNodeReconciler struct {
+	client.Client
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *csiNodeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	handle := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+		nodes := &corev1.NodeList{}
+		Expect(mgr.GetClient().List(ctx, nodes)).To(Succeed())
+		toReconcile := make([]reconcile.Request, 0, len(nodes.Items))
+		for _, node := range nodes.Items {
+			toReconcile = append(toReconcile, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&node)})
+		}
+		return toReconcile
+	})
+	builder := ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.Node{}).
+		Watches(&lvmv1alpha1.LVMCluster{}, handle)
+
+	return builder.Complete(r)
+}
+
+func (r *csiNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
+	if err := r.Client.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list LVMCluster instances: %w", err)
+	}
+	if size := len(lvmClusterList.Items); size > 1 {
+		return ctrl.Result{}, fmt.Errorf("there should be a single LVMCluster but multiple were found, %d clusters found", size)
+	}
+	// get lvmcluster
+	var lvmCluster *lvmv1alpha1.LVMCluster
+	if len(lvmClusterList.Items) > 0 {
+		lvmCluster = &lvmClusterList.Items[0]
+	}
+
+	node := &corev1.Node{}
+	if err := r.Client.Get(ctx, req.NamespacedName, node); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get node: %w", err)
+	}
+	csiNode := &v1.CSINode{}
+	csiNode.SetName(node.Name)
+
+	nodes := &corev1.NodeList{}
+	nodes.Items = append(nodes.Items, *node)
+	if lvmCluster != nil {
+		validNodes, err := selector.ValidNodes(lvmCluster, nodes)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get valid nodes: %w", err)
+		}
+		nodes.Items = validNodes
+	}
+
+	for _, node := range nodes.Items {
+		if node.DeletionTimestamp.IsZero() {
+			_, err := ctrl.CreateOrUpdate(ctx, r.Client, csiNode, func() error {
+				csiNode.Spec.Drivers = []v1.CSINodeDriver{}
+				if lvmCluster != nil && lvmCluster.DeletionTimestamp.IsZero() {
+					csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, v1.CSINodeDriver{
+						Name:   constants.TopolvmCSIDriverName,
+						NodeID: node.Name,
+					})
+				}
+				return nil
+			})
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to create or update CSINode: %w", err)
+			}
+		} else {
+			if err := r.Client.Delete(ctx, csiNode); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to delete CSINode: %w", err)
+			}
+		}
+	}
+
+	return ctrl.Result{}, nil
+}

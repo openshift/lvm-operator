@@ -210,6 +210,7 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		resource.LVMVGs(),
 		resource.LVMVGNodeStatus(),
 		resource.TopoLVMStorageClass(),
+		resource.CSINode(),
 	}
 
 	if r.ClusterType == cluster.TypeOCP {
@@ -339,6 +340,7 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 			resource.LVMVGNodeStatus(),
 			resource.CSIDriver(),
 			resource.VGManager(r.ClusterType),
+			resource.CSINode(),
 		}
 
 		if r.ClusterType == cluster.TypeOCP {

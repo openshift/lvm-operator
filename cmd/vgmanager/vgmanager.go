@@ -39,7 +39,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
-	internalCSI "github.com/openshift/lvm-operator/v4/internal/csi"
+	icsi "github.com/openshift/lvm-operator/v4/internal/csi"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
@@ -47,6 +47,7 @@ import (
 	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
 	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -140,7 +141,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	registrationServer := internalCSI.NewRegistrationServer(
+	registrationServer := icsi.NewRegistrationServer(
 		cancelWithCause,
 		constants.TopolvmCSIDriverName,
 		registrationPath(),
@@ -164,6 +165,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return err
 		}
 		csiGrpcServer := newGRPCServer()
+		grpc_health_v1.RegisterHealthServer(csiGrpcServer, icsi.NewHealthServer(func(ctx context.Context) error {
+			return readyCheck(ctx, mgr, lvmdConfig, registrationServer)
+		}))
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
 		})
@@ -174,14 +178,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not setup topolvm node server: %w", err)
 		}
 		csi.RegisterNodeServer(csiGrpcServer, nodeServer)
-		err = mgr.Add(internalCSI.NewGRPCRunner(csiGrpcServer, constants.DefaultCSISocket, false))
+		err = mgr.Add(icsi.NewGRPCRunner(csiGrpcServer, constants.DefaultCSISocket, false))
 		if err != nil {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
 		}
 
 		registrationGrpcServer := newGRPCServer()
+		grpc_health_v1.RegisterHealthServer(registrationGrpcServer, icsi.NewHealthServer(icsi.AlwaysHealthy))
 		registerapi.RegisterRegistrationServer(registrationGrpcServer, registrationServer)
-		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, pluginRegistrationSocketPath(), false)); err != nil {
+		if err = mgr.Add(icsi.NewGRPCRunner(registrationGrpcServer, pluginRegistrationSocketPath(), false)); err != nil {
 			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
 		}
 	}
@@ -202,22 +207,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
-	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr)); err != nil {
-		return fmt.Errorf("unable to set up ready check: %w", err)
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 
-	if err := mgr.AddHealthzCheck("healthz", func(req *http.Request) error {
-		if len(lvmdConfig.DeviceClasses) == 0 {
-			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy")
-			return ErrNoDeviceClassesAvailable
-		}
-		if !registrationServer.Registered() {
-			log.FromContext(req.Context()).Error(ErrCSIPluginNotYetRegistered, "not healthy")
-			return ErrCSIPluginNotYetRegistered
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("unable to set up health check: %w", err)
+	if err := mgr.AddReadyzCheck("readyz", readyCheckHealthzChecker(mgr, lvmdConfig, registrationServer)); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	// Create new watcher.
@@ -237,7 +232,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if errors.Is(context.Cause(ctx), ErrConfigModified) {
 		opts.SetupLog.Info("restarting controller due to modified configuration")
 		return run(cmd, nil, opts)
-	} else if errors.Is(context.Cause(ctx), internalCSI.ErrPluginRegistrationFailed) {
+	} else if errors.Is(context.Cause(ctx), icsi.ErrPluginRegistrationFailed) {
 		opts.SetupLog.Error(context.Cause(ctx), "restarting due to failed plugin registration")
 		return run(cmd, nil, opts)
 	} else if err := ctx.Err(); err != nil {
@@ -328,15 +323,35 @@ func pluginRegistrationSocketPath() string {
 	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.TopolvmCSIDriverName)
 }
 
-// readyCheck returns a healthz.Checker that verifies the operator is ready
-func readyCheck(mgr manager.Manager) healthz.Checker {
+func readyCheckHealthzChecker(
+	mgr manager.Manager,
+	config *lvmd.Config,
+	server icsi.CheckableRegistrationServer,
+) healthz.Checker {
 	return func(req *http.Request) error {
-		// Perform various checks here to determine if the operator is ready
-		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
-			return fmt.Errorf("informer cache not synced and thus not ready")
-		}
-		return nil
+		return readyCheck(req.Context(), mgr, config, server)
 	}
+}
+
+func readyCheck(
+	ctx context.Context,
+	mgr manager.Manager,
+	config *lvmd.Config,
+	server icsi.CheckableRegistrationServer,
+) error {
+	logger := log.FromContext(ctx)
+	if !mgr.GetCache().WaitForCacheSync(ctx) {
+		return fmt.Errorf("informer cache not synced and thus not ready")
+	}
+	if len(config.DeviceClasses) == 0 {
+		logger.Error(ErrNoDeviceClassesAvailable, "not ready")
+		return ErrNoDeviceClassesAvailable
+	}
+	if !server.Registered() {
+		logger.Error(ErrCSIPluginNotYetRegistered, "not ready")
+		return ErrCSIPluginNotYetRegistered
+	}
+	return nil
 }
 
 // newGRPCServer returns a new grpc.Server with the following settings:
