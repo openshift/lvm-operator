@@ -40,6 +40,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	internalCSI "github.com/openshift/lvm-operator/v4/internal/csi"
+	runner "github.com/openshift/lvm-operator/v4/internal/locking"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
@@ -80,6 +81,8 @@ type Options struct {
 
 	diagnosticsAddr string
 	healthProbeAddr string
+
+	enableSharedVolumes bool
 }
 
 // NewCmd creates a new CLI command
@@ -100,6 +103,10 @@ func NewCmd(opts *Options) *cobra.Command {
 	)
 	cmd.Flags().StringVar(
 		&opts.healthProbeAddr, "health-probe-bind-address", DefaultHealthProbeAddr, "The address the probe endpoint binds to.",
+	)
+	cmd.Flags().BoolVar(
+		&opts.enableSharedVolumes, "enable-shared-volumes", false,
+		"Enable using shared volumes. Enabling this will ensure sanlock, lvmlockd, and watchdog runs on every node, and vgs are created using the locks.",
 	)
 	return cmd
 }
@@ -140,12 +147,38 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	registrationServer := internalCSI.NewRegistrationServer(
-		cancelWithCause,
-		constants.TopolvmCSIDriverName,
-		registrationPath(),
-		[]string{"1.0.0"},
-	)
+	type registration struct {
+		internalCSI.CheckableRegistrationServer
+		registrationPath string
+	}
+	var registrations []registration
+
+	var volumeGroupLock runner.VolumeGroupLock
+	if opts.enableSharedVolumes {
+		if volumeGroupLock, err = runner.NewVolumeGroupLock(ctx, mgr, nodeName, operatorNamespace); err != nil {
+			return fmt.Errorf("could not create volume group lock: %w", err)
+		} else if err := mgr.Add(volumeGroupLock); err != nil {
+			return fmt.Errorf("could not add volume group lock: %w", err)
+		}
+		registration := registration{
+			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
+				cancelWithCause,
+				constants.KubeSANCSIDriverName,
+				kubeSANRegistrationPath(),
+				[]string{"1.0.0"},
+			),
+			registrationPath: kubeSANpluginRegistrationSocketPath(),
+		}
+		registrations = append(registrations, registration)
+		registrationGrpcServer := newGRPCServer()
+		registerapi.RegisterRegistrationServer(registrationGrpcServer, registration)
+		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, registration.registrationPath, false)); err != nil {
+			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
+		}
+	} else {
+		volumeGroupLock = runner.NewNoneVolumeGroupLock()
+	}
+
 	lvmdConfig := &lvmd.Config{}
 	if err := loadConfFile(ctx, lvmdConfig, lvmd.DefaultFileConfigPath); err != nil {
 		opts.SetupLog.Error(err, "lvmd config could not be loaded, starting without topolvm components and attempting bootstrap")
@@ -179,25 +212,36 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
 		}
 
+		registration := registration{
+			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
+				cancelWithCause,
+				constants.TopolvmCSIDriverName,
+				registrationPath(),
+				[]string{"1.0.0"},
+			),
+			registrationPath: topoLVMpluginRegistrationSocketPath(),
+		}
+		registrations = append(registrations, registration)
 		registrationGrpcServer := newGRPCServer()
-		registerapi.RegisterRegistrationServer(registrationGrpcServer, registrationServer)
-		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, pluginRegistrationSocketPath(), false)); err != nil {
+		registerapi.RegisterRegistrationServer(registrationGrpcServer, registration)
+		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, registration.registrationPath, false)); err != nil {
 			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
 		}
 	}
 
 	if err = (&vgmanager.Reconciler{
-		Client:        mgr.GetClient(),
-		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.DefaultConfigurator(),
-		Scheme:        mgr.GetScheme(),
-		LSBLK:         lsblk.NewDefaultHostLSBLK(),
-		Wipefs:        wipefs.NewDefaultHostWipefs(),
-		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
-		LVM:           lvm.NewDefaultHostLVM(),
-		NodeName:      nodeName,
-		Namespace:     operatorNamespace,
-		Filters:       filter.DefaultFilters,
+		Client:           mgr.GetClient(),
+		EventRecorder:    mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		LVMD:             lvmd.DefaultConfigurator(),
+		Scheme:           mgr.GetScheme(),
+		LSBLK:            lsblk.NewDefaultHostLSBLK(),
+		Wipefs:           wipefs.NewDefaultHostWipefs(),
+		Dmsetup:          dmsetup.NewDefaultHostDmsetup(),
+		LVM:              lvm.NewDefaultHostLVM(),
+		NodeName:         nodeName,
+		Namespace:        operatorNamespace,
+		Filters:          filter.DefaultFilters,
+		IsSharedVGLeader: volumeGroupLock.IsLeader,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
@@ -207,13 +251,19 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", func(req *http.Request) error {
+		for _, rs := range registrations {
+			if !rs.Registered() {
+				log.FromContext(req.Context()).Error(ErrCSIPluginNotYetRegistered, "not healthy")
+				return ErrCSIPluginNotYetRegistered
+			}
+		}
+		if opts.enableSharedVolumes {
+			log.FromContext(req.Context()).V(1).Info("shared volumes enabled, skipping lvmd health check")
+			return nil
+		}
 		if len(lvmdConfig.DeviceClasses) == 0 {
 			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy")
 			return ErrNoDeviceClassesAvailable
-		}
-		if !registrationServer.Registered() {
-			log.FromContext(req.Context()).Error(ErrCSIPluginNotYetRegistered, "not healthy")
-			return ErrCSIPluginNotYetRegistered
 		}
 		return nil
 	}); err != nil {
@@ -324,8 +374,16 @@ func registrationPath() string {
 	return fmt.Sprintf("%splugins/%s/node/csi-topolvm.sock", resource.GetAbsoluteKubeletPath(constants.CSIKubeletRootDir), constants.TopolvmCSIDriverName)
 }
 
-func pluginRegistrationSocketPath() string {
+func kubeSANRegistrationPath() string {
+	return fmt.Sprintf("%splugins/%s/socket", resource.GetAbsoluteKubeletPath(constants.CSIKubeletRootDir), constants.KubeSANCSIDriverName)
+}
+
+func topoLVMpluginRegistrationSocketPath() string {
 	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.TopolvmCSIDriverName)
+}
+
+func kubeSANpluginRegistrationSocketPath() string {
+	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.KubeSANCSIDriverName)
 }
 
 // readyCheck returns a healthz.Checker that verifies the operator is ready

@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubesan-csi-snapshotter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubesan-csi-snapshotter
+subjects:
+  - kind: ServiceAccount
+    name: csi-controller-plugin
+    namespace: kubesan

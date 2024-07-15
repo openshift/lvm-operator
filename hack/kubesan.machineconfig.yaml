@@ -1,0 +1,8 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: kubesan-enablement-layer
+spec:
+  osImageURL: quay.io/jmoller/node-base-kubesan-patched:v4.16.0

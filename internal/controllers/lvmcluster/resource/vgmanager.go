@@ -55,6 +55,12 @@ func (v vgManager) GetName() string {
 func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", v.GetName())
 
+	args := r.GetLogPassthroughOptions().VGManager.AsArgs()
+
+	if shared, _ := RequiresSharedVolumeGroupSetup(lvmCluster.Spec.Storage.DeviceClasses); shared {
+		args = append(args, "--enable-shared-volumes=true")
+	}
+
 	// get desired daemonset spec
 	dsTemplate := templateVGManagerDaemonset(
 		lvmCluster,
@@ -62,7 +68,7 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 		r.GetNamespace(),
 		r.GetImageName(),
 		r.GetVGManagerCommand(),
-		r.GetLogPassthroughOptions().VGManager.AsArgs(),
+		args,
 	)
 	if err := ctrl.SetControllerReference(lvmCluster, &dsTemplate, r.Scheme()); err != nil {
 		return fmt.Errorf("failed to set controller reference on vgManager daemonset %q. %v", dsTemplate.Name, err)

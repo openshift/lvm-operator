@@ -138,10 +138,11 @@ func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) 
 				Namespace: namespace,
 			},
 			Spec: lvmv1alpha1.LVMVolumeGroupSpec{
-				NodeSelector:   deviceClass.NodeSelector,
-				DeviceSelector: deviceClass.DeviceSelector,
-				ThinPoolConfig: deviceClass.ThinPoolConfig,
-				Default:        len(deviceClasses) == 1 || deviceClass.Default, // True if there is only one device class or default is explicitly set.
+				NodeSelector:       deviceClass.NodeSelector,
+				DeviceSelector:     deviceClass.DeviceSelector,
+				ThinPoolConfig:     deviceClass.ThinPoolConfig,
+				Default:            len(deviceClasses) == 1 || deviceClass.Default, // True if there is only one device class or default is explicitly set.
+				DeviceAccessPolicy: deviceClass.DeviceAccessPolicy,
 			},
 		}
 		lvmVolumeGroups = append(lvmVolumeGroups, lvmVolumeGroup)

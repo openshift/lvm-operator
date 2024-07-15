@@ -53,7 +53,7 @@ func (c openshiftSccs) GetName() string {
 
 func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
-	sccs := getAllSCCs(r.GetNamespace())
+	sccs := getAllSCCs(r.GetNamespace(), cluster)
 	for _, template := range sccs {
 		scc := &secv1.SecurityContextConstraints{
 			ObjectMeta: metav1.ObjectMeta{
@@ -80,9 +80,9 @@ func (c openshiftSccs) EnsureCreated(r Reconciler, ctx context.Context, cluster 
 	return nil
 }
 
-func (c openshiftSccs) EnsureDeleted(r Reconciler, ctx context.Context, _ *lvmv1alpha1.LVMCluster) error {
+func (c openshiftSccs) EnsureDeleted(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
-	sccs := getAllSCCs(r.GetNamespace())
+	sccs := getAllSCCs(r.GetNamespace(), cluster)
 	for _, scc := range sccs {
 		name := types.NamespacedName{Name: scName}
 		logger := logger.WithValues("SecurityContextConstraint", scName)
@@ -105,10 +105,22 @@ func (c openshiftSccs) EnsureDeleted(r Reconciler, ctx context.Context, _ *lvmv1
 	return nil
 }
 
-func getAllSCCs(namespace string) []*secv1.SecurityContextConstraints {
-	return []*secv1.SecurityContextConstraints{
+func getAllSCCs(namespace string, cluster *lvmv1alpha1.LVMCluster) []*secv1.SecurityContextConstraints {
+	sccs := []*secv1.SecurityContextConstraints{
 		newVGManagerScc(namespace),
 	}
+
+	if shared, _ := RequiresSharedVolumeGroupSetup(cluster.Spec.Storage.DeviceClasses); shared {
+		sccs = append(
+			sccs,
+			newKubeSANScc(namespace),
+			newNBDClientScc(namespace),
+			newNBDServerScc(namespace),
+			newKubeSANBlobsScc(namespace),
+		)
+	}
+
+	return sccs
 }
 
 func newVGManagerScc(namespace string) *secv1.SecurityContextConstraints {
@@ -147,6 +159,174 @@ func newVGManagerScc(namespace string) *secv1.SecurityContextConstraints {
 	}
 	scc.Users = []string{
 		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.VGManagerServiceAccount),
+	}
+
+	return scc
+}
+
+func newKubeSANScc(namespace string) *secv1.SecurityContextConstraints {
+	scc := &secv1.SecurityContextConstraints{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "security.openshift.io/v1",
+			Kind:       "SecurityContextConstraints",
+		},
+	}
+
+	scc.Name = constants.SCCPrefix + "kubesan"
+	scc.AllowPrivilegedContainer = true
+	scc.AllowHostNetwork = false
+	scc.AllowHostDirVolumePlugin = true
+	scc.AllowHostPorts = false
+	scc.AllowHostPID = true
+	scc.AllowHostIPC = false
+	scc.ReadOnlyRootFilesystem = false
+	scc.RequiredDropCapabilities = []corev1.Capability{}
+	scc.RunAsUser = secv1.RunAsUserStrategyOptions{
+		Type: secv1.RunAsUserStrategyRunAsAny,
+	}
+	scc.SELinuxContext = secv1.SELinuxContextStrategyOptions{
+		Type: secv1.SELinuxStrategyMustRunAs,
+	}
+	scc.FSGroup = secv1.FSGroupStrategyOptions{
+		Type: secv1.FSGroupStrategyMustRunAs,
+	}
+	scc.SupplementalGroups = secv1.SupplementalGroupsStrategyOptions{
+		Type: secv1.SupplementalGroupsStrategyRunAsAny,
+	}
+	scc.Volumes = []secv1.FSType{
+		secv1.FSTypeConfigMap,
+		secv1.FSTypeEmptyDir,
+		secv1.FSTypeHostPath,
+		secv1.FSTypeSecret,
+		secv1.FSTypePersistentVolumeClaim,
+	}
+	scc.Users = []string{
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANCSIControllerPluginServiceAccount),
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANCSINodePluginServiceAccount),
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.VGManagerServiceAccount),
+	}
+
+	return scc
+}
+
+func newNBDClientScc(namespace string) *secv1.SecurityContextConstraints {
+	scc := &secv1.SecurityContextConstraints{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "security.openshift.io/v1",
+			Kind:       "SecurityContextConstraints",
+		},
+	}
+
+	scc.Name = constants.SCCPrefix + "kubesan-nbd-client"
+	scc.AllowPrivilegedContainer = true
+	scc.AllowHostNetwork = true
+	scc.AllowHostDirVolumePlugin = true
+	scc.AllowHostPorts = false
+	scc.AllowHostPID = false
+	scc.AllowHostIPC = false
+	scc.ReadOnlyRootFilesystem = false
+	scc.RequiredDropCapabilities = []corev1.Capability{}
+	scc.RunAsUser = secv1.RunAsUserStrategyOptions{
+		Type: secv1.RunAsUserStrategyRunAsAny,
+	}
+	scc.SELinuxContext = secv1.SELinuxContextStrategyOptions{
+		Type: secv1.SELinuxStrategyMustRunAs,
+	}
+	scc.FSGroup = secv1.FSGroupStrategyOptions{
+		Type: secv1.FSGroupStrategyMustRunAs,
+	}
+	scc.SupplementalGroups = secv1.SupplementalGroupsStrategyOptions{
+		Type: secv1.SupplementalGroupsStrategyRunAsAny,
+	}
+	scc.Volumes = []secv1.FSType{
+		secv1.FSTypeConfigMap,
+		secv1.FSTypeHostPath,
+		secv1.FSTypeSecret,
+	}
+	scc.Users = []string{
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANNBDClientServiceAccount),
+	}
+
+	return scc
+}
+
+func newNBDServerScc(namespace string) *secv1.SecurityContextConstraints {
+	scc := &secv1.SecurityContextConstraints{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "security.openshift.io/v1",
+			Kind:       "SecurityContextConstraints",
+		},
+	}
+
+	scc.Name = constants.SCCPrefix + "kubesan-nbd-server"
+	scc.AllowPrivilegedContainer = true
+	scc.AllowHostNetwork = false
+	scc.AllowHostDirVolumePlugin = true
+	scc.AllowHostPorts = false
+	scc.AllowHostPID = false
+	scc.AllowHostIPC = false
+	scc.ReadOnlyRootFilesystem = false
+	scc.RequiredDropCapabilities = []corev1.Capability{}
+	scc.RunAsUser = secv1.RunAsUserStrategyOptions{
+		Type: secv1.RunAsUserStrategyRunAsAny,
+	}
+	scc.SELinuxContext = secv1.SELinuxContextStrategyOptions{
+		Type: secv1.SELinuxStrategyMustRunAs,
+	}
+	scc.FSGroup = secv1.FSGroupStrategyOptions{
+		Type: secv1.FSGroupStrategyMustRunAs,
+	}
+	scc.SupplementalGroups = secv1.SupplementalGroupsStrategyOptions{
+		Type: secv1.SupplementalGroupsStrategyRunAsAny,
+	}
+	scc.Volumes = []secv1.FSType{
+		secv1.FSTypeConfigMap,
+		secv1.FSTypeHostPath,
+		secv1.FSTypeSecret,
+	}
+	scc.Users = []string{
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANNBDClientServiceAccount),
+	}
+
+	return scc
+}
+
+func newKubeSANBlobsScc(namespace string) *secv1.SecurityContextConstraints {
+	scc := &secv1.SecurityContextConstraints{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "security.openshift.io/v1",
+			Kind:       "SecurityContextConstraints",
+		},
+	}
+
+	scc.Name = constants.SCCPrefix + "kubesan-blobs"
+	scc.AllowPrivilegedContainer = true
+	scc.AllowHostNetwork = false
+	scc.AllowHostDirVolumePlugin = true
+	scc.AllowHostPorts = false
+	scc.AllowHostPID = true
+	scc.AllowHostIPC = false
+	scc.ReadOnlyRootFilesystem = false
+	scc.RequiredDropCapabilities = []corev1.Capability{}
+	scc.RunAsUser = secv1.RunAsUserStrategyOptions{
+		Type: secv1.RunAsUserStrategyRunAsAny,
+	}
+	scc.SELinuxContext = secv1.SELinuxContextStrategyOptions{
+		Type: secv1.SELinuxStrategyMustRunAs,
+	}
+	scc.FSGroup = secv1.FSGroupStrategyOptions{
+		Type: secv1.FSGroupStrategyMustRunAs,
+	}
+	scc.SupplementalGroups = secv1.SupplementalGroupsStrategyOptions{
+		Type: secv1.SupplementalGroupsStrategyRunAsAny,
+	}
+	scc.Volumes = []secv1.FSType{
+		secv1.FSTypeConfigMap,
+		secv1.FSTypeHostPath,
+		secv1.FSTypeSecret,
+	}
+	scc.Users = []string{
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANBlobsServiceAccount),
 	}
 
 	return scc

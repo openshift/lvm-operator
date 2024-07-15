@@ -92,9 +92,10 @@ type Reconciler struct {
 	lsblk.LSBLK
 	wipefs.Wipefs
 	dmsetup.Dmsetup
-	NodeName  string
-	Namespace string
-	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	NodeName         string
+	Namespace        string
+	Filters          func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	IsSharedVGLeader func() bool
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -193,7 +194,7 @@ func (r *Reconciler) reconcile(
 
 	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
 
-	vgs, err := r.LVM.ListVGs(ctx, true)
+	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -259,7 +260,7 @@ func (r *Reconciler) reconcile(
 	logger.Info("new available devices discovered", "available", devices.Available)
 
 	// Create VG/extend VG
-	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, devices.Available); err != nil {
+	if err = r.addDevicesToVG(ctx, vgs, volumeGroup, devices.Available); err != nil {
 		err = fmt.Errorf("failed to create/extend volume group %s: %w", volumeGroup.Name, err)
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorVGCreateOrExtendFailed, err)
 		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
@@ -290,7 +291,7 @@ func (r *Reconciler) reconcile(
 	}
 
 	// refresh list of vgs to be used in status
-	vgs, err = r.LVM.ListVGs(ctx, true)
+	vgs, err = r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -318,6 +319,11 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 
 func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
+
+	if volumeGroup.Spec.DeviceAccessPolicy == lvmv1alpha1.DeviceAccessPolicyShared {
+		logger.Info("skipping lvmd config update for shared volume group setup due to differing driver")
+		return nil
+	}
 
 	// Read the lvmd config file
 	lvmdConfig, err := r.LVMD.Load(ctx)
@@ -429,7 +435,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	}
 
 	// Check if volume group exists
-	vgs, err := r.LVM.ListVGs(ctx, true)
+	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{VGName: volumeGroup.Name})
 	if err != nil {
 		return fmt.Errorf("failed to list volume groups, %w", err)
 	}
@@ -469,7 +475,12 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			}
 		}
 
-		if err = r.LVM.DeleteVG(ctx, existingVG); err != nil {
+		if err = r.LVM.DeleteVG(ctx, existingVG, lvm.DeleteVGOptions{
+			SharedVGOptions: lvm.SharedVGOptions{
+				DeviceAccessPolicy:  volumeGroup.Spec.DeviceAccessPolicy,
+				OwnsGlobalLockSpace: r.IsSharedVGLeader,
+			},
+		}); err != nil {
 			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
 				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
