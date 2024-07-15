@@ -430,3 +430,7 @@ vuln-scan-deps:
 .PHONY: vuln-scan-container
 vuln-scan-container:
 	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+
+kubesan-node-layering-image:
+	@echo "Building the kubesan-node-layering image"
+	$(IMAGE_BUILD_CMD) build -f hack/kubesan-node-adjustment.Containerfile -t "quay.io/jmoller/node-base-kubesan-patched:v4.16.0" hack/

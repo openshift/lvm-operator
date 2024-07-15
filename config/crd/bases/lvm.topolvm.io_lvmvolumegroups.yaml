@@ -43,6 +43,10 @@ spec:
                 description: Default is a flag to indicate whether the device-class
                   is the default
                 type: boolean
+              deviceAccessPolicy:
+                description: DeviceAccessPolicy defines the policy for accessing the
+                  devices
+                type: string
               deviceSelector:
                 description: DeviceSelector is a set of rules that should match for
                   a device to be included in this TopoLVMCluster

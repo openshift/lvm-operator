@@ -7,7 +7,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: quay.io/lvms_dev/lvms-operator
+  newName: quay.io/jmoller/lvms-operator
   newTag: latest
 namePrefix: lvms-
 namespace: openshift-storage

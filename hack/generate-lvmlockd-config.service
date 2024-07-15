@@ -1,0 +1,12 @@
+[Unit]
+Description=Generate lvmlockd config based on IP address
+After=network.target
+Before=lvmlockd.service sanlock.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/lvmlockd_generate.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

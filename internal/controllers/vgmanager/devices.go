@@ -30,8 +30,9 @@ import (
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
+func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vg *lvmv1alpha1.LVMVolumeGroup, devices []lsblk.BlockDevice) error {
 	logger := log.FromContext(ctx)
+	vgName := vg.Name
 
 	if len(devices) < 1 {
 		return fmt.Errorf("can't create vg %q with 0 devices", vgName)
@@ -61,7 +62,12 @@ func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, 
 		for _, pvName := range args {
 			pvs = append(pvs, lvm.PhysicalVolume{PvName: pvName})
 		}
-		if err := r.LVM.CreateVG(ctx, lvm.VolumeGroup{Name: vgName, PVs: pvs}); err != nil {
+		if err := r.LVM.CreateVG(ctx, lvm.VolumeGroup{Name: vgName, PVs: pvs}, lvm.CreateVGOptions{
+			lvm.SharedVGOptions{
+				DeviceAccessPolicy:  vg.Spec.DeviceAccessPolicy,
+				OwnsGlobalLockSpace: r.IsSharedVGLeader,
+			},
+		}); err != nil {
 			return fmt.Errorf("failed to create volume group %s: %w", vgName, err)
 		}
 	}

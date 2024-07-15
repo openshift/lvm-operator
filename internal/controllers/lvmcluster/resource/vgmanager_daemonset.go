@@ -64,16 +64,50 @@ var (
 )
 
 var (
-	NodePluginVolName = "node-plugin-dir"
-	NodePluginVol     = corev1.Volume{
-		Name: NodePluginVolName,
+	KubeSANCSIPluginVolName = "kubesan-csi-plugin-dir"
+	KubeSANCSIPluginVol     = corev1.Volume{
+		Name: KubeSANCSIPluginVolName,
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
-				Path: fmt.Sprintf("%splugins/topolvm.io/node", GetAbsoluteKubeletPath(constants.CSIKubeletRootDir)),
+				Path: fmt.Sprintf(
+					"%splugins/%s",
+					GetAbsoluteKubeletPath(constants.CSIKubeletRootDir),
+					constants.KubeSANCSIDriverName,
+				),
 				Type: &HostPathDirectoryOrCreate}},
 	}
-	NodePluginVolMount = corev1.VolumeMount{
-		Name: NodePluginVolName, MountPath: filepath.Dir(constants.DefaultCSISocket),
+	KubeSANCSIPluginVolMount = corev1.VolumeMount{
+		Name:             KubeSANCSIPluginVolName,
+		MountPath:        fmt.Sprintf("/run/csi"),
+		MountPropagation: &mountPropagationBidirectional,
+	}
+)
+
+var (
+	TopoLVMNodePluginVolName = "node-plugin-dir"
+	TopoLVMNodePluginVol     = corev1.Volume{
+		Name: TopoLVMNodePluginVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: fmt.Sprintf("%splugins/%s/node", GetAbsoluteKubeletPath(constants.CSIKubeletRootDir), constants.TopolvmCSIDriverName),
+				Type: &HostPathDirectoryOrCreate}},
+	}
+	TopoLVMNodePluginVolMount = corev1.VolumeMount{
+		Name: TopoLVMNodePluginVolName, MountPath: filepath.Dir(constants.DefaultCSISocket),
+	}
+)
+
+var (
+	KubeSANNBDPluginVolName = "kubesan-nbd"
+	KubeSANNBDPluginVol     = corev1.Volume{
+		Name: KubeSANNBDPluginVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: constants.KubeSANNBDDir,
+				Type: &HostPathDirectoryOrCreate}},
+	}
+	KubeSANNBDPluginMount = corev1.VolumeMount{
+		Name: KubeSANNBDPluginVolName, MountPath: constants.KubeSANNBDDir,
 	}
 )
 
@@ -230,35 +264,49 @@ func templateVGManagerDaemonset(
 	command, args []string,
 ) appsv1.DaemonSet {
 	// aggregate nodeSelector and tolerations from all deviceClasses
-	confMapVolume := LVMDConfMapVol
-	if clusterType == cluster.TypeMicroShift {
-		confMapVolume.VolumeSource.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
-	}
+	shared, standard := RequiresSharedVolumeGroupSetup(lvmCluster.Spec.Storage.DeviceClasses)
 
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)
 	volumes := []corev1.Volume{
 		RegistrationVol,
-		NodePluginVol,
 		FileLockVol,
-		CSIPluginVol,
 		PodVol,
-		confMapVolume,
 		DevHostDirVol,
 		UDevHostDirVol,
 		SysHostDirVol,
 		MetricsCertsDirVol,
+		CSIPluginVol,
 	}
+
+	if standard {
+		confMapVolume := LVMDConfMapVol
+		if clusterType == cluster.TypeMicroShift {
+			confMapVolume.VolumeSource.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
+		}
+		volumes = append(volumes, TopoLVMNodePluginVol, confMapVolume, CSIPluginVol)
+	}
+
+	if shared {
+		volumes = append(volumes, KubeSANNBDPluginVol, KubeSANCSIPluginVol)
+	}
+
 	volumeMounts := []corev1.VolumeMount{
 		RegistrationVolMount,
-		NodePluginVolMount,
 		FileLockVolMount,
-		CSIPluginVolMount,
 		PodVolMount,
-		LVMDConfMapVolMount,
 		DevHostDirVolMount,
 		UDevHostDirVolMount,
 		SysHostDirVolMount,
 		MetricsCertsDirVolMount,
+	}
+
+	if standard {
+		volumeMounts = append(volumeMounts, TopoLVMNodePluginVolMount, LVMDConfMapVolMount,
+			CSIPluginVolMount)
+	}
+
+	if shared {
+		volumeMounts = append(volumeMounts, KubeSANCSIPluginVolMount)
 	}
 
 	if len(command) == 0 {
@@ -354,6 +402,38 @@ func templateVGManagerDaemonset(
 			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 		},
 	}
+
+	if shared {
+		kubesanVolumeMounts := []corev1.VolumeMount{
+			KubeSANCSIPluginVolMount,
+			KubeSANNBDPluginMount,
+		}
+		img := "quay.io/kubesan/kubesan:latest"
+		containers = append(containers, corev1.Container{
+			Name:    "kubesan-csi-plugin",
+			Image:   img,
+			Command: []string{"./kubesan", "csi-node-plugin"},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: ptr.To(true),
+			},
+			VolumeMounts: kubesanVolumeMounts,
+			Env: []corev1.EnvVar{
+				{
+					Name:  "KUBESAN_IMAGE",
+					Value: img,
+				},
+				{
+					Name: "NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
+				},
+			},
+		})
+	}
+
 	annotations := map[string]string{
 		constants.WorkloadPartitioningManagementAnnotation: constants.ManagementAnnotationVal,
 	}

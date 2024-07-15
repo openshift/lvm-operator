@@ -204,13 +204,18 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		logger.Info("successfully added finalizer")
 	}
 
+	_, standard := resource.RequiresSharedVolumeGroupSetup(instance.Spec.Storage.DeviceClasses)
+
 	resources := []resource.Manager{
 		resource.CSIDriver(),
 		resource.VGManager(r.ClusterType),
-		resource.LVMVGs(),
-		resource.LVMVGNodeStatus(),
 		resource.TopoLVMStorageClass(),
 		resource.CSINode(),
+		resource.StorageClass(),
+	}
+
+	if standard {
+		resources = append(resources, resource.LVMVGs(), resource.LVMVGNodeStatus())
 	}
 
 	if r.ClusterType == cluster.TypeOCP {
@@ -335,7 +340,7 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context) (bool, error) {
 func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		resourceDeletionList := []resource.Manager{
-			resource.TopoLVMStorageClass(),
+			resource.StorageClass(),
 			resource.LVMVGs(),
 			resource.LVMVGNodeStatus(),
 			resource.CSIDriver(),
