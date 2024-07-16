@@ -19,6 +19,8 @@ package constants
 const (
 	TopolvmCSIDriverName = "topolvm.io"
 
+	ControllerCSILocalPath = "/run/csi/socket"
+
 	KubeSANIdentifier    = "kubesan"
 	KubeSANDomainName    = "gitlab.io"
 	KubeSANCSIDriverName = KubeSANIdentifier + "." + KubeSANDomainName
@@ -30,7 +32,7 @@ const (
 	KubeSANBlobsServiceAccount               = "kubesan-blobs"
 	KubeSANRunDir                            = "/run/kubesan"
 	KubeSANNBDDir                            = KubeSANRunDir + "/nbd"
-	KubeSANCSILocalPath                      = "/run/csi"
+	KubeSANImage                             = "quay.io/kubesan/kubesan:latest"
 
 	VGManagerServiceAccount = "vg-manager"
 

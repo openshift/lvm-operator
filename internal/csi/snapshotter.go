@@ -26,6 +26,8 @@ type SnapshotterOptions struct {
 	DriverName          string
 	CSIEndpoint         string
 	CSIOperationTimeout time.Duration
+	ExtraCreateMetadata bool
+	LeaderElection      bool
 }
 
 type Snapshotter struct {
@@ -35,7 +37,7 @@ type Snapshotter struct {
 }
 
 func (s *Snapshotter) NeedLeaderElection() bool {
-	return true
+	return s.options.LeaderElection
 }
 
 var _ manager.Runnable = &Snapshotter{}
@@ -90,7 +92,7 @@ func (s *Snapshotter) Start(ctx context.Context) error {
 		-1,
 		"groupsnapshot",
 		-1,
-		false,
+		s.options.ExtraCreateMetadata,
 		rateLimiter,
 		false,
 		factory.Groupsnapshot().V1alpha1().VolumeGroupSnapshotContents(),
