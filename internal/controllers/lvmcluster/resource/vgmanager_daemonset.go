@@ -272,10 +272,10 @@ func templateVGManagerDaemonset(
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
 						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
-				FailureThreshold:    10,
-				InitialDelaySeconds: 0,
+				FailureThreshold:    60, // 60*10 = 600s / 10 min for long startup due to large volume group initialization
+				InitialDelaySeconds: 2,
 				TimeoutSeconds:      2,
-				PeriodSeconds:       2},
+				PeriodSeconds:       10},
 			LivenessProbe: &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
