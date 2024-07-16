@@ -85,10 +85,14 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		p.options.Metrics,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
-	defer grpcClient.Close() //nolint:errcheck,staticcheck
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := grpcClient.Close(); err != nil {
+			logger.Error(err, "failed to close grpc client")
+		}
+	}() //nolint:errcheck,staticcheck
 	pluginCapabilities, controllerCapabilities, err := provisionctrl.GetDriverCapabilities(grpcClient, p.options.CSIOperationTimeout)
 	if err != nil {
 		return err
@@ -293,7 +297,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	var wg sync.WaitGroup
 
 	if p.options.EnableCapacityTracking {
-		wg.Add(3)
+		wg.Add(2)
 		go func() {
 			defer wg.Done()
 			topologyInformer.RunWorker(ctx)
@@ -304,19 +308,23 @@ func (p *Provisioner) Start(ctx context.Context) error {
 			capacityController.Run(ctx, 1)
 			logger.Info("capacity controller finished shutdown")
 		}()
-		go func() {
-			defer wg.Done()
-			defer topologyQueue.ShutDown()
-			provisionController.Run(ctx)
-			logger.Info("provisioner controller finished shutdown")
-		}()
 	}
 
-	wg.Add(1)
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
+		defer claimQueue.ShutDown()
+		logger.Info("starting csi claim controller")
 		csiClaimController.Run(ctx, 1)
 		logger.Info("csi claim controller finished shutdown")
+	}()
+	go func() {
+		defer wg.Done()
+		if topologyQueue != nil {
+			defer topologyQueue.ShutDown()
+		}
+		provisionController.Run(ctx)
+		logger.Info("provisioner controller finished shutdown")
 	}()
 
 	wg.Wait()
