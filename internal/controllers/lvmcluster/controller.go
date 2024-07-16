@@ -204,18 +204,14 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		logger.Info("successfully added finalizer")
 	}
 
-	_, standard := resource.RequiresSharedVolumeGroupSetup(instance.Spec.Storage.DeviceClasses)
-
 	resources := []resource.Manager{
 		resource.CSIDriver(),
 		resource.VGManager(r.ClusterType),
 		resource.TopoLVMStorageClass(),
 		resource.CSINode(),
 		resource.StorageClass(),
-	}
-
-	if standard {
-		resources = append(resources, resource.LVMVGs(), resource.LVMVGNodeStatus())
+		resource.LVMVGs(),
+		resource.LVMVGNodeStatus(),
 	}
 
 	if r.ClusterType == cluster.TypeOCP {

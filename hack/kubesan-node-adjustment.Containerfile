@@ -13,5 +13,9 @@ RUN rpm-ostree cliwrap install-to-root / && \
     rpm-ostree cleanup -m && \
     mkdir -p /etc/modules-load.d && echo -e "nbd\ndm-thin-pool" | sudo tee /etc/modules-load.d/kubesan.conf && \
     mkdir -p /etc/sanlock && echo -e "use_watchdog = 0" | sudo tee /etc/sanlock/sanlock.conf && \
+    sed -i 's/^[[:space:]]*# use_lvmlockd = 0[[:space:]]*$/use_lvmlockd = 1/' /etc/lvm/lvm.conf && \
     systemctl enable generate-lvmlockd-config.service sanlock lvmlockd && \
     ostree container commit
+
+RUN mkdir -p /etc/systemd/system/sanlock.service.d
+ADD ./sanlock-root-workaround.conf /etc/systemd/system/sanlock.service.d/override.conf

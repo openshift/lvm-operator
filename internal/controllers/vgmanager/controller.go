@@ -200,6 +200,17 @@ func (r *Reconciler) reconcile(
 	for _, vg := range vgs {
 		if volumeGroup.Name == vg.Name {
 			vgExistsInLVM = true
+
+			if volumeGroup.Spec.DeviceAccessPolicy == lvmv1alpha1.DeviceAccessPolicyShared {
+				// If we are dealing with a shared volume group, we need to check if the volume group is already in use
+				// by another node. If it is, we need to wait until the other node has finished using it.
+				logger.Info("shared volume group detected, attempting lock space start...", "VGName", vg.Name)
+				if err := r.LVM.LockStart(ctx, vg.Name); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to start shared lockspace %s: %w", vg.Name, err)
+				}
+				logger.Info("shared lockspace started", "VGName", vg.Name)
+			}
+
 			break
 		}
 	}

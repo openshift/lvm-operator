@@ -10,3 +10,6 @@ subjects:
   - kind: ServiceAccount
     name: kubesan-csi-controller-plugin
     namespace: system
+  - kind: ServiceAccount
+    name: vg-manager
+    namespace: system

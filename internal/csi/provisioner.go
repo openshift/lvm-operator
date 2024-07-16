@@ -36,11 +36,20 @@ const (
 	ResyncPeriodOfCsiNodeInformer = 1 * time.Hour
 )
 
+type NodeDeployment struct {
+	NodeName        string
+	NodeCSIEndpoint string
+}
+
 type ProvisionerOptions struct {
 	DriverName          string
 	CSIEndpoint         string
 	CSIOperationTimeout time.Duration
 	Metrics             *connection.ExtendedCSIMetricsManager
+	ExtraCreateMetadata bool
+	*NodeDeployment
+	LeaderElection         bool
+	EnableCapacityTracking bool
 }
 
 type Provisioner struct {
@@ -50,7 +59,7 @@ type Provisioner struct {
 }
 
 func (p *Provisioner) NeedLeaderElection() bool {
-	return true
+	return p.options.LeaderElection
 }
 
 var _ manager.Runnable = &Provisioner{}
@@ -112,6 +121,27 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	nodeLister := factory.Core().V1().Nodes().Lister()
 	claimLister := factory.Core().V1().PersistentVolumeClaims().Lister()
 	vaLister := factory.Storage().V1().VolumeAttachments().Lister()
+
+	var nodeDeployment *provisionctrl.NodeDeployment
+	if p.options.NodeDeployment != nil {
+		nodeGRPCClient, err := connection.Connect(ctx, p.options.NodeCSIEndpoint,
+			p.options.Metrics,
+			connection.OnConnectionLoss(onLostConnection),
+			connection.WithTimeout(p.options.CSIOperationTimeout))
+		defer nodeGRPCClient.Close() //nolint:errcheck,staticcheck
+		if err != nil {
+			return fmt.Errorf("failed to connect to node csi driver: %w", err)
+		}
+		nodeDeployment = &provisionctrl.NodeDeployment{}
+		nodeDeployment.NodeName = p.options.NodeDeployment.NodeName
+		nodeDeployment.ClaimInformer = factory.Core().V1().PersistentVolumeClaims()
+		nodeInfo, err := provisionctrl.GetNodeInfo(nodeGRPCClient, p.options.CSIOperationTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to get node info: %w", err)
+		}
+		nodeDeployment.NodeInfo = *nodeInfo
+	}
+
 	provisioner := provisionctrl.NewCSIProvisioner(
 		clientset,
 		p.options.CSIOperationTimeout,
@@ -133,13 +163,17 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		claimLister,
 		vaLister,
 		nil,
-		false,
+		p.options.ExtraCreateMetadata,
 		"",
-		nil,
+		nodeDeployment,
 		false,
 		false,
 	)
 
+	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
+
+	var capacityFactoryForNamespace informers.SharedInformerFactory
+	var topologyInformer topology.Informer
 	var capacityController *capacity.Controller
 	namespace := os.Getenv("NAMESPACE")
 	if namespace == "" {
@@ -161,54 +195,53 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	logger.Info(fmt.Sprintf("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name))
 	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
 
-	topologyQueue := workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
-		Name: "csitopology",
-	})
+		topologyQueue = workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
+			Name: "csitopology",
+		})
 
-	topologyInformer := topology.NewNodeTopology(
-		p.options.DriverName,
-		clientset,
-		factory.Core().V1().Nodes(),
-		factory.Storage().V1().CSINodes(),
-		topologyQueue,
-	)
+		topologyInformer = topology.NewNodeTopology(
+			p.options.DriverName,
+			clientset,
+			factory.Core().V1().Nodes(),
+			factory.Storage().V1().CSINodes(),
+			topologyQueue,
+		)
 
-	managedByID := "external-provisioner"
-
-	factoryForNamespace := informers.NewSharedInformerFactoryWithOptions(clientset,
-		ResyncPeriodOfCsiNodeInformer,
-		informers.WithNamespace(namespace),
-		informers.WithTweakListOptions(func(lo *metav1.ListOptions) {
-			lo.LabelSelector = labels.Set{
-				capacity.DriverNameLabel: p.options.DriverName,
-				capacity.ManagedByLabel:  managedByID,
-			}.AsSelector().String()
-		}),
-	)
-	// We use the V1 CSIStorageCapacity API if available.
-	clientFactory := capacity.NewV1ClientFactory(clientset)
-	cInformer := factoryForNamespace.Storage().V1().CSIStorageCapacities()
-
-	capacityController = capacity.NewCentralCapacityController(
-		csi.NewControllerClient(grpcClient),
-		p.options.DriverName,
-		clientFactory,
-		// Metrics for the queue is available in the default registry.
-		workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
-			Name: "csistoragecapacity",
-		}),
-		controllerRef,
-		managedByID,
-		namespace,
-		topologyInformer,
-		factory.Storage().V1().StorageClasses(),
-		cInformer,
-		time.Minute,
-		false,
-		p.options.CSIOperationTimeout,
-	)
-	// Wrap Provision and Delete to detect when it is time to refresh capacity.
-	provisioner = capacity.NewProvisionWrapper(provisioner, capacityController)
+		managedByID := "external-provisioner"
+		capacityFactoryForNamespace = informers.NewSharedInformerFactoryWithOptions(clientset,
+			ResyncPeriodOfCsiNodeInformer,
+			informers.WithNamespace(namespace),
+			informers.WithTweakListOptions(func(lo *metav1.ListOptions) {
+				lo.LabelSelector = labels.Set{
+					capacity.DriverNameLabel: p.options.DriverName,
+					capacity.ManagedByLabel:  managedByID,
+				}.AsSelector().String()
+			}),
+		)
+		// We use the V1 CSIStorageCapacity API if available.
+		clientFactory := capacity.NewV1ClientFactory(clientset)
+		cInformer := capacityFactoryForNamespace.Storage().V1().CSIStorageCapacities()
+		capacityController = capacity.NewCentralCapacityController(
+			csi.NewControllerClient(grpcClient),
+			p.options.DriverName,
+			clientFactory,
+			// Metrics for the queue is available in the default registry.
+			workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
+				Name: "csistoragecapacity",
+			}),
+			controllerRef,
+			managedByID,
+			namespace,
+			topologyInformer,
+			factory.Storage().V1().StorageClasses(),
+			cInformer,
+			time.Minute,
+			false,
+			p.options.CSIOperationTimeout,
+		)
+		// Wrap Provision and Delete to detect when it is time to refresh capacity.
+		provisioner = capacity.NewProvisionWrapper(provisioner, capacityController)
+	}
 
 	claimRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
 	claimQueue := workqueue.NewTypedRateLimitingQueueWithConfig(claimRateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
@@ -243,7 +276,12 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	factory.Start(ctx.Done())
 	// Starting is enough, the capacity controller will
 	// wait for sync.
-	factoryForNamespace.Start(ctx.Done())
+	if p.options.EnableCapacityTracking {
+		if capacityFactoryForNamespace == nil {
+			return fmt.Errorf("capacityFactoryForNamespace is nil but should have been initialized")
+		}
+		capacityFactoryForNamespace.Start(ctx.Done())
+	}
 	cacheSyncResult := factory.WaitForCacheSync(ctx.Done())
 	for _, v := range cacheSyncResult {
 		if !v {
@@ -252,27 +290,29 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
-		topologyInformer.RunWorker(ctx)
-		logger.Info("topology informer finished shutdown")
-	}()
-	go func() {
-		defer wg.Done()
-		capacityController.Run(ctx, 1)
-		logger.Info("capacity controller finished shutdown")
-	}()
+		wg.Add(4)
+		go func() {
+			defer wg.Done()
+			topologyInformer.RunWorker(ctx)
+			logger.Info("topology informer finished shutdown")
+		}()
+		go func() {
+			defer wg.Done()
+			capacityController.Run(ctx, 1)
+			logger.Info("capacity controller finished shutdown")
+		}()
+		go func() {
+			defer wg.Done()
+			defer topologyQueue.ShutDown()
+			provisionController.Run(ctx)
+			logger.Info("provisioner controller finished shutdown")
+		}()
+
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		csiClaimController.Run(ctx, 1)
 		logger.Info("csi claim controller finished shutdown")
-	}()
-	go func() {
-		defer wg.Done()
-		defer topologyQueue.ShutDown()
-		provisionController.Run(ctx)
-		logger.Info("provisioner controller finished shutdown")
 	}()
 
 	wg.Wait()

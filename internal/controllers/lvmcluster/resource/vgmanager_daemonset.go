@@ -76,9 +76,18 @@ var (
 				),
 				Type: &HostPathDirectoryOrCreate}},
 	}
-	KubeSANCSIPluginVolMount = corev1.VolumeMount{
+	KubeSANCSIPluginLocalVolMount = corev1.VolumeMount{
 		Name:             KubeSANCSIPluginVolName,
 		MountPath:        fmt.Sprintf("/run/csi"),
+		MountPropagation: &mountPropagationBidirectional,
+	}
+	KubeSANCSIPluginVolMount = corev1.VolumeMount{
+		Name: KubeSANCSIPluginVolName,
+		MountPath: fmt.Sprintf(
+			"%splugins/%s",
+			GetAbsoluteKubeletPath(constants.CSIKubeletRootDir),
+			constants.KubeSANCSIDriverName,
+		),
 		MountPropagation: &mountPropagationBidirectional,
 	}
 )
@@ -94,6 +103,21 @@ var (
 	}
 	TopoLVMNodePluginVolMount = corev1.VolumeMount{
 		Name: TopoLVMNodePluginVolName, MountPath: filepath.Dir(constants.DefaultCSISocket),
+	}
+)
+
+var (
+	KubeSANNodeLocalControllerSocketVolName = "kubesan-node-local-controller-socket"
+	KubeSANNodeLocalControllerSocketVol     = corev1.Volume{
+		Name: KubeSANNodeLocalControllerSocketVolName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				Medium: corev1.StorageMediumMemory,
+			},
+		},
+	}
+	KubeSANNodeLocalControllerSocketVolMount = corev1.VolumeMount{
+		Name: KubeSANNodeLocalControllerSocketVolName, MountPath: filepath.Dir(constants.ControllerCSILocalPath),
 	}
 )
 
@@ -287,7 +311,7 @@ func templateVGManagerDaemonset(
 	}
 
 	if shared {
-		volumes = append(volumes, KubeSANNBDPluginVol, KubeSANCSIPluginVol)
+		volumes = append(volumes, KubeSANNBDPluginVol, KubeSANCSIPluginVol, KubeSANNodeLocalControllerSocketVol)
 	}
 
 	volumeMounts := []corev1.VolumeMount{
@@ -306,7 +330,7 @@ func templateVGManagerDaemonset(
 	}
 
 	if shared {
-		volumeMounts = append(volumeMounts, KubeSANCSIPluginVolMount)
+		volumeMounts = append(volumeMounts, KubeSANCSIPluginVolMount, KubeSANNodeLocalControllerSocketVolMount)
 	}
 
 	if len(command) == 0 {
@@ -404,23 +428,50 @@ func templateVGManagerDaemonset(
 	}
 
 	if shared {
-		kubesanVolumeMounts := []corev1.VolumeMount{
-			KubeSANCSIPluginVolMount,
+		kubeSANNodeVolumeMounts := []corev1.VolumeMount{
+			KubeSANCSIPluginLocalVolMount,
 			KubeSANNBDPluginMount,
 		}
-		img := "quay.io/kubesan/kubesan:latest"
 		containers = append(containers, corev1.Container{
-			Name:    "kubesan-csi-plugin",
-			Image:   img,
+			Name:    "kubesan-csi-node-plugin",
+			Image:   constants.KubeSANImage,
 			Command: []string{"./kubesan", "csi-node-plugin"},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: ptr.To(true),
 			},
-			VolumeMounts: kubesanVolumeMounts,
+			VolumeMounts: kubeSANNodeVolumeMounts,
 			Env: []corev1.EnvVar{
 				{
 					Name:  "KUBESAN_IMAGE",
-					Value: img,
+					Value: constants.KubeSANImage,
+				},
+				{
+					Name: "NODE_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "spec.nodeName",
+						},
+					},
+				},
+			},
+		})
+
+		kubeSANControllerVolumeMounts := []corev1.VolumeMount{
+			DevHostDirVolMount,
+			KubeSANNodeLocalControllerSocketVolMount,
+		}
+		containers = append(containers, corev1.Container{
+			Name:    "kubesan-csi-controller-plugin",
+			Image:   constants.KubeSANImage,
+			Command: []string{"./kubesan", "csi-controller-plugin"},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: ptr.To(true),
+			},
+			VolumeMounts: kubeSANControllerVolumeMounts,
+			Env: []corev1.EnvVar{
+				{
+					Name:  "KUBESAN_IMAGE",
+					Value: constants.KubeSANImage,
 				},
 				{
 					Name: "NODE_NAME",

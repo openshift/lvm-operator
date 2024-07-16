@@ -327,6 +327,9 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 		if deviceClass.Default {
 			countDefault++
 		}
+		if deviceClass.ThinPoolConfig != nil && deviceClass.DeviceAccessPolicy == DeviceAccessPolicyShared {
+			return nil, fmt.Errorf("ThinPoolConfig can not be set when deviceAccessPolicy is set to Shared")
+		}
 		if tpConfig := deviceClass.ThinPoolConfig; tpConfig != nil {
 			tpWarnings, err := v.verifyThinPoolConfig(tpConfig)
 			if err != nil {

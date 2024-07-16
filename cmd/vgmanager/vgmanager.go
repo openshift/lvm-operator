@@ -31,6 +31,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
+	"github.com/kubernetes-csi/csi-lib-utils/connection"
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/resource"
@@ -51,8 +53,10 @@ import (
 	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,6 +90,7 @@ type Options struct {
 	healthProbeAddr string
 
 	enableSharedVolumes bool
+	Metrics             *connection.ExtendedCSIMetricsManager
 }
 
 // NewCmd creates a new CLI command
@@ -210,6 +215,42 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		registerapi.RegisterRegistrationServer(registrationGrpcServer, registration)
 		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, registration.registrationPath, false)); err != nil {
 			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
+		}
+
+		if err := mgr.Add(internalCSI.NewProvisioner(mgr, internalCSI.ProvisionerOptions{
+			DriverName:          constants.KubeSANCSIDriverName,
+			CSIEndpoint:         constants.ControllerCSILocalPath,
+			CSIOperationTimeout: 10 * time.Second,
+			NodeDeployment: &internalCSI.NodeDeployment{
+				NodeName:        nodeName,
+				NodeCSIEndpoint: kubeSANRegistrationPath(),
+			},
+			ExtraCreateMetadata: true,
+			Metrics:             opts.Metrics,
+		})); err != nil {
+			return fmt.Errorf("unable to create CSI Provisioner: %w", err)
+		}
+
+		enableSnapshotting := true
+		vsc := &snapapi.VolumeSnapshotClassList{}
+		if err := mgr.GetClient().List(ctx, vsc, &client.ListOptions{Limit: 1}); err != nil {
+			// this is necessary in case the VolumeSnapshotClass CRDs are not registered in the Distro, e.g. for OpenShift Local
+			if meta.IsNoMatchError(err) {
+				opts.SetupLog.Info("VolumeSnapshotClasses do not exist on the cluster, ignoring")
+				enableSnapshotting = false
+			}
+		}
+
+		if enableSnapshotting {
+			if err := mgr.Add(internalCSI.NewSnapshotter(mgr, internalCSI.SnapshotterOptions{
+				DriverName:          constants.KubeSANCSIDriverName,
+				CSIEndpoint:         constants.ControllerCSILocalPath,
+				CSIOperationTimeout: 10 * time.Second,
+				LeaderElection:      true,
+				ExtraCreateMetadata: true,
+			})); err != nil {
+				return fmt.Errorf("unable to create CSI Snapshotter: %w", err)
+			}
 		}
 	} else {
 		volumeGroupLock = runner.NewNoneVolumeGroupLock()

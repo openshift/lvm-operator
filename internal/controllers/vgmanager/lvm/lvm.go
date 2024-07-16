@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
@@ -140,6 +141,8 @@ type LVM interface {
 	ExtendThinPoolMetadata(ctx context.Context, lvName, vgName string, metadataSizeBytes int64) error
 	ActivateLV(ctx context.Context, lvName, vgName string) error
 	DeleteLV(ctx context.Context, lvName, vgName string) error
+
+	LockStart(ctx context.Context, vgName string) error
 }
 
 type HostLVM struct {
@@ -233,6 +236,16 @@ func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup, opts CreateVG
 
 	if err := hlvm.RunCommandAsHost(ctx, vgCreateCmd, args...); err != nil {
 		return fmt.Errorf("failed to create volume group %q. %v", vg.Name, err)
+	}
+
+	if opts.DeviceAccessPolicy == v1alpha1.DeviceAccessPolicyShared {
+		start := time.Now()
+		logger := log.FromContext(ctx).WithValues("VolumeGroup", vg.Name)
+		logger.Info("shared volume group created, attempting lock space start...")
+		if err := hlvm.LockStart(ctx, vg.Name); err != nil {
+			return fmt.Errorf("failed to start lock for shared volume group %q after creation: %w", vg.Name, err)
+		}
+		logger.Info("lock space started successfully", "duration", time.Since(start))
 	}
 
 	return nil
@@ -594,6 +607,18 @@ func (hlvm *HostLVM) ActivateLV(ctx context.Context, lvName, vgName string) erro
 	// deactivate logical volume
 	if err := hlvm.RunCommandAsHost(ctx, lvChangeCmd, "-ay", lv); err != nil {
 		return fmt.Errorf("failed to activate thin pool %q in volume group %q. %w", lvName, vgName, err)
+	}
+
+	return nil
+}
+
+func (hlvm *HostLVM) LockStart(ctx context.Context, vgName string) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to start lock for volume group: volume group name is empty")
+	}
+
+	if err := hlvm.RunCommandAsHost(ctx, vgChangeCmd, vgName, "--lockstart"); err != nil {
+		return fmt.Errorf("failed to start lock for volume group %q: %w", vgName, err)
 	}
 
 	return nil

@@ -8,8 +8,7 @@ spec:
     - name: vg1
       default: true
       deviceAccessPolicy: shared
-      thinPoolConfig:
-        name: thin-pool-1
-        sizePercent: 90
-        overprovisionRatio: 10
       fstype: xfs
+      deviceSelector:
+        paths:
+        - /dev/nvme1n1
