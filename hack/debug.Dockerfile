@@ -30,12 +30,15 @@ FROM golang:1.22 as dlv
 RUN go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2
+FROM --platform=$TARGETPLATFORM registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
 
-# Update the image to get the latest CVE updates
-RUN microdnf update -y && \
-    microdnf install -y util-linux && \
-    microdnf clean all
+RUN dnf update -y && \
+    dnf install --nodocs --noplugins -y \
+        util-linux \
+        e2fsprogs \
+        xfsprogs \
+        glibc && \
+    dnf clean all
 
 WORKDIR /app
 

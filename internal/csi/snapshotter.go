@@ -59,10 +59,14 @@ func (s *Snapshotter) Start(ctx context.Context) error {
 	grpcClient, err := connection.Connect(ctx, s.options.CSIEndpoint, nil,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(s.options.CSIOperationTimeout))
-	defer grpcClient.Close() //nolint:errcheck,staticcheck
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := grpcClient.Close(); err != nil {
+			log.FromContext(ctx).Error(err, "failed to close grpc client")
+		}
+	}()
 
 	kubeClient, err := kubernetes.NewForConfigAndClient(s.config, s.client)
 	if err != nil {

@@ -58,6 +58,12 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	start := time.Now()
 	end := make(chan any, 1)
 	go func() {
+		// recover panic
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(err, "gRPC server panic", "recover", r)
+			}
+		}()
 		r.srv.GracefulStop()
 		end <- nil
 	}()

@@ -126,7 +126,7 @@ func getCSIDriverResources(cluster *lvmv1alpha1.LVMCluster) []*storagev1.CSIDriv
 			Spec: storagev1.CSIDriverSpec{
 				AttachRequired:       &attachRequired,
 				PodInfoOnMount:       &podInfoOnMount,
-				StorageCapacity:      ptr.To(true),
+				StorageCapacity:      ptr.To(false),
 				VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{storagev1.VolumeLifecyclePersistent},
 			},
 		})

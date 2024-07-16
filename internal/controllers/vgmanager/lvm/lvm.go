@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
@@ -236,16 +235,6 @@ func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup, opts CreateVG
 
 	if err := hlvm.RunCommandAsHost(ctx, vgCreateCmd, args...); err != nil {
 		return fmt.Errorf("failed to create volume group %q. %v", vg.Name, err)
-	}
-
-	if opts.DeviceAccessPolicy == v1alpha1.DeviceAccessPolicyShared {
-		start := time.Now()
-		logger := log.FromContext(ctx).WithValues("VolumeGroup", vg.Name)
-		logger.Info("shared volume group created, attempting lock space start...")
-		if err := hlvm.LockStart(ctx, vg.Name); err != nil {
-			return fmt.Errorf("failed to start lock for shared volume group %q after creation: %w", vg.Name, err)
-		}
-		logger.Info("lock space started successfully", "duration", time.Since(start))
 	}
 
 	return nil

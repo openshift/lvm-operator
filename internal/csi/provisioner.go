@@ -85,10 +85,14 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		p.options.Metrics,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
-	defer grpcClient.Close() //nolint:errcheck,staticcheck
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := grpcClient.Close(); err != nil {
+			logger.Error(err, "failed to close grpc client")
+		}
+	}() //nolint:errcheck,staticcheck
 	pluginCapabilities, controllerCapabilities, err := provisionctrl.GetDriverCapabilities(grpcClient, p.options.CSIOperationTimeout)
 	if err != nil {
 		return err
@@ -301,12 +305,13 @@ func (p *Provisioner) Start(ctx context.Context) error {
 			capacityController.Run(ctx, 1)
 			logger.Info("capacity controller finished shutdown")
 		}()
-		go func() {
-			defer wg.Done()
-			defer topologyQueue.ShutDown()
-			provisionController.Run(ctx)
-			logger.Info("provisioner controller finished shutdown")
-		}()
+
+go func() {
+	defer wg.Done()
+	defer topologyQueue.ShutDown()
+	provisionController.Run(ctx)
+	logger.Info("provisioner controller finished shutdown")
+}()
 
 	wg.Add(1)
 	go func() {
