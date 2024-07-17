@@ -307,7 +307,7 @@ func templateVGManagerDaemonset(
 		if clusterType == cluster.TypeMicroShift {
 			confMapVolume.VolumeSource.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
 		}
-		volumes = append(volumes, TopoLVMNodePluginVol, confMapVolume, CSIPluginVol)
+		volumes = append(volumes, TopoLVMNodePluginVol, confMapVolume)
 	}
 
 	if shared {
@@ -431,6 +431,7 @@ func templateVGManagerDaemonset(
 		kubeSANNodeVolumeMounts := []corev1.VolumeMount{
 			KubeSANCSIPluginLocalVolMount,
 			KubeSANNBDPluginMount,
+			CSIPluginVolMount,
 		}
 		containers = append(containers, corev1.Container{
 			Name:    "kubesan-csi-node-plugin",
@@ -444,6 +445,14 @@ func templateVGManagerDaemonset(
 				{
 					Name:  "KUBESAN_IMAGE",
 					Value: constants.KubeSANImage,
+				},
+				{
+					Name: "NAMESPACE",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.namespace",
+						},
+					},
 				},
 				{
 					Name: "NODE_NAME",
@@ -472,6 +481,14 @@ func templateVGManagerDaemonset(
 				{
 					Name:  "KUBESAN_IMAGE",
 					Value: constants.KubeSANImage,
+				},
+				{
+					Name: "NAMESPACE",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.namespace",
+						},
+					},
 				},
 				{
 					Name: "NODE_NAME",

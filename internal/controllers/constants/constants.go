@@ -27,8 +27,8 @@ const (
 
 	KubeSANCSIControllerPluginServiceAccount = "kubesan-csi-controller-plugin"
 	KubeSANCSINodePluginServiceAccount       = "kubesan-csi-node-plugin"
-	KubeSANNBDClientServiceAccount           = "kubesan-nbd-client"
-	KubeSANNBDServerServiceAccount           = "kubesan-nbd-server"
+	KubeSANNBDClientServiceAccount           = "nbd-client"
+	KubeSANNBDServerServiceAccount           = "nbd-server"
 	KubeSANBlobsServiceAccount               = "kubesan-blobs"
 	KubeSANRunDir                            = "/run/kubesan"
 	KubeSANNBDDir                            = KubeSANRunDir + "/nbd"

@@ -245,6 +245,7 @@ func newNBDClientScc(namespace string) *secv1.SecurityContextConstraints {
 	}
 	scc.Users = []string{
 		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANNBDClientServiceAccount),
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.VGManagerServiceAccount),
 	}
 
 	return scc
@@ -285,7 +286,8 @@ func newNBDServerScc(namespace string) *secv1.SecurityContextConstraints {
 		secv1.FSTypeSecret,
 	}
 	scc.Users = []string{
-		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANNBDClientServiceAccount),
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANNBDServerServiceAccount),
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.VGManagerServiceAccount),
 	}
 
 	return scc
@@ -327,6 +329,7 @@ func newKubeSANBlobsScc(namespace string) *secv1.SecurityContextConstraints {
 	}
 	scc.Users = []string{
 		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.KubeSANBlobsServiceAccount),
+		fmt.Sprintf("system:serviceaccount:%s:%s", namespace, constants.VGManagerServiceAccount),
 	}
 
 	return scc
