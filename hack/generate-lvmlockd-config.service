@@ -1,10 +1,11 @@
 [Unit]
 Description=Generate lvmlockd config based on IP address
-After=network.target
+After=network-online.target
 Before=lvmlockd.service sanlock.service
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sh -c 'until ping -c1 google.com; do sleep 1; done;'
 ExecStart=/usr/bin/lvmlockd_generate.sh
 RemainAfterExit=yes
 
