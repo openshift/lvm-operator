@@ -1,17 +1,17 @@
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: kubesan-blobs
+  name: blobs
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: kubesan-blobs
+  name: blobs
 subjects:
   - kind: ServiceAccount
-    name: kubesan-csi-controller-plugin
+    name: csi-controller-plugin
     namespace: system
   - kind: ServiceAccount
-    name: kubesan-csi-node-plugin
+    name: csi-node-plugin
     namespace: system
   - kind: ServiceAccount
     name: vg-manager
