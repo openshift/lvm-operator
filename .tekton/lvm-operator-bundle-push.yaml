@@ -24,7 +24,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator/lvm-operator-bundle:{{revision}}
   - name: dockerfile
-    value: bundle.Dockerfile
+    value: bundle.konflux.Dockerfile
   pipelineSpec:
     finally:
     - name: show-sbom
