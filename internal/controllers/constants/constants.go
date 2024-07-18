@@ -25,11 +25,11 @@ const (
 	KubeSANDomainName    = "gitlab.io"
 	KubeSANCSIDriverName = KubeSANIdentifier + "." + KubeSANDomainName
 
-	KubeSANCSIControllerPluginServiceAccount = "kubesan-csi-controller-plugin"
-	KubeSANCSINodePluginServiceAccount       = "kubesan-csi-node-plugin"
+	KubeSANCSIControllerPluginServiceAccount = "csi-controller-plugin"
+	KubeSANCSINodePluginServiceAccount       = "csi-node-plugin"
 	KubeSANNBDClientServiceAccount           = "nbd-client"
 	KubeSANNBDServerServiceAccount           = "nbd-server"
-	KubeSANBlobsServiceAccount               = "kubesan-blobs"
+	KubeSANBlobsServiceAccount               = "blobs"
 	KubeSANRunDir                            = "/run/kubesan"
 	KubeSANNBDDir                            = KubeSANRunDir + "/nbd"
 	KubeSANImage                             = "quay.io/kubesan/kubesan:latest"

@@ -301,7 +301,7 @@ func newKubeSANBlobsScc(namespace string) *secv1.SecurityContextConstraints {
 		},
 	}
 
-	scc.Name = constants.SCCPrefix + "kubesan-blobs"
+	scc.Name = constants.SCCPrefix + "blobs"
 	scc.AllowPrivilegedContainer = true
 	scc.AllowHostNetwork = false
 	scc.AllowHostDirVolumePlugin = true

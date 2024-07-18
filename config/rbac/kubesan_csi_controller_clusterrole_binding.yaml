@@ -8,7 +8,7 @@ roleRef:
   name: kubesan-csi-controller
 subjects:
   - kind: ServiceAccount
-    name: kubesan-csi-controller-plugin
+    name: csi-controller-plugin
     namespace: system
   - kind: ServiceAccount
     name: vg-manager

@@ -414,7 +414,7 @@ func templateVGManagerDaemonset(
 			CSIPluginVolMount,
 		}
 		containers = append(containers, corev1.Container{
-			Name:    "kubesan-csi-node-plugin",
+			Name:    "csi-node-plugin",
 			Image:   constants.KubeSANImage,
 			Command: []string{"./kubesan", "csi-node-plugin"},
 			SecurityContext: &corev1.SecurityContext{
@@ -450,7 +450,7 @@ func templateVGManagerDaemonset(
 			KubeSANNodeLocalControllerSocketVolMount,
 		}
 		containers = append(containers, corev1.Container{
-			Name:    "kubesan-csi-controller-plugin",
+			Name:    "csi-controller-plugin",
 			Image:   constants.KubeSANImage,
 			Command: []string{"./kubesan", "csi-controller-plugin"},
 			SecurityContext: &corev1.SecurityContext{

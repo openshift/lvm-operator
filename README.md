@@ -234,16 +234,15 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: lvms-test
-  labels:
-    type: local
+  namespace: openshift-storage
 spec:
   storageClassName: lvms-vg1
   resources:
     requests:
-      storage: 5Gi
+      storage: 1Gi
   accessModes:
-    - ReadWriteOnce
-  volumeMode: Filesystem
+    - ReadWriteMany
+  volumeMode: Block
 EOF
 ```
 
@@ -266,6 +265,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: lvms-test
+  namespace: openshift-storage
 spec:
   volumes:
     - name: storage
@@ -277,9 +277,34 @@ spec:
       ports:
         - containerPort: 80
           name: "http-server"
-      volumeMounts:
-        - mountPath: "/usr/share/nginx/html"
-          name: storage
+      volumeDevices:
+        - name: storage
+          devicePath: /dev/xvda
+EOF
+```
+
+```bash
+$ cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lvms-test-remote
+  namespace: openshift-storage
+spec:
+  nodeName: ip-10-0-35-126.eu-central-1.compute.internal
+  volumes:
+    - name: storage
+      persistentVolumeClaim:
+        claimName: lvms-test
+  containers:
+    - name: container
+      image: public.ecr.aws/docker/library/nginx:latest
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeDevices:
+        - name: storage
+          devicePath: /dev/xvda
 EOF
 ```
 
