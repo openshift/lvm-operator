@@ -19,10 +19,27 @@ package constants
 const (
 	TopolvmCSIDriverName = "topolvm.io"
 
+	ControllerCSILocalPath = "/run/csi/socket"
+
+	KubeSANIdentifier    = "kubesan"
+	KubeSANDomainName    = "gitlab.io"
+	KubeSANCSIDriverName = KubeSANIdentifier + "." + KubeSANDomainName
+
+	KubeSANCSIControllerPluginServiceAccount = "csi-controller-plugin"
+	KubeSANCSINodePluginServiceAccount       = "csi-node-plugin"
+	KubeSANNBDClientServiceAccount           = "nbd-client"
+	KubeSANNBDServerServiceAccount           = "nbd-server"
+	KubeSANBlobsServiceAccount               = "blobs"
+	KubeSANRunDir                            = "/run/kubesan"
+	KubeSANNBDDir                            = KubeSANRunDir + "/nbd"
+	KubeSANImage                             = "quay.io/kubesan/kubesan:latest"
+
 	VGManagerServiceAccount = "vg-manager"
 
 	VgManagerMemRequest = "45Mi"
 	VgManagerCPURequest = "5m"
+
+	KubeSANBackingVolumeGroupKey = "backingVolumeGroup"
 
 	// topoLVM Node
 	CSIKubeletRootDir               = "/var/lib/kubelet/"

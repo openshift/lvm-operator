@@ -92,6 +92,14 @@ const (
 	FilesystemTypeXFS  DeviceFilesystemType = "xfs"
 )
 
+// The DeviceAccessPolicy type defines the accessibility of the lvm2 volume group backing the deviceClass.
+type DeviceAccessPolicy string
+
+const (
+	DeviceAccessPolicyShared    DeviceAccessPolicy = "shared"
+	DeviceAccessPolicyNodeLocal DeviceAccessPolicy = "nodeLocal"
+)
+
 type DeviceClass struct {
 	// Name specifies a name for the device class
 	// +kubebuilder:validation:MaxLength=245
@@ -120,6 +128,13 @@ type DeviceClass struct {
 	// +kubebuilder:default=xfs
 	// +optional
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
+
+	// Policy defines the policy for the deviceClass.
+	// DEV PREVIEW: shared will allow accessing the deviceClass from multiple nodes.
+	// The deviceClass will then be configured via shared volume group.
+	// +optional
+	// +kubebuilder:validation:Enum=shared;local
+	DeviceAccessPolicy DeviceAccessPolicy `json:"deviceAccessPolicy,omitempty"`
 }
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned

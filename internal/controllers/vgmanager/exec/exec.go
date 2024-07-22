@@ -80,7 +80,7 @@ func (e *CommandExecutor) RunCommandAsHostInto(ctx context.Context, into any, co
 func (*CommandExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
 	args := append([]string{"-m", "-u", "-i", "-n", "-p", "-t", "1", command}, arg...)
 	cmd := exec.Command(nsenterPath, args...)
-	log.FromContext(ctx).V(1).Info("executing", "command", cmd.String())
+	log.FromContext(ctx).Info("executing", "command", cmd.String())
 	return runCommandWithOutput(cmd)
 }
 

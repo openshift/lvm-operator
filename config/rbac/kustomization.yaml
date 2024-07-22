@@ -22,3 +22,17 @@ resources:
 - vg_manager_clusterrole.yaml
 - vg_manager_clusterrole_binding.yaml
 - vg_manager_service_account.yaml
+
+- kubesan_blobs_clusterrole.yaml
+- kubesan_blobs_clusterrole_binding.yaml
+- kubesan_blobs_service_account.yaml
+- kubesan_controller_service_account.yaml
+- kubesan_csi_controller_clusterrole.yaml
+- kubesan_csi_controller_clusterrole_binding.yaml
+- kubesan_csi_provisioner_clusterrole.yaml
+- kubesan_csi_provisioner_clusterrole_binding.yaml
+- kubesan_csi_snapshotter_clusterrole.yaml
+- kubesan_csi_snapshotter_clusterrole_binding.yaml
+- kubesan_nbd_client_service_account.yaml
+- kubesan_nbd_server_service_account.yaml
+- kubesan_node_service_account.yaml

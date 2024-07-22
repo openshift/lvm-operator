@@ -279,15 +279,16 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 	csi.RegisterControllerServer(grpcServer, controllerSever)
 
-	if err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, constants.DefaultCSISocket, false)); err != nil {
+	if err = mgr.Add(internalCSI.NewGRPCRunner(grpcServer, constants.ControllerCSILocalPath, false)); err != nil {
 		return err
 	}
 
 	if err := mgr.Add(internalCSI.NewProvisioner(mgr, internalCSI.ProvisionerOptions{
-		DriverName:          constants.TopolvmCSIDriverName,
-		CSIEndpoint:         constants.DefaultCSISocket,
-		CSIOperationTimeout: 10 * time.Second,
-		Metrics:             opts.Metrics,
+		DriverName:             constants.TopolvmCSIDriverName,
+		CSIEndpoint:            constants.ControllerCSILocalPath,
+		CSIOperationTimeout:    10 * time.Second,
+		Metrics:                opts.Metrics,
+		EnableCapacityTracking: true,
 	})); err != nil {
 		return fmt.Errorf("unable to create CSI Provisioner: %w", err)
 	}
@@ -295,7 +296,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if enableSnapshotting {
 		if err := mgr.Add(internalCSI.NewSnapshotter(mgr, internalCSI.SnapshotterOptions{
 			DriverName:          constants.TopolvmCSIDriverName,
-			CSIEndpoint:         constants.DefaultCSISocket,
+			CSIEndpoint:         constants.ControllerCSILocalPath,
 			CSIOperationTimeout: 10 * time.Second,
 		})); err != nil {
 			return fmt.Errorf("unable to create CSI Snapshotter: %w", err)
@@ -304,7 +305,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if err := mgr.Add(internalCSI.NewResizer(mgr, internalCSI.ProvisionerOptions{
 		DriverName:          constants.TopolvmCSIDriverName,
-		CSIEndpoint:         constants.DefaultCSISocket,
+		CSIEndpoint:         constants.ControllerCSILocalPath,
 		CSIOperationTimeout: 10 * time.Second,
 	})); err != nil {
 		return err
