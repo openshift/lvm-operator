@@ -124,7 +124,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return reconcileAgain, fmt.Errorf("failed to list block devices: %v", err)
 	}
 
-	//Get the available block devices that can be used for this volume group
+	// Get the available block devices that can be used for this volume group
 	availableDevices, delayedDevices, err := r.getAvailableDevicesForVG(blockDevices, vgs, volumeGroup)
 	if err != nil {
 		r.Log.Error(err, "failed to get block devices for volumegroup, will retry", "name", volumeGroup.Name)
@@ -151,7 +151,7 @@ func (r *VGReconciler) reconcile(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				r.Log.Error(statuserr, "failed to update status", "VGName", volumeGroup.Name)
 				return reconcileAgain, statuserr
 			}
-			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil //30 seconds to make sure delayed devices become available
+			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil // 30 seconds to make sure delayed devices become available
 		}
 
 		devicesExist := false
@@ -237,9 +237,7 @@ func (r *VGReconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1al
 	if lvmdConfig == nil {
 		// The lvmdconfig file does not exist and will be created.
 		r.Log.Info("lvmd config file doesn't exist, will create one")
-		lvmdConfig = &lvmdCMD.Config{
-			SocketName: controllers.DefaultLVMdSocket,
-		}
+		lvmdConfig = &lvmdCMD.Config{}
 	}
 	existingLvmdConfig := *lvmdConfig
 
@@ -266,6 +264,9 @@ func (r *VGReconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1al
 
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
 	}
+
+	// always set the socket because we assume this socket in topolvm-node.
+	lvmdConfig.SocketName = controllers.DefaultLVMdSocket
 
 	// Apply and save lvmd config
 	if !cmp.Equal(existingLvmdConfig, lvmdConfig) {
