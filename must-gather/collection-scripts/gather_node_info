@@ -19,6 +19,7 @@ commands_get+=("pvs")
 commands_get+=("pvdisplay")
 commands_get+=("lvm version")
 commands_get+=("cat /etc/topolvm/lvmd.yaml")
+commands_get+=("lsblk --paths --json -o NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE")
 
 # collection path for lvm commands
 COMMAND_OUTPUT_FILE="${BASE_COLLECTION_PATH}/node_info"
