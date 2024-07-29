@@ -8,10 +8,11 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus, blockDevices []lsblk.BlockDevice) (bool, error) {
+func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, blockDevices []lsblk.BlockDevice, vgs []lvm.VolumeGroup) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	if volumeGroup.Spec.DeviceSelector == nil || volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData == nil || !*volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData {
@@ -24,7 +25,7 @@ func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lv
 		if err != nil {
 			return false, fmt.Errorf("unable to find symlink for disk path %s: %v", path, err)
 		}
-		if isDeviceAlreadyPartOfVG(nodeStatus, diskName, volumeGroup) {
+		if _, partOfVG := isDeviceAlreadyPartOfVG(vgs, diskName); partOfVG {
 			continue
 		}
 		deviceWiped, err := r.wipeDevice(ctx, diskName, blockDevices)
@@ -41,7 +42,7 @@ func (r *Reconciler) wipeDevicesIfNecessary(ctx context.Context, volumeGroup *lv
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s as unable to find symlink: %v", path, err))
 			continue
 		}
-		if isDeviceAlreadyPartOfVG(nodeStatus, diskName, volumeGroup) {
+		if _, partOfVG := isDeviceAlreadyPartOfVG(vgs, diskName); partOfVG {
 			continue
 		}
 		deviceWiped, err := r.wipeDevice(ctx, diskName, blockDevices)

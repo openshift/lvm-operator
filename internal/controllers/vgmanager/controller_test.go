@@ -258,7 +258,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 
 	By("triggering the second reconciliation after the initial setup", func() {
 		instances.LVM.EXPECT().ListVGs(ctx, true).Return(nil, nil).Once()
-		instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Twice()
+		instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
 			blockDevice.KName: {
@@ -414,6 +414,11 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
 	})
 
+	By("mocking the now created pvs (by proxy through vgcreate) in the next fetch", func() {
+		lvmPV.VgName = vg.GetName()
+		instances.LVM.EXPECT().ListPVs(ctx, "").Return([]lvm.PhysicalVolume{lvmPV}, nil).Once()
+	})
+
 	if vg.Spec.ThinPoolConfig != nil {
 		By("mocking the lv activation and verification of the created thin pool", func() {
 			report := &lvm.LVReport{Report: []lvm.LVReportItem{{
@@ -432,10 +437,38 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	By("verifying the state did not change", func() {
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 		Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
+		var excluded []lvmv1alpha1.ExcludedDevice
+		if vg.Spec.ThinPoolConfig != nil {
+			excluded = append(excluded, []lvmv1alpha1.ExcludedDevice{
+				{
+					Name: fmt.Sprintf("/dev/mapper/%s-%s", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					Reasons: []string{
+						fmt.Sprintf("/dev/mapper/%s-%s is not part of the device selector", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					},
+				},
+				{
+					Name: fmt.Sprintf("/dev/mapper/%s-%s_tdata", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					Reasons: []string{
+						fmt.Sprintf("/dev/mapper/%s-%s_tdata has an invalid filesystem signature (lvm) and cannot be used", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s_tdata has children block devices and could not be considered", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s_tdata is not part of the device selector", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					},
+				},
+				{
+					Name: fmt.Sprintf("/dev/mapper/%s-%s_tmeta", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					Reasons: []string{
+						fmt.Sprintf("/dev/mapper/%s-%s_tmeta has an invalid filesystem signature (lvm) and cannot be used", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s_tmeta has children block devices and could not be considered", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s_tmeta is not part of the device selector", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+					},
+				},
+			}...)
+		}
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
 			Name:                  vg.GetName(),
 			Status:                lvmv1alpha1.VGStatusReady,
 			Devices:               []string{device},
+			Excluded:              excluded,
 			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		Expect(oldReadyGeneration).To(Equal(nodeStatus.GetGeneration()))
@@ -465,17 +498,16 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 
 func createMockedBlockDevice(device string) lsblk.BlockDevice {
 	return lsblk.BlockDevice{
-		Name:       "mock0",
-		KName:      device,
-		Type:       "mocked",
-		Model:      "mocked",
-		Vendor:     "mocked",
-		State:      "live",
-		FSType:     "",
-		Size:       "1G",
-		Children:   nil,
-		Serial:     "MOCK",
-		DevicePath: device,
+		Name:     "mock0",
+		KName:    device,
+		Type:     "mocked",
+		Model:    "mocked",
+		Vendor:   "mocked",
+		State:    "live",
+		FSType:   "",
+		Size:     "1G",
+		Children: nil,
+		Serial:   "MOCK",
 	}
 }
 
@@ -821,6 +853,9 @@ func testReconcileFailure(ctx context.Context) {
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true).Twice().Return(nil, nil)
+		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
@@ -865,11 +900,18 @@ func testReconcileFailure(ctx context.Context) {
 		Expect(nodeStatus.Spec.LVMVGStatus).To(HaveLen(1))
 		Expect(nodeStatus.Spec.LVMVGStatus[0].Status).To(Equal(lvmv1alpha1.VGStatusFailed))
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("unable to validate device"))
+		Expect(err.Error()).To(And(
+			ContainSubstring(fmt.Sprintf("mandatory device path %q cannot be used", "/dev/sda")),
+			ContainSubstring("NOT available as a new device for the volume group"),
+			ContainSubstring("NOT part of a valid and tagged existing volume group"),
+			ContainSubstring("the device did not exist on the host"),
+		))
 	})
 
 	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
 	vg.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(false)
+	vg.Spec.DeviceSelector.OptionalPaths = vg.Spec.DeviceSelector.Paths
+	vg.Spec.DeviceSelector.Paths = nil
 	Expect(instances.client.Update(ctx, vg)).To(Succeed())
 
 	By("triggering failure because vg is not found even though there are no devices to be added", func() {
@@ -883,6 +925,7 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
 				IsUsableLoopDev: false,
@@ -890,7 +933,10 @@ func testReconcileFailure(ctx context.Context) {
 		}, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("the volume group vg1 does not exist and there were no available devices to create it"))
+		Expect(err.Error()).To(And(
+			ContainSubstring("the volume group vg1 does not exist"),
+			ContainSubstring("and there were no available devices to create it"),
+		))
 	})
 
 	By("triggering failure because vg is found but thin-pool validation failed", func() {

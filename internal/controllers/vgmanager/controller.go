@@ -94,7 +94,7 @@ type Reconciler struct {
 	dmsetup.Dmsetup
 	NodeName  string
 	Namespace string
-	Filters   func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	Filters   filter.FilterSetup
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -151,9 +151,14 @@ func (r *Reconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
 	}
 
+	vgs, err := r.LVM.ListVGs(ctx, true)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+	}
+
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
 
-	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, nodeStatus, blockDevices)
+	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, blockDevices, vgs)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
 	}
@@ -164,45 +169,30 @@ func (r *Reconciler) reconcile(
 		}
 	}
 
-	// Get the available block devices that can be used for this volume group
-	// valid means that it can be used to create or extend the volume group
-	// devices that are already part of the volume group will not be returned
-	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, nodeStatus, volumeGroup)
-	if err != nil {
-		err := fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
-		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, FilteredBlockDevices{}, err); err != nil {
-			logger.Error(err, "failed to set status to failed")
-		}
-		return ctrl.Result{}, err
-	}
-
-	logger.V(1).Info("new devices", "newDevices", newDevices)
-
 	pvs, err := r.LVM.ListPVs(ctx, "")
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("physical volumes could not be fetched: %w", err)
 	}
 
-	bdi, err := r.LSBLK.BlockDeviceInfos(ctx, newDevices)
+	bdi, err := r.LSBLK.BlockDeviceInfos(ctx, blockDevices)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get block device infos: %w", err)
 	}
-
 	logger.V(1).Info("block device infos", "bdi", bdi)
 
-	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
+	devices := filterDevices(ctx, blockDevices, r.Filters(&filter.Options{
+		BDI: bdi,
+		PVs: pvs,
+		VG:  volumeGroup,
+	}))
 
-	vgs, err := r.LVM.ListVGs(ctx, true)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
-	}
-
-	vgExistsInLVM := false
-	for _, vg := range vgs {
-		if volumeGroup.Name == vg.Name {
-			vgExistsInLVM = true
-			break
+	if volumeGroup.Spec.DeviceSelector != nil {
+		if err := VerifyMandatoryDevicePaths(devices, volumeGroup.Spec.DeviceSelector.Paths); err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -210,8 +200,16 @@ func (r *Reconciler) reconcile(
 	// - There is no available devices to attach to the volume group
 	// - All the available devices are already attached
 	if len(devices.Available) == 0 {
-		if !vgExistsInLVM {
-			err := fmt.Errorf("the volume group %s does not exist and there were no available devices to create it", volumeGroup.GetName())
+		var lvmVG *lvm.VolumeGroup
+		for _, vg := range vgs {
+			if volumeGroup.Name == vg.Name {
+				lvmVG = &vg
+				break
+			}
+		}
+		if lvmVG == nil {
+			err := fmt.Errorf("the volume group %s does not exist (or was not tagged properly with %q), "+
+				"and there were no available devices to create it", volumeGroup.GetName(), lvm.DefaultTag)
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorNoAvailableDevicesForVG, err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")

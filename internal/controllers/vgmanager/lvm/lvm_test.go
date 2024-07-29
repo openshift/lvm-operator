@@ -588,7 +588,7 @@ func TestNewDefaultHostLVM(t *testing.T) {
 func Test_untaggedVGs(t *testing.T) {
 	vgs := []VolumeGroup{
 		{Name: "vg1", Tags: []string{"tag1"}},
-		{Name: "vg2", Tags: []string{lvmsTag}},
+		{Name: "vg2", Tags: []string{DefaultTag}},
 	}
 
 	vgs = untaggedVGs(vgs)
