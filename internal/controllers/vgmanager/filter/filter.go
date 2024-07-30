@@ -40,9 +40,9 @@ const (
 	notSuspended                  = "notSuspended"
 	noInvalidPartitionLabel       = "noInvalidPartitionLabel"
 	onlyValidFilesystemSignatures = "onlyValidFilesystemSignatures"
-	noBindMounts                  = "noBindMounts"
 	noChildren                    = "noChildren"
 	usableDeviceType              = "usableDeviceType"
+	partOfDeviceSelector          = "partOfDeviceSelector"
 )
 
 var (
@@ -59,9 +59,19 @@ var (
 // evalSymlinks redefined to be able to override in tests
 var evalSymlinks = filepath.EvalSymlinks
 
-type Filter func(lsblk.BlockDevice, []lvm.PhysicalVolume, lsblk.BlockDeviceInfos) error
+type Filter func(lsblk.BlockDevice) error
 
 type Filters map[string]Filter
+
+type Options struct {
+	VG  *lvmv1alpha1.LVMVolumeGroup
+	BDI lsblk.BlockDeviceInfos
+	PVs []lvm.PhysicalVolume
+}
+
+type FilterSetup func(*Options) Filters
+
+var _ FilterSetup = DefaultFilters
 
 // IsExpectedDeviceErrorAfterSetup can be used to check for errors in the filtering process that are expected after
 // the volume group has been initialized correctly because the devices for the volume group create new devices or
@@ -70,23 +80,42 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 	return errors.Is(err, ErrDeviceAlreadySetupCorrectly) || errors.Is(err, ErrLVMPartition)
 }
 
-func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
+func DefaultFilters(opts *Options) Filters {
 	return Filters{
-		notReadOnly: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
+		partOfDeviceSelector: func(dev lsblk.BlockDevice) error {
+			if opts.VG.Spec.DeviceSelector == nil {
+				// if no device selector is set, its automatically a valid candidate
+				return nil
+			}
+			for _, path := range append(
+				opts.VG.Spec.DeviceSelector.Paths,
+				opts.VG.Spec.DeviceSelector.OptionalPaths...,
+			) {
+				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
+				if resolved, err := evalSymlinks(path); resolved == dev.KName {
+					return nil
+				} else if err != nil {
+					return fmt.Errorf("the path %s was no kernel block device name and could not be resolved via symlink resolution: %w", path, err)
+				}
+			}
+			return fmt.Errorf("%s is not part of the device selector", dev.Name)
+		},
+
+		notReadOnly: func(dev lsblk.BlockDevice) error {
 			if dev.ReadOnly {
 				return fmt.Errorf("%s cannot be read-only", dev.Name)
 			}
 			return nil
 		},
 
-		notSuspended: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
+		notSuspended: func(dev lsblk.BlockDevice) error {
 			if dev.State == StateSuspended {
 				return fmt.Errorf("%s cannot be in a %q state", dev.State, dev.Name)
 			}
 			return nil
 		},
 
-		noInvalidPartitionLabel: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
+		noInvalidPartitionLabel: func(dev lsblk.BlockDevice) error {
 			for _, invalidLabel := range invalidPartitionLabels {
 				if strings.Contains(strings.ToLower(dev.PartLabel), invalidLabel) {
 					return fmt.Errorf("%s has an invalid partition label %q", dev.Name, dev.PartLabel)
@@ -95,7 +124,7 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
 			return nil
 		},
 
-		onlyValidFilesystemSignatures: func(dev lsblk.BlockDevice, pvs []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
+		onlyValidFilesystemSignatures: func(dev lsblk.BlockDevice) error {
 			// if no fs type is set, it's always okay
 			if dev.FSType == "" {
 				return nil
@@ -105,7 +134,7 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
 			// this means that if the disk has no children, we can safely reuse it if it's a valid LVM PV.
 			if dev.FSType == FSTypeLVM2Member {
 				var foundPV *lvm.PhysicalVolume
-				for _, pv := range pvs {
+				for _, pv := range opts.PVs {
 					resolvedPVPath, err := evalSymlinks(pv.PvName)
 					if err != nil {
 						return fmt.Errorf("the pv %s could not be resolved via symlink: %w", pv, err)
@@ -122,30 +151,29 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
 					return nil
 				}
 
-				// a volume is a valid PV if it exists under the same name as the Block Device and has either
-				// 1. No Children, No Volume Group attached to it and Free Capacity (then we can reuse it)
+				if foundPV.VgName == opts.VG.GetName() {
+					return fmt.Errorf("%s is already a LVM2_Member of %s: %w", dev.Name, opts.VG.GetName(), ErrDeviceAlreadySetupCorrectly)
+				} else if foundPV.VgName != "" {
+					return fmt.Errorf("%s is already a LVM2_Member of another volume group (%s) and cannot be used for the volume group %s",
+						dev.Name, foundPV.VgName, opts.VG.GetName())
+				}
+
+				// a volume is a valid PV if it exists under the same name as the Block Device and has
+				// 1. No Children
+				// 2. No Volume Group attached to it and
+				// 3. Free Capacity (then we can reuse it)
 				if !dev.HasChildren() {
-					if foundPV.VgName != "" {
-						return fmt.Errorf("%s is already part of another volume group (%s) and cannot be used", dev.Name, foundPV.VgName)
-					}
 					if foundPV.PvFree == "0G" {
 						return fmt.Errorf("%s was reported as having no free capacity as a physical volume and cannot be used", dev.Name)
 					}
 					return nil
 				}
-
-				// 2. Children and has a volume group that matches the one we want to filter for (it is already used)
-				if foundPV.VgName != vg.GetName() {
-					return fmt.Errorf("%s is already a LVM2_Member of another volume group (%s) and cannot be used for the volume group %s",
-						dev.Name, foundPV.VgName, vg.GetName())
-				} else {
-					return fmt.Errorf("%s is already a LVM2_Member of %s: %w", dev.Name, vg.GetName(), ErrDeviceAlreadySetupCorrectly)
-				}
 			}
+
 			return fmt.Errorf("%s has an invalid filesystem signature (%s) and cannot be used", dev.Name, dev.FSType)
 		},
 
-		noChildren: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, _ lsblk.BlockDeviceInfos) error {
+		noChildren: func(dev lsblk.BlockDevice) error {
 			hasChildren := dev.HasChildren()
 			if hasChildren {
 				return fmt.Errorf("%s has children block devices and could not be considered", dev.Name)
@@ -153,11 +181,11 @@ func DefaultFilters(vg *lvmv1alpha1.LVMVolumeGroup) Filters {
 			return nil
 		},
 
-		usableDeviceType: func(dev lsblk.BlockDevice, _ []lvm.PhysicalVolume, bdi lsblk.BlockDeviceInfos) error {
+		usableDeviceType: func(dev lsblk.BlockDevice) error {
 			switch dev.Type {
 			case lsblk.DeviceTypeLoop:
 				// check loop device isn't being used by kubernetes
-				if !bdi[dev.KName].IsUsableLoopDev {
+				if !opts.BDI[dev.KName].IsUsableLoopDev {
 					return fmt.Errorf("%s is an unusable loopback device", dev.Name)
 				}
 			case lsblk.DeviceTypeROM:

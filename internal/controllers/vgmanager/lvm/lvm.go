@@ -48,7 +48,7 @@ const (
 	lvChangeCmd   = "/usr/sbin/lvchange"
 	lvmDevicesCmd = "/usr/sbin/lvmdevices"
 
-	lvmsTag = "@lvms"
+	DefaultTag = "@lvms"
 )
 
 var (
@@ -183,7 +183,7 @@ func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup) error {
 		return fmt.Errorf("failed to create volume group: physical volume list is empty")
 	}
 
-	args := []string{vg.Name, "--addtag", lvmsTag}
+	args := []string{vg.Name, "--addtag", DefaultTag}
 
 	for _, pv := range vg.PVs {
 		args = append(args, pv.PvName)
@@ -226,7 +226,7 @@ func (hlvm *HostLVM) AddTagToVG(ctx context.Context, vgName string) error {
 		return fmt.Errorf("failed to add tag to the volume group. Volume group name is empty")
 	}
 
-	args := []string{vgName, "--addtag", lvmsTag}
+	args := []string{vgName, "--addtag", DefaultTag}
 
 	if err := hlvm.RunCommandAsHost(ctx, vgChangeCmd, args...); err != nil {
 		return fmt.Errorf("failed to add tag to the volume group %q. %v", vgName, err)
@@ -277,7 +277,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 	res := new(VGReport)
 
 	args := []string{
-		lvmsTag, "--units", "g", "--reportformat", "json",
+		DefaultTag, "--units", "g", "--reportformat", "json",
 	}
 	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to list volume groups. %v", err)
@@ -349,7 +349,7 @@ func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, e
 		"-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
 	}
 	if tagged {
-		args = append(args, lvmsTag)
+		args = append(args, DefaultTag)
 	}
 
 	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
@@ -545,7 +545,7 @@ func untaggedVGs(vgs []VolumeGroup) []VolumeGroup {
 	for _, vg := range vgs {
 		tagPresent := false
 		for _, tag := range vg.Tags {
-			if tag == lvmsTag {
+			if tag == DefaultTag {
 				tagPresent = true
 				break
 			}

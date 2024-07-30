@@ -43,9 +43,6 @@ type BlockDevice struct {
 	ReadOnly  bool          `json:"ro,omitempty"`
 	Serial    string        `json:"serial,omitempty"`
 	PartLabel string        `json:"partLabel,omitempty"`
-
-	// DevicePath is the path given by user
-	DevicePath string
 }
 
 type LSBLK interface {
@@ -78,12 +75,13 @@ func (b BlockDevice) HasChildren() bool {
 	return len(b.Children) > 0
 }
 
+const LSBLK_COLUMNS = "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
+
 // ListBlockDevices lists the block devices using the lsblk command
 func (lsblk *HostLSBLK) ListBlockDevices(ctx context.Context) ([]BlockDevice, error) {
 	// var output bytes.Buffer
 	var blockDeviceMap map[string][]BlockDevice
-	columns := "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
-	args := []string{"--json", "--paths", "-o", columns}
+	args := []string{"--json", "--paths", "-o", LSBLK_COLUMNS}
 
 	if err := lsblk.RunCommandAsHostInto(ctx, &blockDeviceMap, lsblk.lsblk, args...); err != nil {
 		return []BlockDevice{}, err
@@ -123,12 +121,12 @@ type BlockDeviceInfo struct {
 	IsUsableLoopDev bool
 }
 
-func flattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
+func FlattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
 	flattened := make(map[string]BlockDevice, len(bs))
 	for _, b := range bs {
 		flattened[b.KName] = b
 		if b.HasChildren() {
-			for k, v := range flattenedBlockDevices(b.Children) {
+			for k, v := range FlattenedBlockDevices(b.Children) {
 				flattened[k] = v
 			}
 		}
@@ -137,7 +135,7 @@ func flattenedBlockDevices(bs []BlockDevice) map[string]BlockDevice {
 }
 
 func (lsblk *HostLSBLK) BlockDeviceInfos(ctx context.Context, bs []BlockDevice) (BlockDeviceInfos, error) {
-	flattenedMap := flattenedBlockDevices(bs)
+	flattenedMap := FlattenedBlockDevices(bs)
 
 	blockDeviceInfos := make(BlockDeviceInfos)
 
