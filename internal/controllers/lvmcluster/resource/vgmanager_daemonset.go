@@ -332,6 +332,7 @@ func templateVGManagerDaemonset(
 					},
 				},
 			},
+			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 		},
 	}
 	annotations := map[string]string{
