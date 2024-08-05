@@ -41,8 +41,8 @@ const (
 	WorkloadPartitioningManagementAnnotation = "target.workload.openshift.io/management"
 	ManagementAnnotationVal                  = `{"effect": "PreferredDuringScheduling"}`
 
-	// DevicesWipedAtAnnotation is an annotation that marks when a device has been wiped
-	DevicesWipedAtAnnotation = "devices.lvms.openshift.io/wiped-at"
+	// DevicesWipedAnnotation is an annotation that marks when a device has been wiped
+	DevicesWipedAnnotation = "devices.lvms.openshift.io/wiped"
 
 	// labels and values
 

@@ -187,7 +187,7 @@ func TestWipeDevices(t *testing.T) {
 			}
 
 			if tt.wipedBefore {
-				volumeGroup.Annotations = map[string]string{constants.DevicesWipedAtAnnotation: time.Now().Format(time.RFC3339)}
+				volumeGroup.Annotations = map[string]string{constants.DevicesWipedAnnotation: time.Now().Format(time.RFC3339)}
 			}
 
 			wiped, err := r.wipeDevices(ctx, volumeGroup, tt.blockDevices)
