@@ -189,19 +189,5 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters fil
 	}
 }
 
-func isDeviceAlreadyPartOfVG(vgs []lvm.VolumeGroup, path string) (string, bool) {
-	for _, vg := range vgs {
-		for _, pv := range vg.PVs {
-			if pv.PvName == path {
-				return vg.Name, true
-			}
-			if resolved, _ := evalSymlinks(pv.PvName); resolved == path {
-				return vg.Name, true
-			}
-		}
-	}
-	return "", false
-}
-
 // evalSymlinks redefined to be able to override in tests
 var evalSymlinks = filepath.EvalSymlinks
