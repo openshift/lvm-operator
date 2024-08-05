@@ -795,27 +795,13 @@ func testReconcileFailure(ctx context.Context) {
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to wipe devices"))
-	})
-
-	By("triggering lsblk failure after wipefs", func() {
-		evalSymlinks = func(path string) (string, error) {
-			return path, nil
-		}
-		defer func() {
-			evalSymlinks = filepath.EvalSymlinks
-		}()
-		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
-			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
-		}, nil)
-		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(nil)
-		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(nil, fmt.Errorf("mocked error"))
-		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to list block devices after wiping devices"))
 	})
 
 	By("triggering failure on fetching new devices to add to volume group", func() {
