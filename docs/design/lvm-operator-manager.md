@@ -61,7 +61,7 @@ The Operator requires elevated permissions to interact with the host's LVM comma
 
 ## Implementation Notes
 
-Each unit of reconciliation should implement the `reconcileUnit` interface. This is run by the controller. Errors and success messages are propagated as Operator status and events. This interface is defined in [lvmcluster_controller.go](../../internal/controllers/lvmcluster/lvmcluster_controller.go)
+Each unit of reconciliation should implement the `reconcileUnit` interface. This is run by the controller. Errors and success messages are propagated as Operator status and events. This interface is defined in [manager.go](../../internal/controllers/lvmcluster/resource/manager.go)
 
 ```go
 type resourceManager interface {
