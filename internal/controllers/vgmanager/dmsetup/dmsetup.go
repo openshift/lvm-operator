@@ -5,9 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	exec2 "os/exec"
 
-	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
+	vgmanagerexec "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -21,15 +20,15 @@ type Dmsetup interface {
 }
 
 type HostDmsetup struct {
-	exec.Executor
+	vgmanagerexec.Executor
 	dmsetup string
 }
 
 func NewDefaultHostDmsetup() *HostDmsetup {
-	return NewHostDmsetup(&exec.CommandExecutor{}, DefaultDMSetup)
+	return NewHostDmsetup(&vgmanagerexec.CommandExecutor{}, DefaultDMSetup)
 }
 
-func NewHostDmsetup(executor exec.Executor, dmsetup string) *HostDmsetup {
+func NewHostDmsetup(executor vgmanagerexec.Executor, dmsetup string) *HostDmsetup {
 	return &HostDmsetup{
 		Executor: executor,
 		dmsetup:  dmsetup,
@@ -42,12 +41,7 @@ func (dmsetup *HostDmsetup) Remove(ctx context.Context, deviceName string) error
 		return errors.New("failed to remove device-mapper reference. Device name is empty")
 	}
 
-	output, err := exec2.CommandContext(ctx, "nsenter",
-		append(
-			[]string{"-m", "-u", "-i", "-n", "-p", "-t", "1"},
-			[]string{dmsetup.dmsetup, "remove", "--force", deviceName}...,
-		)...,
-	).CombinedOutput()
+	output, err := dmsetup.Executor.CombinedOutputCommandAsHost(ctx, dmsetup.dmsetup, "remove", "--force", deviceName)
 
 	if err == nil {
 		log.FromContext(ctx).Info(fmt.Sprintf("successfully removed the reference from device-mapper %q: %s", deviceName, string(output)))

@@ -21,14 +21,19 @@ import (
 	"errors"
 	"io"
 	"strings"
+
+	vgmanagerexec "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
 )
 
 type MockExecutor struct {
 	MockExecuteCommandWithOutputAsHost func(ctx context.Context, command string, arg ...string) (io.ReadCloser, error)
 
-	MockRunCommandAsHost     func(ctx context.Context, command string, arg ...string) error
-	MockRunCommandAsHostInto func(ctx context.Context, into any, command string, arg ...string) error
+	MockRunCommandAsHost            func(ctx context.Context, command string, arg ...string) error
+	MockRunCommandAsHostInto        func(ctx context.Context, into any, command string, arg ...string) error
+	MockCombinedOutputCommandAsHost func(ctx context.Context, command string, arg ...string) ([]byte, error)
 }
+
+var _ vgmanagerexec.Executor = &MockExecutor{}
 
 // StartCommandWithOutputAsHost mocks StartCommandWithOutputAsHost
 func (e *MockExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
@@ -55,4 +60,16 @@ func (e *MockExecutor) RunCommandAsHostInto(ctx context.Context, into any, comma
 	}
 
 	return errors.New("RunCommandAsHostInto not mocked")
+}
+
+func (e *MockExecutor) CombinedOutputCommandAsHost(ctx context.Context, command string, arg ...string) ([]byte, error) {
+	if e.MockCombinedOutputCommandAsHost != nil {
+		return e.MockCombinedOutputCommandAsHost(ctx, command, arg...)
+	}
+
+	return nil, errors.New("CombinedOutputCommandAsHost not mocked")
+}
+
+func (e *MockExecutor) WrapCommandWithNSenter(command string, arg ...string) (string, []string) {
+	return (&vgmanagerexec.CommandExecutor{}).WrapCommandWithNSenter(command, arg...)
 }

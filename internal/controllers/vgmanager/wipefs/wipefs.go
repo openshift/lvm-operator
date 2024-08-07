@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	exec2 "os/exec"
 
-	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
+	vgmanagerexec "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -19,15 +18,15 @@ type Wipefs interface {
 }
 
 type HostWipefs struct {
-	exec.Executor
+	vgmanagerexec.Executor
 	wipefs string
 }
 
 func NewDefaultHostWipefs() *HostWipefs {
-	return NewHostWipefs(&exec.CommandExecutor{}, DefaultWipefs)
+	return NewHostWipefs(&vgmanagerexec.CommandExecutor{}, DefaultWipefs)
 }
 
-func NewHostWipefs(executor exec.Executor, wipefs string) *HostWipefs {
+func NewHostWipefs(executor vgmanagerexec.Executor, wipefs string) *HostWipefs {
 	return &HostWipefs{
 		Executor: executor,
 		wipefs:   wipefs,
@@ -39,12 +38,7 @@ func (wipefs *HostWipefs) Wipe(ctx context.Context, deviceName string) error {
 	if len(deviceName) == 0 {
 		return fmt.Errorf("failed to wipe the device. Device name is empty")
 	}
-	if output, err := exec2.CommandContext(ctx, "nsenter",
-		append(
-			[]string{"-m", "-u", "-i", "-n", "-p", "-t", "1"},
-			[]string{wipefs.wipefs, "--all", "--force", deviceName}...,
-		)...,
-	).CombinedOutput(); err != nil {
+	if output, err := wipefs.CombinedOutputCommandAsHost(ctx, wipefs.wipefs, "--all", "--force", deviceName); err != nil {
 		return fmt.Errorf("failed to wipe the device %q. %v", deviceName, errors.Join(err, errors.New(string(output))))
 	} else {
 		log.FromContext(ctx).Info(fmt.Sprintf("successfully wiped the device %q: %s", deviceName, string(output)))
