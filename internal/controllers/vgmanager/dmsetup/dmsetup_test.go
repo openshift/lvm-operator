@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"strings"
 	"testing"
 
 	"github.com/go-logr/logr/testr"
@@ -26,16 +24,19 @@ func TestRemove(t *testing.T) {
 	}
 
 	executor := &mockExec.MockExecutor{
-		MockExecuteCommandWithOutputAsHost: func(ctx context.Context, command string, args ...string) (io.ReadCloser, error) {
+		MockCombinedOutputCommandAsHost: func(ctx context.Context, command string, args ...string) ([]byte, error) {
 			if args[0] != "remove" {
-				return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[0])
+				return nil, fmt.Errorf("invalid args %q", args[0])
 			}
-			if args[1] == "/dev/loop1" {
-				return io.NopCloser(strings.NewReader("")), nil
-			} else if args[1] == "/dev/loop2" {
-				return io.NopCloser(strings.NewReader("device loop2 not found")), errors.New("device loop2 not found")
+			if args[1] != "--force" {
+				return nil, fmt.Errorf("invalid args %q", args[1])
 			}
-			return io.NopCloser(strings.NewReader("")), fmt.Errorf("invalid args %q", args[1])
+			if args[2] == "/dev/loop1" {
+				return nil, nil
+			} else if args[2] == "/dev/loop2" {
+				return []byte("device loop2 not found"), errors.New("device loop2 not found")
+			}
+			return nil, fmt.Errorf("invalid args %q", args[1])
 		},
 	}
 
