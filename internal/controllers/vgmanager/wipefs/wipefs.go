@@ -2,9 +2,12 @@ package wipefs
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	exec2 "os/exec"
 
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -36,12 +39,15 @@ func (wipefs *HostWipefs) Wipe(ctx context.Context, deviceName string) error {
 	if len(deviceName) == 0 {
 		return fmt.Errorf("failed to wipe the device. Device name is empty")
 	}
-
-	args := []string{"--all", "--force"}
-	args = append(args, deviceName)
-	if err := wipefs.RunCommandAsHost(ctx, wipefs.wipefs, args...); err != nil {
-		return fmt.Errorf("failed to wipe the device %q. %v", deviceName, err)
+	if output, err := exec2.CommandContext(ctx, "nsenter",
+		append(
+			[]string{"-m", "-u", "-i", "-n", "-p", "-t", "1"},
+			[]string{wipefs.wipefs, "--all", "--force", deviceName}...,
+		)...,
+	).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to wipe the device %q. %v", deviceName, errors.Join(err, errors.New(string(output))))
+	} else {
+		log.FromContext(ctx).Info(fmt.Sprintf("successfully wiped the device %q: %s", deviceName, string(output)))
 	}
-
 	return nil
 }

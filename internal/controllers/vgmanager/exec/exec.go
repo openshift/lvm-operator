@@ -80,7 +80,7 @@ func (e *CommandExecutor) RunCommandAsHostInto(ctx context.Context, into any, co
 func (*CommandExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
 	args := append([]string{"-m", "-u", "-i", "-n", "-p", "-t", "1", command}, arg...)
 	cmd := exec.Command(nsenterPath, args...)
-	log.FromContext(ctx).V(1).Info("executing", "command", cmd.String())
+	log.FromContext(ctx).Info("executing", "command", cmd.String())
 	return runCommandWithOutput(cmd)
 }
 
@@ -94,10 +94,13 @@ func (p pipeClosingReadCloser) Close() error {
 	if err := p.ReadCloser.Close(); err != nil {
 		return err
 	}
-
 	// Read the stderr output after the read has finished since we are sure by then the command must have run.
 	stderr, err := io.ReadAll(p.stderr)
 	if err != nil {
+		return err
+	}
+
+	if err := p.stderr.Close(); err != nil {
 		return err
 	}
 
