@@ -31,14 +31,17 @@ import (
 )
 
 var (
-	nsenterPath = "/usr/bin/nsenter"
+	nsEnterPath  = "/usr/bin/nsenter"
+	nsEnterFlags = []string{"-m", "-u", "-i", "-n", "-p", "-t", "1"}
 )
 
 // Executor is the interface for running exec commands
 type Executor interface {
 	StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error)
 	RunCommandAsHost(ctx context.Context, command string, arg ...string) error
+	CombinedOutputCommandAsHost(ctx context.Context, command string, arg ...string) ([]byte, error)
 	RunCommandAsHostInto(ctx context.Context, into any, command string, arg ...string) error
+	WrapCommandWithNSenter(command string, arg ...string) (string, []string)
 }
 
 // CommandExecutor is an Executor type
@@ -48,6 +51,15 @@ type CommandExecutor struct{}
 // it finishes the run and the output will be printed to the log.
 func (e *CommandExecutor) RunCommandAsHost(ctx context.Context, command string, arg ...string) error {
 	return e.RunCommandAsHostInto(ctx, nil, command, arg...)
+}
+
+// CombinedOutputCommandAsHost executes a command as host and returns an error if the command fails.
+// it finishes the run and the output will be printed to the log.
+func (e *CommandExecutor) CombinedOutputCommandAsHost(ctx context.Context, command string, arg ...string) ([]byte, error) {
+	command, arg = e.WrapCommandWithNSenter(command, arg...)
+	cmd := exec.Command(command, arg...)
+	log.FromContext(ctx).Info("executing", "command", cmd.String())
+	return cmd.CombinedOutput()
 }
 
 // RunCommandAsHostInto executes a command as host and returns an error if the command fails.
@@ -77,11 +89,16 @@ func (e *CommandExecutor) RunCommandAsHostInto(ctx context.Context, into any, co
 // StartCommandWithOutputAsHost executes a command with output as host and returns the output as a ReadCloser.
 // The caller is responsible for closing the ReadCloser.
 // Not calling close on this method will result in a resource leak.
-func (*CommandExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
-	args := append([]string{"-m", "-u", "-i", "-n", "-p", "-t", "1", command}, arg...)
-	cmd := exec.Command(nsenterPath, args...)
-	log.FromContext(ctx).V(1).Info("executing", "command", cmd.String())
+func (e *CommandExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
+	command, arg = e.WrapCommandWithNSenter(command, arg...)
+	cmd := exec.Command(command, arg...)
+	log.FromContext(ctx).Info("executing", "command", cmd.String())
 	return runCommandWithOutput(cmd)
+}
+
+// WrapCommandWithNSenter wraps the command and arguments with nsenter arguments.
+func (*CommandExecutor) WrapCommandWithNSenter(command string, arg ...string) (string, []string) {
+	return nsEnterPath, append(append(nsEnterFlags, command), arg...)
 }
 
 type pipeClosingReadCloser struct {
@@ -91,13 +108,13 @@ type pipeClosingReadCloser struct {
 }
 
 func (p pipeClosingReadCloser) Close() error {
-	if err := p.ReadCloser.Close(); err != nil {
-		return err
-	}
-
 	// Read the stderr output after the read has finished since we are sure by then the command must have run.
 	stderr, err := io.ReadAll(p.stderr)
 	if err != nil {
+		return err
+	}
+
+	if err := p.stderr.Close(); err != nil {
 		return err
 	}
 
@@ -118,9 +135,12 @@ func runCommandWithOutput(cmd *exec.Cmd) (io.ReadCloser, error) {
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		_ = stdout.Close()
 		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
+		_ = stdout.Close()
+		_ = stderr.Close()
 		return nil, err
 	}
 

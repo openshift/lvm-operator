@@ -72,7 +72,10 @@ func (c csiNode) EnsureDeleted(r Reconciler, ctx context.Context, cluster *lvmv1
 			}
 		}
 		if found {
-			return fmt.Errorf("csi node %s does not have driver %s", csiNode.Name, constants.TopolvmCSIDriverName)
+			return fmt.Errorf("csi node %s still has driver %s, "+
+				"if you think this is by mistake, "+
+				"manually login to the node and remove the driver from the kubelets plugin directory",
+				csiNode.Name, constants.TopolvmCSIDriverName)
 		}
 	}
 

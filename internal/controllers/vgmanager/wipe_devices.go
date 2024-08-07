@@ -97,16 +97,19 @@ func (r *Reconciler) wipeDevice(ctx context.Context, deviceName string, blockDev
 	wiped := false
 	for _, device := range blockDevices {
 		if device.KName == deviceName {
+			// remove all references that were just orphaned
+			for _, child := range device.Children {
+				// all mapper references must be removed before wiping the device
+				r.removeMapperReference(ctx, child)
+			}
+			logger.Info("wipe device", "deviceName", deviceName)
+			// wipe all signatures once more and cause ioctl reload
 			if err := r.Wipefs.Wipe(ctx, device.KName); err != nil {
 				return false, err
 			}
-			wiped = true
 			logger.Info("device wiped successfully")
-			for _, child := range device.Children {
-				// If the device was used as a Physical Volume before, wipefs does not remove the child LVs.
-				// So, a device-mapper reference removal is necessary to further remove the child LV references.
-				r.removeMapperReference(ctx, child)
-			}
+			wiped = true
+			break
 		} else if device.HasChildren() {
 			childWiped, err := r.wipeDevice(ctx, deviceName, device.Children)
 			if err != nil {
@@ -128,6 +131,13 @@ func (r *Reconciler) removeMapperReference(ctx context.Context, device lsblk.Blo
 			r.removeMapperReference(ctx, child)
 		}
 	}
+	if device.Type == "part" {
+		logger.Info("skipping the removal of device-mapper reference as the device is a partition", "childName", device.KName)
+		return
+	} else {
+		logger.Info("removing device-mapper reference", "childName", device.KName, "deviceType", device.Type)
+	}
+
 	if err := r.Dmsetup.Remove(ctx, device.KName); err != nil {
 		if errors.Is(err, dmsetup.ErrReferenceNotFound) {
 			logger.Info("skipping the removal of device-mapper reference as the reference does not exist", "childName", device.KName)

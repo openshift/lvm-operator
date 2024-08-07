@@ -24,16 +24,16 @@ func TestWipe(t *testing.T) {
 	}
 
 	executor := &mockExec.MockExecutor{
-		MockRunCommandAsHost: func(ctx context.Context, command string, args ...string) error {
+		MockCombinedOutputCommandAsHost: func(ctx context.Context, command string, args ...string) ([]byte, error) {
 			if args[0] != "--all" || args[1] != "--force" {
-				return fmt.Errorf("invalid args %q", args[0:2])
+				return nil, fmt.Errorf("invalid args %q", args[0:2])
 			}
 			if args[2] == "/dev/loop1" {
-				return nil
+				return nil, nil
 			} else if args[2] == "/dev/loop2" {
-				return errors.New("no such file or directory")
+				return nil, errors.New("no such file or directory")
 			}
-			return fmt.Errorf("invalid args %q", args[2])
+			return nil, fmt.Errorf("invalid args %q", args[2])
 		},
 	}
 
