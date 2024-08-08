@@ -27,9 +27,9 @@ import (
 )
 
 func main() {
-	logr := ctrl.Log.WithName("setup")
-	if err := NewCmd(logr).Execute(); err != nil {
-		logr.Error(err, "fatal error encountered")
+	log := ctrl.Log.WithName("setup")
+	if err := NewCmd(log).Execute(); err != nil {
+		log.Error(err, "fatal error encountered")
 		os.Exit(1)
 	}
 }

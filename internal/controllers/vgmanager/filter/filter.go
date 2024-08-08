@@ -92,7 +92,7 @@ func DefaultFilters(opts *Options) Filters {
 				opts.VG.Spec.DeviceSelector.OptionalPaths...,
 			) {
 				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
-				if resolved, err := evalSymlinks(path); resolved == dev.KName {
+				if resolved, err := path.Resolve(evalSymlinks); resolved == dev.KName {
 					return nil
 				} else if err != nil {
 					return fmt.Errorf("the path %s was no kernel block device name and could not be resolved via symlink resolution: %w", path, err)

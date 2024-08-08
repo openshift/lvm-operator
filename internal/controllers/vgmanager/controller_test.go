@@ -191,15 +191,15 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	device := getKNameFromDevice(filepath.Join(GinkgoT().TempDir(), "mock0"))
 	By("setting up the disk as a mocked block device with losetup", func() {
 		// required create to survive valid device check
-		_, err := os.Create(device)
+		_, err := os.Create(device.Unresolved())
 		Expect(err).To(Succeed())
-		blockDevice = createMockedBlockDevice(device)
+		blockDevice = createMockedBlockDevice(device.Unresolved())
 	})
 
 	vg := &vgTemplate
 	if vg.Spec.DeviceSelector == nil {
 		By("defaulting volume group device selector to the temporary device", func() {
-			vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{device}}
+			vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{device}}
 		})
 	}
 	if vg.GetNamespace() == "" {
@@ -288,7 +288,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	var lvmPV lvm.PhysicalVolume
 	var lvmVG lvm.VolumeGroup
 	By("mocking the adding of the device to the volume group", func() {
-		lvmPV = lvm.PhysicalVolume{PvName: device}
+		lvmPV = lvm.PhysicalVolume{PvName: device.Unresolved()}
 		lvmVG = lvm.VolumeGroup{
 			Name: vg.GetName(),
 			PVs:  []lvm.PhysicalVolume{lvmPV},
@@ -377,7 +377,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
 			Name:                  vg.GetName(),
 			Status:                lvmv1alpha1.VGStatusReady,
-			Devices:               []string{device},
+			Devices:               []string{device.Unresolved()},
 			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		oldReadyGeneration = nodeStatus.GetGeneration()
@@ -467,7 +467,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
 			Name:                  vg.GetName(),
 			Status:                lvmv1alpha1.VGStatusReady,
-			Devices:               []string{device},
+			Devices:               []string{device.Unresolved()},
 			Excluded:              excluded,
 			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
@@ -823,7 +823,7 @@ func testReconcileFailure(ctx context.Context) {
 		vg.SetName("vg1")
 		vg.SetNamespace(instances.namespace.GetName())
 		vg.Spec.NodeSelector = instances.nodeSelector.DeepCopy()
-		vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{"/dev/sda"}}
+		vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sda"}}
 		vg.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(true)
 		vg.Spec.ThinPoolConfig = &lvmv1alpha1.ThinPoolConfig{
 			Name:               "thin-pool-1",

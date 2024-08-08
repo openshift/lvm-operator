@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"path/filepath"
 
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
@@ -80,9 +81,9 @@ type FilteredBlockDevices struct {
 // VerifyMandatoryDevicePaths verifies if the provided device list is either available or already setup correctly.
 // While availability is easy to determine, an exclusion by being already setup can only be determined by
 // checking if the excluded device has been filtered due to filter.ErrDeviceAlreadySetupCorrectly.
-func VerifyMandatoryDevicePaths(f FilteredBlockDevices, paths []string) error {
+func VerifyMandatoryDevicePaths(f FilteredBlockDevices, paths []v1alpha1.DevicePath) error {
 	for _, path := range paths {
-		path, err := evalSymlinks(path)
+		path, err := path.Resolve(evalSymlinks)
 		if err != nil {
 			return fmt.Errorf("failed to resolve symlink to determine available or setup path: %w", err)
 		}

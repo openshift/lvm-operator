@@ -83,12 +83,12 @@ func (in *DeviceSelector) DeepCopyInto(out *DeviceSelector) {
 	*out = *in
 	if in.Paths != nil {
 		in, out := &in.Paths, &out.Paths
-		*out = make([]string, len(*in))
+		*out = make([]DevicePath, len(*in))
 		copy(*out, *in)
 	}
 	if in.OptionalPaths != nil {
 		in, out := &in.OptionalPaths, &out.OptionalPaths
-		*out = make([]string, len(*in))
+		*out = make([]DevicePath, len(*in))
 		copy(*out, *in)
 	}
 	if in.ForceWipeDevicesAndDestroyAllData != nil {
