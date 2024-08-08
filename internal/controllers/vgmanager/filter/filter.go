@@ -19,10 +19,10 @@ package filter
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 )
@@ -56,10 +56,7 @@ var (
 	}
 )
 
-// evalSymlinks redefined to be able to override in tests
-var evalSymlinks = filepath.EvalSymlinks
-
-type Filter func(lsblk.BlockDevice) error
+type Filter func(lsblk.BlockDevice, *symlinkResolver.Resolver) error
 
 type Filters map[string]Filter
 
@@ -82,7 +79,7 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 
 func DefaultFilters(opts *Options) Filters {
 	return Filters{
-		partOfDeviceSelector: func(dev lsblk.BlockDevice) error {
+		partOfDeviceSelector: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
 			if opts.VG.Spec.DeviceSelector == nil {
 				// if no device selector is set, its automatically a valid candidate
 				return nil
@@ -92,7 +89,7 @@ func DefaultFilters(opts *Options) Filters {
 				opts.VG.Spec.DeviceSelector.OptionalPaths...,
 			) {
 				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
-				if resolved, err := evalSymlinks(path); resolved == dev.KName {
+				if resolved, err := resolver.Resolve(path.Unresolved()); resolved == dev.KName {
 					return nil
 				} else if err != nil {
 					return fmt.Errorf("the path %s was no kernel block device name and could not be resolved via symlink resolution: %w", path, err)
@@ -101,21 +98,21 @@ func DefaultFilters(opts *Options) Filters {
 			return fmt.Errorf("%s is not part of the device selector", dev.Name)
 		},
 
-		notReadOnly: func(dev lsblk.BlockDevice) error {
+		notReadOnly: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {
 			if dev.ReadOnly {
 				return fmt.Errorf("%s cannot be read-only", dev.Name)
 			}
 			return nil
 		},
 
-		notSuspended: func(dev lsblk.BlockDevice) error {
+		notSuspended: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {
 			if dev.State == StateSuspended {
 				return fmt.Errorf("%s cannot be in a %q state", dev.State, dev.Name)
 			}
 			return nil
 		},
 
-		noInvalidPartitionLabel: func(dev lsblk.BlockDevice) error {
+		noInvalidPartitionLabel: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {
 			for _, invalidLabel := range invalidPartitionLabels {
 				if strings.Contains(strings.ToLower(dev.PartLabel), invalidLabel) {
 					return fmt.Errorf("%s has an invalid partition label %q", dev.Name, dev.PartLabel)
@@ -124,7 +121,7 @@ func DefaultFilters(opts *Options) Filters {
 			return nil
 		},
 
-		onlyValidFilesystemSignatures: func(dev lsblk.BlockDevice) error {
+		onlyValidFilesystemSignatures: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
 			// if no fs type is set, it's always okay
 			if dev.FSType == "" {
 				return nil
@@ -135,7 +132,7 @@ func DefaultFilters(opts *Options) Filters {
 			if dev.FSType == FSTypeLVM2Member {
 				var foundPV *lvm.PhysicalVolume
 				for _, pv := range opts.PVs {
-					resolvedPVPath, err := evalSymlinks(pv.PvName)
+					resolvedPVPath, err := resolver.Resolve(pv.PvName)
 					if err != nil {
 						return fmt.Errorf("the pv %s could not be resolved via symlink: %w", pv, err)
 					}
@@ -173,7 +170,7 @@ func DefaultFilters(opts *Options) Filters {
 			return fmt.Errorf("%s has an invalid filesystem signature (%s) and cannot be used", dev.Name, dev.FSType)
 		},
 
-		noChildren: func(dev lsblk.BlockDevice) error {
+		noChildren: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {
 			hasChildren := dev.HasChildren()
 			if hasChildren {
 				return fmt.Errorf("%s has children block devices and could not be considered", dev.Name)
@@ -181,7 +178,7 @@ func DefaultFilters(opts *Options) Filters {
 			return nil
 		},
 
-		usableDeviceType: func(dev lsblk.BlockDevice) error {
+		usableDeviceType: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {
 			switch dev.Type {
 			case lsblk.DeviceTypeLoop:
 				// check loop device isn't being used by kubernetes

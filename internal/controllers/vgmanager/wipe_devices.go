@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup"
@@ -17,6 +19,7 @@ func (r *Reconciler) wipeDevices(
 	ctx context.Context,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
 	blockDevices []lsblk.BlockDevice,
+	resolver *symlinkResolver.Resolver,
 ) (bool, error) {
 	logger := log.FromContext(ctx)
 
@@ -28,14 +31,23 @@ func (r *Reconciler) wipeDevices(
 	updated := false
 
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-		if deviceWiped, err := r.wipeDevice(ctx, path, blockDevices); err != nil {
+		pathResolved, err := resolver.Resolve(path.Unresolved())
+		if err != nil {
+			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
+		}
+
+		if deviceWiped, err := r.wipeDevice(ctx, pathResolved, blockDevices); err != nil {
 			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
 		} else if deviceWiped {
 			updated = true
 		}
 	}
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
-		if deviceWiped, err := r.wipeDevice(ctx, path, blockDevices); err != nil {
+		pathResolved, err := resolver.Resolve(path.Unresolved())
+		if err != nil {
+			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
+		}
+		if deviceWiped, err := r.wipeDevice(ctx, pathResolved, blockDevices); err != nil {
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
 		} else if deviceWiped {
 			updated = true
@@ -87,12 +99,8 @@ func (r *Reconciler) shouldWipeDevicesOnVolumeGroup(vg *lvmv1alpha1.LVMVolumeGro
 }
 
 func (r *Reconciler) wipeDevice(ctx context.Context, deviceName string, blockDevices []lsblk.BlockDevice) (bool, error) {
-	logger := log.FromContext(ctx).WithValues("deviceName", deviceName)
 
-	var err error
-	if deviceName, err = evalSymlinks(deviceName); err != nil {
-		return false, fmt.Errorf("failed to evaluate symlink for device %s: %w", deviceName, err)
-	}
+	logger := log.FromContext(ctx).WithValues("deviceName", deviceName)
 
 	wiped := false
 	for _, device := range blockDevices {

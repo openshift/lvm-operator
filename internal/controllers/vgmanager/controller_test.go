@@ -191,15 +191,15 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	device := getKNameFromDevice(filepath.Join(GinkgoT().TempDir(), "mock0"))
 	By("setting up the disk as a mocked block device with losetup", func() {
 		// required create to survive valid device check
-		_, err := os.Create(device)
+		_, err := os.Create(device.Unresolved())
 		Expect(err).To(Succeed())
-		blockDevice = createMockedBlockDevice(device)
+		blockDevice = createMockedBlockDevice(device.Unresolved())
 	})
 
 	vg := &vgTemplate
 	if vg.Spec.DeviceSelector == nil {
 		By("defaulting volume group device selector to the temporary device", func() {
-			vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{device}}
+			vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{device}}
 		})
 	}
 	if vg.GetNamespace() == "" {
@@ -288,7 +288,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	var lvmPV lvm.PhysicalVolume
 	var lvmVG lvm.VolumeGroup
 	By("mocking the adding of the device to the volume group", func() {
-		lvmPV = lvm.PhysicalVolume{PvName: device}
+		lvmPV = lvm.PhysicalVolume{PvName: device.Unresolved()}
 		lvmVG = lvm.VolumeGroup{
 			Name: vg.GetName(),
 			PVs:  []lvm.PhysicalVolume{lvmPV},
@@ -377,7 +377,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
 			Name:                  vg.GetName(),
 			Status:                lvmv1alpha1.VGStatusReady,
-			Devices:               []string{device},
+			Devices:               []string{device.Unresolved()},
 			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
 		oldReadyGeneration = nodeStatus.GetGeneration()
@@ -467,7 +467,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
 			Name:                  vg.GetName(),
 			Status:                lvmv1alpha1.VGStatusReady,
-			Devices:               []string{device},
+			Devices:               []string{device.Unresolved()},
 			Excluded:              excluded,
 			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
 		}))
@@ -579,7 +579,11 @@ func testNodeSelector(ctx context.Context) {
 		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
 		WithInterceptorFuncs(funcs).
 		Build()
-	r = &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	r = &Reconciler{
+		Client:   fakeClient,
+		Scheme:   scheme.Scheme,
+		NodeName: "test-node",
+	}
 	By("verifying incorrect node resolution because nodestatus cannot be created")
 	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
 	Expect(err).To(HaveOccurred(), "should error on valid node selector due to failure of nodestatus creation")
@@ -588,7 +592,10 @@ func testNodeSelector(ctx context.Context) {
 	fakeClient = fake.NewClientBuilder().WithScheme(scheme.Scheme).
 		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
 		Build()
-	r = &Reconciler{Client: fakeClient, Scheme: scheme.Scheme}
+	r = &Reconciler{
+		Client: fakeClient,
+		Scheme: scheme.Scheme,
+	}
 	By("Verifying node match error if NodeName is not set")
 	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
 	Expect(err).To(HaveOccurred(), "should error during node match resolution")
@@ -607,7 +614,11 @@ func testNodeSelector(ctx context.Context) {
 		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
 		WithInterceptorFuncs(funcs).
 		Build()
-	r = &Reconciler{Client: fakeClient, Scheme: scheme.Scheme, NodeName: "test-node"}
+	r = &Reconciler{
+		Client:   fakeClient,
+		Scheme:   scheme.Scheme,
+		NodeName: "test-node",
+	}
 	By("verifying incorrect node resolution because nodestatus cannot be fetched from cluster")
 	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
 	Expect(err).To(HaveOccurred(), "should error on valid node selector due to failure of nodestatus fetch")
@@ -618,9 +629,12 @@ func testErrorOnGetLVMVolumeGroup(ctx context.Context) {
 	funcs := interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 		return fmt.Errorf("mock get failure for LVMVolumeGroup %s", key.Name)
 	}}
-	r := &Reconciler{Client: fake.NewClientBuilder().
-		WithInterceptorFuncs(funcs).
-		WithScheme(scheme.Scheme).Build(), Scheme: scheme.Scheme}
+	r := &Reconciler{
+		Client: fake.NewClientBuilder().
+			WithInterceptorFuncs(funcs).
+			WithScheme(scheme.Scheme).Build(),
+		Scheme: scheme.Scheme,
+	}
 	_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&lvmv1alpha1.LVMVolumeGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "openshift-storage"},
 	})})
@@ -811,6 +825,9 @@ func testReconcileFailure(ctx context.Context) {
 	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
 	instances.LVMD = mockLVMD
 
+	// error resolve function to trigger a error
+	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
+
 	By("creating the LVMVolumeGroupNodeStatus", func() {
 		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 		nodeStatus.SetName(instances.node.GetName())
@@ -823,7 +840,7 @@ func testReconcileFailure(ctx context.Context) {
 		vg.SetName("vg1")
 		vg.SetNamespace(instances.namespace.GetName())
 		vg.Spec.NodeSelector = instances.nodeSelector.DeepCopy()
-		vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []string{"/dev/sda"}}
+		vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sda"}}
 		vg.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(true)
 		vg.Spec.ThinPoolConfig = &lvmv1alpha1.ThinPoolConfig{
 			Name:               "thin-pool-1",
@@ -844,12 +861,6 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering wipefs failure", func() {
-		evalSymlinks = func(path string) (string, error) {
-			return path, nil
-		}
-		defer func() {
-			evalSymlinks = filepath.EvalSymlinks
-		}()
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
@@ -863,12 +874,6 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering failure on fetching new devices to add to volume group", func() {
-		evalSymlinks = func(path string) (string, error) {
-			return path, nil
-		}
-		defer func() {
-			evalSymlinks = filepath.EvalSymlinks
-		}()
 		blockDevices := []lsblk.BlockDevice{
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
@@ -898,12 +903,6 @@ func testReconcileFailure(ctx context.Context) {
 	Expect(instances.client.Update(ctx, vg)).To(Succeed())
 
 	By("triggering failure because vg is not found even though there are no devices to be added", func() {
-		evalSymlinks = func(path string) (string, error) {
-			return path, nil
-		}
-		defer func() {
-			evalSymlinks = filepath.EvalSymlinks
-		}()
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
@@ -923,12 +922,6 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering failure because vg is found but thin-pool validation failed", func() {
-		evalSymlinks = func(path string) (string, error) {
-			return path, nil
-		}
-		defer func() {
-			evalSymlinks = filepath.EvalSymlinks
-		}()
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
