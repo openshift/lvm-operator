@@ -44,9 +44,9 @@ type EventReasonInfo string
 type EventReasonError string
 
 const (
-	EventReasonErrorDeletionPending              EventReasonError = "DeletionPending"
-	EventReasonErrorResourceReconciliationFailed EventReasonError = "ResourceReconciliationFailed"
-	EventReasonResourceReconciliationSuccess     EventReasonInfo  = "ResourceReconciliationSuccess"
+	EventReasonErrorDeletionPending                  EventReasonError = "DeletionPending"
+	EventReasonErrorResourceReconciliationIncomplete EventReasonError = "ResourceReconciliationIncomplete"
+	EventReasonResourceReconciliationSuccess         EventReasonInfo  = "ResourceReconciliationSuccess"
 
 	lvmClusterFinalizer = "lvmcluster.topolvm.io"
 	podNameEnv          = "NAME"
@@ -240,8 +240,8 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 
 	resourceSyncElapsedTime := time.Since(resourceSyncStart)
 	if len(errs) > 0 {
-		err := fmt.Errorf("failed to reconcile resources managed by LVMCluster: %w", errors.Join(errs...))
-		r.WarningEvent(ctx, instance, EventReasonErrorResourceReconciliationFailed, err)
+		err := fmt.Errorf("LVMCluster's resources are not yet fully synchronized: %w", errors.Join(errs...))
+		r.WarningEvent(ctx, instance, EventReasonErrorResourceReconciliationIncomplete, err)
 		setResourcesAvailableConditionFalse(instance, err)
 		statusErr := r.updateLVMClusterStatus(ctx, instance)
 		if statusErr != nil {
