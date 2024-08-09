@@ -114,8 +114,8 @@ Here are some tutorials on remotely connecting to a running binary:
 
 1. set up a running OpenShift cluster and install LVMS either via CSV or locally as described above.
 2. login via username & password, ideally kubeadmin, and get the token via `oc whoami -t` to later inject into the test suite. OIDC logins dont use tokens and cannot be used.
-2. download go and install it on your machine (https://golang.org/doc/install) if not already done
-3. use `go run ./test/performance --help` to see the available options for performance testing.
+3. download go and install it on your machine (https://golang.org/doc/install) if not already done
+4. use `go run ./test/performance --help` to see the available options for performance testing.
 
 Mainly we differentiate between 2 kinds of performance tests: Load/Stress Testing, and Idle testing.
 This is important to differentiate because for most installations on edge, LVMS will not be actively working all the time.

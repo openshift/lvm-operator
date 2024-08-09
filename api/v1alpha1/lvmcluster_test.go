@@ -167,7 +167,7 @@ var _ = Describe("webhook acceptance tests", func() {
 					SizePercent:        90,
 					OverprovisionRatio: 10,
 				},
-				DeviceSelector: &DeviceSelector{Paths: []string{
+				DeviceSelector: &DeviceSelector{Paths: []DevicePath{
 					"/dev/test1",
 				}},
 				FilesystemType: "xfs",
@@ -179,7 +179,7 @@ var _ = Describe("webhook acceptance tests", func() {
 					SizePercent:        90,
 					OverprovisionRatio: 10,
 				},
-				DeviceSelector: &DeviceSelector{Paths: []string{
+				DeviceSelector: &DeviceSelector{Paths: []DevicePath{
 					"/dev/test2",
 				}},
 				FilesystemType: "xfs",
@@ -196,7 +196,7 @@ var _ = Describe("webhook acceptance tests", func() {
 					SizePercent:        90,
 					OverprovisionRatio: 10,
 				},
-				DeviceSelector: &DeviceSelector{Paths: []string{
+				DeviceSelector: &DeviceSelector{Paths: []DevicePath{
 					"/dev/test1",
 				}},
 				FilesystemType: "xfs",
@@ -208,7 +208,7 @@ var _ = Describe("webhook acceptance tests", func() {
 					SizePercent:        90,
 					OverprovisionRatio: 10,
 				},
-				DeviceSelector: &DeviceSelector{Paths: []string{
+				DeviceSelector: &DeviceSelector{Paths: []DevicePath{
 					"/dev/test3",
 				}},
 				FilesystemType: "xfs",
@@ -277,7 +277,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("device selector with non-dev path is forbidden", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
 			"some-random-path",
 		}}
 
@@ -292,7 +292,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("device selector with non-dev optional path is forbidden", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{
 			"some-random-path",
 		}}
 
@@ -307,7 +307,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("device selector with overlapping devices in paths is forbidden", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
 			"/dev/test1",
 		}}
 		dupe := *resource.Spec.Storage.DeviceClasses[0].DeepCopy()
@@ -326,7 +326,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("device selector with overlapping devices in optional paths is forbidden", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{
 			"/dev/test1",
 		}}
 		dupe := *resource.Spec.Storage.DeviceClasses[0].DeepCopy()
@@ -477,7 +477,7 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}}
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
@@ -494,7 +494,7 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{"/dev/newpath"}}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{"/dev/newpath"}}
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
@@ -508,11 +508,11 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("device paths cannot be removed from device class in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []string{"/dev/otherpath"}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []DevicePath{"/dev/otherpath"}
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
@@ -526,11 +526,11 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("optional device paths cannot be removed from device class in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []string{"/dev/newpath"}}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{"/dev/newpath"}}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []string{"/dev/otherpath"}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []DevicePath{"/dev/otherpath"}
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
@@ -544,7 +544,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("force wipe option cannot be added in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
@@ -562,7 +562,7 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("force wipe option cannot be changed in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []string{"/dev/newpath"}, ForceWipeDevicesAndDestroyAllData: ptr.To[bool](false)}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}, ForceWipeDevicesAndDestroyAllData: ptr.To[bool](false)}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()

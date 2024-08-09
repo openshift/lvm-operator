@@ -130,17 +130,29 @@ type DeviceSelector struct {
 
 	// Paths specify the device paths.
 	// +optional
-	Paths []string `json:"paths,omitempty"`
+	Paths []DevicePath `json:"paths,omitempty"`
 
 	// OptionalPaths specify the optional device paths.
 	// +optional
-	OptionalPaths []string `json:"optionalPaths,omitempty"`
+	OptionalPaths []DevicePath `json:"optionalPaths,omitempty"`
 
 	// ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
 	// This wipes the file signatures on the devices. Use this feature with caution.
 	// Force wipe the devices only when you know that they do not contain any important data.
 	// +optional
 	ForceWipeDevicesAndDestroyAllData *bool `json:"forceWipeDevicesAndDestroyAllData,omitempty"`
+}
+
+type resolverFunc func(string) (string, error)
+
+type DevicePath string
+
+func (d DevicePath) Resolve(fn resolverFunc) (string, error) {
+	return fn(string(d))
+}
+
+func (d DevicePath) Unresolved() string {
+	return string(d)
 }
 
 type LVMStateType string

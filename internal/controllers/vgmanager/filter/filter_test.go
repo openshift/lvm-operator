@@ -139,19 +139,19 @@ func TestPartOfDeviceSelector(t *testing.T) {
 	testcases := []advancedFilterTestCase{
 		{label: "match path selector", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				Paths: []string{"dev1"},
+				Paths: []lvmv1alpha1.DevicePath{"dev1"},
 			}},
 			assertErr: assert.NoError,
 		},
 		{label: "match optional path selector", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				OptionalPaths: []string{"dev1"},
+				OptionalPaths: []lvmv1alpha1.DevicePath{"dev1"},
 			}},
 			assertErr: assert.NoError,
 		},
 		{label: "no match", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				Paths: []string{"dev2"},
+				Paths: []lvmv1alpha1.DevicePath{"dev2"},
 			}},
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorContains(t, err, "is not part of the device selector")
