@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
@@ -92,9 +93,10 @@ type Reconciler struct {
 	lsblk.LSBLK
 	wipefs.Wipefs
 	dmsetup.Dmsetup
-	NodeName  string
-	Namespace string
-	Filters   filter.FilterSetup
+	NodeName         string
+	Namespace        string
+	Filters          filter.FilterSetup
+	SymlinkResolveFn symlinkResolver.ResolveFn
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -104,6 +106,8 @@ func (r *Reconciler) getFinalizer() string {
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("reconciling")
+
+	resolver := symlinkResolver.NewWithResolver(r.SymlinkResolveFn)
 
 	// Check if this LVMVolumeGroup needs to be processed on this node
 	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
@@ -127,13 +131,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus: %w", err)
 	}
 
-	return r.reconcile(ctx, volumeGroup, nodeStatus)
+	return r.reconcile(ctx, volumeGroup, resolver)
 }
 
 func (r *Reconciler) reconcile(
 	ctx context.Context,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
-	nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus,
+	resolver *symlinkResolver.Resolver,
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	// Check if the LVMVolumeGroup resource is deleted
@@ -158,7 +162,7 @@ func (r *Reconciler) reconcile(
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
 
-	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices); err != nil {
+	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, resolver); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
 	} else if updated {
 		return ctrl.Result{}, r.Client.Update(ctx, volumeGroup)
@@ -175,14 +179,14 @@ func (r *Reconciler) reconcile(
 	}
 	logger.V(1).Info("block device infos", "bdi", bdi)
 
-	devices := filterDevices(ctx, blockDevices, r.Filters(&filter.Options{
+	devices := filterDevices(ctx, blockDevices, resolver, r.Filters(&filter.Options{
 		BDI: bdi,
 		PVs: pvs,
 		VG:  volumeGroup,
 	}))
 
 	if volumeGroup.Spec.DeviceSelector != nil {
-		if err := VerifyMandatoryDevicePaths(devices, volumeGroup.Spec.DeviceSelector.Paths); err != nil {
+		if err := VerifyMandatoryDevicePaths(devices, resolver, volumeGroup.Spec.DeviceSelector.Paths); err != nil {
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")

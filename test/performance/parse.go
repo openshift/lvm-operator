@@ -31,7 +31,7 @@ func parseMetrics(metricsResult string) ([]RawMetric, error) {
 		return nil, fmt.Errorf("failed to unmarshal metrics: %w", err)
 	}
 
-	metrics := []RawMetric{}
+	metrics := make([]RawMetric, 0)
 
 	for _, res := range d.Data.Result {
 		if res.Metric.Container == "POD" {

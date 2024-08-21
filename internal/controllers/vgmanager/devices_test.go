@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
@@ -17,16 +18,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var devicePaths map[string]string
+var devicePaths map[string]v1alpha1.DevicePath
 
 func Test_getNewDevicesToBeAdded(t *testing.T) {
 	// create a folder for each disk to resolve filepath.EvalSymlinks(path) call in getDeviceCandidates.
 	tmpDir := t.TempDir()
-	devicePaths = make(map[string]string)
-	devicePaths["nvme1n1p1"] = fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p1")
-	devicePaths["nvme1n1p2"] = fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p2")
+	devicePaths = make(map[string]v1alpha1.DevicePath)
+	devicePaths["nvme1n1p1"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p1"))
+	devicePaths["nvme1n1p2"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p2"))
 	for _, path := range devicePaths {
-		err := os.Mkdir(path, 0755)
+		err := os.Mkdir(path.Unresolved(), 0755)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,7 +228,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -253,7 +254,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -270,7 +271,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -296,10 +297,10 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
@@ -351,7 +352,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -398,7 +399,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
@@ -446,10 +447,10 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
@@ -486,7 +487,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 							devicePaths["nvme1n1p2"],
 						},
@@ -515,7 +516,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
@@ -542,10 +543,10 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -561,7 +562,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 							devicePaths["nvme1n1p1"],
 						},
@@ -578,7 +579,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 							devicePaths["nvme1n1p1"],
 						},
@@ -603,7 +604,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 			}
 			filters := filter.DefaultFilters(opts)
 
-			devices := filterDevices(ctx, tc.existingBlockDevices, filters)
+			devices := filterDevices(ctx, tc.existingBlockDevices, symlinkResolver.NewWithDefaultResolver(), filters)
 			assert.Equal(t, tc.numOfAvailableDevices, len(devices.Available), "expected numOfAvailableDevices is not equal to actual number")
 
 			if tc.expectError {
@@ -619,5 +620,5 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 // it has /private in the beginning because /tmp symlinks are evaluated as with /private in the beginning on darwin.
 func calculateDevicePath(t *testing.T, deviceName string) string {
 	t.Helper()
-	return getKNameFromDevice(devicePaths[deviceName])
+	return getKNameFromDevice(devicePaths[deviceName].Unresolved()).Unresolved()
 }

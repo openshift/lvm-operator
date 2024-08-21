@@ -2,10 +2,10 @@ package filter
 
 import (
 	"fmt"
-	"path/filepath"
 	"testing"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ func TestNotReadOnly(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notReadOnly](tc.device)
+			err := DefaultFilters(nil)[notReadOnly](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -50,7 +50,7 @@ func TestNotSuspended(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notSuspended](tc.device)
+			err := DefaultFilters(nil)[notSuspended](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -68,7 +68,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device)
+			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -85,7 +85,7 @@ func TestNoChildren(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noChildren](tc.device)
+			err := DefaultFilters(nil)[noChildren](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -101,7 +101,7 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: lsblk.BlockDevice{Name: "dev2", Type: "disk"}, expectErr: false},
 	}
 	for _, tc := range testcases {
-		err := DefaultFilters(nil)[usableDeviceType](tc.device)
+		err := DefaultFilters(nil)[usableDeviceType](tc.device, symlinkResolver.NewWithDefaultResolver())
 		if tc.expectErr {
 			assert.Error(t, err)
 		} else {
@@ -125,7 +125,7 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device)
+			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -139,19 +139,19 @@ func TestPartOfDeviceSelector(t *testing.T) {
 	testcases := []advancedFilterTestCase{
 		{label: "match path selector", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				Paths: []string{"dev1"},
+				Paths: []lvmv1alpha1.DevicePath{"dev1"},
 			}},
 			assertErr: assert.NoError,
 		},
 		{label: "match optional path selector", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				OptionalPaths: []string{"dev1"},
+				OptionalPaths: []lvmv1alpha1.DevicePath{"dev1"},
 			}},
 			assertErr: assert.NoError,
 		},
 		{label: "no match", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				Paths: []string{"dev2"},
+				Paths: []lvmv1alpha1.DevicePath{"dev2"},
 			}},
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorContains(t, err, "is not part of the device selector")
@@ -164,16 +164,10 @@ func TestPartOfDeviceSelector(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			evalSymlinks = func(path string) (string, error) {
-				return path, nil
-			}
-			defer func() {
-				evalSymlinks = filepath.EvalSymlinks
-			}()
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
 			vg.SetName("vg1")
 			vg.Spec = *tc.volumeGroupSpec
-			err := DefaultFilters(&Options{VG: vg})[partOfDeviceSelector](tc.device)
+			err := DefaultFilters(&Options{VG: vg})[partOfDeviceSelector](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
 			tc.assertErr(t, err, fmt.Sprintf("partOfDeviceSelector(%v)", tc.device))
 		})
 	}
@@ -235,9 +229,6 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", VgName: "vg1"}},
 		},
 	}
-	evalSymlinks = func(path string) (string, error) {
-		return path, nil
-	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
@@ -246,7 +237,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			err := DefaultFilters(&Options{
 				VG:  vg,
 				PVs: tc.lvmExpect,
-			})[onlyValidFilesystemSignatures](tc.device)
+			})[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
 			tc.assertErr(t, err, fmt.Sprintf("onlyValidFilesystemSignatures(%v)", tc.device))
 		})
 	}

@@ -20,8 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
+	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
@@ -80,9 +81,9 @@ type FilteredBlockDevices struct {
 // VerifyMandatoryDevicePaths verifies if the provided device list is either available or already setup correctly.
 // While availability is easy to determine, an exclusion by being already setup can only be determined by
 // checking if the excluded device has been filtered due to filter.ErrDeviceAlreadySetupCorrectly.
-func VerifyMandatoryDevicePaths(f FilteredBlockDevices, paths []string) error {
+func VerifyMandatoryDevicePaths(f FilteredBlockDevices, resolver *symlinkResolver.Resolver, paths []v1alpha1.DevicePath) error {
 	for _, path := range paths {
-		path, err := evalSymlinks(path)
+		path, err := resolver.Resolve(path.Unresolved())
 		if err != nil {
 			return fmt.Errorf("failed to resolve symlink to determine available or setup path: %w", err)
 		}
@@ -137,7 +138,7 @@ func (f FilteredBlockDevices) FilterErrors(dev string) []error {
 
 // filterDevices returns:
 // availableDevices: the list of blockdevices considered available
-func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters filter.Filters) FilteredBlockDevices {
+func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *symlinkResolver.Resolver, filters filter.Filters) FilteredBlockDevices {
 	logger := log.FromContext(ctx)
 
 	var availableDevices []lsblk.BlockDevice
@@ -146,7 +147,7 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters fil
 	for _, device := range devices {
 		// check for partitions recursively
 		if device.HasChildren() {
-			filteredChildDevices := filterDevices(ctx, device.Children, filters)
+			filteredChildDevices := filterDevices(ctx, device.Children, resolver, filters)
 			availableDevices = append(availableDevices, filteredChildDevices.Available...)
 			for _, excludedChildDevice := range filteredChildDevices.Excluded {
 				if excluded, ok := excludedByKName[excludedChildDevice.KName]; ok {
@@ -159,7 +160,7 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters fil
 
 		filterErrs := make([]error, 0, len(filters))
 		for name, filterFunc := range filters {
-			if err := filterFunc(device); err != nil {
+			if err := filterFunc(device, resolver); err != nil {
 				logger.WithValues("device.KName", device.KName, "filter.Name", name).
 					V(3).Info("excluded", "reason", err)
 				filterErrs = append(filterErrs, err)
@@ -188,6 +189,3 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, filters fil
 		Excluded:  excluded,
 	}
 }
-
-// evalSymlinks redefined to be able to override in tests
-var evalSymlinks = filepath.EvalSymlinks

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -192,17 +193,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	if err = (&vgmanager.Reconciler{
-		Client:        mgr.GetClient(),
-		EventRecorder: mgr.GetEventRecorderFor(vgmanager.ControllerName),
-		LVMD:          lvmd.DefaultConfigurator(),
-		Scheme:        mgr.GetScheme(),
-		LSBLK:         lsblk.NewDefaultHostLSBLK(),
-		Wipefs:        wipefs.NewDefaultHostWipefs(),
-		Dmsetup:       dmsetup.NewDefaultHostDmsetup(),
-		LVM:           lvm.NewDefaultHostLVM(),
-		NodeName:      nodeName,
-		Namespace:     operatorNamespace,
-		Filters:       filter.DefaultFilters,
+		Client:           mgr.GetClient(),
+		EventRecorder:    mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		LVMD:             lvmd.DefaultConfigurator(),
+		Scheme:           mgr.GetScheme(),
+		LSBLK:            lsblk.NewDefaultHostLSBLK(),
+		Wipefs:           wipefs.NewDefaultHostWipefs(),
+		Dmsetup:          dmsetup.NewDefaultHostDmsetup(),
+		LVM:              lvm.NewDefaultHostLVM(),
+		NodeName:         nodeName,
+		Namespace:        operatorNamespace,
+		Filters:          filter.DefaultFilters,
+		SymlinkResolveFn: filepath.EvalSymlinks,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
