@@ -47,7 +47,7 @@ If an `LVMCluster` already exists, check if all the pods from LVMS are in the `R
 
 There should be one running instance of `lvms-operator` and `vg-manager` (per Node).
 
-#### `vg-manager` is stuck in CrashLoopBackOff state
+#### `vg-manager` is stuck in the `CrashLoopBackOff` state
 
 This error indicates a failure in locating an available disk for LVMS utilization. To investigate further and obtain relevant information, review the status of the `LVMCluster` CR:
 
@@ -172,7 +172,7 @@ In case of a failing / infinitely progressing LVMCluster due to one or many node
 1. The volume group in lvm2 is still recognizable on the host system and the disks are still accessible on at least one of the nodes selected in the NodeSelector of the LVMCluster.
 2. The `vg-manager` pod is stuck in a `CrashLoopBackOff` state and the LVMCluster is in a continuous Failed or Progressing state on all but that accessible one node.
 
-In other words: Make sure at least one node is available with a running `vg-manager` pod and a healthy volume group node status.
+In other words: make sure at least one node is available with a running `vg-manager` pod and a healthy volume group node status.
 
 ### Recovery from disk failure without resetting LVMCluster
 
@@ -236,7 +236,7 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
      If this is 0, the volume group is full (or nearly full with less than 1 Gi available) and no more logical volumes can be created.
    - `vg_missing_pv_count` field, which should be 0. This indicates the number of missing physical volumes in the volume group. If this is greater than 0, the volume group is incomplete and might not be able to function properly.
 
-   Here is an example of a Volume Group missing a PV because its Cable was defective:
+   Here is an example of a Volume Group missing a PV because its cable was defective:
 
    ```json5
    // vgs vg1 -o all --reportformat json --units g | jq .report[0].vg[0]
@@ -283,25 +283,24 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    ```
 
 3. Allow erasure of missing volumes in the volume group (if necessary due to `vg_missing_pv_count` > 0):
-   If the volume group consisted of multiple physical volumes, it might be that one or more of them are missing, but there are still healthy volumes left. In this case, you can remove the missing volumes from the volume group to allow the volume group to function properly again.
-   This will completely erode any potential of automatic recovery on the failing disk, but allows you to activate the volume group again,
-   with all the remaining disks and data on these disks.
 
-   Note that it is advisable to deschedule all workloads using the storage class backed by the volume group, and then call
+   If the volume group consisted of multiple physical volumes, it might be that one or more of them are missing, but there are still healthy volumes left. In this case, you can remove the missing volumes from the volume group to allow the volume group to function properly again. This will completely erode any potential of automatic recovery on the failing disk but allows you to activate the volume group again, with all the remaining disks and data on these disks.
+
+   Note that it is advisable to deschedule all workloads using the storage class backed by the volume group, and then call:
+
    ```bash
    vgchange --activate n <YOUR_VG_NAME_HERE>
    ```
-   This will ensure that no active writes can occur on the volume group while you are erasing the missing volumes.
-   Sometimes, lvm2 will prohibit you from erasing the missing volumes before deactivating the volumes in the volume group.
 
-   Once you have confirmed a disk failure, you can erase the missing volumes from the volume group by calling
+   This will ensure that no active writes can occur on the volume group while you are erasing the missing volumes. Sometimes, lvm2 will prohibit you from erasing the missing volumes before deactivating the volumes in the volume group.
+
+   Once you have confirmed a disk failure, you can erase the missing volumes from the volume group by calling:
 
    ```bash
    vgreduce --removemissing <YOUR_VG_NAME_HERE>
    ```
 
-   If all goes well, another verification of the volume group should confirm that the `vg_missing_pv_count` is now 0.
-   This means the existing data on the remaining disks is still accessible and the volume group can be activated again.
+   If all goes well, another verification of the volume group should confirm that the `vg_missing_pv_count` is now 0. This means the existing data on the remaining disks is still accessible and the volume group can be activated again.
 
    Note that in some cases, especially during scenarios with data loss, the request might fail like below:
 
@@ -319,33 +318,28 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    WARNING: Couldn't find device with uuid K1LP09-3KYN-SP2C-pn5f-dDeR-XyWM-zgB0Ja.
    ```
 
-   Especially true with thin pool setups that encompass the now broken disks, this might cause additional issues.
-   In this case you can attempt to recover the pool by activating the lv in partial mode:
+   Especially true with thin pool setups that encompass the now broken disks, this might cause additional issues. In this case, you can attempt to recover the pool by activating the lv in partial mode:
 
    ```bash
-   sh-5.1# lvchange --activate y vg1/thin-pool-1 --activationmode=partial
+   lvchange --activate y vg1/thin-pool-1 --activationmode=partial
    PARTIAL MODE. Incomplete logical volumes will be processed.
    WARNING: Couldn't find device with uuid K1LP09-3KYN-SP2C-pn5f-dDeR-XyWM-zgB0Ja.
    WARNING: VG vg1 is missing PV K1LP09-3KYN-SP2C-pn5f-dDeR-XyWM-zgB0Ja (last written to [unknown]).
    Cannot activate vg1/thin-pool-1_tdata: pool incomplete.
    ```
 
-   If this fails like above, you can only accept that you must use standard data recovery tools to attempt to scrape
-   data blocks from the disks that are still available.
-   If it succeeds, you can still access the data left on the pool and you should recover it to a separate storage medium
-   before proceeding. After backing up your data, deactivate the lv again and proceed with the next steps.
+   If this fails like above, you can only accept that you must use standard data recovery tools to attempt to scrape data blocks from the disks that are still available. If it succeeds, you can still access the data left on the pool and you should recover it to a separate storage medium before proceeding. After backing up your data, deactivate the lv again and proceed with the next steps.
 
    You can now proceed with one of two methods to recover the data from the volume group:
+
    1. **Reducing** the volume group to only the healthy disks and recovering the data from the remaining disks
    2. **Replacing** the failing disk with a new one and recovering the data from the remaining disks
 
-##### Reducing the volume group to only the healthy disks and recovering the data from the remaining disks
+#### Reducing the volume group to only the healthy disks and recovering the data from the remaining disks
 
-Note that with this method, you will lose the data on the failing disk, but you can recover the data from the remaining disks.
-You will also not need to issue additional disks to the volume group, as the volume group will be reduced to only healthy disks.
-This has the benefit of getting the system running immediately but will result in less overall capacity, less failure resiliency, and a necessary patch to the LVMCluster resource.
+Note that with this method, you will lose the data on the failing disk, but you can recover the data from the remaining disks. You will also not need to issue additional disks to the volume group, as the volume group will be reduced to only healthy disks. This has the benefit of getting the system running immediately but will result in less overall capacity, less failure resiliency, and a necessary patch to the LVMCluster resource.
 
-To reduce the volume group to only the healthy disks, you can call
+To reduce the volume group to only the healthy disks, run:
 
 ```bash
 vgreduce --removemissing --force vg1
@@ -353,9 +347,7 @@ vgreduce --removemissing --force vg1
 
 This will forcefully remove all missing disks from the volume group and make the volume group accessible again.
 
-At this point, it is safe to reschedule your workloads and continue using the volume group.
-However, the LVMCluster might still be failing, as the Volume Group is expected to contain the now missing device.
-This can happen when the LVMCluster was created with a deviceSelector in the failing deviceClass and the DeviceDiscoveryPolicy is set to Preconfigured.
+At this point, it is safe to reschedule your workloads and continue using the volume group. However, the LVMCluster might still be failing, as the Volume Group is expected to contain the now missing device. This can happen when the LVMCluster was created with a deviceSelector in the failing deviceClass and the DeviceDiscoveryPolicy is set to Preconfigured.
 
 To fix this, change the LVMCluster with the following patch:
 
@@ -375,16 +367,16 @@ After you are done with the patch, you can re-enable the webhook by calling
  oc patch validatingwebhookconfigurations.admissionregistration.k8s.io lvm-operator-webhook --type='json' -p='[{"op": "replace", "path": "/webhooks/0/failurePolicy", "value": "Fail"}]'
  ```
 
-After this, you can wait for vg-manager / LVMCluster to reconcile the changes, and the LVMCluster should be healthy again. (of course this time without the failing disk)
+After this, you can wait for vg-manager/LVMCluster to reconcile the changes, and the LVMCluster should be healthy again. (this time, of course, without the failing disk)
 
-##### Replacing unhealthy/broken disks and recovering the data from the remaining disks
+#### Replacing unhealthy/broken disks and recovering the data from the remaining disks
 
-   In this scenario, it is necessary to replace the failing disk with a new one.
-   This will allow you to recover the data from the remaining disks and restore the volume group to its original capacity and resiliency state before the failure even though it will still not recover any data.
-   This method is more time-consuming and requires additional hardware, but will result in the same state as before the failure.
+In this scenario, it is necessary to replace the failing disk with a new one. This will allow you to recover the data from the remaining disks and restore the volume group to its original capacity and resiliency state before the failure even though it will still not recover any data. This method is more time-consuming and requires additional hardware, but will result in the same state as before the failure.
 
-   To replace the failing disk with a new one, you can follow the following steps:
+To replace the failing disk with a new one, you can follow the following steps:
+
 1. Check the necessary PVIDs to replace:
+
    ```bash
    pvs
    Devices file PVID K1LP093KYNSP2Cpn5fdDeRXyWMzgB0Ja last seen on /dev/vdc not found.
@@ -394,8 +386,11 @@ After this, you can wait for vg-manager / LVMCluster to reconcile the changes, a
    /dev/vdb   vg1 lvm2 a--  <20.00g 4.00g
    [unknown]  vg1 lvm2 a-m  <20.00g    0
    ```
+
    In this case, the PVID of the failing disk is `K1LP09-3KYN-SP2C-pn5f-dDeR-XyWM-zgB0Ja`.
+
 2. Register the new disk (ideally available under the same device path as before):
+
    ```bash
    pvcreate --restorefile /etc/lvm/backup/vg1 --uuid K1LP09-3KYN-SP2C-pn5f-dDeR-XyWM-zgB0Ja /dev/vdc
    WARNING: Couldn't find device with uuid YForIB-bMtp-6d8V-o3WR-Eqim-paAG-cJMhgV.
@@ -417,20 +412,21 @@ After this, you can wait for vg-manager / LVMCluster to reconcile the changes, a
    WARNING: updating PV header on /dev/vdc for VG vg1.
    Volume group "vg1" successfully extended
    ```
-   Note that due to the restoration, the thin pool used up 100% of the new disk instead of the thinPoolConfig from the LVMCluster.
-   If that is undesired, you should manually resize the vg on that pv afterward or specify the desired sizes with vgextend.
 
-It should be mentioned that if the path used in the deviceSelector differs from the path in LVMCluster, you might need to patch the LVMCluster resource by deactivating the webhook the same way as you would when reducing the volume group.
+   Note that due to the restoration, the thin pool used up 100% of the new disk instead of the thinPoolConfig from the LVMCluster. If that is undesired, you should manually resize the vg on that pv afterward or specify the desired sizes with vgextend.
+
+   It should be mentioned that if the path used in the deviceSelector differs from the path in LVMCluster, you might need to patch the LVMCluster resource by deactivating the webhook the same way as you would when reducing the volume group.
 
 ### Recovery from node failure without resetting LVMCluster
 
-LVMCluster and its node-daemon vg-manager periodically reconcile changes on the node and attempt to recreate the Volume Group and Thin Pool (if necessary) on the node.
-If the Volume Group is still recognizable on the host system and the disks are still accessible on at least one node, you can follow the following procedure to reduce the LVMCluster to only the healthy node(s) and recover from the failure without resetting the LVMCluster.
+LVMCluster and its node-daemon vg-manager periodically reconcile changes on the node and attempt to recreate the Volume Group and Thin Pool (if necessary) on the node. If the Volume Group is still recognizable on the host system and the disks are still accessible on at least one node, you can follow the following procedure to reduce the LVMCluster to only the healthy node(s) and recover from the failure without resetting the LVMCluster.
 
 1. Modify the nodeSelector of the affected deviceClass to only include the healthy node(s) with the healthy volume group node status.
+
    ```bash
    oc patch lvmcluster <MY_LVMCLUSTER_NAME_HERE> --type='json' -p='[{"op": "replace", "path": "/spec/storage/deviceClasses/0/nodeSelector", "value": {nodeSelectorTerms: [{matchExpressions: [{key: "kubernetes.io/hostname", operator: "In", values: ["<HEALTHY_NODE_NAME_HERE>"]}]}]}}]'}]'
    ```
+
    This will remove the failing node(s) from the LVMCluster and only include the healthy node(s) in the LVMCluster.
 
    It might be necessary to temporarily disable the ValidatingWebhook that normally ensures that the nodeSelector is valid.
@@ -439,13 +435,10 @@ If the Volume Group is still recognizable on the host system and the disks are s
    oc patch validatingwebhookconfigurations.admissionregistration.k8s.io <LVM_CLUSTER_WEBHOOK_HERE> --type='json' -p='[{"op": "replace", "path": "/webhooks/0/failurePolicy", "value": "Ignore"}]'
    ```
 
-    After you are done with the patch, you can re-enable the webhook by calling
+   After you are done with the patch, you can re-enable the webhook by calling
 
    ```bash
    oc patch validatingwebhookconfigurations.admissionregistration.k8s.io <LVM_CLUSTER_WEBHOOK_HERE> --type='json' -p='[{"op": "replace", "path": "/webhooks/0/failurePolicy", "value": "Fail"}]'
    ```
 
-2. Wait for the LVMCluster to reconcile the changes. The LVMCluster should now only contain the healthy node(s) and the failing node(s) should be removed from the LVMCluster. The LVMCluster should now be Ready again.
-   Note that now pods using the deviceClass / StorageClass backed by the deviceClass will only be scheduled on the healthy node(s) and the failing node(s) will not be used / usable anymore.
-   It is thus recommended to use a different deviceClass for the failing node(s) if you want to use them again in the future and move workloads over after recovering their data.
-   If the node failure was temporary, you can use the same mechanism as described in the Recovery from disk failure without resetting LVMCluster section to re-enable the failing node(s) in the LVMCluster by changing the nodeSelector back to include the failing node(s) again.
+2. Wait for the LVMCluster to reconcile the changes. The LVMCluster should now only contain the healthy node(s) and the failing node(s) should be removed from the LVMCluster. The LVMCluster should now be Ready again. Note that now pods using the deviceClass / StorageClass backed by the deviceClass will only be scheduled on the healthy node(s) and the failing node(s) will not be used / usable anymore. It is thus recommended to use a different deviceClass for the failing node(s) if you want to use them again in the future and move workloads over after recovering their data. If the node failure was temporary, you can use the same mechanism as described in the Recovery from disk failure without resetting LVMCluster section to re-enable the failing node(s) in the LVMCluster by changing the nodeSelector back to include the failing node(s) again.
