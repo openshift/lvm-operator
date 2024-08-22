@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-## Persistent Volume Claim (PVC) is stuck in `Pending` state
+## Persistent Volume Claim (PVC) is stuck in the `Pending` state
 
 There can be many reasons why a `PersistentVolumeClaim` (`PVC`) gets stuck in a `Pending` state. Some possible reasons and some troubleshooting suggestions are described below.
 
@@ -106,7 +106,7 @@ After resolving the issue with the respective node, if the problem persists and 
 
 ## Forced cleanup
 
-After resolving any disk or node related problem, if the recurring issue persists despite the resolution, it may be necessary to perform a forced cleanup procedure for LVMS. This procedure aims to comprehensively address any persistent issues and ensure the proper functioning of the LVMS solution.
+After resolving any disk or node-related problem, if the recurring issue persists despite the resolution, it may be necessary to perform a forced cleanup procedure for LVMS. This procedure aims to comprehensively address any persistent issues and ensure the proper functioning of the LVMS solution.
 
 1. Remove all the PVCs created using LVMS, and pods using those PVCs.
 2. Switch to `openshift-storage` namespace:
@@ -129,14 +129,14 @@ After resolving any disk or node related problem, if the recurring issue persist
     oc delete logicalvolume <name>
     ```
 
-4. Make sure there is no `LVMVolumeGroup` resources left:
+4. Make sure there are no `LVMVolumeGroup` resources left:
 
     ```bash
     $ oc get lvmvolumegroup
     No resources found
     ```
 
-    If there is any `LVMVolumeGroup` resources left, remove finalizers from these resources and delete them:
+    If there are any `LVMVolumeGroup` resources left, remove finalizers from these resources and delete them:
 
     ```bash
     $ oc patch lvmvolumegroup <name> -p '{"metadata":{"finalizers":[]}}' --type=merge
@@ -146,6 +146,7 @@ After resolving any disk or node related problem, if the recurring issue persist
 5. Remove any `LVMVolumeGroupNodeStatus` resources:
 
     ```bash
+    $ oc patch lvmvolumegroupnodestatus <name> -p '{"metadata":{"finalizers":[]}}' --type=merge
     $ oc delete lvmvolumegroupnodestatus --all
     ```
 
@@ -157,7 +158,7 @@ After resolving any disk or node related problem, if the recurring issue persist
 
 ## Graceful cleanup with partial recovery of data
 
-In some situations it might be undesirable to perform a forced cleanup, as it may result in data loss of all data in the LVMCluster. In such cases, you can perform a graceful cleanup with partial recovery of data. This procedure aims to address the issue while preserving the data associated with the PVCs that are not affected. This is most likely to happen in a multi-node environment, but sometimes can also help in single-node situations where one or more, but not all included disks of the LVMCluster are affected.
+In some situations, it might be undesirable to perform a forced cleanup, as it may result in data loss of all data in the LVMCluster. You can perform a graceful cleanup with partial data recovery in such cases. This procedure aims to address the issue while preserving the data associated with the PVCs that are not affected. This is most likely to happen in a multi-node environment, but sometimes can also help in single-node situations where one or more, but not all included disks of the LVMCluster are affected.
 
 ### Pre-requisites to perform a graceful cleanup with partial recovery of data on a single node
 
@@ -171,7 +172,7 @@ In case of a failing / infinitely progressing LVMCluster due to one or many node
 1. The volume group in lvm2 is still recognizable on the host system and the disks are still accessible on at least one of the nodes selected in the NodeSelector of the LVMCluster.
 2. The `vg-manager` pod is stuck in a `CrashLoopBackOff` state and the LVMCluster is in a continuous Failed or Progressing state on all but that accessible one node.
 
-In other words: Make sure there is at least one node available with a running `vg-manager` pod and a healthy volume group node status.
+In other words: Make sure at least one node is available with a running `vg-manager` pod and a healthy volume group node status.
 
 ### Recovery from disk failure without resetting LVMCluster
 
@@ -229,10 +230,10 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    ```
 
    There are quite a few fields available that give hints on possible issues. The most important ones are the
-   - `vg_attr` field, which should be `wz--n-` for a normal volume group. This indicates a normal writeable, zeroing volume group
+   - `vg_attr` field that should be `wz--n-` for a normal volume group. This indicates a normal writeable, zeroing volume group
      Any deviation from this might indicate a problem with the volume group.
-   - `vg_free` field, which should be (significantly) greater than 1. This indicates the amount of free space (in Gi) in the volume group.
-     If this is 0, the volume group is full (or nearly full with less than 1 Gi available) and no more logical volumes can be created now or in the near future
+   - `vg_free` field that should be (significantly) greater than 1. This indicates the amount of free space (in Gi) in the volume group.
+     If this is 0, the volume group is full (or nearly full with less than 1 Gi available) and no more logical volumes can be created.
    - `vg_missing_pv_count` field, which should be 0. This indicates the number of missing physical volumes in the volume group. If this is greater than 0, the volume group is incomplete and might not be able to function properly.
 
    Here is an example of a Volume Group missing a PV because its Cable was defective:
@@ -290,7 +291,7 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    ```bash
    vgchange --activate n <YOUR_VG_NAME_HERE>
    ```
-   This will make sure that no active writes can occur on the volume group while you are erasing the missing volumes.
+   This will ensure that no active writes can occur on the volume group while you are erasing the missing volumes.
    Sometimes, lvm2 will prohibit you from erasing the missing volumes before deactivating the volumes in the volume group.
 
    Once you have confirmed a disk failure, you can erase the missing volumes from the volume group by calling
@@ -300,7 +301,7 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    ```
 
    If all goes well, another verification of the volume group should confirm that the `vg_missing_pv_count` is now 0.
-   This means that the existing data on the remaining disks is still accessible and the volume group can be activated again.
+   This means the existing data on the remaining disks is still accessible and the volume group can be activated again.
 
    Note that in some cases, especially during scenarios with data loss, the request might fail like below:
 
@@ -332,7 +333,7 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    If this fails like above, you can only accept that you must use standard data recovery tools to attempt to scrape
    data blocks from the disks that are still available.
    If it succeeds, you can still access the data left on the pool and you should recover it to a separate storage medium
-   before procedding. After you are done backing up your data, deactivate the lv again and proceed with the next steps.
+   before proceeding. After backing up your data, deactivate the lv again and proceed with the next steps.
 
    You can now proceed with one of two methods to recover the data from the volume group:
    1. **Reducing** the volume group to only the healthy disks and recovering the data from the remaining disks
@@ -341,8 +342,8 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
 ##### Reducing the volume group to only the healthy disks and recovering the data from the remaining disks
 
 Note that with this method, you will lose the data on the failing disk, but you can recover the data from the remaining disks.
-You will also not need to issue additional disks to the volume group, as the volume group will be reduced to only the healthy disks.
-This has the benefit to get the system running immediately, but will result in less overall capacity, less failure resiliency, and a necessary patch to the LVMCluster resource.
+You will also not need to issue additional disks to the volume group, as the volume group will be reduced to only healthy disks.
+This has the benefit of getting the system running immediately but will result in less overall capacity, less failure resiliency, and a necessary patch to the LVMCluster resource.
 
 To reduce the volume group to only the healthy disks, you can call
 
@@ -356,13 +357,13 @@ At this point, it is safe to reschedule your workloads and continue using the vo
 However, the LVMCluster might still be failing, as the Volume Group is expected to contain the now missing device.
 This can happen when the LVMCluster was created with a deviceSelector in the failing deviceClass and the DeviceDiscoveryPolicy is set to Preconfigured.
 
-To fix this, change the lvmcluster with the following patch:
+To fix this, change the LVMCluster with the following patch:
 
 ```bash
-oc patch LVMCluster my-lvmcluster --type='json' -p='[{"op": "remove", "path": "/spec/storage/deviceClasses/0/deviceSelector/paths/0"}]'
+oc patch lvmcluster my-lvmcluster --type='json' -p='[{"op": "remove", "path": "/spec/storage/deviceClasses/0/deviceSelector/paths/0"}]'
 ```
 
-This might be rejected in case the LVMClusters deviceSelector is static. In this case it is necessary to temporarily disable the ValidatingWebhook that normally ensures that the deviceSelector is valid.
+This might be rejected in case the LVMClusters deviceSelector is static. In this case, it is necessary to temporarily disable the ValidatingWebhook that normally ensures that the deviceSelector is valid.
 
  ```bash
  oc patch validatingwebhookconfigurations.admissionregistration.k8s.io lvm-operator-webhook --type='json' -p='[{"op": "replace", "path": "/webhooks/0/failurePolicy", "value": "Ignore"}]'
@@ -376,11 +377,11 @@ After you are done with the patch, you can re-enable the webhook by calling
 
 After this, you can wait for vg-manager / LVMCluster to reconcile the changes, and the LVMCluster should be healthy again. (of course this time without the failing disk)
 
-##### Replacing unhealthy / broken disks and recovering the data from the remaining disks
+##### Replacing unhealthy/broken disks and recovering the data from the remaining disks
 
-   In this scenario it is necessary to add a replacement disk to the system and replace the failing disk with the new one.
+   In this scenario, it is necessary to replace the failing disk with a new one.
    This will allow you to recover the data from the remaining disks and restore the volume group to its original capacity and resiliency state before the failure even though it will still not recover any data.
-   This method is more time consuming and requires additional hardware, but will result in the same state as before the failure.
+   This method is more time-consuming and requires additional hardware, but will result in the same state as before the failure.
 
    To replace the failing disk with a new one, you can follow the following steps:
 1. Check the necessary PVIDs to replace:
@@ -416,8 +417,8 @@ After this, you can wait for vg-manager / LVMCluster to reconcile the changes, a
    WARNING: updating PV header on /dev/vdc for VG vg1.
    Volume group "vg1" successfully extended
    ```
-   Note that due to the restorataion, the thin pool used up 100% of the new disk instead of the thinPoolConfig from the LVMCluster.
-   If that is undesired, you should manually resize the vg on that pv afterwards or specify the desired sizes with vgextend.
+   Note that due to the restoration, the thin pool used up 100% of the new disk instead of the thinPoolConfig from the LVMCluster.
+   If that is undesired, you should manually resize the vg on that pv afterward or specify the desired sizes with vgextend.
 
 It should be mentioned that if the path used in the deviceSelector differs from the path in LVMCluster, you might need to patch the LVMCluster resource by deactivating the webhook the same way as you would when reducing the volume group.
 
@@ -432,7 +433,7 @@ If the Volume Group is still recognizable on the host system and the disks are s
    ```
    This will remove the failing node(s) from the LVMCluster and only include the healthy node(s) in the LVMCluster.
 
-   It might be necessary to temporarily disable the ValidatingWebhook that normally ensures that the deviceSelector is valid.
+   It might be necessary to temporarily disable the ValidatingWebhook that normally ensures that the nodeSelector is valid.
 
    ```bash
    oc patch validatingwebhookconfigurations.admissionregistration.k8s.io <LVM_CLUSTER_WEBHOOK_HERE> --type='json' -p='[{"op": "replace", "path": "/webhooks/0/failurePolicy", "value": "Ignore"}]'
