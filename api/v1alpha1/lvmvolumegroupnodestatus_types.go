@@ -58,9 +58,11 @@ type VGStatus struct {
 	// Reason provides more detail on the volume group creation status
 	Reason string `json:"reason,omitempty"`
 	// Devices is the list of devices used by the volume group
+	//+listType=atomic
 	Devices []string `json:"devices,omitempty"`
 	// Excluded contains the per node status of applied device exclusions that were picked up via selector,
 	// but were not used for other reasons.
+	//+listType=atomic
 	Excluded []ExcludedDevice `json:"excluded,omitempty"`
 	// DeviceDiscoveryPolicy is a field to indicate whether the devices are discovered
 	// at runtime or preconfigured through a DeviceSelector

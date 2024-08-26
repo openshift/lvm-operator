@@ -143,6 +143,13 @@ type DeviceSelector struct {
 	ForceWipeDevicesAndDestroyAllData *bool `json:"forceWipeDevicesAndDestroyAllData,omitempty"`
 }
 
+func (d *DeviceSelector) AllPaths() []DevicePath {
+	paths := make([]DevicePath, len(d.Paths)+len(d.OptionalPaths))
+	copy(paths, d.Paths)
+	copy(paths[len(d.Paths):], d.OptionalPaths)
+	return paths
+}
+
 type DevicePath string
 
 func (d DevicePath) Unresolved() string {

@@ -18,6 +18,7 @@ package lvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -41,7 +42,9 @@ const (
 	vgChangeCmd   = "/usr/sbin/vgchange"
 	vgExtendCmd   = "/usr/sbin/vgextend"
 	vgRemoveCmd   = "/usr/sbin/vgremove"
+	vgReduceCmd   = "/usr/sbin/vgreduce"
 	pvRemoveCmd   = "/usr/sbin/pvremove"
+	pvMoveCmd     = "/usr/sbin/pvmove"
 	lvCreateCmd   = "/usr/sbin/lvcreate"
 	lvExtendCmd   = "/usr/sbin/lvextend"
 	lvRemoveCmd   = "/usr/sbin/lvremove"
@@ -108,7 +111,7 @@ type LVM interface {
 	GetVG(ctx context.Context, name string) (VolumeGroup, error)
 
 	ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error)
-	ListVGs(ctx context.Context, taggedByLVMS bool) ([]VolumeGroup, error)
+	ListVGs(ctx context.Context, taggedByLVMS bool) ([]*VolumeGroup, error)
 	ListLVsByName(ctx context.Context, vgName string) ([]string, error)
 	ListLVs(ctx context.Context, vgName string) (*LVReport, error)
 
@@ -117,6 +120,8 @@ type LVM interface {
 	ExtendLV(ctx context.Context, lvName, vgName string, sizePercent int) error
 	ActivateLV(ctx context.Context, lvName, vgName string) error
 	DeleteLV(ctx context.Context, lvName, vgName string) error
+	MoveExtentsBetweenPVs(ctx context.Context, from []string, to []string) error
+	ReduceVG(ctx context.Context, name string, reduce []string) error
 }
 
 type HostLVM struct {
@@ -277,7 +282,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 	res := new(VGReport)
 
 	args := []string{
-		DefaultTag, "--units", "g", "--reportformat", "json",
+		DefaultTag, "--units", "b", "--reportformat", "json",
 	}
 	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to list volume groups. %v", err)
@@ -314,7 +319,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error) {
 	res := new(PVReport)
 	args := []string{
-		"--units", "g", "-v", "--reportformat", "json",
+		"--units", "b", "-v", "--reportformat", "json",
 	}
 	if vgName != "" {
 		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
@@ -342,11 +347,11 @@ func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolu
 }
 
 // ListVGs lists all volume groups and the physical volumes associated with them.
-func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, error) {
+func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]*VolumeGroup, error) {
 	res := new(VGReport)
 
 	args := []string{
-		"-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
+		"-o", "vg_name,vg_size,vg_tags", "--units", "b", "--reportformat", "json",
 	}
 	if tagged {
 		args = append(args, DefaultTag)
@@ -356,10 +361,10 @@ func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, e
 		return nil, fmt.Errorf("failed to list volume groups. %v", err)
 	}
 
-	var vgList []VolumeGroup
+	var vgList []*VolumeGroup
 	for _, report := range res.Report {
 		for _, vg := range report.Vg {
-			vgList = append(vgList, VolumeGroup{
+			vgList = append(vgList, &VolumeGroup{
 				Name:   vg.Name,
 				VgSize: vg.VgSize,
 				PVs:    []PhysicalVolume{},
@@ -540,8 +545,44 @@ func (hlvm *HostLVM) ActivateLV(ctx context.Context, lvName, vgName string) erro
 	return nil
 }
 
-func untaggedVGs(vgs []VolumeGroup) []VolumeGroup {
-	var untaggedVGs []VolumeGroup
+func (hlvm *HostLVM) MoveExtentsBetweenPVs(ctx context.Context, from []string, to []string) error {
+	if len(from) == 0 {
+		return fmt.Errorf("failed to move extents between physical volumes: from list is empty")
+	}
+	if len(to) == 0 {
+		return fmt.Errorf("failed to move extents between physical volumes: to list is empty")
+	}
+	// first run pvmove to catch any potential crashed leftoff moves that could impact our move here.
+	// this will tell lvm to start from the last checkpoint.
+	if err := hlvm.RunCommandAsHost(ctx, pvMoveCmd); err != nil {
+		return fmt.Errorf("failed to move extents between physical volumes. %v", err)
+	}
+	// technically we could parallelize this here but its hard to draw a graph with from->to without overlaps,
+	// so keep it safe for now.
+	// TODO: optimize to parallel move if necessary
+	// do not specify any lvs because we want to stay on PV level with this logic, technically we could also move
+	// data on lv level but for now lets try to keep it simple
+	var errs error
+	for _, from := range from {
+		args := append([]string{from, "--atomic"}, to...)
+		if err := hlvm.RunCommandAsHost(ctx, pvMoveCmd, args...); err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to move extents between physical volumes: %w", err))
+		}
+	}
+
+	return errs
+}
+
+func (hlvm *HostLVM) ReduceVG(ctx context.Context, name string, reduce []string) error {
+	args := append([]string{name}, reduce...)
+	if err := hlvm.RunCommandAsHost(ctx, vgReduceCmd, args...); err != nil {
+		return fmt.Errorf("failed to reduce volume group %q to get rid of %s: %v", name, strings.Join(reduce, ", "), err)
+	}
+	return nil
+}
+
+func untaggedVGs(vgs []*VolumeGroup) []*VolumeGroup {
+	var untaggedVGs []*VolumeGroup
 	for _, vg := range vgs {
 		tagPresent := false
 		for _, tag := range vg.Tags {

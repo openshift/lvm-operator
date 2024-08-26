@@ -709,23 +709,23 @@ func (_c *MockLVM_ListPVs_Call) RunAndReturn(run func(context.Context, string) (
 }
 
 // ListVGs provides a mock function with given fields: ctx, taggedByLVMS
-func (_m *MockLVM) ListVGs(ctx context.Context, taggedByLVMS bool) ([]lvm.VolumeGroup, error) {
+func (_m *MockLVM) ListVGs(ctx context.Context, taggedByLVMS bool) ([]*lvm.VolumeGroup, error) {
 	ret := _m.Called(ctx, taggedByLVMS)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListVGs")
 	}
 
-	var r0 []lvm.VolumeGroup
+	var r0 []*lvm.VolumeGroup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, bool) ([]lvm.VolumeGroup, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bool) ([]*lvm.VolumeGroup, error)); ok {
 		return rf(ctx, taggedByLVMS)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, bool) []lvm.VolumeGroup); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bool) []*lvm.VolumeGroup); ok {
 		r0 = rf(ctx, taggedByLVMS)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]lvm.VolumeGroup)
+			r0 = ret.Get(0).([]*lvm.VolumeGroup)
 		}
 	}
 
@@ -757,12 +757,108 @@ func (_c *MockLVM_ListVGs_Call) Run(run func(ctx context.Context, taggedByLVMS b
 	return _c
 }
 
-func (_c *MockLVM_ListVGs_Call) Return(_a0 []lvm.VolumeGroup, _a1 error) *MockLVM_ListVGs_Call {
+func (_c *MockLVM_ListVGs_Call) Return(_a0 []*lvm.VolumeGroup, _a1 error) *MockLVM_ListVGs_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool) ([]lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
+func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool) ([]*lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MoveExtentsBetweenPVs provides a mock function with given fields: ctx, from, to
+func (_m *MockLVM) MoveExtentsBetweenPVs(ctx context.Context, from []string, to []string) error {
+	ret := _m.Called(ctx, from, to)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MoveExtentsBetweenPVs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string, []string) error); ok {
+		r0 = rf(ctx, from, to)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_MoveExtentsBetweenPVs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MoveExtentsBetweenPVs'
+type MockLVM_MoveExtentsBetweenPVs_Call struct {
+	*mock.Call
+}
+
+// MoveExtentsBetweenPVs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - from []string
+//   - to []string
+func (_e *MockLVM_Expecter) MoveExtentsBetweenPVs(ctx interface{}, from interface{}, to interface{}) *MockLVM_MoveExtentsBetweenPVs_Call {
+	return &MockLVM_MoveExtentsBetweenPVs_Call{Call: _e.mock.On("MoveExtentsBetweenPVs", ctx, from, to)}
+}
+
+func (_c *MockLVM_MoveExtentsBetweenPVs_Call) Run(run func(ctx context.Context, from []string, to []string)) *MockLVM_MoveExtentsBetweenPVs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string), args[2].([]string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_MoveExtentsBetweenPVs_Call) Return(_a0 error) *MockLVM_MoveExtentsBetweenPVs_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_MoveExtentsBetweenPVs_Call) RunAndReturn(run func(context.Context, []string, []string) error) *MockLVM_MoveExtentsBetweenPVs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReduceVG provides a mock function with given fields: ctx, name, reduce
+func (_m *MockLVM) ReduceVG(ctx context.Context, name string, reduce []string) error {
+	ret := _m.Called(ctx, name, reduce)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReduceVG")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string) error); ok {
+		r0 = rf(ctx, name, reduce)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_ReduceVG_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReduceVG'
+type MockLVM_ReduceVG_Call struct {
+	*mock.Call
+}
+
+// ReduceVG is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - reduce []string
+func (_e *MockLVM_Expecter) ReduceVG(ctx interface{}, name interface{}, reduce interface{}) *MockLVM_ReduceVG_Call {
+	return &MockLVM_ReduceVG_Call{Call: _e.mock.On("ReduceVG", ctx, name, reduce)}
+}
+
+func (_c *MockLVM_ReduceVG_Call) Run(run func(ctx context.Context, name string, reduce []string)) *MockLVM_ReduceVG_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_ReduceVG_Call) Return(_a0 error) *MockLVM_ReduceVG_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_ReduceVG_Call) RunAndReturn(run func(context.Context, string, []string) error) *MockLVM_ReduceVG_Call {
 	_c.Call.Return(run)
 	return _c
 }

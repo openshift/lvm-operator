@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
@@ -30,7 +31,7 @@ import (
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
+func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []*lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
 	logger := log.FromContext(ctx)
 
 	if len(devices) < 1 {
@@ -41,7 +42,7 @@ func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, 
 	var existingVolumeGroup *lvm.VolumeGroup
 	for _, vg := range vgs {
 		if vg.Name == vgName {
-			existingVolumeGroup = &vg
+			existingVolumeGroup = vg
 		}
 	}
 
@@ -81,7 +82,7 @@ type FilteredBlockDevices struct {
 // VerifyMandatoryDevicePaths verifies if the provided device list is either available or already setup correctly.
 // While availability is easy to determine, an exclusion by being already setup can only be determined by
 // checking if the excluded device has been filtered due to filter.ErrDeviceAlreadySetupCorrectly.
-func VerifyMandatoryDevicePaths(f FilteredBlockDevices, resolver *symlinkResolver.Resolver, paths []v1alpha1.DevicePath) error {
+func VerifyMandatoryDevicePaths(f *FilteredBlockDevices, resolver *symlinkResolver.Resolver, paths []v1alpha1.DevicePath) error {
 	for _, path := range paths {
 		path, err := resolver.Resolve(path.Unresolved())
 		if err != nil {
@@ -116,7 +117,7 @@ func VerifyMandatoryDevicePaths(f FilteredBlockDevices, resolver *symlinkResolve
 }
 
 // IsAvailable checks if the provided device is available for use in a new volume group.
-func (f FilteredBlockDevices) IsAvailable(dev string) bool {
+func (f *FilteredBlockDevices) IsAvailable(dev string) bool {
 	for _, available := range f.Available {
 		if dev == available.KName {
 			return true
@@ -127,7 +128,7 @@ func (f FilteredBlockDevices) IsAvailable(dev string) bool {
 
 // FilterErrors checks if the provided device is already setup correctly in an existing volume group
 // (all filters decided the device is either okay to use or returned filter.ErrDeviceAlreadySetupCorrectly).
-func (f FilteredBlockDevices) FilterErrors(dev string) []error {
+func (f *FilteredBlockDevices) FilterErrors(dev string) []error {
 	for _, excluded := range f.Excluded {
 		if dev == excluded.KName {
 			return excluded.FilterErrors
@@ -136,9 +137,26 @@ func (f FilteredBlockDevices) FilterErrors(dev string) []error {
 	return nil
 }
 
+func (f *FilteredBlockDevices) MakeUnavailable(dev string, errs []error) error {
+	idx := slices.IndexFunc(f.Available, func(device lsblk.BlockDevice) bool {
+		return device.KName == dev
+	})
+	if idx < 0 {
+		return fmt.Errorf("device %q not found in available devices", dev)
+	}
+	f.Available = slices.Delete(f.Available, idx, idx)
+
+	device := FilteredBlockDevice{
+		BlockDevice:  f.Available[idx],
+		FilterErrors: errs,
+	}
+	f.Excluded = append(f.Excluded, device)
+	return nil
+}
+
 // filterDevices returns:
 // availableDevices: the list of blockdevices considered available
-func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *symlinkResolver.Resolver, filters filter.Filters) FilteredBlockDevices {
+func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *symlinkResolver.Resolver, filters filter.Filters) *FilteredBlockDevices {
 	logger := log.FromContext(ctx)
 
 	var availableDevices []lsblk.BlockDevice
@@ -184,7 +202,7 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *s
 		excluded = append(excluded, device)
 	}
 
-	return FilteredBlockDevices{
+	return &FilteredBlockDevices{
 		Available: availableDevices,
 		Excluded:  excluded,
 	}

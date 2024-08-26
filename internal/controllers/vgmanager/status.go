@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []*lvm.VolumeGroup, devices *FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusProgressing,
@@ -46,7 +46,7 @@ func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lv
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []*lvm.VolumeGroup, devices *FilteredBlockDevices) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusReady,
@@ -60,7 +60,7 @@ func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alp
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices, err error) (bool, error) {
+func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []*lvm.VolumeGroup, devices *FilteredBlockDevices, err error) (bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusFailed,
@@ -170,7 +170,7 @@ func (r *Reconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha
 	return nil
 }
 
-func (r *Reconciler) setDevices(status *lvmv1alpha1.VGStatus, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
+func (r *Reconciler) setDevices(status *lvmv1alpha1.VGStatus, vgs []*lvm.VolumeGroup, devices *FilteredBlockDevices) (bool, error) {
 	devicesExist := false
 	for _, vg := range vgs {
 		if status.Name == vg.Name {

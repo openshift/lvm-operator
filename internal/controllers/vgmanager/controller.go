@@ -19,8 +19,11 @@ package vgmanager
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -71,6 +74,8 @@ const EventReasonLVMDConfigMissing EventReasonInfo = "LVMDConfigMissing"
 const EventReasonLVMDConfigUpdated EventReasonInfo = "LVMDConfigUpdated"
 const EventReasonLVMDConfigDeleted EventReasonInfo = "LVMDConfigDeleted"
 const EventReasonVolumeGroupReady EventReasonInfo = "VolumeGroupReady"
+const EventReasonExtentMigrationStarted EventReasonInfo = "ExtentMigrationStarted"
+const EventReasonExtentMigrationFinished EventReasonInfo = "ExtentMigrationFinished"
 
 var (
 	reconcileAgain = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
@@ -202,7 +207,7 @@ func (r *Reconciler) reconcile(
 		var lvmVG *lvm.VolumeGroup
 		for _, vg := range vgs {
 			if volumeGroup.Name == vg.Name {
-				lvmVG = &vg
+				lvmVG = vg
 				break
 			}
 		}
@@ -210,6 +215,14 @@ func (r *Reconciler) reconcile(
 			err := fmt.Errorf("the volume group %s does not exist (or was not tagged properly with %q), "+
 				"and there were no available devices to create it", volumeGroup.GetName(), lvm.DefaultTag)
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorNoAvailableDevicesForVG, err)
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, err
+		}
+
+		if err := r.ensurePVConsistency(ctx, lvmVG, volumeGroup, devices); err != nil {
+			err := fmt.Errorf("error while validating volume group: %w", err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
 			}
@@ -313,7 +326,7 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 	return ctrl.Result{}
 }
 
-func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) error {
+func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []*lvm.VolumeGroup, devices *FilteredBlockDevices) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	// Read the lvmd config file
@@ -431,7 +444,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 		return fmt.Errorf("failed to list volume groups, %w", err)
 	}
 	vgExistsInLVM := false
-	var existingVG lvm.VolumeGroup
+	var existingVG *lvm.VolumeGroup
 	for _, vg := range vgs {
 		if volumeGroup.Name == vg.Name {
 			vgExistsInLVM = true
@@ -455,7 +468,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			if thinPoolExists {
 				if err := r.LVM.DeleteLV(ctx, thinPoolName, volumeGroup.Name); err != nil {
 					err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
-					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
+					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, &FilteredBlockDevices{}, err); err != nil {
 						logger.Error(err, "failed to set status to failed")
 					}
 					return err
@@ -466,9 +479,9 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			}
 		}
 
-		if err = r.LVM.DeleteVG(ctx, existingVG); err != nil {
+		if err = r.LVM.DeleteVG(ctx, *existingVG); err != nil {
 			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
-			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, &FilteredBlockDevices{}, err); err != nil {
 				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
 			}
 			return err
@@ -637,11 +650,11 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	if lvSize == "" {
 		return fmt.Errorf("lvSize is empty and cannot be used for extension")
 	}
-	if len(lvSize) < 2 {
-		return fmt.Errorf("lvSize is too short (maybe missing unit) and cannot be used for extension")
-	}
 
-	thinPoolSize, err := strconv.ParseFloat(lvSize[:len(lvSize)-1], 64)
+	if !unicode.IsDigit(rune(lvSize[len(lvSize)-1])) {
+		lvSize = lvSize[:len(lvSize)-1]
+	}
+	thinPoolSize, err := strconv.ParseFloat(lvSize, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse lvSize. %v", err)
 	}
@@ -653,25 +666,19 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	if vg.VgSize == "" {
 		return fmt.Errorf("VgSize is empty and cannot be used for extension")
 	}
-	if len(vg.VgSize) < 2 {
-		return fmt.Errorf("VgSize is too short (maybe missing unit) and cannot be used for extension")
+
+	vgSize := vg.VgSize
+	if !unicode.IsDigit(rune(vgSize[len(vgSize)-1])) {
+		vgSize = vgSize[:len(vgSize)-1]
 	}
 
-	if vgUnit, lvUnit := vg.VgSize[len(vg.VgSize)-1], lvSize[len(lvSize)-1]; vgUnit != lvUnit {
-		return fmt.Errorf("VgSize (%s) and lvSize (%s), units do not match and cannot be used for extension",
-			string(vgUnit), string(lvUnit))
-	} else if string(vgUnit) != "g" {
-		return fmt.Errorf("VgSize (%s) and lvSize (%s), units are not in floating point based gibibytes and cannot be used for extension",
-			string(vgUnit), string(lvUnit))
-	}
-
-	vgSize, err := strconv.ParseFloat(vg.VgSize[:len(vg.VgSize)-1], 64)
+	vgSizeParsed, err := strconv.ParseFloat(vgSize, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse vgSize. %v", err)
 	}
 
 	// return if thinPoolSize does not require expansion
-	if config.SizePercent <= int((thinPoolSize/vgSize)*100) {
+	if config.SizePercent <= int((thinPoolSize/vgSizeParsed)*100) {
 		return nil
 	}
 
@@ -723,7 +730,11 @@ func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolum
 
 // NormalEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
 func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonInfo, message string) {
-	if !log.FromContext(ctx).V(1).Enabled() {
+	r.NormalEventWithMinimumVerbosity(ctx, obj, reason, message, 1)
+}
+
+func (r *Reconciler) NormalEventWithMinimumVerbosity(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonInfo, message string, minimumVerbosity int) {
+	if !log.FromContext(ctx).V(minimumVerbosity).Enabled() {
 		return
 	}
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
@@ -745,6 +756,124 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolume
 	}
 	r.Event(obj, corev1.EventTypeNormal, string(reason),
 		fmt.Sprintf("update on node %s: %s", client.ObjectKeyFromObject(nodeStatus), message))
+}
+
+func (r *Reconciler) ensurePVConsistency(
+	ctx context.Context,
+	lvmVG *lvm.VolumeGroup,
+	vg *lvmv1alpha1.LVMVolumeGroup,
+	devices *FilteredBlockDevices,
+) error {
+	if lvmVG.PVs == nil {
+		return fmt.Errorf("no physical volumes specified in volume group %q, cannot verify consistency", vg.Name)
+	}
+
+	logger := log.FromContext(ctx)
+	paths := vg.Spec.DeviceSelector.AllPaths()
+	resolvedDesiredPaths := make([]string, 0, len(paths))
+	resolvedActualPaths := make([]string, 0, len(lvmVG.PVs))
+
+	for _, path := range paths {
+		resolvedPath, err := r.SymlinkResolveFn(path.Unresolved())
+		if err != nil {
+			return fmt.Errorf("failed to resolve desired symlink for vg validation: %w", err)
+		}
+
+		resolvedDesiredPaths = append(resolvedDesiredPaths, resolvedPath)
+	}
+
+	for _, pv := range lvmVG.PVs {
+		resolvedPath, err := r.SymlinkResolveFn(pv.PvName)
+		if err != nil {
+			return fmt.Errorf("failed to resolve actual symlink for vg validation: %w", err)
+		}
+
+		resolvedActualPaths = append(resolvedActualPaths, resolvedPath)
+	}
+
+	// TODO increase verbosity
+	logger.Info("resolved paths for volume group consistency check", "desired", resolvedDesiredPaths, "actual", resolvedActualPaths)
+
+	toReduce := make([]string, 0, len(resolvedActualPaths))
+	toLeaveInVG := make([]string, 0, len(resolvedActualPaths))
+
+	for _, actualPath := range resolvedActualPaths {
+		if slices.Contains(resolvedDesiredPaths, actualPath) {
+			toLeaveInVG = append(toLeaveInVG, actualPath)
+		} else {
+			logger.Info("pv is to be removed from volume group", "path", actualPath)
+			toReduce = append(toReduce, actualPath)
+		}
+	}
+
+	// TODO increase verbosity
+	logger.Info("resolved candidates to reduce and to leave in the volume group", "toReduce", toReduce, "toLeaveInVG", toLeaveInVG)
+
+	if len(toReduce) == 0 {
+		// No paths to reduce, nothing to do
+		logger.Info("no paths to reduce, volume group has consistent pvs")
+		return nil
+	}
+
+	if len(toLeaveInVG) == 0 {
+		return fmt.Errorf("all paths in the volume group are to be removed so there is no space to move pv extents, " +
+			"this is not allowed. delete the volume group instead")
+	}
+
+	// first off move all extents from the reduced paths to the paths that are to be left in the VG
+	// TODO: This can take a (very) long time based on the data, change to make async
+	logger.Info(
+		"moving extents from reduction candidates to left pvs to ensure consistent data after path removal",
+		"toReduce",
+		toReduce,
+		"toLeaveInVG",
+		toLeaveInVG,
+	)
+	r.NormalEventWithMinimumVerbosity(ctx, vg, EventReasonExtentMigrationStarted,
+		fmt.Sprintf(
+			"moving extents from reduction candidates (%s) to left pvs (%s) "+
+				"to ensure consistent data after path removal",
+			strings.Join(toReduce, ", "),
+			strings.Join(toLeaveInVG, ", "),
+		), 0)
+	if err := r.LVM.MoveExtentsBetweenPVs(ctx, toReduce, toLeaveInVG); err != nil {
+		return fmt.Errorf("could not ensure that physical extents in vg %q were moved from reduction candidates (%s) to left pvs (%s)",
+			vg.Name, strings.Join(toReduce, ", "), strings.Join(toLeaveInVG, ", "))
+	}
+	r.NormalEventWithMinimumVerbosity(ctx, vg, EventReasonExtentMigrationFinished,
+		fmt.Sprintf(
+			"moved extents from reduction candidates (%s) to left pvs (%s) "+
+				"to ensure consistent data after path removal",
+			strings.Join(toReduce, ", "),
+			strings.Join(toLeaveInVG, ", "),
+		), 0)
+
+	// now reduce the volume group
+	if err := r.LVM.ReduceVG(ctx, lvmVG.Name, toReduce); err != nil {
+		return err
+	}
+
+	newPVs := make([]lvm.PhysicalVolume, 0, len(lvmVG.PVs))
+	for i := range lvmVG.PVs {
+		if !slices.Contains(toReduce, resolvedActualPaths[i]) {
+			newPVs = append(newPVs, lvmVG.PVs[i])
+		}
+	}
+	lvmVG.PVs = newPVs
+
+	for _, reduced := range toReduce {
+		if err := devices.MakeUnavailable(reduced, []error{
+			fmt.Errorf("volume was recently reduced/removed from %q", vg.Name),
+			fmt.Errorf("%s is not part of the device selector", reduced),
+		}); err != nil {
+			return fmt.Errorf("failed to make device %q unavailable in device list: %w", reduced, err)
+		}
+	}
+
+	// TODO increase verbosity
+	logger.Info("adjusted new set of pvs after reduction", "newPVs", newPVs)
+
+	return nil
 }
 
 func verifyChunkSizeForPolicy(config *lvmv1alpha1.ThinPoolConfig, lv lvm.LogicalVolume) error {

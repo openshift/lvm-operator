@@ -237,13 +237,13 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
-		if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
-			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
-		}
-
-		if err := validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
-			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
-		}
+		// if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
+		// 	return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
+		// }
+		//
+		// if err := validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
+		// 	return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
+		// }
 
 	}
 
@@ -269,24 +269,24 @@ func validateDeviceClassesStillExist(old, new []DeviceClass) error {
 	return nil
 }
 
-func validateDevicePathsStillExist(old, new []DevicePath) error {
-	deviceMap := make(map[DevicePath]struct{})
-
-	for _, device := range old {
-		deviceMap[device] = struct{}{}
-	}
-
-	for _, device := range new {
-		delete(deviceMap, device)
-	}
-
-	// if any old device is removed now
-	if len(deviceMap) != 0 {
-		return fmt.Errorf("devices can not be removed from the LVMCluster once added oldDevices:%s, newDevices:%s", old, new)
-	}
-
-	return nil
-}
+// func validateDevicePathsStillExist(old, new []DevicePath) error {
+// 	deviceMap := make(map[DevicePath]struct{})
+//
+// 	for _, device := range old {
+// 		deviceMap[device] = struct{}{}
+// 	}
+//
+// 	for _, device := range new {
+// 		delete(deviceMap, device)
+// 	}
+//
+// 	// if any old device is removed now
+// 	if len(deviceMap) != 0 {
+// 		return fmt.Errorf("devices can not be removed from the LVMCluster once added oldDevices:%s, newDevices:%s", old, new)
+// 	}
+//
+// 	return nil
+// }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
