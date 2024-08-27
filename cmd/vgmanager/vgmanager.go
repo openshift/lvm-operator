@@ -82,6 +82,8 @@ type Options struct {
 
 	diagnosticsAddr string
 	healthProbeAddr string
+
+	registrationWatchdogTimeout time.Duration
 }
 
 // NewCmd creates a new CLI command
@@ -102,6 +104,10 @@ func NewCmd(opts *Options) *cobra.Command {
 	)
 	cmd.Flags().StringVar(
 		&opts.healthProbeAddr, "health-probe-bind-address", DefaultHealthProbeAddr, "The address the probe endpoint binds to.",
+	)
+	cmd.Flags().DurationVar(
+		&opts.registrationWatchdogTimeout, "registration-watchdog-timeout", 10*time.Second, "Timeout for the registration watchdog."+
+			" If the plugin is not registered after this time, the manager will be auto restarted to avoid possible kubelet registration deadlocks.",
 	)
 	return cmd
 }
@@ -147,7 +153,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		constants.TopolvmCSIDriverName,
 		registrationPath(),
 		[]string{"1.0.0"},
+		opts.registrationWatchdogTimeout,
 	)
+
 	lvmdConfig := &lvmd.Config{}
 	if err := loadConfFile(ctx, lvmdConfig, lvmd.DefaultFileConfigPath); err != nil {
 		opts.SetupLog.Error(err, "lvmd config could not be loaded, starting without topolvm components and attempting bootstrap")
@@ -230,6 +238,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if err := mgr.Start(ctx); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
 	}
+
+	opts.SetupLog.Info("starting csi node registration watchdog")
+	registrationServer.StartRegistrationWatchdog(ctx)
 
 	if errors.Is(context.Cause(ctx), ErrConfigModified) {
 		opts.SetupLog.Info("restarting controller due to modified configuration")

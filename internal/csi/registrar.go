@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "net/http/pprof"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -16,6 +17,8 @@ type registrationServer struct {
 	driverName string
 	endpoint   string
 	version    []string
+
+	watchDogTimeout time.Duration
 
 	registered    bool
 	registeredMut sync.RWMutex
@@ -30,16 +33,47 @@ var ErrPluginRegistrationFailed = fmt.Errorf("plugin registration failed")
 type CheckableRegistrationServer interface {
 	registerapi.RegistrationServer
 	Registered() bool
+	StartRegistrationWatchdog(ctx context.Context)
 }
 
 // NewRegistrationServer returns an initialized registrationServer instance
-func NewRegistrationServer(onFail context.CancelCauseFunc, driverName string, endpoint string, versions []string) CheckableRegistrationServer {
+func NewRegistrationServer(
+	onFail context.CancelCauseFunc,
+	driverName string,
+	endpoint string,
+	versions []string,
+	watchDogTimeout time.Duration,
+) CheckableRegistrationServer {
 	return &registrationServer{
-		onFail:     onFail,
-		driverName: driverName,
-		endpoint:   endpoint,
-		version:    versions,
+		watchDogTimeout: watchDogTimeout,
+		onFail:          onFail,
+		driverName:      driverName,
+		endpoint:        endpoint,
+		version:         versions,
 	}
+}
+
+// StartRegistrationWatchdog starts a watchdog to check if the plugin is registered after e.watchDogTimeout
+// If the plugin is not registered, it will call e.onFail
+// If the plugin is registered, it will return on the next opportunity
+func (e *registrationServer) StartRegistrationWatchdog(ctx context.Context) {
+	go func(ctx context.Context) {
+		ctx, cancel := context.WithTimeout(ctx, e.watchDogTimeout)
+		defer cancel()
+		timer := time.NewTimer(500 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+			if e.Registered() {
+				// registered, happy path
+				return
+			}
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil {
+				e.onFail(fmt.Errorf("%w: %s", ErrPluginRegistrationFailed, err))
+			}
+		}
+	}(ctx)
 }
 
 // GetInfo is the RPC invoked by plugin watcher
