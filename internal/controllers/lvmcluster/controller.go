@@ -241,7 +241,9 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 	resourceSyncElapsedTime := time.Since(resourceSyncStart)
 	if len(errs) > 0 {
 		err := fmt.Errorf("LVMCluster's resources are not yet fully synchronized: %w", errors.Join(errs...))
-		r.WarningEvent(ctx, instance, EventReasonErrorResourceReconciliationIncomplete, err)
+		if logger.V(1).Enabled() {
+			r.WarningEvent(ctx, instance, EventReasonErrorResourceReconciliationIncomplete, err)
+		}
 		setResourcesAvailableConditionFalse(instance, err)
 		statusErr := r.updateLVMClusterStatus(ctx, instance)
 		if statusErr != nil {

@@ -18,6 +18,7 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -33,6 +34,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/pvworker"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	"k8s.io/utils/ptr"
 
@@ -102,6 +104,7 @@ type Reconciler struct {
 	Namespace        string
 	Filters          filter.FilterSetup
 	SymlinkResolveFn symlinkResolver.ResolveFn
+	ExtentMoveWorker pvworker.AsyncExtentMover
 }
 
 func (r *Reconciler) getFinalizer() string {
@@ -821,7 +824,6 @@ func (r *Reconciler) ensurePVConsistency(
 	}
 
 	// first off move all extents from the reduced paths to the paths that are to be left in the VG
-	// TODO: This can take a (very) long time based on the data, change to make async
 	logger.Info(
 		"moving extents from reduction candidates to left pvs to ensure consistent data after path removal",
 		"toReduce",
@@ -829,24 +831,50 @@ func (r *Reconciler) ensurePVConsistency(
 		"toLeaveInVG",
 		toLeaveInVG,
 	)
-	r.NormalEventWithMinimumVerbosity(ctx, vg, EventReasonExtentMigrationStarted,
-		fmt.Sprintf(
-			"moving extents from reduction candidates (%s) to left pvs (%s) "+
-				"to ensure consistent data after path removal",
-			strings.Join(toReduce, ", "),
-			strings.Join(toLeaveInVG, ", "),
-		), 0)
-	if err := r.LVM.MoveExtentsBetweenPVs(ctx, toReduce, toLeaveInVG); err != nil {
-		return fmt.Errorf("could not ensure that physical extents in vg %q were moved from reduction candidates (%s) to left pvs (%s)",
-			vg.Name, strings.Join(toReduce, ", "), strings.Join(toLeaveInVG, ", "))
+
+	status := r.ExtentMoveWorker.Status()
+
+	if status.Error() != nil {
+		if err := r.ExtentMoveWorker.Reset(); err != nil {
+			return fmt.Errorf("failed to reset pv move worker after error: %w", errors.Join(status.Error(), err))
+		}
+		return fmt.Errorf("pv move worker is in error state, worker was reset: %w", status.Error())
 	}
-	r.NormalEventWithMinimumVerbosity(ctx, vg, EventReasonExtentMigrationFinished,
-		fmt.Sprintf(
-			"moved extents from reduction candidates (%s) to left pvs (%s) "+
-				"to ensure consistent data after path removal",
-			strings.Join(toReduce, ", "),
-			strings.Join(toLeaveInVG, ", "),
-		), 0)
+
+	if status.State() == pvworker.SyncStateSyncing {
+		currentFrom, currentTo := status.Operation()
+		return fmt.Errorf("waiting for pv move operation to finish for %q (moving extents from %s to %s)", vg.Name,
+			strings.Join(currentFrom, ", "), strings.Join(currentTo, ", "))
+	}
+
+	if status.State() == pvworker.SyncStateIdle {
+		r.NormalEventWithMinimumVerbosity(ctx, vg, EventReasonExtentMigrationStarted,
+			fmt.Sprintf(
+				"moving extents from reduction candidates (%s) to left pvs (%s) "+
+					"to ensure consistent data after path removal",
+				strings.Join(toReduce, ", "),
+				strings.Join(toLeaveInVG, ", "),
+			), 0)
+		if err := r.ExtentMoveWorker.Sync(toReduce, toLeaveInVG); err != nil {
+			return fmt.Errorf("failed to start asynchronous pv move: %w", err)
+		}
+		return fmt.Errorf("pv move worker is now syncing, waiting for completion")
+	}
+
+	if status.State() == pvworker.SyncStateDone {
+		r.NormalEventWithMinimumVerbosity(ctx, vg, EventReasonExtentMigrationFinished,
+			fmt.Sprintf(
+				"moved extents from reduction candidates (%s) to left pvs (%s) "+
+					"to ensure consistent data after path removal within %s",
+				strings.Join(toReduce, ", "),
+				strings.Join(toLeaveInVG, ", "),
+				r.ExtentMoveWorker.Status().SyncDuration(),
+			), 0)
+	}
+
+	if err := r.ExtentMoveWorker.Reset(); err != nil {
+		return fmt.Errorf("failed to reset pv move worker after successful move: %w", err)
+	}
 
 	// now reduce the volume group
 	if err := r.LVM.ReduceVG(ctx, lvmVG.Name, toReduce); err != nil {

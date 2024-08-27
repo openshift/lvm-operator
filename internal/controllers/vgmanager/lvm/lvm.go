@@ -120,7 +120,7 @@ type LVM interface {
 	ExtendLV(ctx context.Context, lvName, vgName string, sizePercent int) error
 	ActivateLV(ctx context.Context, lvName, vgName string) error
 	DeleteLV(ctx context.Context, lvName, vgName string) error
-	MoveExtentsBetweenPVs(ctx context.Context, from []string, to []string) error
+	MovePhysicalExtents(ctx context.Context, from []string, to []string) error
 	ReduceVG(ctx context.Context, name string, reduce []string) error
 }
 
@@ -545,7 +545,7 @@ func (hlvm *HostLVM) ActivateLV(ctx context.Context, lvName, vgName string) erro
 	return nil
 }
 
-func (hlvm *HostLVM) MoveExtentsBetweenPVs(ctx context.Context, from []string, to []string) error {
+func (hlvm *HostLVM) MovePhysicalExtents(ctx context.Context, from []string, to []string) error {
 	if len(from) == 0 {
 		return fmt.Errorf("failed to move extents between physical volumes: from list is empty")
 	}
@@ -566,6 +566,11 @@ func (hlvm *HostLVM) MoveExtentsBetweenPVs(ctx context.Context, from []string, t
 	for _, from := range from {
 		args := append([]string{from, "--atomic"}, to...)
 		if err := hlvm.RunCommandAsHost(ctx, pvMoveCmd, args...); err != nil {
+			// if we already have the extents where they need to be, lvm
+			// will report an error, we skip them because for us that's still a success.
+			if strings.Contains(err.Error(), "No data to move") {
+				continue
+			}
 			errs = errors.Join(errs, fmt.Errorf("failed to move extents between physical volumes: %w", err))
 		}
 	}

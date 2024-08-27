@@ -39,6 +39,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/pvworker"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	icsi "github.com/openshift/lvm-operator/v4/internal/csi"
 	"github.com/spf13/cobra"
@@ -192,6 +193,8 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		}
 	}
 
+	hostLVM := lvm.NewDefaultHostLVM()
+
 	if err = (&vgmanager.Reconciler{
 		Client:           mgr.GetClient(),
 		EventRecorder:    mgr.GetEventRecorderFor(vgmanager.ControllerName),
@@ -200,11 +203,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		LSBLK:            lsblk.NewDefaultHostLSBLK(),
 		Wipefs:           wipefs.NewDefaultHostWipefs(),
 		Dmsetup:          dmsetup.NewDefaultHostDmsetup(),
-		LVM:              lvm.NewDefaultHostLVM(),
+		LVM:              hostLVM,
 		NodeName:         nodeName,
 		Namespace:        operatorNamespace,
 		Filters:          filter.DefaultFilters,
 		SymlinkResolveFn: filepath.EvalSymlinks,
+		ExtentMoveWorker: pvworker.NewAsyncExtentMover(hostLVM.MovePhysicalExtents),
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}

@@ -768,11 +768,11 @@ func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool) ([]
 }
 
 // MoveExtentsBetweenPVs provides a mock function with given fields: ctx, from, to
-func (_m *MockLVM) MoveExtentsBetweenPVs(ctx context.Context, from []string, to []string) error {
+func (_m *MockLVM) MovePhysicalExtents(ctx context.Context, from []string, to []string) error {
 	ret := _m.Called(ctx, from, to)
 
 	if len(ret) == 0 {
-		panic("no return value specified for MoveExtentsBetweenPVs")
+		panic("no return value specified for MovePhysicalExtents")
 	}
 
 	var r0 error
@@ -785,7 +785,7 @@ func (_m *MockLVM) MoveExtentsBetweenPVs(ctx context.Context, from []string, to 
 	return r0
 }
 
-// MockLVM_MoveExtentsBetweenPVs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MoveExtentsBetweenPVs'
+// MockLVM_MoveExtentsBetweenPVs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MovePhysicalExtents'
 type MockLVM_MoveExtentsBetweenPVs_Call struct {
 	*mock.Call
 }
@@ -795,7 +795,7 @@ type MockLVM_MoveExtentsBetweenPVs_Call struct {
 //   - from []string
 //   - to []string
 func (_e *MockLVM_Expecter) MoveExtentsBetweenPVs(ctx interface{}, from interface{}, to interface{}) *MockLVM_MoveExtentsBetweenPVs_Call {
-	return &MockLVM_MoveExtentsBetweenPVs_Call{Call: _e.mock.On("MoveExtentsBetweenPVs", ctx, from, to)}
+	return &MockLVM_MoveExtentsBetweenPVs_Call{Call: _e.mock.On("MovePhysicalExtents", ctx, from, to)}
 }
 
 func (_c *MockLVM_MoveExtentsBetweenPVs_Call) Run(run func(ctx context.Context, from []string, to []string)) *MockLVM_MoveExtentsBetweenPVs_Call {
