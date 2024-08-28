@@ -51,6 +51,7 @@ ENVTEST_KUBERNETES_VERSION := $(shell echo $(KUBERNETES_VERSION) | cut -d "." -f
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
+KUSTOMIZATION_BASE ?= config/default
 
 ## Variables for the images
 
@@ -203,14 +204,20 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	cd config/manager && \
+		$(KUSTOMIZE) edit set image controller=$(IMG) && \
+		$(KUSTOMIZE) edit set nameprefix $(MANAGER_NAME_PREFIX) && \
+		$(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
+	cd config/prometheus && \
+		$(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
+	cd config/webhook && \
+		$(KUSTOMIZE) edit set nameprefix $(MANAGER_NAME_PREFIX) && \
+		$(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
+	$(KUSTOMIZE) build $(KUSTOMIZATION_BASE) | kubectl apply -n $(OPERATOR_NAMESPACE) -f -
+	-$(KUSTOMIZE) build config/prometheus | kubectl apply -n $(OPERATOR_NAMESPACE) -f -
 
-deploy-debug: manifests kustomize ## Deploy controller started through delve to the K8s cluster specified in ~/.kube/config. See CONTRIBUTING.md for more information
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	$(KUSTOMIZE) build config/debug | kubectl apply -f -
+deploy-debug:
+	KUSTOMIZATION_BASE=config/debug $(MAKE) deploy
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
@@ -238,8 +245,9 @@ bundle: manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
-	cd config/webhook && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set nameprefix ${MANAGER_NAME_PREFIX}
+	cd config/prometheus && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
+	cd config/webhook && $(KUSTOMIZE) edit set nameprefix $(MANAGER_NAME_PREFIX)
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG) && $(KUSTOMIZE) edit set nameprefix $(MANAGER_NAME_PREFIX)
 	cd config/manifests/bases && \
 		rm -rf kustomization.yaml && \
 		$(KUSTOMIZE) create --resources $(BUNDLE_PACKAGE).clusterserviceversion.yaml && \

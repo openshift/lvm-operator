@@ -3,5 +3,6 @@
 resources:
 - bases
 - ../default
+- ../prometheus
 - ../samples
 - ../scorecard
