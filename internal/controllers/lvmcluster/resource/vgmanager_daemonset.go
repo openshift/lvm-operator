@@ -359,7 +359,7 @@ func templateVGManagerDaemonset(
 				},
 
 				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: ptr.To(int64(30)),
+					TerminationGracePeriodSeconds: ptr.To(int64(0)),
 					PriorityClassName:             constants.PriorityClassNameUserCritical,
 					Volumes:                       volumes,
 					Containers:                    containers,
