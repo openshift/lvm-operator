@@ -9,6 +9,7 @@ import (
 	lvmdCMD "github.com/topolvm/topolvm/cmd/lvmd/app"
 	lvmd "github.com/topolvm/topolvm/pkg/lvmd/types"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
@@ -30,6 +31,50 @@ const (
 	MicroShiftFileConfigPath = MicroShiftFileConfigDir + "/lvmd.yaml"
 	maxReadLength            = 2 * 1 << 20 // 2MB
 )
+
+func DeepCopyConfig(c *Config) *Config {
+	if c == nil {
+		return nil
+	}
+
+	conf := &Config{
+		SocketName: c.SocketName,
+	}
+
+	for _, dc := range c.DeviceClasses {
+		newDc := &DeviceClass{
+			Name:            dc.Name,
+			VolumeGroup:     dc.VolumeGroup,
+			Default:         dc.Default,
+			StripeSize:      dc.StripeSize,
+			LVCreateOptions: dc.LVCreateOptions,
+			Type:            dc.Type,
+		}
+		if dc.SpareGB != nil {
+			newDc.SpareGB = ptr.To(*dc.SpareGB)
+		}
+		if dc.Stripe != nil {
+			newDc.Stripe = ptr.To(*dc.Stripe)
+		}
+		if dc.ThinPoolConfig != nil {
+			newDc.ThinPoolConfig = &ThinPoolConfig{
+				Name:               dc.ThinPoolConfig.Name,
+				OverprovisionRatio: dc.ThinPoolConfig.OverprovisionRatio,
+			}
+		}
+		conf.DeviceClasses = append(conf.DeviceClasses, newDc)
+	}
+
+	for _, co := range c.LvcreateOptionClasses {
+		opt := &lvmd.LvcreateOptionClass{
+			Name:    co.Name,
+			Options: co.Options,
+		}
+		conf.LvcreateOptionClasses = append(conf.LvcreateOptionClasses, opt)
+	}
+
+	return conf
+}
 
 func DefaultConfigurator() *CachedFileConfig {
 	return NewFileConfigurator(DefaultFileConfigPath)

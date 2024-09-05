@@ -331,17 +331,20 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 		lvmdConfigWasMissing = true
 		lvmdConfig = &lvmd.Config{}
 	}
-	existingLvmdConfig := *lvmdConfig
+
+	oldConfig := lvmd.DeepCopyConfig(lvmdConfig)
 
 	// Add the volume group to device classes inside lvmd config if not exists
-	found := false
+	var dc *lvmd.DeviceClass
 	for _, deviceClass := range lvmdConfig.DeviceClasses {
 		if deviceClass.Name == volumeGroup.Name {
-			found = true
+			dc = deviceClass
+			break
 		}
 	}
-	if !found {
-		dc := &lvmd.DeviceClass{
+
+	if dc == nil {
+		dc = &lvmd.DeviceClass{
 			Name:        volumeGroup.Name,
 			VolumeGroup: volumeGroup.Name,
 			Default:     volumeGroup.Spec.Default,
@@ -360,9 +363,11 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 		}
 
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
+	} else if dc.Type == lvmd.TypeThin {
+		dc.ThinPoolConfig.OverprovisionRatio = float64(volumeGroup.Spec.ThinPoolConfig.OverprovisionRatio)
 	}
 
-	if err := r.updateLVMDConfigAfterReconcile(ctx, volumeGroup, &existingLvmdConfig, lvmdConfig, lvmdConfigWasMissing); err != nil {
+	if err := r.updateLVMDConfigAfterReconcile(ctx, volumeGroup, oldConfig, lvmdConfig, lvmdConfigWasMissing); err != nil {
 		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
 			logger.Error(err, "failed to set status to failed")
 		}
