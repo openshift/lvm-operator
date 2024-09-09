@@ -334,7 +334,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 			PVs:    []lvm.PhysicalVolume{lvmPV},
 		}
 	}
-	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]*lvm.VolumeGroup{&createdVG}, nil).Once()
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
@@ -411,7 +411,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	})
 
 	By("mocking the now created vg in the next fetch", func() {
-		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]*lvm.VolumeGroup{&createdVG}, nil).Once()
 	})
 
 	By("mocking the now created pvs (by proxy through vgcreate) in the next fetch", func() {
@@ -479,7 +479,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
 		Expect(vg.Finalizers).ToNot(BeEmpty())
 		Expect(vg.DeletionTimestamp).ToNot(BeNil())
-		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]*lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
 
 		if vg.Spec.ThinPoolConfig != nil {
 			instances.LVM.EXPECT().LVExists(ctx, thinPool.Name, createdVG.Name).Return(true, nil).Once()
@@ -680,7 +680,7 @@ func testLVMD(ctx context.Context) {
 	ctx = log.IntoContext(ctx, logger)
 
 	vg := &lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}
-	devices := FilteredBlockDevices{}
+	devices := &FilteredBlockDevices{}
 
 	r.Client = fake.NewClientBuilder().WithObjects(vg).WithScheme(scheme.Scheme).Build()
 	mockLVMD := lvmdmocks.NewMockConfigurator(GinkgoT())
@@ -689,12 +689,12 @@ func testLVMD(ctx context.Context) {
 	r.LVM = mockLVM
 
 	mockLVMD.EXPECT().Load(ctx).Once().Return(nil, fmt.Errorf("mock load failure"))
-	err := r.applyLVMDConfig(ctx, vg, []lvm.VolumeGroup{}, devices)
+	err := r.applyLVMDConfig(ctx, vg, []*lvm.VolumeGroup{}, devices)
 	Expect(err).To(HaveOccurred(), "should error if lvmd config cannot be loaded")
 
 	mockLVMD.EXPECT().Load(ctx).Once().Return(&lvmd.Config{}, nil)
 	mockLVMD.EXPECT().Save(ctx, mock.Anything).Once().Return(fmt.Errorf("mock save failure"))
-	err = r.applyLVMDConfig(ctx, vg, []lvm.VolumeGroup{}, devices)
+	err = r.applyLVMDConfig(ctx, vg, []*lvm.VolumeGroup{}, devices)
 	Expect(err).To(HaveOccurred(), "should error if lvmd config cannot be saved")
 }
 

@@ -100,7 +100,7 @@ func TestHostLVM_GetVG(t *testing.T) {
 							return fmt.Errorf("mocked error")
 						}
 						argsConcat := strings.Join(args, " ")
-						out := "--units g -v --reportformat json -S vgname=%s"
+						out := "--units b -v --reportformat json -S vgname=%s"
 						if argsConcat == fmt.Sprintf(out, "vg1") {
 							return json.Unmarshal([]byte(mockPvsOutputForVG1), &into)
 						} else if argsConcat == fmt.Sprintf(out, "vg2") {
@@ -586,7 +586,7 @@ func TestNewDefaultHostLVM(t *testing.T) {
 }
 
 func Test_untaggedVGs(t *testing.T) {
-	vgs := []VolumeGroup{
+	vgs := []*VolumeGroup{
 		{Name: "vg1", Tags: []string{"tag1"}},
 		{Name: "vg2", Tags: []string{DefaultTag}},
 	}

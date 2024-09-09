@@ -63,6 +63,7 @@ spec:
                       items:
                         type: string
                       type: array
+                      x-kubernetes-list-type: atomic
                     excluded:
                       description: |-
                         Excluded contains the per node status of applied device exclusions that were picked up via selector,
@@ -83,6 +84,7 @@ spec:
                         - reasons
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     name:
                       description: Name is the name of the volume group
                       type: string
