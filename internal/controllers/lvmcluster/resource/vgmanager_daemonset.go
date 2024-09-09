@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/selector"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -73,6 +74,22 @@ var (
 	}
 	NodePluginVolMount = corev1.VolumeMount{
 		Name: NodePluginVolName, MountPath: filepath.Dir(constants.DefaultCSISocket),
+	}
+)
+
+var (
+	FileLockVolName = "file-lock-dir"
+	FileLockVol     = corev1.Volume{
+		Name: FileLockVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: filepath.Dir(util.FileLockDir),
+				Type: &HostPathDirectoryOrCreate},
+		},
+	}
+	FileLockVolMount = corev1.VolumeMount{
+		Name:      FileLockVolName,
+		MountPath: filepath.Dir(util.FileLockDir),
 	}
 )
 
@@ -222,6 +239,7 @@ func templateVGManagerDaemonset(
 	volumes := []corev1.Volume{
 		RegistrationVol,
 		NodePluginVol,
+		FileLockVol,
 		CSIPluginVol,
 		PodVol,
 		confMapVolume,
@@ -233,6 +251,7 @@ func templateVGManagerDaemonset(
 	volumeMounts := []corev1.VolumeMount{
 		RegistrationVolMount,
 		NodePluginVolMount,
+		FileLockVolMount,
 		CSIPluginVolMount,
 		PodVolMount,
 		LVMDConfMapVolMount,
