@@ -17,6 +17,7 @@ limitations under the License.
 package vgmanager
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 
@@ -107,9 +108,21 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			BindAddress:    opts.diagnosticsAddr,
 			SecureServing:  true,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) {
+					opts.SetupLog.Info("disabling http/2")
+					c.NextProtos = []string{"http/1.1"}
+				},
+			},
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) {
+					opts.SetupLog.Info("disabling http/2")
+					c.NextProtos = []string{"http/1.1"}
+				},
+			},
 		}},
 		HealthProbeBindAddress: opts.healthProbeAddr,
 		LeaderElection:         false,
