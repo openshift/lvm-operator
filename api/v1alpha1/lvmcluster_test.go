@@ -426,24 +426,6 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
-	It("updating ThinPoolConfig.OverprovisionRatio is not allowed", func(ctx SpecContext) {
-		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-
-		updated := resource.DeepCopy()
-
-		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig.OverprovisionRatio--
-
-		err := k8sClient.Update(ctx, updated)
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(Satisfy(k8serrors.IsForbidden))
-		statusError := &k8serrors.StatusError{}
-		Expect(errors.As(err, &statusError)).To(BeTrue())
-		Expect(statusError.Status().Message).To(ContainSubstring(ErrThinPoolConfigCannotBeChanged.Error()))
-
-		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-	})
-
 	It("updating ThinPoolConfig.ChunkSizeCalculationPolicy is not allowed", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
