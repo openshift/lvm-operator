@@ -26,6 +26,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 	devicePaths = make(map[string]v1alpha1.DevicePath)
 	devicePaths["nvme1n1p1"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p1"))
 	devicePaths["nvme1n1p2"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p2"))
+	devicePaths["md1"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "md1"))
 	for _, path := range devicePaths {
 		err := os.Mkdir(path.Unresolved(), 0755)
 		if err != nil {
@@ -587,6 +588,58 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 			},
 			numOfAvailableDevices: 0,
+		},
+		{
+			description: "vg RAID with multiple paths under different devices",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []v1alpha1.DevicePath{
+							devicePaths["md1"],
+						},
+					},
+				},
+			},
+			existingBlockDevices: []lsblk.BlockDevice{
+				{
+					Name:     "nvme1n1p1",
+					Type:     "disk",
+					Size:     "50G",
+					ReadOnly: false,
+					State:    "live",
+					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Serial:   "vol071204a42d92d52a2",
+					FSType:   "linux_raid_member",
+					Children: []lsblk.BlockDevice{{
+						Name:     "/dev/md1",
+						Type:     "raid1",
+						Size:     "50G",
+						ReadOnly: false,
+						KName:    calculateDevicePath(t, "md1"),
+					}},
+				},
+				{
+					Name:     "nvme1n1p2",
+					Type:     "disk",
+					Size:     "50G",
+					ReadOnly: false,
+					State:    "live",
+					KName:    calculateDevicePath(t, "nvme1n1p2"),
+					Serial:   "vol07993aa64fe3c5316",
+					FSType:   "linux_raid_member",
+					Children: []lsblk.BlockDevice{{
+						Name:     "/dev/md1",
+						Type:     "raid1",
+						Size:     "50G",
+						ReadOnly: false,
+						KName:    calculateDevicePath(t, "md1"),
+					}},
+				},
+			},
+			numOfAvailableDevices: 1,
 		},
 	}
 
