@@ -39,6 +39,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/util"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	icsi "github.com/openshift/lvm-operator/v4/internal/csi"
 	"github.com/spf13/cobra"
@@ -93,7 +94,7 @@ func NewCmd(opts *Options) *cobra.Command {
 		SilenceErrors: false,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, opts)
+			return runWithFileLock(cmd, args, opts)
 		},
 	}
 
@@ -104,6 +105,27 @@ func NewCmd(opts *Options) *cobra.Command {
 		&opts.healthProbeAddr, "health-probe-bind-address", DefaultHealthProbeAddr, "The address the probe endpoint binds to.",
 	)
 	return cmd
+}
+
+func runWithFileLock(cmd *cobra.Command, args []string, opts *Options) error {
+	lock, err := util.NewFileLock("vgmanager")
+	if err != nil {
+		return fmt.Errorf("unable to create lock: %w", err)
+	}
+	defer func() {
+		if err := lock.Close(); err != nil {
+			opts.SetupLog.Error(err, "unable to close file lock")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
+	if err := lock.WaitForLock(ctx); err != nil {
+		return fmt.Errorf("unable to acquire lock: %w", err)
+	}
+
+	return run(cmd, args, opts)
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {

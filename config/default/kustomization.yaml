@@ -31,5 +31,4 @@ resources:
 - ../crd
 - ../rbac
 - ../manager
-- ../prometheus
 - ../webhook

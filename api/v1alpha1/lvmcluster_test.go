@@ -418,6 +418,14 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	It("ThinPoolConfig.SizePercent of 100 is allowed but not recommended", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.SizePercent = 100
+
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 	It("updating ThinPoolConfig.ChunkSizeCalculationPolicy is not allowed", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
