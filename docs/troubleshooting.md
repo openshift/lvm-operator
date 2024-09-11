@@ -89,17 +89,13 @@ To investigate the issue further, establish a direct connection to the host wher
 
 ### Node failure
 
-If PVCs associated with a specific node remain in a `Pending` state, it suggests a potential issue with that particular node. To identify the problematic node, you can examine the restart count of the `topolvm-node` pod. An increased restart count indicates potential problems with the underlying node, which may require further investigation and troubleshooting.
+If PVCs associated with a specific node remain in a `Pending` state, it suggests a potential issue with that particular node. To identify the problematic node, you can examine the restart count of the `vg-manager` pod. An increased restart count indicates potential problems with the underlying node, which may require further investigation and troubleshooting.
 
  ```bash
  $ oc get pods -n openshift-storage
  NAME                                  READY   STATUS    RESTARTS      AGE
  lvms-operator-7b9fb858cb-6nsml        3/3     Running   0             70m
- topolvm-controller-5dd9cf78b5-7wwr2   5/5     Running   0             66m
- topolvm-node-dr26h                    4/4     Running   0             66m
- topolvm-node-54as8                    4/4     Running   0             66m
- topolvm-node-78fft                    4/4     Running   17 (8s ago)   66m
- vg-manager-r6zdv                      1/1     Running   0             66m
+ vg-manager-r6zdv                      1/1     Running   17 (8s ago)   66m
  vg-manager-990ut                      1/1     Running   0             66m
  vg-manager-an118                      1/1     Running   0             66m
  ```
