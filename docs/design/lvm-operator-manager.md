@@ -33,11 +33,11 @@ The `csiDriver` reconcile unit creates the TopoLVM `CSIDriver` resource.
 
 ### TopoLVM Controller
 
-The `topolvmController` reconcile unit is responsible for deploying a single instance of the TopoLVM controller plugin deployment and ensuring that any necessary updates are made to the deployment.
+The TopoLVM Controller is embedded into LVM Operator.
 
-### Topolvm Node and lvmd
+### TopoLVM Node and lvmd
 
-The `topolvmNode` reconcile unit is responsible for deploying and managing the TopoLVM Node daemon set. It scales the DaemonSet based on the node selector specified in the devicesClasses field in the `LVMCluster` CR. During initialization, an init container polls for the availability of the lvmd configuration file before starting the `topolvm-node` container.
+The TopoLVM Node and lvmd are embedded into [Volume Group Manager](./vg-manager.md).
 
 ### TopoLVM Scheduler
 
@@ -61,18 +61,18 @@ The Operator requires elevated permissions to interact with the host's LVM comma
 
 ## Implementation Notes
 
-Each unit of reconciliation should implement the `reconcileUnit` interface. This is run by the controller. Errors and success messages are propagated as Operator status and events. This interface is defined in [lvmcluster_controller.go](../../internal/controllers/lvmcluster/lvmcluster_controller.go)
+Each unit of reconciliation should implement the `Manager` interface. This is run by the controller. Errors and success messages are propagated as Operator status and events. This interface is defined in [manager.go](../../internal/controllers/lvmcluster/resource/manager.go)
 
 ```go
-type resourceManager interface {
+type Manager interface {
 
-	// getName should return a camelCase name of this unit of reconciliation
-	getName() string
+    // GetName should return a camelCase name of this unit of reconciliation
+    GetName() string
 
-	// ensureCreated should check the resources managed by this unit
-	ensureCreated(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+    // EnsureCreated should check the resources managed by this unit
+    EnsureCreated(Reconciler, context.Context, *lvmv1alpha1.LVMCluster) error
 
-	// ensureDeleted should wait for the resources to be cleaned up
-	ensureDeleted(*LVMClusterReconciler, context.Context, lvmv1alpha1.LVMCluster) error
+    // EnsureDeleted should wait for the resources to be cleaned up
+    EnsureDeleted(Reconciler, context.Context, *lvmv1alpha1.LVMCluster) error
 }
 ```
