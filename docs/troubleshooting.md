@@ -41,15 +41,13 @@ If an `LVMCluster` already exists, check if all the pods from LVMS are in the `R
  ```bash
  $ oc get pods -n openshift-storage
  NAME                                  READY   STATUS    RESTARTS      AGE
- lvms-operator-7b9fb858cb-6nsml        3/3     Running   0             70m
- topolvm-controller-5dd9cf78b5-7wwr2   5/5     Running   0             66m
- topolvm-node-dr26h                    4/4     Running   0             66m
+ lvms-operator-7b9fb858cb-6nsml        1/1     Running   0             70m
  vg-manager-r6zdv                      1/1     Running   0             66m
  ```
 
-There should be one running instance of `lvms-operator` and `vg-manager`, and multiple instances of `topolvm-controller` and `topolvm-node` depending on the number of nodes.
+There should be one running instance of `lvms-operator` and `vg-manager` (per Node).
 
-#### `topolvm-node` is stuck in `Init:0/1`
+#### `vg-manager` is stuck in `CrashLoopBackOff` state
 
 This error indicates a failure in locating an available disk for LVMS utilization. To investigate further and obtain relevant information, review the status of the `LVMCluster` CR:
 
