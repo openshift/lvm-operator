@@ -141,14 +141,21 @@ func (f FilteredBlockDevices) FilterErrors(dev string) []error {
 func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *symlinkResolver.Resolver, filters filter.Filters) FilteredBlockDevices {
 	logger := log.FromContext(ctx)
 
-	var availableDevices []lsblk.BlockDevice
+	availableByKName := make(map[string]lsblk.BlockDevice)
 	excludedByKName := make(map[string]FilteredBlockDevice)
 
 	for _, device := range devices {
 		// check for partitions recursively
 		if device.HasChildren() {
 			filteredChildDevices := filterDevices(ctx, device.Children, resolver, filters)
-			availableDevices = append(availableDevices, filteredChildDevices.Available...)
+			for _, available := range filteredChildDevices.Available {
+				if _, exists := availableByKName[available.KName]; exists {
+					logger.WithValues("device.KName", available.KName).
+						V(3).Info("skipping duplicate available device, this can happen for multipath / dmsetup devices")
+				} else {
+					availableByKName[available.KName] = available
+				}
+			}
 			for _, excludedChildDevice := range filteredChildDevices.Excluded {
 				if excluded, ok := excludedByKName[excludedChildDevice.KName]; ok {
 					excluded.FilterErrors = append(excluded.FilterErrors, excludedChildDevice.FilterErrors...)
@@ -167,7 +174,7 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *s
 			}
 		}
 		if len(filterErrs) == 0 {
-			availableDevices = append(availableDevices, device)
+			availableByKName[device.KName] = device
 			continue
 		}
 
@@ -182,6 +189,11 @@ func filterDevices(ctx context.Context, devices []lsblk.BlockDevice, resolver *s
 	var excluded []FilteredBlockDevice
 	for _, device := range excludedByKName {
 		excluded = append(excluded, device)
+	}
+
+	availableDevices := make([]lsblk.BlockDevice, 0, len(availableByKName))
+	for _, device := range availableByKName {
+		availableDevices = append(availableDevices, device)
 	}
 
 	return FilteredBlockDevices{
