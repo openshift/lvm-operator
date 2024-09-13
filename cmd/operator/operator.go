@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
 	"os/signal"
@@ -182,9 +183,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			BindAddress:    opts.diagnosticsAddr,
 			SecureServing:  true,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
+			},
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
+			},
 		}},
 		Cache: cache.Options{
 			DefaultTransform: NoManagedFields,
