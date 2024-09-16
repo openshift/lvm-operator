@@ -41,9 +41,11 @@ type ThinPoolConfig struct {
 	Name string `json:"name"`
 
 	// SizePercent specifies the percentage of space in the LVM volume group for creating the thin pool.
+	// If the size configuration is 100, the whole disk will be used.
+	// By default, 90% of the disk is used for the thin pool to allow for data or metadata expansion later on.
 	// +kubebuilder:default=90
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=90
+	// +kubebuilder:validation:Maximum=100
 	SizePercent int `json:"sizePercent,omitempty"`
 
 	// OverProvisionRatio specifies a factor by which you can provision additional storage based on the available storage in the thin pool. To prevent over-provisioning through validation, set this field to 1.

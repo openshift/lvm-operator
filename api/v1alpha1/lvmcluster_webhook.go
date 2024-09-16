@@ -32,6 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+// ThinPoolConfigMaxRecommendedSizePercent is the maximum recommended size percent for the thin pool.
+const ThinPoolConfigMaxRecommendedSizePercent = 90
+
 // log is for logging in this package.
 var lvmclusterlog = logf.Log.WithName("lvmcluster-webhook")
 
@@ -292,19 +295,28 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 		return nil, ErrAtLeastOneDeviceClassRequired
 	}
 	countDefault := 0
+	warnings := admission.Warnings{}
 	for _, deviceClass := range deviceClasses {
 		if deviceClass.Default {
 			countDefault++
+		}
+		if tpConfig := deviceClass.ThinPoolConfig; tpConfig != nil {
+			tpWarnings, err := v.verifyThinPoolConfig(tpConfig)
+			if err != nil {
+				return nil, err
+			}
+			warnings = append(warnings, tpWarnings...)
 		}
 	}
 	if countDefault > 1 {
 		return nil, fmt.Errorf("%w. Currently, there are %d default deviceClasses", ErrOnlyOneDefaultDeviceClassAllowed, countDefault)
 	}
+
 	if countDefault == 0 {
-		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly"}, nil
+		warnings = append(warnings, "no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly")
 	}
 
-	return nil, nil
+	return warnings, nil
 }
 
 func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.Warnings, error) {
@@ -326,6 +338,21 @@ func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.W
 	}
 
 	return nil, nil
+}
+
+func (v *lvmClusterValidator) verifyThinPoolConfig(config *ThinPoolConfig) (admission.Warnings, error) {
+	if config.SizePercent <= ThinPoolConfigMaxRecommendedSizePercent {
+		return nil, nil
+	}
+	return admission.Warnings{fmt.Sprintf(
+		"ThinPoolConfig.SizePercent for %[1]s is greater than %[2]d%%, "+
+			"this may lead to issues once the thin pool metadata that is created by default is nearing full capacity, "+
+			"as it will be impossible to extent the metadata pool size. "+
+			"You can ignore this warning if "+
+			"a) you are certain that you do not need to extend the metadata pool in the future or "+
+			"b) you set it above %[2]d%% but below 100%% because the buffer is sufficiently big with a smaller reserved percentage",
+		config.Name, ThinPoolConfigMaxRecommendedSizePercent,
+	)}, nil
 }
 
 func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
