@@ -86,6 +86,9 @@ var _ = Describe("vgmanager controller", func() {
 			It("should correctly emit events", testEvents)
 		})
 	})
+	Context("lvmd config reconciler", func() {
+		It("should update lvmd config on overprovision ratio change", testLVMDConfigChange)
+	})
 })
 
 func init() {
@@ -940,6 +943,46 @@ func testReconcileFailure(ctx context.Context) {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(MatchError(expectedError))
 	})
+}
+
+func testLVMDConfigChange(ctx context.Context) {
+	r := &Reconciler{Scheme: scheme.Scheme, NodeName: "test", Namespace: "test"}
+	r.LVMD = lvmd.NewFileConfigurator(filepath.Join(GinkgoT().TempDir(), "lvmd.yaml"))
+	r.EventRecorder = record.NewFakeRecorder(100)
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	vg := &lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name1",
+			Namespace: "namespace1",
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+			ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+				Name:               "mytp1",
+				SizePercent:        90,
+				OverprovisionRatio: 5,
+			},
+		},
+	}
+
+	r.Client = fake.NewClientBuilder().WithObjects(vg).WithScheme(scheme.Scheme).Build()
+
+	err := r.applyLVMDConfig(ctx, vg, nil, FilteredBlockDevices{})
+	Expect(err).NotTo(HaveOccurred())
+
+	cfg, err := r.LVMD.Load(ctx)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
+
+	vg.Spec.ThinPoolConfig.OverprovisionRatio = 1
+	err = r.applyLVMDConfig(ctx, vg, nil, FilteredBlockDevices{})
+	Expect(err).NotTo(HaveOccurred())
+
+	cfg, err = r.LVMD.Load(ctx)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
+	Expect(cfg.DeviceClasses[0].ThinPoolConfig.OverprovisionRatio).To(Equal(float64(1)))
 }
 
 func calculateExpectedChunkSize(chunkSize *resource.Quantity) int64 {
