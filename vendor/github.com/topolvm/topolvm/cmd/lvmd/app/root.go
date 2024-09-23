@@ -2,19 +2,25 @@ package app
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/internal/lvmd"
 	"github.com/topolvm/topolvm/internal/lvmd/command"
+	"github.com/topolvm/topolvm/internal/profiling"
 	"github.com/topolvm/topolvm/pkg/lvmd/proto"
 	lvmdTypes "github.com/topolvm/topolvm/pkg/lvmd/types"
 	"google.golang.org/grpc"
@@ -26,9 +32,11 @@ import (
 )
 
 var (
-	cfgFilePath string
-	lvmPath     string
-	zapOpts     zap.Options
+	cfgFilePath          string
+	lvmPath              string
+	zapOpts              zap.Options
+	profilingBindAddress string
+	metricsBindAddress   string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -51,13 +59,13 @@ volume group.
 	},
 }
 
-func subMain(ctx context.Context) error {
+func subMain(parentCtx context.Context) error {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(parentCtx)
 
 	command.SetLVMPath(lvmPath)
 
-	if err := loadConfFile(ctx, cfgFilePath); err != nil {
+	if err := loadConfFile(parentCtx, cfgFilePath); err != nil {
 		return err
 	}
 
@@ -65,7 +73,7 @@ func subMain(ctx context.Context) error {
 		return err
 	}
 
-	vgs, err := command.ListVolumeGroups(ctx)
+	vgs, err := command.ListVolumeGroups(parentCtx)
 	if err != nil {
 		logger.Error(err, "error while retrieving volume groups")
 		return err
@@ -79,7 +87,7 @@ func subMain(ctx context.Context) error {
 		}
 
 		if dc.Type == lvmdTypes.TypeThin {
-			_, err = vg.FindPool(ctx, dc.ThinPoolConfig.Name)
+			_, err = vg.FindPool(parentCtx, dc.ThinPoolConfig.Name)
 			if err != nil {
 				logger.Error(err, "Thin pool not found:", "thinpool", dc.ThinPoolConfig.Name)
 				return err
@@ -105,8 +113,10 @@ func subMain(ctx context.Context) error {
 	proto.RegisterLVServiceServer(grpcServer, lvmd.NewLVService(dcm, ocm, notifier))
 	grpc_health_v1.RegisterHealthServer(grpcServer, lvmd.NewHealthService())
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	wg, pprofServer, metricsServer := startMetricsAndProfilingServers(logger)
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
@@ -114,7 +124,18 @@ func subMain(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				ticker.Stop()
+				if pprofServer != nil {
+					if err := pprofServer.Shutdown(parentCtx); err != nil {
+						logger.Error(err, "failed to shutdown pprof server")
+					}
+				}
+				if metricsServer != nil {
+					if err := metricsServer.Shutdown(parentCtx); err != nil {
+						logger.Error(err, "failed to shutdown metrics server")
+					}
+				}
 				grpcServer.GracefulStop()
+				wg.Wait()
 				return
 			case <-ticker.C:
 				notifier()
@@ -123,6 +144,42 @@ func subMain(ctx context.Context) error {
 	}()
 
 	return grpcServer.Serve(lis)
+}
+
+// startMetricsAndProfilingServers starts metrics and profiling servers if the bind addresses are set
+// and returns a wait group to wait for the servers to stop.
+func startMetricsAndProfilingServers(logger logr.Logger) (*sync.WaitGroup, *http.Server, *http.Server) {
+	var wg sync.WaitGroup
+	var pprofServer *http.Server
+	if profilingBindAddress != "" {
+		wg.Add(1)
+		pprofServer = profiling.NewProfilingServer(profilingBindAddress)
+		go func() {
+			defer wg.Done()
+			if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				logger.Error(err, "pprof server error")
+			}
+		}()
+	}
+
+	var metricsServer *http.Server
+	if metricsBindAddress != "" {
+		wg.Add(1)
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer = &http.Server{
+			Addr:    metricsBindAddress,
+			Handler: mux,
+		}
+		go func() {
+			defer wg.Done()
+			if err := metricsServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				logger.Error(err, "metrics server error")
+			}
+		}()
+	}
+
+	return &wg, pprofServer, metricsServer
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -138,6 +195,8 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFilePath, "config", filepath.Join("/etc", "topolvm", "lvmd.yaml"), "config file")
 	rootCmd.PersistentFlags().StringVar(&lvmPath, "lvm-path", "", "lvm command path on the host OS")
+	rootCmd.PersistentFlags().StringVar(&profilingBindAddress, "profiling-bind-address", "", "bind address to expose pprof profiling. If empty, profiling is disabled")
+	rootCmd.PersistentFlags().StringVar(&metricsBindAddress, "metrics-bind-address", ":8080", "bind address to expose prometheus metrics. If empty, metrics are disabled")
 
 	goflags := flag.NewFlagSet("klog", flag.ExitOnError)
 	klog.InitFlags(goflags)
