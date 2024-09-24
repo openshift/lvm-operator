@@ -575,6 +575,10 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				return err
 			}
 
+			if err := r.verifyMetadataSize(ctx, volumeGroup.Name, lv.Name, lv.MetadataSize, convertMetadataSize(volumeGroup.Spec.ThinPoolConfig)); err != nil {
+				return fmt.Errorf("failed to verify metadata size for thinpool %s in volume group %s: %w", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err)
+			}
+
 			logger.V(1).Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
 		}
 		if !thinPoolExists {
@@ -616,7 +620,8 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	}
 
 	logger.Info("creating lvm thinpool")
-	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config)); err != nil {
+
+	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config), convertMetadataSize(config)); err != nil {
 		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
 	logger.Info("successfully created thinpool")
@@ -634,6 +639,16 @@ func convertChunkSize(config *lvmv1alpha1.ThinPoolConfig) int64 {
 		return lvmv1alpha1.ChunkSizeDefault.Value()
 	}
 	return config.ChunkSize.Value()
+}
+
+func convertMetadataSize(config *lvmv1alpha1.ThinPoolConfig) int64 {
+	if config.MetadataSizeCalculationPolicy == lvmv1alpha1.MetadataSizePolicyHost {
+		return -1
+	}
+	if config.MetadataSize == nil {
+		return lvmv1alpha1.ThinPoolMetadataSizeDefault.Value()
+	}
+	return config.MetadataSize.Value()
 }
 
 func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
@@ -686,6 +701,26 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	}
 	logger.Info("successfully extended thinpool")
 
+	return nil
+}
+
+func (r *Reconciler) verifyMetadataSize(ctx context.Context, vgName, lvName string, lvMetadataSize string, newMetadataSize int64) error {
+	if newMetadataSize == -1 {
+		return nil
+	}
+
+	currentMetadataSize, err := strconv.ParseInt(lvMetadataSize[:len(lvMetadataSize)-1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata size. %w", err)
+	}
+	if currentMetadataSize >= newMetadataSize {
+		return nil
+	}
+
+	err = r.LVM.ExtendThinPoolMetadata(ctx, lvName, vgName, newMetadataSize)
+	if err != nil {
+		return fmt.Errorf("failed to extend thinpool metadata: %w", err)
+	}
 	return nil
 }
 
