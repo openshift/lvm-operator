@@ -159,9 +159,9 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		return fmt.Errorf("look up owner(s) of pod failed: %w", err)
 	}
 	logger.Info(fmt.Sprintf("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name))
-	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
+	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
 
-	topologyQueue := workqueue.NewRateLimitingQueueWithConfig(rateLimiter, workqueue.RateLimitingQueueConfig{
+	topologyQueue := workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
 		Name: "csitopology",
 	})
 
@@ -194,7 +194,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		p.options.DriverName,
 		clientFactory,
 		// Metrics for the queue is available in the default registry.
-		workqueue.NewRateLimitingQueueWithConfig(rateLimiter, workqueue.RateLimitingQueueConfig{
+		workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
 			Name: "csistoragecapacity",
 		}),
 		controllerRef,
@@ -210,8 +210,8 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	// Wrap Provision and Delete to detect when it is time to refresh capacity.
 	provisioner = capacity.NewProvisionWrapper(provisioner, capacityController)
 
-	claimRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
-	claimQueue := workqueue.NewRateLimitingQueueWithConfig(claimRateLimiter, workqueue.RateLimitingQueueConfig{
+	claimRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
+	claimQueue := workqueue.NewTypedRateLimitingQueueWithConfig(claimRateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
 		Name: "claims",
 	})
 	claimInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
@@ -226,7 +226,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		controller.FailedDeleteThreshold(0),
 		controller.RateLimiter(rateLimiter),
 		controller.Threadiness(1),
-		controller.CreateProvisionedPVLimiter(workqueue.DefaultControllerRateLimiter()),
+		controller.CreateProvisionedPVLimiter(workqueue.DefaultTypedControllerRateLimiter[any]()),
 		controller.ClaimsInformer(claimInformer),
 		controller.NodesLister(nodeLister),
 		controller.AddFinalizer(true),

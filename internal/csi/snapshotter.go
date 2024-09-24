@@ -75,7 +75,7 @@ func (s *Snapshotter) Start(ctx context.Context) error {
 	coreFactory := coreinformers.NewSharedInformerFactory(kubeClient, ResyncPeriodOfSnapshotInformer)
 	snapShotter := snapshotter.NewSnapshotter(grpcClient)
 
-	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
+	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
 	ctrl := controller.NewCSISnapshotSideCarController(
 		snapClient,
 		kubeClient,
