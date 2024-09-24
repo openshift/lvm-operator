@@ -22,7 +22,7 @@ import (
 	"io"
 	"strings"
 
-	vgmanagerexec "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
+	vgmanagerexec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
 )
 
 type MockExecutor struct {

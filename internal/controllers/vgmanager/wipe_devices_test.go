@@ -170,7 +170,7 @@ func TestWipeDevices(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
-			r := &Reconciler{Wipefs: mockWipefs, Dmsetup: mockDmsetup}
+			r := &Reconciler{NodeName: "test", Wipefs: mockWipefs, Dmsetup: mockDmsetup}
 			if tt.wipeCount > 0 {
 				mockWipefs.EXPECT().Wipe(ctx, mock.Anything).Return(nil).Times(tt.wipeCount)
 			}
@@ -187,7 +187,8 @@ func TestWipeDevices(t *testing.T) {
 			}
 
 			if tt.wipedBefore {
-				volumeGroup.Annotations = map[string]string{constants.DevicesWipedAnnotation: time.Now().Format(time.RFC3339)}
+				volumeGroup.Annotations = map[string]string{
+					constants.DevicesWipedAnnotationPrefix + r.NodeName: time.Now().Format(time.RFC3339)}
 			}
 
 			wiped, err := r.wipeDevices(ctx, volumeGroup, tt.blockDevices)

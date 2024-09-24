@@ -795,9 +795,6 @@ func testReconcileFailure(ctx context.Context) {
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
-		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
-		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
