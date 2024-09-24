@@ -44,7 +44,6 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	icsi "github.com/openshift/lvm-operator/v4/internal/csi"
 	"github.com/spf13/cobra"
-	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
 	"github.com/topolvm/topolvm/pkg/driver"
 	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
@@ -197,9 +196,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
-		if err := os.MkdirAll(topolvm.DeviceDirectory, 0755); err != nil {
-			return err
-		}
 		csiGrpcServer := newGRPCServer()
 		grpc_health_v1.RegisterHealthServer(csiGrpcServer, icsi.NewHealthServer(func(ctx context.Context) error {
 			return readyCheck(ctx, mgr, lvmdConfig, registrationServer)

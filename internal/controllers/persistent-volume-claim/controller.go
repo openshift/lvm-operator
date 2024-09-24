@@ -136,6 +136,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithEventFilter(r.Predicates()).
 		For(&corev1.PersistentVolumeClaim{}).
+		Named("lvms_persistentvolumeclaim").
 		Complete(r)
 }
 
