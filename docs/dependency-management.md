@@ -11,6 +11,7 @@ To update the dependencies, follow the steps below:
 1. Update the go.mod file with the new version of go corresponding to the go version used by kubernetes itself. An example for 1.31 is https://github.com/kubernetes/kubernetes/blob/v1.31.1/go.mod#L9.
     Note that we only use the latest minor for pinning in the Dockerfile, and use the latest Z-stream in our go.mod file at the time of the update.
     Do not jump into the next minor Go version if available but unused in upstream.
+    Also note that the base image used in the pipeline may restrict the maximum z-stream you can use.
 2. Update dependencies in the go.mod file: Upstream usually uses scripts to bump all k8s dependencies at once.
     However the same can be achieved manually with a simple replace statement. For example, to update the k8s.io dependency list, you can replace all occurrences of the 0.y.z version with the latest 0.y.z version. For example:
     ```go.mod
