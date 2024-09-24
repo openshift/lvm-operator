@@ -57,9 +57,10 @@ var _ = Describe("vgmanager controller", func() {
 				},
 				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
 					ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
-						Name:               "thin-pool-1",
-						SizePercent:        90,
-						OverprovisionRatio: 10,
+						Name:                          "thin-pool-1",
+						MetadataSizeCalculationPolicy: lvmv1alpha1.MetadataSizePolicyHost,
+						SizePercent:                   90,
+						OverprovisionRatio:            10,
 					},
 				},
 			})
@@ -307,7 +308,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		By("mocking the creation of the thin pool in the vg", func() {
 			instances.LVM.EXPECT().ListLVs(ctx, lvmVG.Name).Return(&lvm.LVReport{Report: make([]lvm.LVReportItem, 0)}, nil).Once()
 			instances.LVM.EXPECT().CreateLV(ctx, vg.Spec.ThinPoolConfig.Name, vg.GetName(), vg.Spec.ThinPoolConfig.SizePercent,
-				calculateExpectedChunkSize(vg.Spec.ThinPoolConfig.ChunkSize)).Return(nil).Once()
+				calculateExpectedChunkSize(vg.Spec.ThinPoolConfig.ChunkSize), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value()).Return(nil).Once()
 		})
 		By("mocking the report of LVs to now contain the thin pool", func() {
 			// validateLVs
@@ -318,6 +319,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 				LvSize:          "1.0G",
 				MetadataPercent: "10.0",
 				ChunkSize:       strconv.FormatInt(ptr.To(resource.MustParse("128Ki")).Value(), 10),
+				MetadataSize:    strconv.FormatInt(ptr.To(resource.MustParse("128Mi")).Value(), 10),
 			}
 			createdVG = lvm.VolumeGroup{
 				Name:   vg.GetName(),
@@ -797,14 +799,14 @@ func testThinPoolCreation(ctx context.Context) {
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize)).Once().Return(fmt.Errorf("mocked error"))
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value()).Once().Return(fmt.Errorf("mocked error"))
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).To(HaveOccurred(), "should create thin pool if it does not exist, but should fail if that does not work")
 
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
 		Lv: []lvm.LogicalVolume{},
 	}}}, nil)
-	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize)).Once().Return(nil)
+	mockLVM.EXPECT().CreateLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent, calculateExpectedChunkSize(thinPool.ChunkSize), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value()).Once().Return(nil)
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should create thin pool if it does not exist")
 

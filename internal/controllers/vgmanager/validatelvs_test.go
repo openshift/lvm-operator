@@ -41,7 +41,7 @@ var mockLvsOutputWrongLVsInReport = `
       "report": [
           {
               "lv": [
-                  {"lv_name":"thin-pool-BLUB", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":""}
+                  {"lv_name":"thin-pool-BLUB", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "metadata_size":"1073741824b"}
               ]
           }
       ]
@@ -53,7 +53,7 @@ var mockLvsOutputThinPoolValid = `
       "report": [
           {
               "lv": [
-                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "chunk_size": "524288"}
+                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "chunk_size": "524288", "metadata_size":"1073741824b"}
               ]
           }
       ]
@@ -65,7 +65,7 @@ var mockLvsOutputThinPoolHighMetadataUse = `
       "report": [
           {
               "lv": [
-                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"98.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":""}
+                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"98.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "metadata_size":"1073741824b"}
               ]
           }
       ]
@@ -76,7 +76,7 @@ var mockLvsOutputThinPoolSuspended = `
       "report": [
           {
               "lv": [
-                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-s-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":""}
+                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"twi-s-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "metadata_size":"1073741824b"}
               ]
           }
       ]
@@ -88,7 +88,7 @@ var mockLvsOutputRAID = `
       "report": [
           {
               "lv": [
-                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"rwi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":""}
+                  {"lv_name":"thin-pool-1", "vg_name":"vg1", "lv_attr":"rwi-a-tz--", "lv_size":"26.96g", "pool_lv":"", "origin":"", "data_percent":"0.00", "metadata_percent":"10.52", "move_pv":"", "mirror_log":"", "copy_percent":"", "convert_lv":"", "metadata_size":"1073741824b"}
               ]
           }
       ]
@@ -140,8 +140,9 @@ func TestVGReconciler_validateLVs(t *testing.T) {
 			args: args{volumeGroup: &lvmv1alpha1.LVMVolumeGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "default"},
 				Spec: lvmv1alpha1.LVMVolumeGroupSpec{ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
-					Name:      "thin-pool-1",
-					ChunkSize: ptr.To(resource.MustParse("512Ki")),
+					Name:                          "thin-pool-1",
+					ChunkSize:                     ptr.To(resource.MustParse("512Ki")),
+					MetadataSizeCalculationPolicy: lvmv1alpha1.MetadataSizePolicyHost,
 				}},
 			}},
 			wantErr: assert.NoError,
