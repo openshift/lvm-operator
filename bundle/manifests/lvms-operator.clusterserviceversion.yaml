@@ -15,13 +15,7 @@ metadata:
               "deviceClasses": [
                 {
                   "default": true,
-                  "deviceSelector": {
-                    "paths": [
-                      "/dev/vdb",
-                      "/dev/vdc"
-                    ]
-                  },
-                  "fstype": "ext4",
+                  "fstype": "xfs",
                   "name": "vg1",
                   "thinPoolConfig": {
                     "name": "thin-pool-1",
