@@ -58,7 +58,7 @@ func (r *Reconciler) wipeDevices(
 		if volumeGroup.Annotations == nil {
 			volumeGroup.Annotations = make(map[string]string)
 		}
-		volumeGroup.Annotations[constants.DevicesWipedAnnotation] = fmt.Sprintf(
+		volumeGroup.Annotations[constants.DevicesWipedAnnotationPrefix+r.NodeName] = fmt.Sprintf(
 			"the devices of this volume group have been wiped at %s by lvms according to policy. This marker"+
 				"serves as indicator that the devices have been wiped before and should not be wiped again."+
 				"removal of this annotation is unsupported and may lead to data loss due to additional wiping.",
@@ -92,7 +92,7 @@ func (r *Reconciler) shouldWipeDevicesOnVolumeGroup(vg *lvmv1alpha1.LVMVolumeGro
 	// If the devices have not been wiped before, they should be wiped.
 	var wipedBefore bool
 	if vg.Annotations != nil {
-		_, wipedBefore = vg.Annotations[constants.DevicesWipedAnnotation]
+		_, wipedBefore = vg.Annotations[constants.DevicesWipedAnnotationPrefix+r.NodeName]
 	}
 
 	return !wipedBefore
