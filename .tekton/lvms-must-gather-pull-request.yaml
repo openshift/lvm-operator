@@ -17,6 +17,8 @@ metadata:
   name: lvms-must-gather-on-pull-request
   namespace: logical-volume-manag-tenant
 spec:
+  timeouts:
+    pipeline: 1h30m
   params:
   - name: git-url
     value: '{{source_url}}'
