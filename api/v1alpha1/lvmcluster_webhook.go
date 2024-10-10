@@ -56,6 +56,7 @@ var (
 	ErrEmptyPathsWithMultipleDeviceClasses                   = errors.New("path list should not be empty when there are multiple deviceClasses")
 	ErrDuplicateLVMCluster                                   = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
 	ErrThinPoolConfigCannotBeChanged                         = errors.New("ThinPoolConfig can not be changed")
+	ErrThinPoolMetadataSizeCanOnlyBeIncreased                = errors.New("thin pool metadata size can only be increased")
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
@@ -126,6 +127,11 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 
+	metadataWarnings, err := v.verifyMetadataSize(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, metadataWarnings...)
 	return warnings, nil
 }
 
@@ -196,6 +202,21 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSizeCalculationPolicy is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if !reflect.DeepEqual(newThinPoolConfig.ChunkSize, oldThinPoolConfig.ChunkSize) {
 				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSize is invalid: %w", ErrThinPoolConfigCannotBeChanged)
+			}
+
+			if newThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyStatic {
+				if newThinPoolConfig.MetadataSize == nil {
+					warnings = append(warnings, "thin pool metadata size is unset. LVMS operator will automatically set it to 1Gb and grow metadata size if needed")
+					newThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
+				}
+				if oldThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyStatic {
+					if oldThinPoolConfig.MetadataSize == nil {
+						oldThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
+					}
+					if newThinPoolConfig.MetadataSize.Value() < oldThinPoolConfig.MetadataSize.Value() {
+						return warnings, fmt.Errorf("ThinPoolConfig.MetadataSize is invalid: %w", ErrThinPoolMetadataSizeCanOnlyBeIncreased)
+					}
+				}
 			}
 		}
 
@@ -517,4 +538,29 @@ func (v *lvmClusterValidator) verifyChunkSize(l *LVMCluster) error {
 	}
 
 	return nil
+}
+
+func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error) {
+	warnings := make([]string, 0)
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.ThinPoolConfig == nil {
+			continue
+		}
+		if dc.ThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyHost && dc.ThinPoolConfig.MetadataSize != nil {
+			return warnings, fmt.Errorf("metadata size can not be set when metadata size calculation policy is set to Host")
+		}
+		if dc.ThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyStatic && dc.ThinPoolConfig.MetadataSize == nil {
+			warnings = append(warnings, "metadata size in unset. LVMS will set it to 1Gi by default")
+			dc.ThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
+		}
+		if dc.ThinPoolConfig.MetadataSize != nil {
+			if dc.ThinPoolConfig.ChunkSize.Cmp(ThinPoolMetadataSizeMinimum) < 0 {
+				return warnings, fmt.Errorf("metadata size must be greater than or equal to %s", ThinPoolMetadataSizeMinimum.String())
+			}
+			if dc.ThinPoolConfig.MetadataSize.Cmp(ThinPoolMetadataSizeMaximum) > 0 {
+				return warnings, fmt.Errorf("metadata size must be less than or equal to %s", ThinPoolMetadataSizeMaximum.String())
+			}
+		}
+	}
+	return warnings, nil
 }

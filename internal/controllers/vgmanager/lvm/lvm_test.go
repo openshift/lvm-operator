@@ -426,19 +426,20 @@ func TestHostLVM_ListLVsByName(t *testing.T) {
 
 func TestHostLVM_CreateLV(t *testing.T) {
 	tests := []struct {
-		name           string
-		lvName         string
-		vgName         string
-		sizePercent    int
-		chunkSizeBytes int64
-		wantErr        bool
-		execErr        bool
+		name              string
+		lvName            string
+		vgName            string
+		sizePercent       int
+		chunkSizeBytes    int64
+		metadataSizeBytes int64
+		wantErr           bool
+		execErr           bool
 	}{
-		{"Empty Volume Group Name", "lv1", "", 10, lvmv1alpha1.ChunkSizeDefault.Value(), true, false},
-		{"Empty Logical Volume Name", "", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), true, false},
-		{"Invalid SizePercent", "lv1", "vg1", -10, lvmv1alpha1.ChunkSizeDefault.Value(), true, false},
-		{"Error on Exec", "lv1", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), true, true},
-		{"LV created successfully", "lv1", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), false, false},
+		{"Empty Volume Group Name", "lv1", "", 10, lvmv1alpha1.ChunkSizeDefault.Value(), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value(), true, false},
+		{"Empty Logical Volume Name", "", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value(), true, false},
+		{"Invalid SizePercent", "lv1", "vg1", -10, lvmv1alpha1.ChunkSizeDefault.Value(), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value(), true, false},
+		{"Error on Exec", "lv1", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value(), true, true},
+		{"LV created successfully", "lv1", "vg1", 10, lvmv1alpha1.ChunkSizeDefault.Value(), lvmv1alpha1.ThinPoolMetadataSizeDefault.Value(), false, false},
 	}
 
 	for _, tt := range tests {
@@ -452,7 +453,7 @@ func TestHostLVM_CreateLV(t *testing.T) {
 				return nil
 			}}
 
-			err := NewHostLVM(executor).CreateLV(ctx, tt.lvName, tt.vgName, tt.sizePercent, tt.chunkSizeBytes)
+			err := NewHostLVM(executor).CreateLV(ctx, tt.lvName, tt.vgName, tt.sizePercent, tt.chunkSizeBytes, tt.metadataSizeBytes)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
