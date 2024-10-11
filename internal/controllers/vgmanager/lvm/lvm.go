@@ -60,6 +60,7 @@ var (
 		"lv_size",
 		"metadata_percent",
 		"chunk_size",
+		"lv_metadata_size",
 	}
 )
 
@@ -98,6 +99,7 @@ type LogicalVolume struct {
 	LvSize          string `json:"lv_size"`
 	MetadataPercent string `json:"metadata_percent"`
 	ChunkSize       string `json:"chunk_size"`
+	MetadataSize    string `json:"lv_metadata_size"`
 }
 
 type LVM interface {
@@ -113,8 +115,9 @@ type LVM interface {
 	ListLVs(ctx context.Context, vgName string) (*LVReport, error)
 
 	LVExists(ctx context.Context, lvName, vgName string) (bool, error)
-	CreateLV(ctx context.Context, lvName, vgName string, sizePercent int, chunkSizeBytes int64) error
+	CreateLV(ctx context.Context, lvName, vgName string, sizePercent int, chunkSizeBytes, metadataSizeBytes int64) error
 	ExtendLV(ctx context.Context, lvName, vgName string, sizePercent int) error
+	ExtendThinPoolMetadata(ctx context.Context, lvName, vgName string, metadataSizeBytes int64) error
 	ActivateLV(ctx context.Context, lvName, vgName string) error
 	DeleteLV(ctx context.Context, lvName, vgName string) error
 }
@@ -472,7 +475,7 @@ func (hlvm *HostLVM) DeleteLV(ctx context.Context, lvName, vgName string) error 
 }
 
 // CreateLV creates the logical volume
-func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePercent int, chunkSizeBytes int64) error {
+func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePercent int, chunkSizeBytes, metadataSizeBytes int64) error {
 	if vgName == "" {
 		return fmt.Errorf("failed to create logical volume in volume group: volume group name is empty")
 	}
@@ -487,6 +490,10 @@ func (hlvm *HostLVM) CreateLV(ctx context.Context, lvName, vgName string, sizePe
 
 	if chunkSizeBytes > 0 {
 		args = append(args, "-c", fmt.Sprintf("%vb", chunkSizeBytes))
+	}
+
+	if metadataSizeBytes > 0 {
+		args = append(args, "--poolmetadatasize", fmt.Sprintf("%vb", metadataSizeBytes))
 	}
 
 	args = append(args, fmt.Sprintf("%s/%s", vgName, lvName))
@@ -518,6 +525,26 @@ func (hlvm *HostLVM) ExtendLV(ctx context.Context, lvName, vgName string, sizePe
 			lvName, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
 	}
 
+	return nil
+}
+
+func (hlvm *HostLVM) ExtendThinPoolMetadata(ctx context.Context, lvName, vgName string, metadataSizeBytes int64) error {
+	if vgName == "" {
+		return fmt.Errorf("failed to extend logical volume metadata size in volume group: volume group name is empty")
+	}
+	if lvName == "" {
+		return fmt.Errorf("failed to extend logical volume metadata size in volume group: logical volume name is empty")
+	}
+	if metadataSizeBytes <= 0 {
+		return fmt.Errorf("failed to extend logical volume metadata size in volume group: size value should be greater than 0")
+	}
+
+	args := []string{"--poolmetadatasize", fmt.Sprintf("%vb", metadataSizeBytes), fmt.Sprintf("%s/%s", vgName, lvName)}
+	err := hlvm.RunCommandAsHost(ctx, lvExtendCmd, args...)
+	if err != nil {
+		return fmt.Errorf("failed to extend logical volume metadata size %q in the volume group %q using command '%s': %w",
+			lvName, vgName, fmt.Sprintf("%s %s", lvExtendCmd, strings.Join(args, " ")), err)
+	}
 	return nil
 }
 
