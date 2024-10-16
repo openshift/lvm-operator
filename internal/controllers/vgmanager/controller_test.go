@@ -262,7 +262,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	}
 
 	By("triggering the second reconciliation after the initial setup", func() {
-		instances.LVM.EXPECT().ListVGs(ctx, true).Return(nil, nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Return(nil, nil).Once()
 		instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
@@ -285,7 +285,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	})
 
 	// Requeue effects
-	instances.LVM.EXPECT().ListVGs(ctx, true).Return(nil, nil).Once()
+	instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Return(nil, nil).Once()
 	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 	instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 
@@ -298,7 +298,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 			Name: vg.GetName(),
 			PVs:  []lvm.PhysicalVolume{lvmPV},
 		}
-		instances.LVM.EXPECT().CreateVG(ctx, lvmVG).Return(nil).Once()
+		instances.LVM.EXPECT().CreateVG(ctx, lvmVG, lvm.CreateVGOptions{}).Return(nil).Once()
 	})
 
 	// addThinPoolToVG
@@ -340,7 +340,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 			PVs:    []lvm.PhysicalVolume{lvmPV},
 		}
 	}
-	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
+	instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
 
 	By("triggering the next reconciliation after the creation of the thin pool", func() {
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
@@ -417,7 +417,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	})
 
 	By("mocking the now created vg in the next fetch", func() {
-		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
 	})
 
 	By("mocking the now created pvs (by proxy through vgcreate) in the next fetch", func() {
@@ -485,14 +485,14 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
 		Expect(vg.Finalizers).ToNot(BeEmpty())
 		Expect(vg.DeletionTimestamp).ToNot(BeNil())
-		instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Return([]lvm.VolumeGroup{{Name: createdVG.Name}}, nil).Once()
 
 		if vg.Spec.ThinPoolConfig != nil {
 			instances.LVM.EXPECT().LVExists(ctx, thinPool.Name, createdVG.Name).Return(true, nil).Once()
 			instances.LVM.EXPECT().DeleteLV(ctx, thinPool.Name, createdVG.Name).Return(nil).Once()
 		}
 
-		instances.LVM.EXPECT().DeleteVG(ctx, lvm.VolumeGroup{Name: createdVG.Name}).Return(nil).Once()
+		instances.LVM.EXPECT().DeleteVG(ctx, lvm.VolumeGroup{Name: createdVG.Name}, lvm.DeleteVGOptions{}).Return(nil).Once()
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).ToNot(Succeed())
@@ -900,7 +900,7 @@ func testReconcileFailure(ctx context.Context) {
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Once().Return(nil, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
@@ -914,7 +914,7 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(blockDevices, nil)
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Once().Return(nil, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 		Expect(instances.client.Get(ctx, client.ObjectKey{
@@ -943,7 +943,7 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
 				IsUsableLoopDev: false,
@@ -964,7 +964,7 @@ func testReconcileFailure(ctx context.Context) {
 		vgs := []lvm.VolumeGroup{
 			{Name: "vg1", VgSize: "1g"},
 		}
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(vgs, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Once().Return(vgs, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {

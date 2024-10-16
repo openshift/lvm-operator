@@ -224,7 +224,7 @@ func TestHostLVM_DeleteVG(t *testing.T) {
 				},
 			}
 
-			err := NewHostLVM(executor).DeleteVG(ctx, tt.volumeGroup)
+			err := NewHostLVM(executor).DeleteVG(ctx, tt.volumeGroup, DeleteVGOptions{})
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -265,7 +265,7 @@ func TestHostLVM_ListVGs(t *testing.T) {
 					return fmt.Errorf("invalid args %q", args[0])
 				},
 			}
-			_, err := NewHostLVM(executor).ListVGs(ctx, true)
+			_, err := NewHostLVM(executor).ListVGs(ctx, true, ListVGOptions{})
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -299,7 +299,7 @@ func TestHostLVM_CreateVG(t *testing.T) {
 					return nil
 				},
 			}
-			err := NewHostLVM(executor).CreateVG(ctx, tt.volumeGroup)
+			err := NewHostLVM(executor).CreateVG(ctx, tt.volumeGroup, CreateVGOptions{})
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

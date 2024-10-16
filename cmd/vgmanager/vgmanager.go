@@ -189,7 +189,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	type registration struct {
-		internalCSI.CheckableRegistrationServer
+		icsi.CheckableRegistrationServer
 		registrationPath string
 	}
 	var registrations []registration
@@ -201,8 +201,8 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		} else if err := mgr.Add(volumeGroupLock); err != nil {
 			return fmt.Errorf("could not add volume group lock: %w", err)
 		}
-		registration := registration{
-			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
+		reg := registration{
+			CheckableRegistrationServer: icsi.NewRegistrationServer(
 				cancelWithCause,
 				constants.KubeSANCSIDriverName,
 				kubeSANRegistrationPath(),
@@ -210,18 +210,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			),
 			registrationPath: kubeSANpluginRegistrationSocketPath(),
 		}
-		registrations = append(registrations, registration)
+		registrations = append(registrations, reg)
 		registrationGrpcServer := newGRPCServer()
-		registerapi.RegisterRegistrationServer(registrationGrpcServer, registration)
-		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, registration.registrationPath, false)); err != nil {
-			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
+		registerapi.RegisterRegistrationServer(registrationGrpcServer, reg)
+		if err = mgr.Add(icsi.NewGRPCRunner(registrationGrpcServer, reg.registrationPath, false)); err != nil {
+			return fmt.Errorf("could not add grpc runner for reg server: %w", err)
 		}
 
-		if err := mgr.Add(internalCSI.NewProvisioner(mgr, internalCSI.ProvisionerOptions{
+		if err := mgr.Add(icsi.NewProvisioner(mgr, icsi.ProvisionerOptions{
 			DriverName:          constants.KubeSANCSIDriverName,
 			CSIEndpoint:         constants.ControllerCSILocalPath,
 			CSIOperationTimeout: 10 * time.Second,
-			NodeDeployment: &internalCSI.NodeDeployment{
+			NodeDeployment: &icsi.NodeDeployment{
 				NodeName:        nodeName,
 				NodeCSIEndpoint: kubeSANRegistrationPath(),
 			},
@@ -242,7 +242,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		}
 
 		if enableSnapshotting {
-			if err := mgr.Add(internalCSI.NewSnapshotter(mgr, internalCSI.SnapshotterOptions{
+			if err := mgr.Add(icsi.NewSnapshotter(mgr, icsi.SnapshotterOptions{
 				DriverName:          constants.KubeSANCSIDriverName,
 				CSIEndpoint:         constants.ControllerCSILocalPath,
 				CSIOperationTimeout: 10 * time.Second,
@@ -270,9 +270,19 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
+		reg := registration{
+			CheckableRegistrationServer: icsi.NewRegistrationServer(
+				cancelWithCause,
+				constants.TopolvmCSIDriverName,
+				registrationPath(),
+				[]string{"1.0.0"},
+			),
+			registrationPath: topoLVMpluginRegistrationSocketPath(),
+		}
+
 		csiGrpcServer := newGRPCServer()
 		grpc_health_v1.RegisterHealthServer(csiGrpcServer, icsi.NewHealthServer(func(ctx context.Context) error {
-			return readyCheck(ctx, mgr, lvmdConfig, registrationServer)
+			return readyCheck(ctx, mgr, lvmdConfig, reg)
 		}))
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
@@ -289,21 +299,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
 		}
 
-		registration := registration{
-			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
-				cancelWithCause,
-				constants.TopolvmCSIDriverName,
-				registrationPath(),
-				[]string{"1.0.0"},
-			),
-			registrationPath: topoLVMpluginRegistrationSocketPath(),
-		}
-		registrations = append(registrations, registration)
+		registrations = append(registrations, reg)
 		registrationGrpcServer := newGRPCServer()
 		grpc_health_v1.RegisterHealthServer(registrationGrpcServer, icsi.NewHealthServer(icsi.AlwaysHealthy))
-		registerapi.RegisterRegistrationServer(registrationGrpcServer, registration)
-		if err = mgr.Add(icsi.NewGRPCRunner(registrationGrpcServer, registration.registrationPath, false)); err != nil {
-			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
+		registerapi.RegisterRegistrationServer(registrationGrpcServer, reg)
+		if err = mgr.Add(icsi.NewGRPCRunner(registrationGrpcServer, reg.registrationPath, false)); err != nil {
+			return fmt.Errorf("could not add grpc runner for reg server: %w", err)
 		}
 	}
 
@@ -347,10 +348,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return nil
 	}); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
-	}
-
-	if err := mgr.AddReadyzCheck("readyz", readyCheckHealthzChecker(mgr, lvmdConfig, registrationServer)); err != nil {
-		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	// Create new watcher.

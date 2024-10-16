@@ -32,31 +32,30 @@ import (
 )
 
 const (
-	scName = "storageclass"
+	scName = "topolvm-storageclass"
 )
 
-func StorageClass() Manager {
-	return &storageClass{}
+func TopoLVMStorageClass() Manager {
+	return &topolvmStorageClass{}
 }
 
-type storageClass struct{}
+type topolvmStorageClass struct{}
 
-// storageClass unit satisfies resourceManager interface
-var _ Manager = storageClass{}
+// topolvmStorageClass unit satisfies resourceManager interface
+var _ Manager = topolvmStorageClass{}
 
-func (s storageClass) GetName() string {
+func (s topolvmStorageClass) GetName() string {
 	return scName
 }
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;create;delete;watch;list;update;patch
 
-func (s storageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
+func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
 	// one storage class for every deviceClass based on CR is created
 	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
-	kubeSANStorageClasses := s.getKubeSANStorageClasses(r, ctx, *cluster)
-	for _, sc := range append(topolvmStorageClasses, kubeSANStorageClasses...) {
+	for _, sc := range topolvmStorageClasses {
 		// we anticipate no edits to storage class
 		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
 			labels.SetManagedLabels(r.Scheme(), sc, cluster)
@@ -72,7 +71,7 @@ func (s storageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *
 	return nil
 }
 
-func (s storageClass) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
 	// construct name of storage class based on CR spec deviceClass field and
@@ -101,7 +100,7 @@ func (s storageClass) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluste
 	return nil
 }
 
-func (s storageClass) getKubeSANStorageClasses(r Reconciler, ctx context.Context, cluster lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
+func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
 	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
@@ -127,69 +126,7 @@ func (s storageClass) getKubeSANStorageClasses(r Reconciler, ctx context.Context
 		}
 	}
 	var sc []*storagev1.StorageClass
-	for _, deviceClass := range cluster.Spec.Storage.DeviceClasses {
-		if deviceClass.DeviceAccessPolicy != lvmv1alpha1.DeviceAccessPolicyShared {
-			continue
-		}
-
-		scName := GetStorageClassName(deviceClass.Name)
-
-		storageClass := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: scName,
-				Annotations: map[string]string{
-					"description": "Provides RWX for Filesystem & Block volumes specialized for SAN infrastructure",
-				},
-			},
-			Provisioner:          constants.KubeSANCSIDriverName,
-			VolumeBindingMode:    &volumeBindingMode,
-			AllowVolumeExpansion: &allowVolumeExpansion,
-			Parameters: map[string]string{
-				constants.KubeSANBackingVolumeGroupKey: deviceClass.Name,
-				"csi.storage.k8s.io/fstype":            string(deviceClass.FilesystemType),
-			},
-		}
-		// reconcile will pick up any existing LVMO storage classes as well
-		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
-			storageClass.Annotations[defaultSCAnnotation] = "true"
-			defaultStorageClassName = scName
-		}
-		sc = append(sc, storageClass)
-	}
-	return sc
-}
-
-func (s storageClass) getTopolvmStorageClasses(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
-	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
-
-	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
-	allowVolumeExpansion := true
-	volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
-	defaultStorageClassName := ""
-	setDefaultStorageClass := true
-
-	// Mark the lvms storage class, associated with the default device class, as default if no other default storage class exists on the cluster
-	scList := &storagev1.StorageClassList{}
-	err := r.List(ctx, scList)
-
-	if err != nil {
-		logger.Error(err, "failed to list storage classes. Not setting any storageclass as the default")
-		setDefaultStorageClass = false
-	} else {
-		for _, sc := range scList.Items {
-			v := sc.Annotations[defaultSCAnnotation]
-			if v == "true" {
-				defaultStorageClassName = sc.Name
-				break
-			}
-		}
-	}
-	var sc []*storagev1.StorageClass
-	for _, deviceClass := range cluster.Spec.Storage.DeviceClasses {
-		if deviceClass.DeviceAccessPolicy != lvmv1alpha1.DeviceAccessPolicyNodeLocal {
-			continue
-		}
-
+	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
 
 		storageClass := &storagev1.StorageClass{

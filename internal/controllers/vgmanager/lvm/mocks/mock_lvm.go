@@ -820,6 +820,53 @@ func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool, lvm
 	return _c
 }
 
+// LockStart provides a mock function with given fields: ctx, vgName
+func (_m *MockLVM) LockStart(ctx context.Context, vgName string) error {
+	ret := _m.Called(ctx, vgName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LockStart")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, vgName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_LockStart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LockStart'
+type MockLVM_LockStart_Call struct {
+	*mock.Call
+}
+
+// LockStart is a helper method to define mock.On call
+//   - ctx context.Context
+//   - vgName string
+func (_e *MockLVM_Expecter) LockStart(ctx interface{}, vgName interface{}) *MockLVM_LockStart_Call {
+	return &MockLVM_LockStart_Call{Call: _e.mock.On("LockStart", ctx, vgName)}
+}
+
+func (_c *MockLVM_LockStart_Call) Run(run func(ctx context.Context, vgName string)) *MockLVM_LockStart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_LockStart_Call) Return(_a0 error) *MockLVM_LockStart_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_LockStart_Call) RunAndReturn(run func(context.Context, string) error) *MockLVM_LockStart_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockLVM creates a new instance of MockLVM. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockLVM(t interface {

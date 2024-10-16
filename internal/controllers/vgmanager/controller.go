@@ -181,6 +181,11 @@ func (r *Reconciler) reconcile(
 		VG:  volumeGroup,
 	}))
 
+	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+	}
+
 	if volumeGroup.Spec.DeviceSelector != nil {
 		if err := VerifyMandatoryDevicePaths(devices, resolver, volumeGroup.Spec.DeviceSelector.Paths); err != nil {
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
@@ -189,11 +194,6 @@ func (r *Reconciler) reconcile(
 			}
 			return ctrl.Result{}, err
 		}
-	}
-
-	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
 
 	vgExistsInLVM := false

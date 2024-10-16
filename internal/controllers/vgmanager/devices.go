@@ -30,7 +30,7 @@ import (
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vg *lvmv1alpha1.LVMVolumeGroup, devices []lsblk.BlockDevice) error {
+func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vg *v1alpha1.LVMVolumeGroup, devices []lsblk.BlockDevice) error {
 	logger := log.FromContext(ctx)
 	vgName := vg.Name
 

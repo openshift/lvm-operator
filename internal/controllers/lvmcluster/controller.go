@@ -209,7 +209,6 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		resource.VGManager(r.ClusterType),
 		resource.TopoLVMStorageClass(),
 		resource.CSINode(),
-		resource.StorageClass(),
 		resource.LVMVGs(),
 		resource.LVMVGNodeStatus(),
 	}
@@ -336,7 +335,7 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context) (bool, error) {
 func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		resourceDeletionList := []resource.Manager{
-			resource.StorageClass(),
+			resource.TopoLVMStorageClass(),
 			resource.LVMVGs(),
 			resource.LVMVGNodeStatus(),
 			resource.CSIDriver(),
