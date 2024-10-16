@@ -207,10 +207,10 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 	resources := []resource.Manager{
 		resource.CSIDriver(),
 		resource.VGManager(r.ClusterType),
-		resource.LVMVGs(),
-		resource.LVMVGNodeStatus(),
 		resource.TopoLVMStorageClass(),
 		resource.CSINode(),
+		resource.LVMVGs(),
+		resource.LVMVGNodeStatus(),
 	}
 
 	if r.ClusterType == cluster.TypeOCP {
