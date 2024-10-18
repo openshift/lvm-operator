@@ -554,7 +554,7 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 			dc.ThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
 		}
 		if dc.ThinPoolConfig.MetadataSize != nil {
-			if dc.ThinPoolConfig.ChunkSize.Cmp(ThinPoolMetadataSizeMinimum) < 0 {
+			if dc.ThinPoolConfig.MetadataSize.Cmp(ThinPoolMetadataSizeMinimum) < 0 {
 				return warnings, fmt.Errorf("metadata size must be greater than or equal to %s", ThinPoolMetadataSizeMinimum.String())
 			}
 			if dc.ThinPoolConfig.MetadataSize.Cmp(ThinPoolMetadataSizeMaximum) > 0 {
