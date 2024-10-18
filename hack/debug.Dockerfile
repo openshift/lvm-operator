@@ -2,7 +2,7 @@
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
-FROM golang:1.22 as builder
+FROM golang:1.23 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -26,7 +26,7 @@ ENV CGO_ENABLED=0
 # Build
 RUN go build -gcflags "all=-N -l" -mod=vendor -a -o lvms cmd/main.go
 
-FROM golang:1.22 as dlv
+FROM golang:1.23 as dlv
 RUN go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
