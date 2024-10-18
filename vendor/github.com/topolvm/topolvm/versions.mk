@@ -1,5 +1,6 @@
 # https://github.com/docker/buildx/releases
 BUILDX_VERSION := 0.15.1
+# If you update the version, you also need to update getting-started.md.
 # https://github.com/cert-manager/cert-manager/releases
 CERT_MANAGER_VERSION := v1.15.1
 # https://github.com/helm/chart-testing/releases
@@ -46,7 +47,7 @@ EXTERNAL_PROVISIONER_VERSION := 5.0.1
 EXTERNAL_RESIZER_VERSION := 1.11.1
 EXTERNAL_SNAPSHOTTER_VERSION := 8.0.1
 LIVENESSPROBE_VERSION := 2.13.0
-NODE_DRIVER_REGISTRAR_VERSION := 2.11.0
+NODE_DRIVER_REGISTRAR_VERSION := 2.11.1
 
 # The container version of kind must be with the digest.
 # ref. https://github.com/kubernetes-sigs/kind/releases

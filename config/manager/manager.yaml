@@ -88,6 +88,7 @@ spec:
         volumeMounts:
           - mountPath: /run/csi
             name: "socket-dir"
+        terminationMessagePolicy: FallbackToLogsOnError
       volumes:
         - name: socket-dir
           emptyDir: {}

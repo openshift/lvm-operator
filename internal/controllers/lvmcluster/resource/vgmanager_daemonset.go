@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/selector"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -131,6 +132,22 @@ var (
 	}
 	KubeSANNBDPluginMount = corev1.VolumeMount{
 		Name: KubeSANNBDPluginVolName, MountPath: constants.KubeSANNBDDir,
+	}
+)
+
+var (
+	FileLockVolName = "file-lock-dir"
+	FileLockVol     = corev1.Volume{
+		Name: FileLockVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: filepath.Dir(util.FileLockDir),
+				Type: &HostPathDirectoryOrCreate},
+		},
+	}
+	FileLockVolMount = corev1.VolumeMount{
+		Name:      FileLockVolName,
+		MountPath: filepath.Dir(util.FileLockDir),
 	}
 )
 
@@ -282,6 +299,7 @@ func templateVGManagerDaemonset(
 		SysHostDirVol,
 		MetricsCertsDirVol,
 		CSIPluginVol,
+		FileLockVol,
 	}
 
 	if standard {
@@ -303,6 +321,7 @@ func templateVGManagerDaemonset(
 		UDevHostDirVolMount,
 		SysHostDirVolMount,
 		MetricsCertsDirVolMount,
+		FileLockVolMount,
 	}
 
 	if standard {
@@ -344,10 +363,10 @@ func templateVGManagerDaemonset(
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
 						Port: intstr.FromString(constants.TopolvmNodeContainerHealthzName)}},
-				FailureThreshold:    10,
-				InitialDelaySeconds: 0,
+				FailureThreshold:    60, // 60*10 = 600s / 10 min for long startup due to large volume group initialization
+				InitialDelaySeconds: 2,
 				TimeoutSeconds:      2,
-				PeriodSeconds:       2},
+				PeriodSeconds:       10},
 			LivenessProbe: &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{Path: "/healthz",
@@ -404,6 +423,7 @@ func templateVGManagerDaemonset(
 					},
 				},
 			},
+			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 		},
 	}
 

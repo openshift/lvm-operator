@@ -160,7 +160,7 @@ After the CR is deployed, the following actions are executed:
 
 - A Logical Volume Manager (LVM) volume group named `vg1` is created, utilizing all available disks on the cluster.
 - A thin pool named `thin-pool-1` is created within `vg1`, with a size equivalent to 90% of `vg1`.
-- The TopoLVM Container Storage Interface (CSI) plugin is deployed, resulting in the launch of the `topolvm-controller` and `topolvm-node` pods.
+- The TopoLVM Container Storage Interface (CSI) plugin is deployed.
 - A storage class and a volume snapshot class are created, both named `lvms-vg1`. This facilitates storage provisioning for OpenShift workloads. The storage class is configured with the `WaitForFirstConsumer` volume binding mode that is utilized in a multi-node configuration to optimize the scheduling of pod placement. This strategy prioritizes the allocation of pods to nodes with the greatest amount of available storage capacity.
 - The LVMS system also creates two additional internal CRs to support its functionality:
   * `LVMVolumeGroup` is generated and managed by LVMS to monitor the individual volume groups across multiple nodes in the cluster.
@@ -180,8 +180,6 @@ Wait until all pods are active:
 ```bash
 $ oc get pods -w
 ```
-
-The `topolvm-node` pod remains in the initialization phase until the `vg-manager` completes all the necessary preparations.
 
 Once all the pods have been launched, the LVMS is ready to manage your logical volumes and make them available for use in your applications.
 

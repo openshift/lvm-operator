@@ -117,17 +117,17 @@ func (_c *MockLVM_AddTagToVG_Call) RunAndReturn(run func(context.Context, string
 	return _c
 }
 
-// CreateLV provides a mock function with given fields: ctx, lvName, vgName, sizePercent, chunkSizeBytes
-func (_m *MockLVM) CreateLV(ctx context.Context, lvName string, vgName string, sizePercent int, chunkSizeBytes int64) error {
-	ret := _m.Called(ctx, lvName, vgName, sizePercent, chunkSizeBytes)
+// CreateLV provides a mock function with given fields: ctx, lvName, vgName, sizePercent, chunkSizeBytes, metadataSizeBytes
+func (_m *MockLVM) CreateLV(ctx context.Context, lvName string, vgName string, sizePercent int, chunkSizeBytes int64, metadataSizeBytes int64) error {
+	ret := _m.Called(ctx, lvName, vgName, sizePercent, chunkSizeBytes, metadataSizeBytes)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateLV")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int64) error); ok {
-		r0 = rf(ctx, lvName, vgName, sizePercent, chunkSizeBytes)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int64, int64) error); ok {
+		r0 = rf(ctx, lvName, vgName, sizePercent, chunkSizeBytes, metadataSizeBytes)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -146,13 +146,14 @@ type MockLVM_CreateLV_Call struct {
 //   - vgName string
 //   - sizePercent int
 //   - chunkSizeBytes int64
-func (_e *MockLVM_Expecter) CreateLV(ctx interface{}, lvName interface{}, vgName interface{}, sizePercent interface{}, chunkSizeBytes interface{}) *MockLVM_CreateLV_Call {
-	return &MockLVM_CreateLV_Call{Call: _e.mock.On("CreateLV", ctx, lvName, vgName, sizePercent, chunkSizeBytes)}
+//   - metadataSizeBytes int64
+func (_e *MockLVM_Expecter) CreateLV(ctx interface{}, lvName interface{}, vgName interface{}, sizePercent interface{}, chunkSizeBytes interface{}, metadataSizeBytes interface{}) *MockLVM_CreateLV_Call {
+	return &MockLVM_CreateLV_Call{Call: _e.mock.On("CreateLV", ctx, lvName, vgName, sizePercent, chunkSizeBytes, metadataSizeBytes)}
 }
 
-func (_c *MockLVM_CreateLV_Call) Run(run func(ctx context.Context, lvName string, vgName string, sizePercent int, chunkSizeBytes int64)) *MockLVM_CreateLV_Call {
+func (_c *MockLVM_CreateLV_Call) Run(run func(ctx context.Context, lvName string, vgName string, sizePercent int, chunkSizeBytes int64, metadataSizeBytes int64)) *MockLVM_CreateLV_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int), args[4].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int), args[4].(int64), args[5].(int64))
 	})
 	return _c
 }
@@ -162,7 +163,7 @@ func (_c *MockLVM_CreateLV_Call) Return(_a0 error) *MockLVM_CreateLV_Call {
 	return _c
 }
 
-func (_c *MockLVM_CreateLV_Call) RunAndReturn(run func(context.Context, string, string, int, int64) error) *MockLVM_CreateLV_Call {
+func (_c *MockLVM_CreateLV_Call) RunAndReturn(run func(context.Context, string, string, int, int64, int64) error) *MockLVM_CreateLV_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -356,6 +357,55 @@ func (_c *MockLVM_ExtendLV_Call) Return(_a0 error) *MockLVM_ExtendLV_Call {
 }
 
 func (_c *MockLVM_ExtendLV_Call) RunAndReturn(run func(context.Context, string, string, int) error) *MockLVM_ExtendLV_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExtendThinPoolMetadata provides a mock function with given fields: ctx, lvName, vgName, metadataSizeBytes
+func (_m *MockLVM) ExtendThinPoolMetadata(ctx context.Context, lvName string, vgName string, metadataSizeBytes int64) error {
+	ret := _m.Called(ctx, lvName, vgName, metadataSizeBytes)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExtendThinPoolMetadata")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64) error); ok {
+		r0 = rf(ctx, lvName, vgName, metadataSizeBytes)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_ExtendThinPoolMetadata_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExtendThinPoolMetadata'
+type MockLVM_ExtendThinPoolMetadata_Call struct {
+	*mock.Call
+}
+
+// ExtendThinPoolMetadata is a helper method to define mock.On call
+//   - ctx context.Context
+//   - lvName string
+//   - vgName string
+//   - metadataSizeBytes int64
+func (_e *MockLVM_Expecter) ExtendThinPoolMetadata(ctx interface{}, lvName interface{}, vgName interface{}, metadataSizeBytes interface{}) *MockLVM_ExtendThinPoolMetadata_Call {
+	return &MockLVM_ExtendThinPoolMetadata_Call{Call: _e.mock.On("ExtendThinPoolMetadata", ctx, lvName, vgName, metadataSizeBytes)}
+}
+
+func (_c *MockLVM_ExtendThinPoolMetadata_Call) Run(run func(ctx context.Context, lvName string, vgName string, metadataSizeBytes int64)) *MockLVM_ExtendThinPoolMetadata_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64))
+	})
+	return _c
+}
+
+func (_c *MockLVM_ExtendThinPoolMetadata_Call) Return(_a0 error) *MockLVM_ExtendThinPoolMetadata_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_ExtendThinPoolMetadata_Call) RunAndReturn(run func(context.Context, string, string, int64) error) *MockLVM_ExtendThinPoolMetadata_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -766,6 +816,53 @@ func (_c *MockLVM_ListVGs_Call) Return(_a0 []lvm.VolumeGroup, _a1 error) *MockLV
 }
 
 func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool, lvm.ListVGOptions) ([]lvm.VolumeGroup, error)) *MockLVM_ListVGs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LockStart provides a mock function with given fields: ctx, vgName
+func (_m *MockLVM) LockStart(ctx context.Context, vgName string) error {
+	ret := _m.Called(ctx, vgName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LockStart")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, vgName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_LockStart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LockStart'
+type MockLVM_LockStart_Call struct {
+	*mock.Call
+}
+
+// LockStart is a helper method to define mock.On call
+//   - ctx context.Context
+//   - vgName string
+func (_e *MockLVM_Expecter) LockStart(ctx interface{}, vgName interface{}) *MockLVM_LockStart_Call {
+	return &MockLVM_LockStart_Call{Call: _e.mock.On("LockStart", ctx, vgName)}
+}
+
+func (_c *MockLVM_LockStart_Call) Run(run func(ctx context.Context, vgName string)) *MockLVM_LockStart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_LockStart_Call) Return(_a0 error) *MockLVM_LockStart_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_LockStart_Call) RunAndReturn(run func(context.Context, string) error) *MockLVM_LockStart_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -34,6 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+// ThinPoolConfigMaxRecommendedSizePercent is the maximum recommended size percent for the thin pool.
+const ThinPoolConfigMaxRecommendedSizePercent = 90
+
 // log is for logging in this package.
 var lvmclusterlog = logf.Log.WithName("lvmcluster-webhook")
 
@@ -53,6 +56,7 @@ var (
 	ErrEmptyPathsWithMultipleDeviceClasses                   = errors.New("path list should not be empty when there are multiple deviceClasses")
 	ErrDuplicateLVMCluster                                   = errors.New("duplicate LVMClusters are not allowed, remove the old LVMCluster or work with the existing instance")
 	ErrThinPoolConfigCannotBeChanged                         = errors.New("ThinPoolConfig can not be changed")
+	ErrThinPoolMetadataSizeCanOnlyBeIncreased                = errors.New("thin pool metadata size can only be increased")
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
@@ -123,6 +127,11 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 
+	metadataWarnings, err := v.verifyMetadataSize(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, metadataWarnings...)
 	return warnings, nil
 }
 
@@ -173,7 +182,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		var newThinPoolConfig, oldThinPoolConfig *ThinPoolConfig
-		var newDevices, newOptionalDevices, oldDevices, oldOptionalDevices []string
+		var newDevices, newOptionalDevices, oldDevices, oldOptionalDevices []DevicePath
 		var oldForceWipeOption, newForceWipeOption *bool
 
 		newThinPoolConfig = deviceClass.ThinPoolConfig
@@ -189,12 +198,25 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 				return warnings, fmt.Errorf("ThinPoolConfig.Name is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if newThinPoolConfig.SizePercent != oldThinPoolConfig.SizePercent {
 				return warnings, fmt.Errorf("ThinPoolConfig.SizePercent is invalid: %w", ErrThinPoolConfigCannotBeChanged)
-			} else if newThinPoolConfig.OverprovisionRatio != oldThinPoolConfig.OverprovisionRatio {
-				return warnings, fmt.Errorf("ThinPoolConfig.OverprovisionRatio is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if newThinPoolConfig.ChunkSizeCalculationPolicy != oldThinPoolConfig.ChunkSizeCalculationPolicy {
 				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSizeCalculationPolicy is invalid: %w", ErrThinPoolConfigCannotBeChanged)
 			} else if !reflect.DeepEqual(newThinPoolConfig.ChunkSize, oldThinPoolConfig.ChunkSize) {
 				return warnings, fmt.Errorf("ThinPoolConfig.ChunkSize is invalid: %w", ErrThinPoolConfigCannotBeChanged)
+			}
+
+			if newThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyStatic {
+				if newThinPoolConfig.MetadataSize == nil {
+					warnings = append(warnings, "thin pool metadata size is unset. LVMS operator will automatically set it to 1Gb and grow metadata size if needed")
+					newThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
+				}
+				if oldThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyStatic {
+					if oldThinPoolConfig.MetadataSize == nil {
+						oldThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
+					}
+					if newThinPoolConfig.MetadataSize.Value() < oldThinPoolConfig.MetadataSize.Value() {
+						return warnings, fmt.Errorf("ThinPoolConfig.MetadataSize is invalid: %w", ErrThinPoolMetadataSizeCanOnlyBeIncreased)
+					}
+				}
 			}
 		}
 
@@ -215,7 +237,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		oldDevices, oldOptionalDevices, oldForceWipeOption, err = v.getPathsOfDeviceClass(oldLVMCluster, deviceClass.Name)
 
 		// Is this a new device class?
-		if err == ErrDeviceClassNotFound {
+		if errors.Is(err, ErrDeviceClassNotFound) {
 			continue
 		}
 
@@ -269,11 +291,11 @@ func validateDeviceClassesStillExist(old, new []DeviceClass) error {
 	return nil
 }
 
-func validateDevicePathsStillExist(old, new []string) error {
-	deviceMap := make(map[string]bool)
+func validateDevicePathsStillExist(old, new []DevicePath) error {
+	deviceMap := make(map[DevicePath]struct{})
 
 	for _, device := range old {
-		deviceMap[device] = true
+		deviceMap[device] = struct{}{}
 	}
 
 	for _, device := range new {
@@ -300,6 +322,7 @@ func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Ob
 func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnings, error) {
 	deviceClasses := l.Spec.Storage.DeviceClasses
 	countDefault := 0
+	warnings := admission.Warnings{}
 	for _, deviceClass := range deviceClasses {
 		if deviceClass.Default {
 			countDefault++
@@ -307,15 +330,23 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 		if deviceClass.ThinPoolConfig != nil && deviceClass.DeviceAccessPolicy == DeviceAccessPolicyShared {
 			return nil, fmt.Errorf("ThinPoolConfig can not be set when deviceAccessPolicy is set to Shared")
 		}
+		if tpConfig := deviceClass.ThinPoolConfig; tpConfig != nil {
+			tpWarnings, err := v.verifyThinPoolConfig(tpConfig)
+			if err != nil {
+				return nil, err
+			}
+			warnings = append(warnings, tpWarnings...)
+		}
 	}
 	if countDefault > 1 {
 		return nil, fmt.Errorf("%w. Currently, there are %d default deviceClasses", ErrOnlyOneDefaultDeviceClassAllowed, countDefault)
 	}
+
 	if countDefault == 0 {
-		return admission.Warnings{"no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly or you will have to declare another default StorageClass"}, nil
+		warnings = append(warnings, "no default deviceClass was specified, it will be mandatory to specify the generated storage class in any PVC explicitly or you will have to declare another default StorageClass")
 	}
 
-	return nil, nil
+	return warnings, nil
 }
 
 func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.Warnings, error) {
@@ -339,18 +370,33 @@ func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.W
 	return nil, nil
 }
 
+func (v *lvmClusterValidator) verifyThinPoolConfig(config *ThinPoolConfig) (admission.Warnings, error) {
+	if config.SizePercent <= ThinPoolConfigMaxRecommendedSizePercent {
+		return nil, nil
+	}
+	return admission.Warnings{fmt.Sprintf(
+		"ThinPoolConfig.SizePercent for %[1]s is greater than %[2]d%%, "+
+			"this may lead to issues once the thin pool metadata that is created by default is nearing full capacity, "+
+			"as it will be impossible to extent the metadata pool size. "+
+			"You can ignore this warning if "+
+			"a) you are certain that you do not need to extend the metadata pool in the future or "+
+			"b) you set it above %[2]d%% but below 100%% because the buffer is sufficiently big with a smaller reserved percentage",
+		config.Name, ThinPoolConfigMaxRecommendedSizePercent,
+	)}, nil
+}
+
 func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
-				if !strings.HasPrefix(path, "/dev/") {
-					return fmt.Errorf("path %s must be an absolute path to the device", path)
+				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
+					return fmt.Errorf("path %s must be an absolute path to the device", path.Unresolved())
 				}
 			}
 
 			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-				if !strings.HasPrefix(path, "/dev/") {
-					return fmt.Errorf("optional path %s must be an absolute path to the device", path)
+				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
+					return fmt.Errorf("optional path %s must be an absolute path to the device", path.Unresolved())
 				}
 			}
 		}
@@ -375,57 +421,53 @@ func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 		    }
 		}
 	*/
-	devices := make(map[string]map[string]string)
+	devices := make(map[string]map[DevicePath]string)
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
-		if deviceClass.DeviceSelector != nil {
-			nodeSelector := deviceClass.NodeSelector.String()
 
-			// Required paths
-			for _, path := range deviceClass.DeviceSelector.Paths {
-				if val, ok := devices[nodeSelector][path]; ok {
-					var err error
-					if val != deviceClass.Name {
-						err = fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
-					} else {
-						err = fmt.Errorf("error: device path %s is specified at multiple places in deviceClass %s", path, val)
-					}
-					return err
+		if deviceClass.DeviceSelector == nil {
+			continue
+		}
+
+		nodeSelector := deviceClass.NodeSelector.String()
+
+		// Required paths
+		for _, path := range deviceClass.DeviceSelector.Paths {
+			if val, ok := devices[nodeSelector][path]; ok {
+				if val != deviceClass.Name {
+					return fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
 				}
-
-				if devices[nodeSelector] == nil {
-					devices[nodeSelector] = make(map[string]string)
-				}
-
-				devices[nodeSelector][path] = deviceClass.Name
+				return fmt.Errorf("error: device path %s is specified at multiple places in deviceClass %s", path, val)
 			}
 
-			// Optional paths
-			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-				if val, ok := devices[nodeSelector][path]; ok {
-					var err error
-					if val != deviceClass.Name {
-						err = fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
-					} else {
-						err = fmt.Errorf("error: optional device path %s is specified at multiple places in deviceClass %s", path, val)
-					}
-					return err
-				}
-
-				if devices[nodeSelector] == nil {
-					devices[nodeSelector] = make(map[string]string)
-				}
-
-				devices[nodeSelector][path] = deviceClass.Name
+			if devices[nodeSelector] == nil {
+				devices[nodeSelector] = make(map[DevicePath]string)
 			}
+
+			devices[nodeSelector][path] = deviceClass.Name
+		}
+
+		// Optional paths
+		for _, path := range deviceClass.DeviceSelector.OptionalPaths {
+			if val, ok := devices[nodeSelector][path]; ok {
+				if val != deviceClass.Name {
+					return fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
+				}
+				return fmt.Errorf("error: optional device path %s is specified at multiple places in deviceClass %s", path, val)
+			}
+
+			if devices[nodeSelector] == nil {
+				devices[nodeSelector] = make(map[DevicePath]string)
+			}
+
+			devices[nodeSelector][path] = deviceClass.Name
 		}
 	}
 
 	return nil
 }
 
-func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassName string) (required []string, optional []string, forceWipe *bool, err error) {
-	required, optional, err = []string{}, []string{}, nil
+func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassName string) (required []DevicePath, optional []DevicePath, forceWipe *bool, err error) {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
 			if deviceClass.DeviceSelector != nil {
@@ -433,7 +475,6 @@ func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassNa
 				optional = deviceClass.DeviceSelector.OptionalPaths
 				forceWipe = deviceClass.DeviceSelector.ForceWipeDevicesAndDestroyAllData
 			}
-
 			return
 		}
 	}
@@ -500,4 +541,29 @@ func (v *lvmClusterValidator) verifyChunkSize(l *LVMCluster) error {
 	}
 
 	return nil
+}
+
+func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error) {
+	warnings := make([]string, 0)
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.ThinPoolConfig == nil {
+			continue
+		}
+		if dc.ThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyHost && dc.ThinPoolConfig.MetadataSize != nil {
+			return warnings, fmt.Errorf("metadata size can not be set when metadata size calculation policy is set to Host")
+		}
+		if dc.ThinPoolConfig.MetadataSizeCalculationPolicy == MetadataSizePolicyStatic && dc.ThinPoolConfig.MetadataSize == nil {
+			warnings = append(warnings, "metadata size in unset. LVMS will set it to 1Gi by default")
+			dc.ThinPoolConfig.MetadataSize = &ThinPoolMetadataSizeDefault
+		}
+		if dc.ThinPoolConfig.MetadataSize != nil {
+			if dc.ThinPoolConfig.ChunkSize.Cmp(ThinPoolMetadataSizeMinimum) < 0 {
+				return warnings, fmt.Errorf("metadata size must be greater than or equal to %s", ThinPoolMetadataSizeMinimum.String())
+			}
+			if dc.ThinPoolConfig.MetadataSize.Cmp(ThinPoolMetadataSizeMaximum) > 0 {
+				return warnings, fmt.Errorf("metadata size must be less than or equal to %s", ThinPoolMetadataSizeMaximum.String())
+			}
+		}
+	}
+	return warnings, nil
 }

@@ -18,11 +18,13 @@ package vgmanager
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -40,21 +42,21 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/util"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	internalCSI "github.com/openshift/lvm-operator/v4/internal/csi"
 	runner "github.com/openshift/lvm-operator/v4/internal/locking"
 	"github.com/spf13/cobra"
-	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/pkg/controller"
 	"github.com/topolvm/topolvm/pkg/driver"
 	topoLVMD "github.com/topolvm/topolvm/pkg/lvmd"
 	"github.com/topolvm/topolvm/pkg/runners"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -99,7 +101,7 @@ func NewCmd(opts *Options) *cobra.Command {
 		SilenceErrors: false,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, opts)
+			return runWithFileLock(cmd, args, opts)
 		},
 	}
 
@@ -114,6 +116,27 @@ func NewCmd(opts *Options) *cobra.Command {
 		"Enable using shared volumes. Enabling this will ensure sanlock, lvmlockd, and watchdog runs on every node, and vgs are created using the locks.",
 	)
 	return cmd
+}
+
+func runWithFileLock(cmd *cobra.Command, args []string, opts *Options) error {
+	lock, err := util.NewFileLock("vgmanager")
+	if err != nil {
+		return fmt.Errorf("unable to create lock: %w", err)
+	}
+	defer func() {
+		if err := lock.Close(); err != nil {
+			opts.SetupLog.Error(err, "unable to close file lock")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
+	if err := lock.WaitForLock(ctx); err != nil {
+		return fmt.Errorf("unable to acquire lock: %w", err)
+	}
+
+	return run(cmd, args, opts)
 }
 
 func run(cmd *cobra.Command, _ []string, opts *Options) error {
@@ -135,9 +158,21 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			BindAddress:    opts.diagnosticsAddr,
 			SecureServing:  true,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) {
+					opts.SetupLog.Info("disabling http/2")
+					c.NextProtos = []string{"http/1.1"}
+				},
+			},
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) {
+					opts.SetupLog.Info("disabling http/2")
+					c.NextProtos = []string{"http/1.1"}
+				},
+			},
 		}},
 		HealthProbeBindAddress: opts.healthProbeAddr,
 		LeaderElection:         false,
@@ -234,10 +269,19 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
-		if err := os.MkdirAll(topolvm.DeviceDirectory, 0755); err != nil {
-			return err
+		registration := registration{
+			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
+				cancelWithCause,
+				constants.TopolvmCSIDriverName,
+				registrationPath(),
+				[]string{"1.0.0"},
+			),
+			registrationPath: topoLVMpluginRegistrationSocketPath(),
 		}
 		csiGrpcServer := newGRPCServer()
+		grpc_health_v1.RegisterHealthServer(csiGrpcServer, internalCSI.NewHealthServer(func(ctx context.Context) error {
+			return readyCheck(ctx, lvmdConfig, []internalCSI.CheckableRegistrationServer{registration}, opts.enableSharedVolumes)
+		}))
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
 		})
@@ -253,17 +297,9 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add grpc runner for node server: %w", err)
 		}
 
-		registration := registration{
-			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
-				cancelWithCause,
-				constants.TopolvmCSIDriverName,
-				registrationPath(),
-				[]string{"1.0.0"},
-			),
-			registrationPath: topoLVMpluginRegistrationSocketPath(),
-		}
 		registrations = append(registrations, registration)
 		registrationGrpcServer := newGRPCServer()
+		grpc_health_v1.RegisterHealthServer(registrationGrpcServer, internalCSI.NewHealthServer(internalCSI.AlwaysHealthy))
 		registerapi.RegisterRegistrationServer(registrationGrpcServer, registration)
 		if err = mgr.Add(internalCSI.NewGRPCRunner(registrationGrpcServer, registration.registrationPath, false)); err != nil {
 			return fmt.Errorf("could not add grpc runner for registration server: %w", err)
@@ -282,33 +318,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		NodeName:         nodeName,
 		Namespace:        operatorNamespace,
 		Filters:          filter.DefaultFilters,
+		SymlinkResolveFn: filepath.EvalSymlinks,
 		IsSharedVGLeader: volumeGroupLock.IsLeader,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
-	if err := mgr.AddReadyzCheck("readyz", readyCheck(mgr)); err != nil {
-		return fmt.Errorf("unable to set up ready check: %w", err)
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 
-	if err := mgr.AddHealthzCheck("healthz", func(req *http.Request) error {
-		for _, rs := range registrations {
-			if !rs.Registered() {
-				log.FromContext(req.Context()).Error(ErrCSIPluginNotYetRegistered, "not healthy")
-				return ErrCSIPluginNotYetRegistered
-			}
-		}
-		if opts.enableSharedVolumes {
-			log.FromContext(req.Context()).V(1).Info("shared volumes enabled, skipping lvmd health check")
-			return nil
-		}
-		if len(lvmdConfig.DeviceClasses) == 0 {
-			log.FromContext(req.Context()).Error(ErrNoDeviceClassesAvailable, "not healthy")
-			return ErrNoDeviceClassesAvailable
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("unable to set up health check: %w", err)
+	if err := mgr.AddReadyzCheck("readyz", readyCheckHealthzChecker(lvmdConfig, registrations, opts.enableSharedVolumes)); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	// Create new watcher.
@@ -427,15 +448,37 @@ func kubeSANpluginRegistrationSocketPath() string {
 	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.KubeSANCSIDriverName)
 }
 
-// readyCheck returns a healthz.Checker that verifies the operator is ready
-func readyCheck(mgr manager.Manager) healthz.Checker {
+func readyCheckHealthzChecker(
+	config *lvmd.Config,
+	server any,
+	enableSharedVolumes bool,
+) healthz.Checker {
 	return func(req *http.Request) error {
-		// Perform various checks here to determine if the operator is ready
-		if !mgr.GetCache().WaitForCacheSync(req.Context()) {
-			return fmt.Errorf("informer cache not synced and thus not ready")
+		return readyCheck(req.Context(), config, server, enableSharedVolumes)
+	}
+}
+
+func readyCheck(
+	ctx context.Context,
+	config *lvmd.Config,
+	servers any,
+	enableSharedVolumes bool,
+) error {
+	for _, rs := range servers.([]internalCSI.CheckableRegistrationServer) {
+		if !rs.Registered() {
+			log.FromContext(ctx).Error(ErrCSIPluginNotYetRegistered, "not healthy")
+			return ErrCSIPluginNotYetRegistered
 		}
+	}
+	if enableSharedVolumes {
+		log.FromContext(ctx).Info("shared volumes enabled, skipping lvmd health check")
 		return nil
 	}
+	if len(config.DeviceClasses) == 0 {
+		log.FromContext(ctx).Error(ErrNoDeviceClassesAvailable, "not healthy")
+		return ErrNoDeviceClassesAvailable
+	}
+	return nil
 }
 
 // newGRPCServer returns a new grpc.Server with the following settings:

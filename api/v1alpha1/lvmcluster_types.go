@@ -41,9 +41,11 @@ type ThinPoolConfig struct {
 	Name string `json:"name"`
 
 	// SizePercent specifies the percentage of space in the LVM volume group for creating the thin pool.
+	// If the size configuration is 100, the whole disk will be used.
+	// By default, 90% of the disk is used for the thin pool to allow for data or metadata expansion later on.
 	// +kubebuilder:default=90
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=90
+	// +kubebuilder:validation:Maximum=100
 	SizePercent int `json:"sizePercent,omitempty"`
 
 	// OverProvisionRatio specifies a factor by which you can provision additional storage based on the available storage in the thin pool. To prevent over-provisioning through validation, set this field to 1.
@@ -66,7 +68,37 @@ type ThinPoolConfig struct {
 	// It can be between 64Ki and 1Gi due to the underlying limitations of lvm2.
 	// +optional
 	ChunkSize *resource.Quantity `json:"chunkSize,omitempty"`
+
+	// MetadataSize specifies metadata size for thin pool. It used only when MetadataSizeCalculationPolicy
+	// is set to Static. No MetadataSize with a MetadataSizeCalculationPolicy set to Static will result in
+	// default metadata size of 1Gi. It can be between 2Mi and 16Gi due to the underlying limitations of lvm2.
+	// +optional
+	MetadataSize *resource.Quantity `json:"metadataSize,omitempty"`
+
+	// MetadataSizeCalculationPolicy specifies the policy to calculate metadata size for the underlying volume.
+	// When set to Host, the metadata size is calculated based on lvm2 default settings
+	// When set to Static, the metadata size is calculated based on the static size attribute provided within MetadataSize
+	// +kubebuilder:default=Host
+	// +kubebuilder:validation:Enum=Host;Static
+	// +required
+	MetadataSizeCalculationPolicy MetadataSizePolicy `json:"metadataSizeCalculationPolicy,omitempty"`
 }
+
+// MetadataSizePolicy specifies the policy to calculate the metadata size for the underlying volume.
+type MetadataSizePolicy string
+
+const (
+	// MetadataSizePolicyHost calculates the metadata size based on the lvm2 default settings.
+	MetadataSizePolicyHost MetadataSizePolicy = "Host"
+	// MetadataSizePolicyStatic calculates the metadata size based on a static size attribute.
+	MetadataSizePolicyStatic MetadataSizePolicy = "Static"
+)
+
+var (
+	ThinPoolMetadataSizeMinimum = resource.MustParse("2Mi")
+	ThinPoolMetadataSizeMaximum = resource.MustParse("16Gi")
+	ThinPoolMetadataSizeDefault = resource.MustParse("1Gi")
+)
 
 // ChunkSizeCalculationPolicy specifies the policy to calculate the chunk size for the underlying volume.
 // for more information, see man lvm.
@@ -145,17 +177,23 @@ type DeviceSelector struct {
 
 	// Paths specify the device paths.
 	// +optional
-	Paths []string `json:"paths,omitempty"`
+	Paths []DevicePath `json:"paths,omitempty"`
 
 	// OptionalPaths specify the optional device paths.
 	// +optional
-	OptionalPaths []string `json:"optionalPaths,omitempty"`
+	OptionalPaths []DevicePath `json:"optionalPaths,omitempty"`
 
 	// ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
 	// This wipes the file signatures on the devices. Use this feature with caution.
 	// Force wipe the devices only when you know that they do not contain any important data.
 	// +optional
 	ForceWipeDevicesAndDestroyAllData *bool `json:"forceWipeDevicesAndDestroyAllData,omitempty"`
+}
+
+type DevicePath string
+
+func (d DevicePath) Unresolved() string {
+	return string(d)
 }
 
 type LVMStateType string

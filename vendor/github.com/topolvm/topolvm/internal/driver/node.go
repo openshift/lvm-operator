@@ -3,9 +3,9 @@ package driver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -14,6 +14,7 @@ import (
 	"github.com/topolvm/topolvm"
 	"github.com/topolvm/topolvm/internal/driver/internal/k8s"
 	"github.com/topolvm/topolvm/internal/filesystem"
+	"github.com/topolvm/topolvm/internal/lvmd/command"
 	"github.com/topolvm/topolvm/pkg/lvmd/proto"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
@@ -26,8 +27,6 @@ import (
 
 const (
 	findmntCmd = "/bin/findmnt"
-
-	deviceMode = 0600 | unix.S_IFBLK
 )
 
 var nodeLogger = ctrl.Log.WithName("driver").WithName("node")
@@ -179,9 +178,7 @@ func (s *nodeServerNoLocked) NodePublishVolume(ctx context.Context, req *csi.Nod
 
 func makeMountOptions(readOnly bool, mountOption *csi.VolumeCapability_MountVolume) ([]string, error) {
 	mountOptions := make([]string, 0, len(mountOption.MountFlags)+2)
-	if readOnly {
-		mountOptions = append(mountOptions, "ro")
-	}
+	mountOptions = append(mountOptions, toReadOnlyMountOption(readOnly)...)
 
 	for _, f := range mountOption.MountFlags {
 		if f == "rw" && readOnly {
@@ -198,20 +195,16 @@ func makeMountOptions(readOnly bool, mountOption *csi.VolumeCapability_MountVolu
 	return mountOptions, nil
 }
 
+func toReadOnlyMountOption(readOnly bool) []string {
+	return map[bool][]string{true: {"ro"}, false: nil}[readOnly]
+}
+
 func (s *nodeServerNoLocked) nodePublishFilesystemVolume(req *csi.NodePublishVolumeRequest, lv *proto.LogicalVolume) error {
 	// Check request
 	mountOption := req.GetVolumeCapability().GetMount()
 	if mountOption.FsType == "" {
 		mountOption.FsType = "ext4"
 	}
-
-	// Find lv and create a block device with it
-	device := filepath.Join(topolvm.DeviceDirectory, req.GetVolumeId())
-	err := s.createDeviceIfNeeded(device, lv)
-	if err != nil {
-		return err
-	}
-
 	mountOptions, err := makeMountOptions(req.GetReadonly(), mountOption)
 	if err != nil {
 		return err
@@ -222,7 +215,7 @@ func (s *nodeServerNoLocked) nodePublishFilesystemVolume(req *csi.NodePublishVol
 		return status.Errorf(codes.Internal, "mkdir failed: target=%s, error=%v", req.GetTargetPath(), err)
 	}
 
-	fsType, err := filesystem.DetectFilesystem(device)
+	fsType, err := filesystem.DetectFilesystem(lv.GetPath())
 	if err != nil {
 		return status.Errorf(codes.Internal, "filesystem check failed: volume=%s, error=%v", req.GetVolumeId(), err)
 	}
@@ -237,7 +230,7 @@ func (s *nodeServerNoLocked) nodePublishFilesystemVolume(req *csi.NodePublishVol
 	}
 
 	if !mounted {
-		if err := s.mounter.FormatAndMount(device, req.GetTargetPath(), mountOption.FsType, mountOptions); err != nil {
+		if err := s.mounter.FormatAndMount(lv.GetPath(), req.GetTargetPath(), mountOption.FsType, mountOptions); err != nil {
 			return status.Errorf(codes.Internal, "mount failed: volume=%s, error=%v", req.GetVolumeId(), err)
 		}
 		if err := os.Chmod(req.GetTargetPath(), 0777|os.ModeSetgid); err != nil {
@@ -246,8 +239,8 @@ func (s *nodeServerNoLocked) nodePublishFilesystemVolume(req *csi.NodePublishVol
 	}
 
 	r := mountutil.NewResizeFs(s.mounter.Exec)
-	if resize, err := r.NeedResize(device, req.GetTargetPath()); resize {
-		if _, err := r.Resize(device, req.GetTargetPath()); err != nil {
+	if resize, err := r.NeedResize(lv.GetPath(), req.GetTargetPath()); resize {
+		if _, err := r.Resize(lv.GetPath(), req.GetTargetPath()); err != nil {
 			return status.Errorf(codes.Internal, "failed to resize filesystem %s (mounted at: %s): %v", req.VolumeId, req.GetTargetPath(), err)
 		}
 	} else if err != nil {
@@ -262,48 +255,28 @@ func (s *nodeServerNoLocked) nodePublishFilesystemVolume(req *csi.NodePublishVol
 	return nil
 }
 
-func (s *nodeServerNoLocked) createDeviceIfNeeded(device string, lv *proto.LogicalVolume) error {
-	var stat unix.Stat_t
-	err := filesystem.Stat(device, &stat)
-	switch err {
-	case nil:
-		// a block device already exists, check its attributes
-		if stat.Rdev == unix.Mkdev(lv.DevMajor, lv.DevMinor) && stat.Uid == uint32(os.Getuid()) && stat.Mode == deviceMode {
-			return nil
-		}
-		err := os.Remove(device)
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed to remove device file %s: error=%v", device, err)
-		}
-		fallthrough
-	case unix.ENOENT:
-		err = os.MkdirAll(path.Dir(device), 0755)
-		if err != nil {
-			return status.Errorf(codes.Internal, "mkdir failed: target=%s, error=%v", path.Dir(device), err)
-		}
-
-		devno := unix.Mkdev(lv.DevMajor, lv.DevMinor)
-		if err := filesystem.Mknod(device, deviceMode, int(devno)); err != nil {
-			return status.Errorf(codes.Internal, "mknod failed for %s. major=%d, minor=%d, error=%v",
-				device, lv.DevMajor, lv.DevMinor, err)
-		}
-	default:
-		return status.Errorf(codes.Internal, "failed to stat %s: error=%v", device, err)
-	}
-	return nil
-}
-
 func (s *nodeServerNoLocked) nodePublishBlockVolume(req *csi.NodePublishVolumeRequest, lv *proto.LogicalVolume) error {
 	// Find lv and create a block device with it
-	targetPath := req.GetTargetPath()
-	err := s.createDeviceIfNeeded(targetPath, lv)
+	// We mount via bind mount so that we can also respect the readonly flag
+	mountOptions := append(toReadOnlyMountOption(req.GetReadonly()), "bind")
+
+	fi, err := os.Create(req.GetTargetPath())
 	if err != nil {
-		return err
+		return status.Errorf(codes.Internal, "create failed: target=%s, error=%v", req.GetTargetPath(), err)
+	}
+	defer func() { _ = fi.Close() }()
+
+	if err := os.Chmod(req.GetTargetPath(), 0755); err != nil {
+		return status.Errorf(codes.Internal, "chmod failed: target=%s, error=%v", req.GetTargetPath(), err)
+	}
+
+	if err := s.mounter.Mount(lv.GetPath(), req.GetTargetPath(), "", mountOptions); err != nil {
+		return status.Errorf(codes.Internal, "(bind)mount failed: volume=%s, error=%v", req.GetVolumeId(), err)
 	}
 
 	nodeLogger.Info("NodePublishVolume(block) succeeded",
 		"volume_id", req.GetVolumeId(),
-		"target_path", targetPath)
+		"target_path", req.GetTargetPath())
 	return nil
 }
 
@@ -338,12 +311,10 @@ func (s *nodeServerNoLocked) NodeUnpublishVolume(ctx context.Context, req *csi.N
 		return nil, status.Error(codes.InvalidArgument, "no target_path is provided")
 	}
 
-	device := filepath.Join(topolvm.DeviceDirectory, volumeID)
-
 	info, err := os.Stat(targetPath)
 	if os.IsNotExist(err) {
-		// target_path does not exist, but device for mount-type PV may still exist.
-		_ = os.Remove(device)
+		// target_path does not exist, but legacy device for mount-type PV may still exist.
+		_ = os.Remove(filepath.Join(topolvm.LegacyDeviceDirectory, volumeID))
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	} else if err != nil {
 		return nil, status.Errorf(codes.Internal, "stat failed for %s: %v", targetPath, err)
@@ -351,7 +322,7 @@ func (s *nodeServerNoLocked) NodeUnpublishVolume(ctx context.Context, req *csi.N
 
 	// remove device file if target_path is device, unmount target_path otherwise
 	if info.IsDir() {
-		err = s.nodeUnpublishFilesystemVolume(req, device)
+		err = s.nodeUnpublishFilesystemVolume(req)
 	} else {
 		err = s.nodeUnpublishBlockVolume(req)
 	}
@@ -361,15 +332,11 @@ func (s *nodeServerNoLocked) NodeUnpublishVolume(ctx context.Context, req *csi.N
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (s *nodeServerNoLocked) nodeUnpublishFilesystemVolume(req *csi.NodeUnpublishVolumeRequest, device string) error {
+func (s *nodeServerNoLocked) nodeUnpublishFilesystemVolume(req *csi.NodeUnpublishVolumeRequest) error {
 	targetPath := req.GetTargetPath()
 
 	if err := mountutil.CleanupMountPoint(targetPath, s.mounter, true); err != nil {
 		return status.Errorf(codes.Internal, "unmount failed for %s: error=%v", targetPath, err)
-	}
-
-	if err := os.Remove(device); err != nil && !os.IsNotExist(err) {
-		return status.Errorf(codes.Internal, "remove device failed for %s: error=%v", device, err)
 	}
 
 	nodeLogger.Info("NodeUnpublishVolume(fs) is succeeded",
@@ -379,9 +346,12 @@ func (s *nodeServerNoLocked) nodeUnpublishFilesystemVolume(req *csi.NodeUnpublis
 }
 
 func (s *nodeServerNoLocked) nodeUnpublishBlockVolume(req *csi.NodeUnpublishVolumeRequest) error {
-	if err := os.Remove(req.GetTargetPath()); err != nil {
-		return status.Errorf(codes.Internal, "remove failed for %s: error=%v", req.GetTargetPath(), err)
+	targetPath := req.GetTargetPath()
+
+	if err := mountutil.CleanupMountPoint(targetPath, s.mounter, true); err != nil {
+		return status.Errorf(codes.Internal, "unmount failed for %s: error=%v", targetPath, err)
 	}
+
 	nodeLogger.Info("NodeUnpublishVolume(block) is succeeded",
 		"volume_id", req.GetVolumeId(),
 		"target_path", req.GetTargetPath())
@@ -400,10 +370,10 @@ func (s *nodeServerNoLocked) NodeGetVolumeStats(ctx context.Context, req *csi.No
 	}
 
 	var st unix.Stat_t
-	switch err := filesystem.Stat(volumePath, &st); err {
-	case unix.ENOENT:
+	switch err := filesystem.Stat(volumePath, &st); {
+	case errors.Is(err, unix.ENOENT):
 		return nil, status.Error(codes.NotFound, "Volume is not found at "+volumePath)
-	case nil:
+	case err == nil:
 	default:
 		return nil, status.Errorf(codes.Internal, "stat on %s was failed: %v", volumePath, err)
 	}
@@ -450,7 +420,26 @@ func (s *nodeServerNoLocked) NodeGetVolumeStats(ctx context.Context, req *csi.No
 			Available: int64(sfs.Ffree),
 		})
 	}
-	return &csi.NodeGetVolumeStatsResponse{Usage: usage}, nil
+
+	var lv *proto.LogicalVolume
+	lvr, err := s.k8sLVService.GetVolume(ctx, volumeID)
+	if err != nil {
+		return nil, err
+	}
+	lv, err = s.getLvFromContext(ctx, lvr.Spec.DeviceClass, volumeID)
+	if err != nil {
+		return nil, err
+	}
+	if lv == nil {
+		return nil, status.Errorf(codes.NotFound, "failed to find LV: %s", volumeID)
+	}
+
+	volumeCondition, err := getVolumeCondition(lv)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{Usage: usage, VolumeCondition: volumeCondition}, nil
 }
 
 func (s *nodeServerNoLocked) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
@@ -485,7 +474,6 @@ func (s *nodeServerNoLocked) NodeExpandVolume(ctx context.Context, req *csi.Node
 		return &csi.NodeExpandVolumeResponse{}, nil
 	}
 
-	device := filepath.Join(topolvm.DeviceDirectory, volumeID)
 	lvr, err := s.k8sLVService.GetVolume(ctx, volumeID)
 	deviceClass := topolvm.DefaultDeviceClassName
 	if err == nil {
@@ -499,10 +487,6 @@ func (s *nodeServerNoLocked) NodeExpandVolume(ctx context.Context, req *csi.Node
 	}
 	if lv == nil {
 		return nil, status.Errorf(codes.NotFound, "failed to find LV: %s", volumeID)
-	}
-	err = s.createDeviceIfNeeded(device, lv)
-	if err != nil {
-		return nil, err
 	}
 
 	args := []string{"-o", "source", "--noheadings", "--target", req.GetVolumePath()}
@@ -519,7 +503,7 @@ func (s *nodeServerNoLocked) NodeExpandVolume(ctx context.Context, req *csi.Node
 
 	logger.Info("triggering filesystem resize")
 	r := mountutil.NewResizeFs(s.mounter.Exec)
-	if _, err := r.Resize(device, volumePath); err != nil {
+	if _, err := r.Resize(lv.GetPath(), volumePath); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to resize filesystem %s (mounted at: %s): %v", volumeID, volumePath, err)
 	}
 
@@ -536,6 +520,7 @@ func (s *nodeServerNoLocked) NodeGetCapabilities(context.Context, *csi.NodeGetCa
 	capabilities := []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 	}
 
 	csiCaps := make([]*csi.NodeServiceCapability, len(capabilities))
@@ -563,4 +548,24 @@ func (s *nodeServerNoLocked) NodeGetInfo(ctx context.Context, req *csi.NodeGetIn
 			},
 		},
 	}, nil
+}
+
+func getVolumeCondition(lv *proto.LogicalVolume) (*csi.VolumeCondition, error) {
+	attr, err := command.ParsedLVAttr(lv.GetAttr())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse attributes returned from logical volume service: %w", err)
+	}
+	var volumeCondition csi.VolumeCondition
+	if err := attr.VerifyHealth(); err != nil {
+		volumeCondition = csi.VolumeCondition{
+			Abnormal: true,
+			Message:  err.Error(),
+		}
+	} else {
+		volumeCondition = csi.VolumeCondition{
+			Abnormal: false,
+			Message:  "volume is healthy and operating normally",
+		}
+	}
+	return &volumeCondition, nil
 }

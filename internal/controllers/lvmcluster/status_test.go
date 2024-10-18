@@ -924,8 +924,8 @@ func TestComputeReadiness(t *testing.T) {
 				{
 					Type:    lvmv1alpha1.ResourcesAvailable,
 					Status:  metav1.ConditionFalse,
-					Reason:  ReasonResourcesSyncFailed,
-					Message: MessageReasonResourcesSyncFailed,
+					Reason:  ReasonResourcesIncomplete,
+					Message: MessageReasonResourcesSyncIncomplete,
 				},
 				{
 					Type:    lvmv1alpha1.VolumeGroupsReady,
@@ -938,13 +938,13 @@ func TestComputeReadiness(t *testing.T) {
 			expectedReady: false,
 		},
 		{
-			desc: "one failing, one degraded",
+			desc: "one progressing, one degraded",
 			conditions: []metav1.Condition{
 				{
 					Type:    lvmv1alpha1.ResourcesAvailable,
 					Status:  metav1.ConditionFalse,
-					Reason:  ReasonResourcesSyncFailed,
-					Message: MessageReasonResourcesSyncFailed,
+					Reason:  ReasonResourcesIncomplete,
+					Message: MessageReasonResourcesSyncIncomplete,
 				},
 				{
 					Type:    lvmv1alpha1.VolumeGroupsReady,
@@ -953,7 +953,7 @@ func TestComputeReadiness(t *testing.T) {
 					Message: MessageVGsDegraded,
 				},
 			},
-			expectedState: lvmv1alpha1.LVMStatusFailed,
+			expectedState: lvmv1alpha1.LVMStatusDegraded,
 			expectedReady: false,
 		},
 		{
@@ -1000,8 +1000,8 @@ func TestComputeReadiness(t *testing.T) {
 				{
 					Type:    lvmv1alpha1.ResourcesAvailable,
 					Status:  metav1.ConditionFalse,
-					Reason:  ReasonResourcesSyncFailed,
-					Message: MessageReasonResourcesSyncFailed,
+					Reason:  ReasonResourcesIncomplete,
+					Message: MessageReasonResourcesSyncIncomplete,
 				},
 				{
 					Type:    lvmv1alpha1.VolumeGroupsReady,
@@ -1010,7 +1010,7 @@ func TestComputeReadiness(t *testing.T) {
 					Message: MessageVGsUnmanaged,
 				},
 			},
-			expectedState: lvmv1alpha1.LVMStatusFailed,
+			expectedState: lvmv1alpha1.LVMStatusProgressing,
 			expectedReady: false,
 		},
 	}

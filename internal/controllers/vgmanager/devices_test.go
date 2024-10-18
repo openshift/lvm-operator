@@ -8,42 +8,39 @@ import (
 
 	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var devicePaths map[string]string
+var devicePaths map[string]v1alpha1.DevicePath
 
 func Test_getNewDevicesToBeAdded(t *testing.T) {
-	// create a folder for each disk to resolve filepath.EvalSymlinks(path) call in getNewDevicesToBeAdded.
+	// create a folder for each disk to resolve filepath.EvalSymlinks(path) call in getDeviceCandidates.
 	tmpDir := t.TempDir()
-	devicePaths = make(map[string]string)
-	devicePaths["nvme1n1p1"] = fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p1")
-	devicePaths["nvme1n1p2"] = fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p2")
+	devicePaths = make(map[string]v1alpha1.DevicePath)
+	devicePaths["nvme1n1p1"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p1"))
+	devicePaths["nvme1n1p2"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "nvme1n1p2"))
+	devicePaths["md1"] = v1alpha1.DevicePath(fmt.Sprintf("%s/%s", tmpDir, "md1"))
 	for _, path := range devicePaths {
-		err := os.Mkdir(path, 0755)
+		err := os.Mkdir(path.Unresolved(), 0755)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	r := &Reconciler{}
-
-	filters := filter.DefaultFilters(nil)
-	// remove noBindMounts filter as it reads `proc/1/mountinfo` file.
-	delete(filters, "noBindMounts")
-
 	testCases := []struct {
 		description           string
 		volumeGroup           v1alpha1.LVMVolumeGroup
 		existingBlockDevices  []lsblk.BlockDevice
-		nodeStatus            v1alpha1.LVMVolumeGroupNodeStatus
 		numOfAvailableDevices int
 		expectError           bool
+		vgs                   []lvm.VolumeGroup
 	}{
 		{
 			description: "device is available to use",
@@ -232,7 +229,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -258,7 +255,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -266,7 +263,6 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 			},
 			existingBlockDevices:  []lsblk.BlockDevice{},
 			numOfAvailableDevices: 0,
-			expectError:           true,
 		},
 		{
 			description: "vg has device path that exists but read-only",
@@ -276,7 +272,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
@@ -302,24 +298,74 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
 				},
 			},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{
-				Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-					LVMVGStatus: []v1alpha1.VGStatus{
+			vgs: []lvm.VolumeGroup{
+				{
+					Name: "vg1",
+					PVs: []lvm.PhysicalVolume{
 						{
-							Name: "vg1",
-							Devices: []string{
-								calculateDevicePath(t, "nvme1n1p1"),
-								calculateDevicePath(t, "nvme1n1p2"),
-							},
+							PvName: calculateDevicePath(t, "nvme1n1p1"),
+							VgName: "vg1",
+						},
+						{
+							PvName: calculateDevicePath(t, "nvme1n1p2"),
+							VgName: "vg1",
+						},
+					},
+				},
+			},
+			existingBlockDevices: []lsblk.BlockDevice{
+				{
+					Name:     "nvme1n1p1",
+					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+					FSType:   filter.FSTypeLVM2Member,
+				},
+				{
+					Name:     "nvme1n1p2",
+					KName:    calculateDevicePath(t, "nvme1n1p2"),
+					Type:     "disk",
+					Size:     "279.4G",
+					ReadOnly: false,
+					State:    "live",
+					FSType:   filter.FSTypeLVM2Member,
+				},
+			},
+			numOfAvailableDevices: 0,
+			expectError:           false,
+		},
+		{
+			description: "vg has device path that is not a part of the existing vg",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []v1alpha1.DevicePath{
+							devicePaths["nvme1n1p1"],
+						},
+					},
+				},
+			},
+			vgs: []lvm.VolumeGroup{
+				{
+					Name: "vg1",
+					PVs: []lvm.PhysicalVolume{
+						{
+							PvName: calculateDevicePath(t, "nvme1n1p2"),
+							VgName: "vg1",
 						},
 					},
 				},
@@ -340,42 +386,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					Size:     "279.4G",
 					ReadOnly: false,
 					State:    "live",
-				},
-			},
-			numOfAvailableDevices: 0,
-			expectError:           false,
-		},
-		{
-			description: "vg has device path that is not a part of the existing vg",
-			volumeGroup: v1alpha1.LVMVolumeGroup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "vg1",
-				},
-				Spec: v1alpha1.LVMVolumeGroupSpec{
-					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
-							devicePaths["nvme1n1p1"],
-						},
-					},
-				},
-			},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{
-				Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-					LVMVGStatus: []v1alpha1.VGStatus{
-						{
-							Name: "vg1",
-						},
-					},
-				},
-			},
-			existingBlockDevices: []lsblk.BlockDevice{
-				{
-					Name:     "nvme1n1p1",
-					KName:    calculateDevicePath(t, "nvme1n1p1"),
-					Type:     "disk",
-					Size:     "279.4G",
-					ReadOnly: false,
-					State:    "live",
+					FSType:   filter.FSTypeLVM2Member,
 				},
 			},
 			numOfAvailableDevices: 1,
@@ -389,17 +400,19 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
 				},
 			},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{
-				Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-					LVMVGStatus: []v1alpha1.VGStatus{
+			vgs: []lvm.VolumeGroup{
+				{
+					Name: "vg1",
+					PVs: []lvm.PhysicalVolume{
 						{
-							Name: "vg1",
+							PvName: calculateDevicePath(t, "nvme1n1p2"),
+							VgName: "vg1",
 						},
 					},
 				},
@@ -420,12 +433,12 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 							Size:     "4G",
 							ReadOnly: false,
 							State:    "live",
+							FSType:   filter.FSTypeLVM2Member,
 						},
 					},
 				},
 			},
-			numOfAvailableDevices: 1,
-			expectError:           false,
+			numOfAvailableDevices: 0,
 		},
 		{
 			description: "vg has required and optional devices",
@@ -435,10 +448,10 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
@@ -452,6 +465,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					Size:     "279.4G",
 					ReadOnly: false,
 					State:    "live",
+					FSType:   filter.FSTypeLVM2Member,
 				},
 				{
 					Name:     "nvme1n1p2",
@@ -460,6 +474,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					Size:     "279.4G",
 					ReadOnly: false,
 					State:    "live",
+					FSType:   filter.FSTypeLVM2Member,
 				},
 			},
 			numOfAvailableDevices: 2,
@@ -473,7 +488,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 							devicePaths["nvme1n1p2"],
 						},
@@ -488,6 +503,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 					Size:     "279.4G",
 					ReadOnly: false,
 					State:    "live",
+					FSType:   filter.FSTypeLVM2Member,
 				},
 			},
 			numOfAvailableDevices: 1,
@@ -501,7 +517,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p2"],
 						},
 					},
@@ -528,17 +544,16 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 						},
 					},
 				},
 			},
 			numOfAvailableDevices: 0,
-			expectError:           true,
 		},
 		{
 			description: "vg has duplicate required device paths listed",
@@ -548,7 +563,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						Paths: []string{
+						Paths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 							devicePaths["nvme1n1p1"],
 						},
@@ -556,7 +571,6 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 			},
 			numOfAvailableDevices: 0,
-			expectError:           true,
 		},
 		{
 			description: "vg has duplicate optional device paths listed",
@@ -566,7 +580,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 				Spec: v1alpha1.LVMVolumeGroupSpec{
 					DeviceSelector: &v1alpha1.DeviceSelector{
-						OptionalPaths: []string{
+						OptionalPaths: []v1alpha1.DevicePath{
 							devicePaths["nvme1n1p1"],
 							devicePaths["nvme1n1p1"],
 						},
@@ -574,26 +588,83 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 				},
 			},
 			numOfAvailableDevices: 0,
-			expectError:           true,
+		},
+		{
+			description: "vg RAID with multiple paths under different devices",
+			volumeGroup: v1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "vg1",
+				},
+				Spec: v1alpha1.LVMVolumeGroupSpec{
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []v1alpha1.DevicePath{
+							devicePaths["md1"],
+						},
+					},
+				},
+			},
+			existingBlockDevices: []lsblk.BlockDevice{
+				{
+					Name:     "nvme1n1p1",
+					Type:     "disk",
+					Size:     "50G",
+					ReadOnly: false,
+					State:    "live",
+					KName:    calculateDevicePath(t, "nvme1n1p1"),
+					Serial:   "vol071204a42d92d52a2",
+					FSType:   "linux_raid_member",
+					Children: []lsblk.BlockDevice{{
+						Name:     "/dev/md1",
+						Type:     "raid1",
+						Size:     "50G",
+						ReadOnly: false,
+						KName:    calculateDevicePath(t, "md1"),
+					}},
+				},
+				{
+					Name:     "nvme1n1p2",
+					Type:     "disk",
+					Size:     "50G",
+					ReadOnly: false,
+					State:    "live",
+					KName:    calculateDevicePath(t, "nvme1n1p2"),
+					Serial:   "vol07993aa64fe3c5316",
+					FSType:   "linux_raid_member",
+					Children: []lsblk.BlockDevice{{
+						Name:     "/dev/md1",
+						Type:     "raid1",
+						Size:     "50G",
+						ReadOnly: false,
+						KName:    calculateDevicePath(t, "md1"),
+					}},
+				},
+			},
+			numOfAvailableDevices: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
-			availableDevices, err := r.getNewDevicesToBeAdded(ctx, tc.existingBlockDevices, &tc.nodeStatus, &tc.volumeGroup)
-			if !tc.expectError {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
+
+			opts := &filter.Options{
+				VG:  &tc.volumeGroup,
+				BDI: nil,
+				PVs: []lvm.PhysicalVolume{},
 			}
-			devices := r.filterDevices(ctx, availableDevices, nil, nil, filters)
-			if !tc.expectError {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
+			for _, vg := range tc.vgs {
+				opts.PVs = append(opts.PVs, vg.PVs...)
 			}
+			filters := filter.DefaultFilters(opts)
+
+			devices := filterDevices(ctx, tc.existingBlockDevices, symlinkResolver.NewWithDefaultResolver(), filters)
 			assert.Equal(t, tc.numOfAvailableDevices, len(devices.Available), "expected numOfAvailableDevices is not equal to actual number")
+
+			if tc.expectError {
+				if len(devices.Excluded) == 0 {
+					t.Errorf("expected error but got no excluded devices which could have signalled an error")
+				}
+			}
 		})
 	}
 }
@@ -602,5 +673,5 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 // it has /private in the beginning because /tmp symlinks are evaluated as with /private in the beginning on darwin.
 func calculateDevicePath(t *testing.T, deviceName string) string {
 	t.Helper()
-	return getKNameFromDevice(devicePaths[deviceName])
+	return getKNameFromDevice(devicePaths[deviceName].Unresolved()).Unresolved()
 }

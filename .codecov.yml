@@ -28,5 +28,6 @@ comment:
 
 ignore:
   - "test/**/*"
-  - "**/mocks"
+  - "**/mocks/*.go"
+  - "cmd"
   - "**/zz_generated*.go"

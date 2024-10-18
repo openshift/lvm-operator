@@ -83,12 +83,12 @@ func (in *DeviceSelector) DeepCopyInto(out *DeviceSelector) {
 	*out = *in
 	if in.Paths != nil {
 		in, out := &in.Paths, &out.Paths
-		*out = make([]string, len(*in))
+		*out = make([]DevicePath, len(*in))
 		copy(*out, *in)
 	}
 	if in.OptionalPaths != nil {
 		in, out := &in.OptionalPaths, &out.OptionalPaths
-		*out = make([]string, len(*in))
+		*out = make([]DevicePath, len(*in))
 		copy(*out, *in)
 	}
 	if in.ForceWipeDevicesAndDestroyAllData != nil {
@@ -482,6 +482,11 @@ func (in *ThinPoolConfig) DeepCopyInto(out *ThinPoolConfig) {
 	*out = *in
 	if in.ChunkSize != nil {
 		in, out := &in.ChunkSize, &out.ChunkSize
+		x := (*in).DeepCopy()
+		*out = &x
+	}
+	if in.MetadataSize != nil {
+		in, out := &in.MetadataSize, &out.MetadataSize
 		x := (*in).DeepCopy()
 		*out = &x
 	}

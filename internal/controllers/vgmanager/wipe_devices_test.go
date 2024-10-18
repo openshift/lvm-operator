@@ -2,13 +2,17 @@ package vgmanager
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
+	"time"
+
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 
 	"github.com/go-logr/logr/testr"
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	dmsetupmocks "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup/mocks"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	wipefsmocks "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,17 +26,18 @@ func TestWipeDevices(t *testing.T) {
 	tests := []struct {
 		name                 string
 		forceWipeNotEnabled  bool
-		devicePaths          []string
-		optionalDevicePaths  []string
+		devicePaths          []v1alpha1.DevicePath
+		optionalDevicePaths  []v1alpha1.DevicePath
 		blockDevices         []lsblk.BlockDevice
-		nodeStatus           v1alpha1.LVMVolumeGroupNodeStatus
+		vgs                  []lvm.VolumeGroup
 		wipeCount            int
 		removeReferenceCount int
+		wipedBefore          bool
 	}{
 		{
 			name:                 "Force wipe feature is not enabled",
 			forceWipeNotEnabled:  true,
-			devicePaths:          []string{"/dev/loop1"},
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
 			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
 			wipeCount:            0,
 			removeReferenceCount: 0,
@@ -44,147 +49,129 @@ func TestWipeDevices(t *testing.T) {
 			removeReferenceCount: 0,
 		},
 		{
-			name:         "Device exist in the device list",
-			devicePaths:  []string{"/dev/loop1"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/sda"}}},
-			}},
+			name:                 "Device exist in the device list",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/sda"}}}},
 			wipeCount:            1,
 			removeReferenceCount: 0,
 		},
 		{
 			name:                 "Device does not exist in the device list",
-			devicePaths:          []string{"/dev/loop1"},
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
 			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}},
 			wipeCount:            0,
 			removeReferenceCount: 0,
 		},
 		{
 			name:                 "Device exist as a child",
-			devicePaths:          []string{"/dev/loop1"},
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
 			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda", Children: []lsblk.BlockDevice{{KName: "/dev/loop1"}}}, {KName: "/dev/sdb"}},
 			wipeCount:            1,
 			removeReferenceCount: 0,
 		},
 		{
 			name:                 "Device has child references",
-			devicePaths:          []string{"/dev/loop1"},
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
 			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/loop1", Children: []lsblk.BlockDevice{{KName: "/dev/loop1p1", Children: []lsblk.BlockDevice{{KName: "/dev/loop1p1p1"}}}, {KName: "/dev/loop1p2"}}}, {KName: "/dev/sda"}},
 			wipeCount:            1,
 			removeReferenceCount: 3,
 		},
 		{
 			name:                 "Device exists as a child device that has a child reference",
-			devicePaths:          []string{"/dev/loop1"},
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
 			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda", Children: []lsblk.BlockDevice{{KName: "/dev/loop1", Children: []lsblk.BlockDevice{{KName: "/dev/loop1p1"}}}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}}}, {KName: "/dev/sdb"}},
 			wipeCount:            1,
 			removeReferenceCount: 1,
 		},
 		{
-			name:         "Device exist in the device list and is already part of a vg",
-			devicePaths:  []string{"/dev/loop1"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/loop1"}}},
-			}},
+			name:                 "Device exist in the device list and is already part of a vg",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/loop1"}}}},
+			wipeCount:            1,
+			removeReferenceCount: 0,
+		},
+		{
+			name:                 "Device exist in the device list and is already part of a vg, but was already wiped before",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/loop1"}}}},
+			wipedBefore:          true,
 			wipeCount:            0,
 			removeReferenceCount: 0,
 		},
 		{
-			name:         "Only one device out of two exists in the device list",
-			devicePaths:  []string{"/dev/loop1", "/dev/loop2"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/sda"}}},
-			}},
+			name:                 "Only one device out of two exists in the device list",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1", "/dev/loop2"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/sda"}}}},
 			wipeCount:            1,
 			removeReferenceCount: 0,
 		},
 		{
-			name:         "Both devices exist in the device list",
-			devicePaths:  []string{"/dev/loop1", "/dev/loop2"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/sda"}}},
-			}},
+			name:                 "Both devices exist in the device list",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1", "/dev/loop2"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/sda"}}}},
 			wipeCount:            2,
 			removeReferenceCount: 1,
 		},
 		{
-			name:                "One required and one optional device exist in the device list",
-			devicePaths:         []string{"/dev/loop1"},
-			optionalDevicePaths: []string{"/dev/loop2"},
-			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/sda"}}},
-			}},
+			name:                 "One required and one optional device exist in the device list",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
+			optionalDevicePaths:  []v1alpha1.DevicePath{"/dev/loop2"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/sda"}}}},
 			wipeCount:            2,
 			removeReferenceCount: 1,
 		},
 		{
-			name:                "Optional device does not exist in the device list",
-			devicePaths:         []string{"/dev/loop1"},
-			optionalDevicePaths: []string{"/dev/loop2"},
-			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/sda"}}},
-			}},
+			name:                 "Optional device does not exist in the device list",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
+			optionalDevicePaths:  []v1alpha1.DevicePath{"/dev/loop2"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/sda"}}}},
 			wipeCount:            1,
 			removeReferenceCount: 0,
 		},
 		{
-			name:         "Both devices, one of them is a child, exist in the device list",
-			devicePaths:  []string{"/dev/loop1", "/dev/loop2p1"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/sda"}}},
-			}},
+			name:                 "Both devices, one of them is a child, exist in the device list",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1", "/dev/loop2p1"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/sda"}}}},
 			wipeCount:            2,
 			removeReferenceCount: 0,
 		},
 		{
-			name:         "Both devices exist in the device list, one of them is part of the vg",
-			devicePaths:  []string{"/dev/loop1", "/dev/loop2"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/loop1"}}},
-			}},
-			wipeCount:            1,
+			name:                 "Both devices exist in the device list, one of them is part of the vg",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1", "/dev/loop2"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/loop1"}}}},
+			wipeCount:            2,
 			removeReferenceCount: 1,
 		},
 		{
-			name:         "Both devices are part of the vg",
-			devicePaths:  []string{"/dev/loop1", "/dev/loop2"},
-			blockDevices: []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
-			nodeStatus: v1alpha1.LVMVolumeGroupNodeStatus{Spec: v1alpha1.LVMVolumeGroupNodeStatusSpec{
-				LVMVGStatus: []v1alpha1.VGStatus{
-					{Name: "vg1", Devices: []string{"/dev/loop1", "/dev/loop2"}}},
-			}},
-			wipeCount:            0,
-			removeReferenceCount: 0,
+			name:                 "Both devices are part of the vg, one of them with a child",
+			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1", "/dev/loop2"},
+			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/loop1"}, {KName: "/dev/loop2", Children: []lsblk.BlockDevice{{KName: "/dev/loop2p1"}}}},
+			vgs:                  []lvm.VolumeGroup{{Name: "vg1", PVs: []lvm.PhysicalVolume{{PvName: "/dev/loop1"}, {PvName: "/dev/loop2"}}}},
+			wipeCount:            2,
+			removeReferenceCount: 1,
 		},
 	}
 	mockWipefs := wipefsmocks.NewMockWipefs(t)
 	mockDmsetup := dmsetupmocks.NewMockDmsetup(t)
-	evalSymlinks = func(path string) (string, error) {
-		return path, nil
-	}
-	defer func() {
-		evalSymlinks = filepath.EvalSymlinks
-	}()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
-			r := &Reconciler{Wipefs: mockWipefs, Dmsetup: mockDmsetup}
+			r := &Reconciler{
+				NodeName:         "test",
+				Wipefs:           mockWipefs,
+				Dmsetup:          mockDmsetup,
+				SymlinkResolveFn: func(path string) (string, error) { return path, nil },
+			}
 			if tt.wipeCount > 0 {
 				mockWipefs.EXPECT().Wipe(ctx, mock.Anything).Return(nil).Times(tt.wipeCount)
 			}
@@ -200,7 +187,12 @@ func TestWipeDevices(t *testing.T) {
 				}},
 			}
 
-			wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, &tt.nodeStatus, tt.blockDevices)
+			if tt.wipedBefore {
+				volumeGroup.Annotations = map[string]string{
+					constants.DevicesWipedAnnotationPrefix + r.NodeName: time.Now().Format(time.RFC3339)}
+			}
+
+			wiped, err := r.wipeDevices(ctx, volumeGroup, tt.blockDevices, symlinkResolver.NewWithResolver(r.SymlinkResolveFn))
 			if tt.wipeCount > 0 {
 				assert.True(t, wiped)
 			} else {

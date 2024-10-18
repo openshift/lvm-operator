@@ -39,6 +39,13 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", r.sockFile, err)
 	}
+	defer func(ctx context.Context) {
+		logger := log.FromContext(ctx)
+		if err := os.Remove(r.sockFile); err != nil && !os.IsNotExist(err) {
+			logger.Error(fmt.Errorf("failed to remove socket file after shutdown: %w", err), "failed socket file removal")
+		}
+		logger.Info("removed socket file", "sockFile", r.sockFile)
+	}(ctx)
 
 	go func() {
 		if err := r.srv.Serve(lis); err != nil {
@@ -66,9 +73,6 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	case <-time.After(10 * time.Second):
 		r.srv.Stop()
 		logger.Info("Stopped gRPC server forcibly", "duration", time.Since(start))
-	}
-	if err := os.Remove(r.sockFile); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove socket file after shutdown: %w", err)
 	}
 	return nil
 }

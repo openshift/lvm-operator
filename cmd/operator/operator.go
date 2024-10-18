@@ -18,6 +18,7 @@ package operator
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -32,8 +33,8 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/node/removal"
-	"github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume"
-	"github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume-claim"
+	persistent_volume "github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume"
+	persistent_volume_claim "github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume-claim"
 	internalCSI "github.com/openshift/lvm-operator/v4/internal/csi"
 	"github.com/openshift/lvm-operator/v4/internal/migration/microlvms"
 	"github.com/spf13/cobra"
@@ -186,9 +187,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			BindAddress:    opts.diagnosticsAddr,
 			SecureServing:  true,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
+			},
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
+			TLSOpts: []func(*tls.Config){
+				func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
+			},
 		}},
 		Cache: cache.Options{
 			DefaultTransform: NoManagedFields,

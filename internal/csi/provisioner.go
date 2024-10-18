@@ -11,11 +11,11 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
-	"github.com/kubernetes-csi/external-provisioner/pkg/capacity"
-	"github.com/kubernetes-csi/external-provisioner/pkg/capacity/topology"
-	provisionctrl "github.com/kubernetes-csi/external-provisioner/pkg/controller"
-	"github.com/kubernetes-csi/external-provisioner/pkg/features"
-	"github.com/kubernetes-csi/external-provisioner/pkg/owner"
+	"github.com/kubernetes-csi/external-provisioner/v5/pkg/capacity"
+	"github.com/kubernetes-csi/external-provisioner/v5/pkg/capacity/topology"
+	provisionctrl "github.com/kubernetes-csi/external-provisioner/v5/pkg/controller"
+	"github.com/kubernetes-csi/external-provisioner/v5/pkg/features"
+	"github.com/kubernetes-csi/external-provisioner/v5/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -248,8 +248,8 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		provisioner = capacity.NewProvisionWrapper(provisioner, capacityController)
 	}
 
-	claimRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
-	claimQueue := workqueue.NewRateLimitingQueueWithConfig(claimRateLimiter, workqueue.RateLimitingQueueConfig{
+	claimRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
+	claimQueue := workqueue.NewTypedRateLimitingQueueWithConfig(claimRateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
 		Name: "claims",
 	})
 	claimInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
@@ -264,7 +264,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		controller.FailedDeleteThreshold(0),
 		controller.RateLimiter(rateLimiter),
 		controller.Threadiness(1),
-		controller.CreateProvisionedPVLimiter(workqueue.DefaultControllerRateLimiter()),
+		controller.CreateProvisionedPVLimiter(workqueue.DefaultTypedControllerRateLimiter[any]()),
 		controller.ClaimsInformer(claimInformer),
 		controller.NodesLister(nodeLister),
 		controller.AddFinalizer(true),

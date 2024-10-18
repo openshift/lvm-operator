@@ -10,3 +10,4 @@ images:
   newName: quay.io/jmoller/lvms-operator
   newTag: latest
 namePrefix: lvms-
+namespace: openshift-storage

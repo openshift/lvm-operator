@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/stretchr/testify/assert"
@@ -17,10 +18,11 @@ type filterTestCase struct {
 }
 
 type advancedFilterTestCase struct {
-	label     string
-	device    lsblk.BlockDevice
-	assertErr assert.ErrorAssertionFunc
-	lvmExpect []lvm.PhysicalVolume
+	label           string
+	device          lsblk.BlockDevice
+	assertErr       assert.ErrorAssertionFunc
+	volumeGroupSpec *lvmv1alpha1.LVMVolumeGroupSpec
+	lvmExpect       []lvm.PhysicalVolume
 }
 
 func TestNotReadOnly(t *testing.T) {
@@ -30,7 +32,7 @@ func TestNotReadOnly(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notReadOnly](tc.device, nil, nil)
+			err := DefaultFilters(nil)[notReadOnly](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -48,7 +50,7 @@ func TestNotSuspended(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notSuspended](tc.device, nil, nil)
+			err := DefaultFilters(nil)[notSuspended](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -66,7 +68,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device, nil, nil)
+			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -83,7 +85,7 @@ func TestNoChildren(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noChildren](tc.device, nil, nil)
+			err := DefaultFilters(nil)[noChildren](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -99,7 +101,7 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: lsblk.BlockDevice{Name: "dev2", Type: "disk"}, expectErr: false},
 	}
 	for _, tc := range testcases {
-		err := DefaultFilters(nil)[usableDeviceType](tc.device, nil, nil)
+		err := DefaultFilters(nil)[usableDeviceType](tc.device, symlinkResolver.NewWithDefaultResolver())
 		if tc.expectErr {
 			assert.Error(t, err)
 		} else {
@@ -123,7 +125,7 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device, nil, nil)
+			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -131,6 +133,45 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPartOfDeviceSelector(t *testing.T) {
+	testcases := []advancedFilterTestCase{
+		{label: "match path selector", device: lsblk.BlockDevice{KName: "dev1"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				Paths: []lvmv1alpha1.DevicePath{"dev1"},
+			}},
+			assertErr: assert.NoError,
+		},
+		{label: "match optional path selector", device: lsblk.BlockDevice{KName: "dev1"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				OptionalPaths: []lvmv1alpha1.DevicePath{"dev1"},
+			}},
+			assertErr: assert.NoError,
+		},
+		{label: "no match", device: lsblk.BlockDevice{KName: "dev1"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				Paths: []lvmv1alpha1.DevicePath{"dev2"},
+			}},
+			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorContains(t, err, "is not part of the device selector")
+			},
+		},
+		{label: "no selector", device: lsblk.BlockDevice{KName: "dev1"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{},
+			assertErr:       assert.NoError,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.label, func(t *testing.T) {
+			vg := &lvmv1alpha1.LVMVolumeGroup{}
+			vg.SetName("vg1")
+			vg.Spec = *tc.volumeGroupSpec
+			err := DefaultFilters(&Options{VG: vg})[partOfDeviceSelector](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
+			tc.assertErr(t, err, fmt.Sprintf("partOfDeviceSelector(%v)", tc.device))
+		})
+	}
+
 }
 
 func TestOnlyValidFilesystemSignatures(t *testing.T) {
@@ -159,7 +200,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			label:  "LVM2_Member with matching pvs,no children,mismatching vg",
 			device: lsblk.BlockDevice{KName: "dev1", FSType: FSTypeLVM2Member},
 			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorContains(t, err, "already part of another volume group")
+				return assert.ErrorContains(t, err, "already a LVM2_Member of another volume group")
 			},
 			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", VgName: "random"}},
 		},
@@ -188,15 +229,15 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			lvmExpect: []lvm.PhysicalVolume{{PvName: "dev1", VgName: "vg1"}},
 		},
 	}
-	evalSymlinks = func(path string) (string, error) {
-		return path, nil
-	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
 			vg.SetName("vg1")
 
-			err := DefaultFilters(vg)[onlyValidFilesystemSignatures](tc.device, tc.lvmExpect, nil)
+			err := DefaultFilters(&Options{
+				VG:  vg,
+				PVs: tc.lvmExpect,
+			})[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
 			tc.assertErr(t, err, fmt.Sprintf("onlyValidFilesystemSignatures(%v)", tc.device))
 		})
 	}

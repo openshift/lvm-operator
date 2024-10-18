@@ -21,8 +21,8 @@ const (
 	ReasonResourcesAvailable  = "ResourcesAvailable"
 	MessageResourcesAvailable = "Reconciliation is complete and all the resources are available"
 
-	ReasonResourcesSyncFailed        = "ResourcesSyncFailed"
-	MessageReasonResourcesSyncFailed = "Reconciliation is failed with %v"
+	ReasonResourcesIncomplete            = "ResourcesSyncIncomplete"
+	MessageReasonResourcesSyncIncomplete = "Resources have not yet been fully synced to the cluster: %v"
 
 	ReasonVGReadinessInProgress  = "VGReadinessInProgress"
 	MessageVGReadinessInProgress = "VG readiness check is still in progress"
@@ -49,12 +49,12 @@ func setResourcesAvailableConditionTrue(instance *lvmv1alpha1.LVMCluster) {
 	})
 }
 
-func setResourcesAvailableConditionFalse(instance *lvmv1alpha1.LVMCluster, reconcileError error) {
+func setResourcesAvailableConditionFalse(instance *lvmv1alpha1.LVMCluster, resourceSyncError error) {
 	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 		Type:    lvmv1alpha1.ResourcesAvailable,
 		Status:  metav1.ConditionFalse,
-		Reason:  ReasonResourcesSyncFailed,
-		Message: fmt.Sprintf(MessageReasonResourcesSyncFailed, reconcileError),
+		Reason:  ReasonResourcesIncomplete,
+		Message: fmt.Sprintf(MessageReasonResourcesSyncIncomplete, resourceSyncError),
 	})
 }
 
@@ -150,13 +150,13 @@ func computeLVMClusterReadiness(conditions []metav1.Condition) (lvmv1alpha1.LVMS
 
 func translateReasonToState(reason string, currentState lvmv1alpha1.LVMStateType) lvmv1alpha1.LVMStateType {
 	switch reason {
-	case ReasonVGsFailed, ReasonResourcesSyncFailed:
+	case ReasonVGsFailed:
 		return lvmv1alpha1.LVMStatusFailed
 	case ReasonVGsDegraded:
 		if currentState != lvmv1alpha1.LVMStatusFailed {
 			return lvmv1alpha1.LVMStatusDegraded
 		}
-	case ReasonReconciliationInProgress, ReasonVGReadinessInProgress:
+	case ReasonReconciliationInProgress, ReasonVGReadinessInProgress, ReasonResourcesIncomplete:
 		if currentState != lvmv1alpha1.LVMStatusFailed && currentState != lvmv1alpha1.LVMStatusDegraded {
 			return lvmv1alpha1.LVMStatusProgressing
 		}

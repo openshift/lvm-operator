@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
@@ -94,7 +95,8 @@ type Reconciler struct {
 	dmsetup.Dmsetup
 	NodeName         string
 	Namespace        string
-	Filters          func(*lvmv1alpha1.LVMVolumeGroup) filter.Filters
+	Filters          filter.FilterSetup
+	SymlinkResolveFn symlinkResolver.ResolveFn
 	IsSharedVGLeader func() bool
 }
 
@@ -105,6 +107,8 @@ func (r *Reconciler) getFinalizer() string {
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("reconciling")
+
+	resolver := symlinkResolver.NewWithResolver(r.SymlinkResolveFn)
 
 	// Check if this LVMVolumeGroup needs to be processed on this node
 	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
@@ -128,13 +132,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus: %w", err)
 	}
 
-	return r.reconcile(ctx, volumeGroup, nodeStatus)
+	return r.reconcile(ctx, volumeGroup, resolver)
 }
 
 func (r *Reconciler) reconcile(
 	ctx context.Context,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
-	nodeStatus *lvmv1alpha1.LVMVolumeGroupNodeStatus,
+	resolver *symlinkResolver.Resolver,
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	// Check if the LVMVolumeGroup resource is deleted
@@ -154,56 +158,46 @@ func (r *Reconciler) reconcile(
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
 
-	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, nodeStatus, blockDevices)
-	if err != nil {
+	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, resolver); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
+	} else if updated {
+		return ctrl.Result{}, r.Client.Update(ctx, volumeGroup)
 	}
-	if wiped {
-		blockDevices, err = r.LSBLK.ListBlockDevices(ctx)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to list block devices after wiping devices: %w", err)
-		}
-	}
-
-	// Get the available block devices that can be used for this volume group
-	// valid means that it can be used to create or extend the volume group
-	// devices that are already part of the volume group will not be returned
-	newDevices, err := r.getNewDevicesToBeAdded(ctx, blockDevices, nodeStatus, volumeGroup)
-	if err != nil {
-		err := fmt.Errorf("failed to get matching available block devices for volumegroup %s: %w", volumeGroup.GetName(), err)
-		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
-		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, nil, FilteredBlockDevices{}, err); err != nil {
-			logger.Error(err, "failed to set status to failed")
-		}
-		return ctrl.Result{}, err
-	}
-
-	logger.V(1).Info("new devices", "newDevices", newDevices)
 
 	pvs, err := r.LVM.ListPVs(ctx, "")
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("physical volumes could not be fetched: %w", err)
 	}
 
-	bdi, err := r.LSBLK.BlockDeviceInfos(ctx, newDevices)
+	bdi, err := r.LSBLK.BlockDeviceInfos(ctx, blockDevices)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get block device infos: %w", err)
 	}
-
 	logger.V(1).Info("block device infos", "bdi", bdi)
 
-	devices := r.filterDevices(ctx, newDevices, pvs, bdi, r.Filters(volumeGroup))
+	devices := filterDevices(ctx, blockDevices, resolver, r.Filters(&filter.Options{
+		BDI: bdi,
+		PVs: pvs,
+		VG:  volumeGroup,
+	}))
 
 	vgs, err := r.LVM.ListVGs(ctx, true, lvm.ListVGOptions{})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
 
-	vgExistsInLVM := false
+	if volumeGroup.Spec.DeviceSelector != nil {
+		if err := VerifyMandatoryDevicePaths(devices, resolver, volumeGroup.Spec.DeviceSelector.Paths); err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, err
+		}
+	}
+
 	for _, vg := range vgs {
 		if volumeGroup.Name == vg.Name {
-			vgExistsInLVM = true
-
 			if volumeGroup.Spec.DeviceAccessPolicy == lvmv1alpha1.DeviceAccessPolicyShared {
 				// If we are dealing with a shared volume group, we need to check if the volume group is already in use
 				// by another node. If it is, we need to wait until the other node has finished using it.
@@ -213,7 +207,6 @@ func (r *Reconciler) reconcile(
 				}
 				logger.Info("shared lockspace started", "VGName", vg.Name)
 			}
-
 			break
 		}
 	}
@@ -222,8 +215,16 @@ func (r *Reconciler) reconcile(
 	// - There is no available devices to attach to the volume group
 	// - All the available devices are already attached
 	if len(devices.Available) == 0 {
-		if !vgExistsInLVM {
-			err := fmt.Errorf("the volume group %s does not exist and there were no available devices to create it", volumeGroup.GetName())
+		var lvmVG *lvm.VolumeGroup
+		for _, vg := range vgs {
+			if volumeGroup.Name == vg.Name {
+				lvmVG = &vg
+				break
+			}
+		}
+		if lvmVG == nil {
+			err := fmt.Errorf("the volume group %s does not exist (or was not tagged properly with %q), "+
+				"and there were no available devices to create it", volumeGroup.GetName(), lvm.DefaultTag)
 			r.WarningEvent(ctx, volumeGroup, EventReasonErrorNoAvailableDevicesForVG, err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
 				logger.Error(err, "failed to set status to failed")
@@ -351,17 +352,20 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 		lvmdConfigWasMissing = true
 		lvmdConfig = &lvmd.Config{}
 	}
-	existingLvmdConfig := *lvmdConfig
+
+	oldConfig := lvmd.DeepCopyConfig(lvmdConfig)
 
 	// Add the volume group to device classes inside lvmd config if not exists
-	found := false
+	var dc *lvmd.DeviceClass
 	for _, deviceClass := range lvmdConfig.DeviceClasses {
 		if deviceClass.Name == volumeGroup.Name {
-			found = true
+			dc = deviceClass
+			break
 		}
 	}
-	if !found {
-		dc := &lvmd.DeviceClass{
+
+	if dc == nil {
+		dc = &lvmd.DeviceClass{
 			Name:        volumeGroup.Name,
 			VolumeGroup: volumeGroup.Name,
 			Default:     volumeGroup.Spec.Default,
@@ -380,9 +384,11 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 		}
 
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
+	} else if dc.Type == lvmd.TypeThin {
+		dc.ThinPoolConfig.OverprovisionRatio = float64(volumeGroup.Spec.ThinPoolConfig.OverprovisionRatio)
 	}
 
-	if err := r.updateLVMDConfigAfterReconcile(ctx, volumeGroup, &existingLvmdConfig, lvmdConfig, lvmdConfigWasMissing); err != nil {
+	if err := r.updateLVMDConfigAfterReconcile(ctx, volumeGroup, oldConfig, lvmdConfig, lvmdConfigWasMissing); err != nil {
 		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
 			logger.Error(err, "failed to set status to failed")
 		}
@@ -595,6 +601,10 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 				return err
 			}
 
+			if err := r.verifyMetadataSize(ctx, volumeGroup.Name, lv.Name, lv.MetadataSize, convertMetadataSize(volumeGroup.Spec.ThinPoolConfig)); err != nil {
+				return fmt.Errorf("failed to verify metadata size for thinpool %s in volume group %s: %w", volumeGroup.Spec.ThinPoolConfig.Name, volumeGroup.Name, err)
+			}
+
 			logger.V(1).Info("confirmed created logical volume has correct attributes", "lv_attr", lvAttr.String())
 		}
 		if !thinPoolExists {
@@ -636,7 +646,8 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	}
 
 	logger.Info("creating lvm thinpool")
-	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config)); err != nil {
+
+	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config), convertMetadataSize(config)); err != nil {
 		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
 	logger.Info("successfully created thinpool")
@@ -654,6 +665,16 @@ func convertChunkSize(config *lvmv1alpha1.ThinPoolConfig) int64 {
 		return lvmv1alpha1.ChunkSizeDefault.Value()
 	}
 	return config.ChunkSize.Value()
+}
+
+func convertMetadataSize(config *lvmv1alpha1.ThinPoolConfig) int64 {
+	if config.MetadataSizeCalculationPolicy == lvmv1alpha1.MetadataSizePolicyHost {
+		return -1
+	}
+	if config.MetadataSize == nil {
+		return lvmv1alpha1.ThinPoolMetadataSizeDefault.Value()
+	}
+	return config.MetadataSize.Value()
 }
 
 func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize string, config *lvmv1alpha1.ThinPoolConfig) error {
@@ -706,6 +727,26 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	}
 	logger.Info("successfully extended thinpool")
 
+	return nil
+}
+
+func (r *Reconciler) verifyMetadataSize(ctx context.Context, vgName, lvName string, lvMetadataSize string, newMetadataSize int64) error {
+	if newMetadataSize == -1 {
+		return nil
+	}
+
+	currentMetadataSize, err := strconv.ParseInt(lvMetadataSize[:len(lvMetadataSize)-1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata size. %w", err)
+	}
+	if currentMetadataSize >= newMetadataSize {
+		return nil
+	}
+
+	err = r.LVM.ExtendThinPoolMetadata(ctx, lvName, vgName, newMetadataSize)
+	if err != nil {
+		return fmt.Errorf("failed to extend thinpool metadata: %w", err)
+	}
 	return nil
 }
 
