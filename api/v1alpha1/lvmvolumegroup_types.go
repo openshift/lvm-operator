@@ -40,6 +40,10 @@ type LVMVolumeGroupSpec struct {
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`
+
+	// DeviceAccessPolicy defines the policy for accessing the devices
+	// +optional
+	DeviceAccessPolicy DeviceAccessPolicy `json:"deviceAccessPolicy,omitempty"`
 }
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup

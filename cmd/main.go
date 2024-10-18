@@ -79,6 +79,7 @@ func NewCmd(setupLog logr.Logger) *cobra.Command {
 		vgmanager.NewCmd(&vgmanager.Options{
 			Scheme:   scheme,
 			SetupLog: setupLog,
+			Metrics:  InitializeMetricsManager(),
 		}),
 	)
 

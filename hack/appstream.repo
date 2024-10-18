@@ -1,0 +1,7 @@
+[localdev-rhel-9-appstream-rpms]
+name = localdev-rhel-9-appstream-rpms
+id = localdev-rhel-9-appstream-rpms
+baseurl = https://rhsm-pulp.corp.redhat.com/content/eus/rhel9/9.4/x86_64/appstream/os/
+enabled = 1
+gpgcheck = 0
+sslverify=0
