@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main-rhtap"
+      == "main"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
@@ -24,7 +24,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator/lvm-operator-bundle:{{revision}}
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle:{{revision}}
   - name: dockerfile
     value: bundle.konflux.Dockerfile
   pipelineSpec:

@@ -1,5 +1,5 @@
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22 as builder
-ARG IMG=quay.io/repository/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator/lvm-operator@sha256:676f97daee7ae533ad206242123720db817fc67a56e8d0feca0b4794f93404f6
+ARG IMG=quay.io/repository/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:676f97daee7ae533ad206242123720db817fc67a56e8d0feca0b4794f93404f6
 WORKDIR /code
 COPY ./ ./
 RUN make bundle IMG=${IMG}
