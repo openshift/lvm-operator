@@ -58,6 +58,15 @@ spec:
                             class is the default. You can configure only a single
                             default device class.
                           type: boolean
+                        deviceAccessPolicy:
+                          description: |-
+                            Policy defines the policy for the deviceClass.
+                            DEV PREVIEW: shared will allow accessing the deviceClass from multiple nodes.
+                            The deviceClass will then be configured via shared volume group.
+                          enum:
+                          - shared
+                          - local
+                          type: string
                         deviceSelector:
                           description: DeviceSelector contains the configuration to
                             specify paths to the devices that you want to add to the

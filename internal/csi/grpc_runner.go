@@ -3,8 +3,10 @@ package csi
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
+	"path"
 	"time"
 
 	"google.golang.org/grpc"
@@ -34,6 +36,10 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	err := os.Remove(r.sockFile)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove existing socket file before startup: %w", err)
+	}
+	err = os.MkdirAll(path.Dir(r.sockFile), fs.ModeDir)
+	if err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 	lis, err := net.Listen("unix", r.sockFile)
 	if err != nil {

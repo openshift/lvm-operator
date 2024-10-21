@@ -964,7 +964,7 @@ func testReconcileFailure(ctx context.Context) {
 		vgs := []lvm.VolumeGroup{
 			{Name: "vg1", VgSize: "1g"},
 		}
-		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{VGName: "vg1"}).Once().Return(vgs, nil)
+		instances.LVM.EXPECT().ListVGs(ctx, true, lvm.ListVGOptions{}).Once().Return(vgs, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {

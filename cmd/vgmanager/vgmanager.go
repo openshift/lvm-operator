@@ -28,6 +28,8 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
@@ -70,7 +72,17 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/yaml"
+
+	_ "unsafe"
 )
+
+//go:linkname used_names_link sigs.k8s.io/controller-runtime/pkg/controller.usedNames
+var used_names_link sets.Set[string]
+
+type CSIRegistration struct {
+	internalCSI.CheckableRegistrationServer
+	registrationPath string
+}
 
 const (
 	DefaultDiagnosticsAddr = ":8443"
@@ -187,11 +199,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	type registration struct {
-		internalCSI.CheckableRegistrationServer
-		registrationPath string
-	}
-	var registrations []registration
+	var registrations []CSIRegistration
 
 	var volumeGroupLock runner.VolumeGroupLock
 	if opts.enableSharedVolumes {
@@ -200,7 +208,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		} else if err := mgr.Add(volumeGroupLock); err != nil {
 			return fmt.Errorf("could not add volume group lock: %w", err)
 		}
-		registration := registration{
+		registration := CSIRegistration{
 			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
 				cancelWithCause,
 				constants.KubeSANCSIDriverName,
@@ -269,7 +277,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			return fmt.Errorf("could not add topolvm metrics: %w", err)
 		}
 
-		registration := registration{
+		registration := CSIRegistration{
 			CheckableRegistrationServer: internalCSI.NewRegistrationServer(
 				cancelWithCause,
 				constants.TopolvmCSIDriverName,
@@ -280,7 +288,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		}
 		csiGrpcServer := newGRPCServer()
 		grpc_health_v1.RegisterHealthServer(csiGrpcServer, internalCSI.NewHealthServer(func(ctx context.Context) error {
-			return readyCheck(ctx, lvmdConfig, []internalCSI.CheckableRegistrationServer{registration}, opts.enableSharedVolumes)
+			return readyCheck(ctx, lvmdConfig, registrations, opts.enableSharedVolumes)
 		}))
 		identityServer := driver.NewIdentityServer(func() (bool, error) {
 			return true, nil
@@ -348,9 +356,11 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if errors.Is(context.Cause(ctx), ErrConfigModified) {
 		opts.SetupLog.Info("restarting controller due to modified configuration")
+		used_names_link = nil
 		return run(cmd, nil, opts)
 	} else if errors.Is(context.Cause(ctx), internalCSI.ErrPluginRegistrationFailed) {
 		opts.SetupLog.Error(context.Cause(ctx), "restarting due to failed plugin registration")
+		used_names_link = nil
 		return run(cmd, nil, opts)
 	} else if err := ctx.Err(); err != nil {
 		opts.SetupLog.Error(err, "exiting abnormally")
@@ -448,23 +458,19 @@ func kubeSANpluginRegistrationSocketPath() string {
 	return fmt.Sprintf("%s/%s-reg.sock", constants.DefaultPluginRegistrationPath, constants.KubeSANCSIDriverName)
 }
 
-func readyCheckHealthzChecker(
-	config *lvmd.Config,
-	server any,
-	enableSharedVolumes bool,
-) healthz.Checker {
+func readyCheckHealthzChecker(config *lvmd.Config, registrations []CSIRegistration, enableSharedVolumes bool) healthz.Checker {
 	return func(req *http.Request) error {
-		return readyCheck(req.Context(), config, server, enableSharedVolumes)
+		return readyCheck(req.Context(), config, registrations, enableSharedVolumes)
 	}
 }
 
 func readyCheck(
 	ctx context.Context,
 	config *lvmd.Config,
-	servers any,
+	servers []CSIRegistration,
 	enableSharedVolumes bool,
 ) error {
-	for _, rs := range servers.([]internalCSI.CheckableRegistrationServer) {
+	for _, rs := range servers {
 		if !rs.Registered() {
 			log.FromContext(ctx).Error(ErrCSIPluginNotYetRegistered, "not healthy")
 			return ErrCSIPluginNotYetRegistered
