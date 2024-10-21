@@ -3,8 +3,10 @@ package csi
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
+	"path"
 	"time"
 
 	"google.golang.org/grpc"
@@ -35,6 +37,10 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove existing socket file before startup: %w", err)
 	}
+	err = os.MkdirAll(path.Dir(r.sockFile), fs.ModeDir)
+	if err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
 	lis, err := net.Listen("unix", r.sockFile)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", r.sockFile, err)
@@ -58,6 +64,12 @@ func (r gRPCServerRunner) Start(ctx context.Context) error {
 	start := time.Now()
 	end := make(chan any, 1)
 	go func() {
+		// recover panic
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(err, "gRPC server panic", "recover", r)
+			}
+		}()
 		r.srv.GracefulStop()
 		end <- nil
 	}()

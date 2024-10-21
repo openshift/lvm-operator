@@ -7,6 +7,7 @@ resources:
 - bases/topolvm.io_logicalvolumes.yaml
 - bases/lvm.topolvm.io_lvmvolumegroups.yaml
 - bases/lvm.topolvm.io_lvmvolumegroupnodestatuses.yaml
+- bases/kubesan.gitlab.io_blobpools.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:

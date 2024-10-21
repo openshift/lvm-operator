@@ -86,7 +86,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         volumeMounts:
-          - mountPath: /run/topolvm
+          - mountPath: /run/csi
             name: "socket-dir"
         terminationMessagePolicy: FallbackToLogsOnError
       volumes:
