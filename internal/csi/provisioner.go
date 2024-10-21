@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller"
 	"strconv"
 	"sync"
 	"time"
@@ -29,18 +30,26 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller"
 )
 
 const (
 	ResyncPeriodOfCsiNodeInformer = 1 * time.Hour
 )
 
+type NodeDeployment struct {
+	NodeName        string
+	NodeCSIEndpoint string
+}
+
 type ProvisionerOptions struct {
 	DriverName          string
 	CSIEndpoint         string
 	CSIOperationTimeout time.Duration
 	Metrics             *connection.ExtendedCSIMetricsManager
+	ExtraCreateMetadata bool
+	*NodeDeployment
+	LeaderElection         bool
+	EnableCapacityTracking bool
 }
 
 type Provisioner struct {
@@ -50,7 +59,7 @@ type Provisioner struct {
 }
 
 func (p *Provisioner) NeedLeaderElection() bool {
-	return true
+	return p.options.LeaderElection
 }
 
 var _ manager.Runnable = &Provisioner{}
@@ -76,10 +85,14 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		p.options.Metrics,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
-	defer grpcClient.Close() //nolint:errcheck,staticcheck
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := grpcClient.Close(); err != nil {
+			logger.Error(err, "failed to close grpc client")
+		}
+	}() //nolint:errcheck,staticcheck
 	pluginCapabilities, controllerCapabilities, err := provisionctrl.GetDriverCapabilities(grpcClient, p.options.CSIOperationTimeout)
 	if err != nil {
 		return err
@@ -112,6 +125,27 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	nodeLister := factory.Core().V1().Nodes().Lister()
 	claimLister := factory.Core().V1().PersistentVolumeClaims().Lister()
 	vaLister := factory.Storage().V1().VolumeAttachments().Lister()
+
+	var nodeDeployment *provisionctrl.NodeDeployment
+	if p.options.NodeDeployment != nil {
+		nodeGRPCClient, err := connection.Connect(ctx, p.options.NodeCSIEndpoint,
+			p.options.Metrics,
+			connection.OnConnectionLoss(onLostConnection),
+			connection.WithTimeout(p.options.CSIOperationTimeout))
+		defer nodeGRPCClient.Close() //nolint:errcheck,staticcheck
+		if err != nil {
+			return fmt.Errorf("failed to connect to node csi driver: %w", err)
+		}
+		nodeDeployment = &provisionctrl.NodeDeployment{}
+		nodeDeployment.NodeName = p.options.NodeDeployment.NodeName
+		nodeDeployment.ClaimInformer = factory.Core().V1().PersistentVolumeClaims()
+		nodeInfo, err := provisionctrl.GetNodeInfo(nodeGRPCClient, p.options.CSIOperationTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to get node info: %w", err)
+		}
+		nodeDeployment.NodeInfo = *nodeInfo
+	}
+
 	provisioner := provisionctrl.NewCSIProvisioner(
 		clientset,
 		p.options.CSIOperationTimeout,
@@ -133,13 +167,17 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		claimLister,
 		vaLister,
 		nil,
-		false,
+		p.options.ExtraCreateMetadata,
 		"",
-		nil,
+		nodeDeployment,
 		false,
 		false,
 	)
 
+	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(time.Second, 5*time.Minute)
+
+	var capacityFactoryForNamespace informers.SharedInformerFactory
+	var topologyInformer topology.Informer
 	var capacityController *capacity.Controller
 	namespace := os.Getenv("NAMESPACE")
 	if namespace == "" {
@@ -159,13 +197,13 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		return fmt.Errorf("look up owner(s) of pod failed: %w", err)
 	}
 	logger.Info(fmt.Sprintf("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name))
-	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
+	rateLimiter = workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
 
 	topologyQueue := workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
 		Name: "csitopology",
 	})
 
-	topologyInformer := topology.NewNodeTopology(
+	topologyInformer = topology.NewNodeTopology(
 		p.options.DriverName,
 		clientset,
 		factory.Core().V1().Nodes(),
@@ -174,8 +212,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	)
 
 	managedByID := "external-provisioner"
-
-	factoryForNamespace := informers.NewSharedInformerFactoryWithOptions(clientset,
+	capacityFactoryForNamespace = informers.NewSharedInformerFactoryWithOptions(clientset,
 		ResyncPeriodOfCsiNodeInformer,
 		informers.WithNamespace(namespace),
 		informers.WithTweakListOptions(func(lo *metav1.ListOptions) {
@@ -187,8 +224,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	)
 	// We use the V1 CSIStorageCapacity API if available.
 	clientFactory := capacity.NewV1ClientFactory(clientset)
-	cInformer := factoryForNamespace.Storage().V1().CSIStorageCapacities()
-
+	cInformer := capacityFactoryForNamespace.Storage().V1().CSIStorageCapacities()
 	capacityController = capacity.NewCentralCapacityController(
 		csi.NewControllerClient(grpcClient),
 		p.options.DriverName,
@@ -243,7 +279,9 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	factory.Start(ctx.Done())
 	// Starting is enough, the capacity controller will
 	// wait for sync.
-	factoryForNamespace.Start(ctx.Done())
+	if p.options.EnableCapacityTracking {
+		capacityFactoryForNamespace.Start(ctx.Done())
+	}
 	cacheSyncResult := factory.WaitForCacheSync(ctx.Done())
 	for _, v := range cacheSyncResult {
 		if !v {
@@ -263,16 +301,19 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		capacityController.Run(ctx, 1)
 		logger.Info("capacity controller finished shutdown")
 	}()
-	go func() {
-		defer wg.Done()
-		csiClaimController.Run(ctx, 1)
-		logger.Info("csi claim controller finished shutdown")
-	}()
+
 	go func() {
 		defer wg.Done()
 		defer topologyQueue.ShutDown()
 		provisionController.Run(ctx)
 		logger.Info("provisioner controller finished shutdown")
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		csiClaimController.Run(ctx, 1)
+		logger.Info("csi claim controller finished shutdown")
 	}()
 
 	wg.Wait()

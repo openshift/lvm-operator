@@ -72,13 +72,16 @@ const (
 	StateMappedDevicePresentWithoutTables      State = 'd'
 	StateMappedDevicePresentWithInactiveTables State = 'i'
 	StateNone                                  State = '-'
+	StateUnknown                               State = 'X'
+	StateCheckNeeded                           State = 'c'
 )
 
 type Open rune
 
 const (
-	OpenTrue  Open = 'o'
-	OpenFalse Open = '-'
+	OpenTrue    Open = 'o'
+	OpenFalse   Open = '-'
+	OpenUnknown Open = 'X'
 )
 
 type OpenTarget rune
