@@ -1,5 +1,5 @@
-# oc adm release info --image-for rhel-coreos on a 4.16 cluster
-FROM quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:eaa7835f2ec7d2513a76e30a41c21ce62ec11313fab2f8f3f46dd4999957a883
+# oc adm release info --image-for rhel-coreos on a 4.17 cluster
+FROM quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:fa2cf5bb6cb549c2dad86a89a33f22b16e82eedfc1893dab04a9b5273d5d5d6b
 
 ADD ./appstream.repo /etc/yum.repos.d/
 ADD ./baseos.repo /etc/yum.repos.d/
