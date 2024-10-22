@@ -62,7 +62,7 @@ repos:
       - id: codespell
         args: [
           "--ignore-words-list",
-          "afterall",
+          "afterall,NotIn",
           "--check-filenames",
           "--check-hidden",
           "-S",
