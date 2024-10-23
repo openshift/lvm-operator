@@ -1,24 +1,36 @@
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22 as builder
-ARG IMG=quay.io/repository/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:676f97daee7ae533ad206242123720db817fc67a56e8d0feca0b4794f93404f6
-WORKDIR /code
+ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:9ceebff6596d8916a40ab22ae40178b0b6222ee5d96b9ad196a4545d4531b902
+ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:1e24519186f95f0d77e2692400f661453caf55c754cd1776bc7ee94798957de2
+WORKDIR /operator
 COPY ./ ./
-RUN make bundle IMG=${IMG}
+RUN CI_VERSION="4.18.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./hack/render_templates.sh
+
+FROM scratch
+
+# Copy files to locations specified by labels.
+COPY --from=builder /operator/bundle/manifests /manifests/
+COPY --from=builder /operator/bundle/metadata /metadata/
+COPY --from=builder /operator/bundle/tests/scorecard /tests/scorecard/
 
 # Core bundle labels.
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=lvms-operator
-LABEL operators.operatorframework.io.bundle.channels.v1=alpha
-LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.34.1
-LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
-LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v4
 
-# Labels for testing.
-LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
-LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
+# Operator bundle metadata
+LABEL com.redhat.delivery.operator.bundle=true
+LABEL com.redhat.openshift.versions="v4.18-v4.19"
+LABEL com.redhat.delivery.backport=false
 
-# Copy files to locations specified by labels.
-COPY bundle/manifests /manifests/
-COPY bundle/metadata /metadata/
-COPY bundle/tests/scorecard /tests/scorecard/
+# Standard Red Hat labels
+LABEL com.redhat.component="lvms-operator-bundle-container"
+LABEL name="lvms4/lvms-operator-bundle"
+LABEL version="4.18.0"
+LABEL release="1"
+LABEL summary="An operator bundle for LVM Storage Operator"
+LABEL io.k8s.display-name="lvms-operator-bundle"
+LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
+LABEL description="An operator bundle for LVM Storage Operator"
+LABEL io.openshift.tags="lvms"
+LABEL lvms.tags="v4.18"
