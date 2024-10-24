@@ -32,7 +32,7 @@ const (
 	KubeSANBlobsServiceAccount               = "blobs"
 	KubeSANRunDir                            = "/run/kubesan"
 	KubeSANNBDDir                            = KubeSANRunDir + "/nbd"
-	KubeSANImage                             = "quay.io/kubesan/kubesan:latest"
+	KubeSANImage                             = "quay.io/bzamalut/kubesan:latest"
 
 	VGManagerServiceAccount = "vg-manager"
 

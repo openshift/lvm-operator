@@ -1,5 +1,8 @@
-# oc adm release info --image-for rhel-coreos on a 4.16 cluster
-FROM quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:eaa7835f2ec7d2513a76e30a41c21ce62ec11313fab2f8f3f46dd4999957a883
+# oc adm release info --image-for rhel-coreos on a 4.17 cluster
+# default image, but please use "$make kubesan-node-layering-image" to build correct image with current cluster's rhel version
+ARG BASE_IMG=quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:eaa7835f2ec7d2513a76e30a41c21ce62ec11313fab2f8f3f46dd4999957a883
+
+FROM $BASE_IMG
 
 ADD ./appstream.repo /etc/yum.repos.d/
 ADD ./baseos.repo /etc/yum.repos.d/

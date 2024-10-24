@@ -5,4 +5,4 @@ metadata:
     machineconfiguration.openshift.io/role: worker
   name: kubesan-enablement-layer
 spec:
-  osImageURL: quay.io/jmoller/node-base-kubesan-patched:v4.16.0-00
+  osImageURL: quay.io/bzamalut/node-base-kubesan-patched:latest

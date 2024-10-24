@@ -423,6 +423,12 @@ vuln-scan-deps:
 vuln-scan-container:
 	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
 
+KUBESAN_IMAGE = quay.io/bzamalut/node-base-kubesan-patched:latest
 kubesan-node-layering-image:
 	@echo "Building the kubesan-node-layering image"
-	$(IMAGE_BUILD_CMD) build -f hack/kubesan-node-adjustment.Containerfile -t "quay.io/jmoller/node-base-kubesan-patched:v4.16.0-00" hack/
+	$(IMAGE_BUILD_CMD) build -f hack/kubesan-node-adjustment.Containerfile --build-arg BASE_IMG=$(shell oc adm release info --image-for rhel-coreos) -t ${KUBESAN_IMAGE} hack/
+	$(IMAGE_BUILD_CMD) push ${KUBESAN_IMAGE}
+
+apply-kubesan-node-layering-image:
+	yq e -i '.spec.osImageURL = "${KUBESAN_IMAGE}"' hack/kubesan.machineconfig.yaml
+	oc apply -f hack/kubesan.machineconfig.yaml
