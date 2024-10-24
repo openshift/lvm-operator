@@ -416,7 +416,7 @@ func templateVGManagerDaemonset(
 		containers = append(containers, corev1.Container{
 			Name:    "csi-node-plugin",
 			Image:   constants.KubeSANImage,
-			Command: []string{"./kubesan", "csi-node-plugin"},
+			Command: []string{"/kubesan/bin/kubesan", "csi-node-plugin"},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: ptr.To(true),
 			},
@@ -452,7 +452,7 @@ func templateVGManagerDaemonset(
 		containers = append(containers, corev1.Container{
 			Name:    "csi-controller-plugin",
 			Image:   constants.KubeSANImage,
-			Command: []string{"./kubesan", "csi-controller-plugin"},
+			Command: []string{"/kubesan/bin/kubesan", "csi-controller-plugin"},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: ptr.To(true),
 			},
