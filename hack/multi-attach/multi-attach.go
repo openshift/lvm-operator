@@ -273,6 +273,7 @@ func (m *AWSDiskManager) createAndAttachAWSVolumesForNodes(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("failed to create aws Disks for Nodes %s with %v: %w", volume.Nodes, createInput, err)
 	}
+	time.Sleep(5 * time.Second)
 	log.Info("created volume", "size", volume.Size, "id", vol.VolumeId)
 	// attach and poll for attachment to complete
 	attachments := make([]*ec2.VolumeAttachment, 0, len(volume.Nodes))
@@ -307,7 +308,7 @@ func (m *AWSDiskManager) createAndAttachAWSVolumesForNodes(ctx context.Context, 
 				}
 				attachment, err := m.ec2.AttachVolumeWithContext(ctx, attachInput)
 				if err != nil {
-					ctrllog.FromContext(ctx).Info("failed to attach volume, retrying...", "node", node.InstanceID)
+					ctrllog.FromContext(ctx).Error(err, "failed to attach volume, retrying...", "node", node.InstanceID)
 					continue
 				}
 				attachments = append(attachments, attachment)

@@ -39,7 +39,7 @@ const (
 	VgManagerMemRequest = "45Mi"
 	VgManagerCPURequest = "5m"
 
-	KubeSANBackingVolumeGroupKey = "backingVolumeGroup"
+	KubeSANVolumeGroupKey = "lvmVolumeGroup"
 
 	// topoLVM Node
 	CSIKubeletRootDir               = "/var/lib/kubelet/"
