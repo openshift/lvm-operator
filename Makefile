@@ -432,3 +432,8 @@ kubesan-node-layering-image:
 apply-kubesan-node-layering-image:
 	yq e -i '.spec.osImageURL = "${KUBESAN_IMAGE}"' hack/kubesan.machineconfig.yaml
 	oc apply -f hack/kubesan.machineconfig.yaml
+
+# This recipe exists only for the LVMS + Kubesan demo
+deploy-kubesan: REF=v0.6.0
+deploy-kubesan: NS=openshift-storage
+	./hack/deploy-kubesan.sh

@@ -98,3 +98,15 @@ rules:
     - patch
     - update
     - watch
+- apiGroups:
+  - kubesan.gitlab.io
+  resources:
+    - volumes
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
