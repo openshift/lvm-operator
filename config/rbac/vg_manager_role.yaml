@@ -99,7 +99,7 @@ rules:
     - update
     - watch
 - apiGroups:
-    - kubesan.gitlab.io
+  - kubesan.gitlab.io
   resources:
     - volumes
   verbs:
