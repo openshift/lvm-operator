@@ -412,6 +412,7 @@ func templateVGManagerDaemonset(
 			KubeSANCSIPluginLocalVolMount,
 			KubeSANNBDPluginMount,
 			CSIPluginVolMount,
+			DevHostDirVolMount,
 		}
 		containers = append(containers, corev1.Container{
 			Name:            "csi-node-plugin",
@@ -420,6 +421,7 @@ func templateVGManagerDaemonset(
 			Command:         []string{"/kubesan/bin/kubesan", "csi-node-plugin"},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: ptr.To(true),
+				RunAsUser:  ptr.To(int64(0)),
 			},
 			VolumeMounts: kubeSANNodeVolumeMounts,
 			Env: []corev1.EnvVar{
@@ -457,6 +459,7 @@ func templateVGManagerDaemonset(
 			Command:         []string{"/kubesan/bin/kubesan", "csi-controller-plugin"},
 			SecurityContext: &corev1.SecurityContext{
 				Privileged: ptr.To(true),
+				RunAsUser:  ptr.To(int64(0)),
 			},
 			VolumeMounts: kubeSANControllerVolumeMounts,
 			Env: []corev1.EnvVar{
