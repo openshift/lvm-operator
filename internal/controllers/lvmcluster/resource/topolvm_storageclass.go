@@ -147,6 +147,7 @@ func (s storageClass) getKubeSANStorageClasses(r Reconciler, ctx context.Context
 			Parameters: map[string]string{
 				constants.KubeSANVolumeGroupKey: deviceClass.Name,
 				"csi.storage.k8s.io/fstype":     string(deviceClass.FilesystemType),
+				"mode":                          "Linear",
 			},
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
