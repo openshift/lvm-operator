@@ -17,6 +17,7 @@ limitations under the License.
 package filter
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,6 +26,8 @@ import (
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -66,7 +69,7 @@ type Options struct {
 	PVs []lvm.PhysicalVolume
 }
 
-type FilterSetup func(*Options) Filters
+type FilterSetup func(context.Context, *Options) Filters
 
 var _ FilterSetup = DefaultFilters
 
@@ -77,7 +80,8 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 	return errors.Is(err, ErrDeviceAlreadySetupCorrectly) || errors.Is(err, ErrLVMPartition)
 }
 
-func DefaultFilters(opts *Options) Filters {
+func DefaultFilters(ctx context.Context, opts *Options) Filters {
+	logger := log.FromContext(ctx)
 	return Filters{
 		partOfDeviceSelector: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
 			if opts.VG.Spec.DeviceSelector == nil {
@@ -92,10 +96,11 @@ func DefaultFilters(opts *Options) Filters {
 				if resolved, err := resolver.Resolve(path.Unresolved()); resolved == dev.KName {
 					return nil
 				} else if err != nil {
-					return fmt.Errorf("the path %s was no kernel block device name and could not be resolved via symlink resolution: %w", path, err)
+					logger.Error(err, "the path was no kernel block device name and could not be resolved via symlink resolution", "path", path)
+					continue
 				}
 			}
-			return fmt.Errorf("%s is not part of the device selector", dev.Name)
+			return fmt.Errorf("%s is not part of the device selector or could not be resolved via symlink resolution", dev.Name)
 		},
 
 		notReadOnly: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {

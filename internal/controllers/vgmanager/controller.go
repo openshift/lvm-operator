@@ -179,7 +179,7 @@ func (r *Reconciler) reconcile(
 	}
 	logger.V(1).Info("block device infos", "bdi", bdi)
 
-	devices := filterDevices(ctx, blockDevices, resolver, r.Filters(&filter.Options{
+	devices := filterDevices(ctx, blockDevices, resolver, r.Filters(ctx, &filter.Options{
 		BDI: bdi,
 		PVs: pvs,
 		VG:  volumeGroup,
