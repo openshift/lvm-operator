@@ -37,6 +37,7 @@ import (
 	persistent_volume_claim "github.com/openshift/lvm-operator/v4/internal/controllers/persistent-volume-claim"
 	internalCSI "github.com/openshift/lvm-operator/v4/internal/csi"
 	"github.com/openshift/lvm-operator/v4/internal/migration/microlvms"
+	wipe_refactor "github.com/openshift/lvm-operator/v4/internal/migration/wipe-refactor"
 	"github.com/spf13/cobra"
 	topolvmcontrollers "github.com/topolvm/topolvm/pkg/controller"
 	"github.com/topolvm/topolvm/pkg/driver"
@@ -179,6 +180,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if err := microlvms.NewCleanup(setupClient, operatorNamespace).RemovePreMicroLVMSComponents(ctx); err != nil {
 		return fmt.Errorf("failed to run pre 4.16 MicroLVMS cleanup: %w", err)
+	}
+
+	if err := wipe_refactor.NewWipeRefactor(setupClient, operatorNamespace).AnnotateExistingLVMVolumeGroupsIfWipingEnabled(ctx); err != nil {
+		return fmt.Errorf("failed to run wipe migration logic: %w", err)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
