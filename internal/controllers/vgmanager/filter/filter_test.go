@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestNotReadOnly(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notReadOnly](tc.device, symlinkResolver.NewWithDefaultResolver())
+			err := DefaultFilters(context.Background(), nil)[notReadOnly](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -50,7 +51,7 @@ func TestNotSuspended(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[notSuspended](tc.device, symlinkResolver.NewWithDefaultResolver())
+			err := DefaultFilters(context.Background(), nil)[notSuspended](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -68,7 +69,7 @@ func TestNoFilesystemSignature(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithDefaultResolver())
+			err := DefaultFilters(context.Background(), nil)[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -85,7 +86,7 @@ func TestNoChildren(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noChildren](tc.device, symlinkResolver.NewWithDefaultResolver())
+			err := DefaultFilters(context.Background(), nil)[noChildren](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -101,7 +102,7 @@ func TestIsUsableDeviceType(t *testing.T) {
 		{label: "tc Disk", device: lsblk.BlockDevice{Name: "dev2", Type: "disk"}, expectErr: false},
 	}
 	for _, tc := range testcases {
-		err := DefaultFilters(nil)[usableDeviceType](tc.device, symlinkResolver.NewWithDefaultResolver())
+		err := DefaultFilters(context.Background(), nil)[usableDeviceType](tc.device, symlinkResolver.NewWithDefaultResolver())
 		if tc.expectErr {
 			assert.Error(t, err)
 		} else {
@@ -125,7 +126,7 @@ func TestNoBiosBootInPartLabel(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.label, func(t *testing.T) {
-			err := DefaultFilters(nil)[noInvalidPartitionLabel](tc.device, symlinkResolver.NewWithDefaultResolver())
+			err := DefaultFilters(context.Background(), nil)[noInvalidPartitionLabel](tc.device, symlinkResolver.NewWithDefaultResolver())
 			if tc.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -167,7 +168,7 @@ func TestPartOfDeviceSelector(t *testing.T) {
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
 			vg.SetName("vg1")
 			vg.Spec = *tc.volumeGroupSpec
-			err := DefaultFilters(&Options{VG: vg})[partOfDeviceSelector](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
+			err := DefaultFilters(context.Background(), &Options{VG: vg})[partOfDeviceSelector](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
 			tc.assertErr(t, err, fmt.Sprintf("partOfDeviceSelector(%v)", tc.device))
 		})
 	}
@@ -234,7 +235,7 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 			vg := &lvmv1alpha1.LVMVolumeGroup{}
 			vg.SetName("vg1")
 
-			err := DefaultFilters(&Options{
+			err := DefaultFilters(context.Background(), &Options{
 				VG:  vg,
 				PVs: tc.lvmExpect,
 			})[onlyValidFilesystemSignatures](tc.device, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))

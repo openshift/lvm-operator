@@ -443,7 +443,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 				{
 					Name: fmt.Sprintf("/dev/mapper/%s-%s", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
 					Reasons: []string{
-						fmt.Sprintf("/dev/mapper/%s-%s is not part of the device selector", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s is not part of the device selector or could not be resolved via symlink resolution", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
 					},
 				},
 				{
@@ -451,7 +451,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 					Reasons: []string{
 						fmt.Sprintf("/dev/mapper/%s-%s_tdata has an invalid filesystem signature (lvm) and cannot be used", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
 						fmt.Sprintf("/dev/mapper/%s-%s_tdata has children block devices and could not be considered", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
-						fmt.Sprintf("/dev/mapper/%s-%s_tdata is not part of the device selector", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s_tdata is not part of the device selector or could not be resolved via symlink resolution", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
 					},
 				},
 				{
@@ -459,7 +459,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 					Reasons: []string{
 						fmt.Sprintf("/dev/mapper/%s-%s_tmeta has an invalid filesystem signature (lvm) and cannot be used", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
 						fmt.Sprintf("/dev/mapper/%s-%s_tmeta has children block devices and could not be considered", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
-						fmt.Sprintf("/dev/mapper/%s-%s_tmeta is not part of the device selector", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
+						fmt.Sprintf("/dev/mapper/%s-%s_tmeta is not part of the device selector or could not be resolved via symlink resolution", lvmVG.Name, strings.Replace(vg.Spec.ThinPoolConfig.Name, "-", "--", 2)),
 					},
 				},
 			}...)
