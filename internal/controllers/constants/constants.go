@@ -39,8 +39,10 @@ const (
 
 	// WorkloadPartitioningManagement contains the management workload annotation
 	WorkloadPartitioningManagementAnnotation = "target.workload.openshift.io/management"
+	ManagementAnnotationVal                  = `{"effect": "PreferredDuringScheduling"}`
 
-	ManagementAnnotationVal = `{"effect": "PreferredDuringScheduling"}`
+	// DevicesWipedAnnotationPrefix is an annotation prefix that marks when a device has been wiped on a certain node
+	DevicesWipedAnnotationPrefix = "wiped.devices.lvms.openshift.io/"
 
 	// labels and values
 

@@ -160,15 +160,10 @@ func (r *Reconciler) reconcile(
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
 
-	wiped, err := r.wipeDevicesIfNecessary(ctx, volumeGroup, nodeStatus, blockDevices)
-	if err != nil {
+	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
-	}
-	if wiped {
-		blockDevices, err = r.LSBLK.ListBlockDevices(ctx)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to list block devices after wiping devices: %w", err)
-		}
+	} else if updated {
+		return ctrl.Result{}, r.Client.Update(ctx, volumeGroup)
 	}
 
 	// Get the available block devices that can be used for this volume group

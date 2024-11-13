@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
-	"github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
+	vgmanagerexec "github.com/openshift/lvm-operator/internal/controllers/vgmanager/exec"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -20,15 +20,15 @@ type Dmsetup interface {
 }
 
 type HostDmsetup struct {
-	exec.Executor
+	vgmanagerexec.Executor
 	dmsetup string
 }
 
 func NewDefaultHostDmsetup() *HostDmsetup {
-	return NewHostDmsetup(&exec.CommandExecutor{}, DefaultDMSetup)
+	return NewHostDmsetup(&vgmanagerexec.CommandExecutor{}, DefaultDMSetup)
 }
 
-func NewHostDmsetup(executor exec.Executor, dmsetup string) *HostDmsetup {
+func NewHostDmsetup(executor vgmanagerexec.Executor, dmsetup string) *HostDmsetup {
 	return &HostDmsetup{
 		Executor: executor,
 		dmsetup:  dmsetup,
@@ -41,23 +41,14 @@ func (dmsetup *HostDmsetup) Remove(ctx context.Context, deviceName string) error
 		return errors.New("failed to remove device-mapper reference. Device name is empty")
 	}
 
-	args := []string{"remove"}
-	args = append(args, deviceName)
-	output, err := dmsetup.StartCommandWithOutputAsHost(ctx, dmsetup.dmsetup, args...)
+	output, err := dmsetup.Executor.CombinedOutputCommandAsHost(ctx, dmsetup.dmsetup, "remove", "--force", deviceName)
+
 	if err == nil {
+		log.FromContext(ctx).Info(fmt.Sprintf("successfully removed the reference from device-mapper %q: %s", deviceName, string(output)))
 		return nil
 	}
 
-	// if err != nil (ExitCode != 0), we can check the cmd output to verify if we have a non-found device
-	data, err := io.ReadAll(output)
-	if err != nil {
-		return fmt.Errorf("failed to read output from device-mapper %q: %w", deviceName, err)
-	}
-	if err := output.Close(); err != nil {
-		return fmt.Errorf("failed to close output from device-mapper %q: %w", deviceName, err)
-	}
-
-	if bytes.Contains(data, []byte("not found")) {
+	if bytes.Contains(output, []byte("not found")) {
 		return ErrReferenceNotFound
 	}
 	return fmt.Errorf("failed to remove the reference from device-mapper %q: %w", deviceName, err)
