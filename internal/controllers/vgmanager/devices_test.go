@@ -655,7 +655,7 @@ func Test_getNewDevicesToBeAdded(t *testing.T) {
 			for _, vg := range tc.vgs {
 				opts.PVs = append(opts.PVs, vg.PVs...)
 			}
-			filters := filter.DefaultFilters(opts)
+			filters := filter.DefaultFilters(context.Background(), opts)
 
 			devices := filterDevices(ctx, tc.existingBlockDevices, symlinkResolver.NewWithDefaultResolver(), filters)
 			assert.Equal(t, tc.numOfAvailableDevices, len(devices.Available), "expected numOfAvailableDevices is not equal to actual number")
