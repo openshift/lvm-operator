@@ -1,0 +1,6 @@
+# approval == this is a good idea /approve
+approvers:
+  - edge-enablement-approvers
+# review == this code is good /lgtm
+reviewers:
+  - edge-enablement-reviewers
