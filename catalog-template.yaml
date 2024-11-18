@@ -1,0 +1,33 @@
+Schema: olm.semver
+GenerateMajorChannels: false
+GenerateMinorChannels: true
+Candidate:
+Stable:
+  Bundles:
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.1
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.0
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.4
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.3
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.2
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.1
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.0
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.8
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.7
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.6
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.5
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.4
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.3
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.2
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.1
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.0
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.10
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.9
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.8
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.7
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.6
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.5
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.4
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.3
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.2
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.1
+  - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.0
