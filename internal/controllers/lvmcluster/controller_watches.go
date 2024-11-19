@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/utils/ptr"
 
 	secv1 "github.com/openshift/api/security/v1"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -67,6 +69,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.getManagedLabelObjsForReconcile),
 		)
 	}
+
+	builder.WithOptions(controller.Options{SkipNameValidation: ptr.To(true)})
 
 	return builder.Complete(r)
 }
