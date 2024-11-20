@@ -33,6 +33,8 @@ RUN dnf update -y && \
         glibc && \
     dnf clean all
 
+RUN [ -d /run/lock ] || mkdir /run/lock
+
 WORKDIR /
 COPY --from=builder /workspace/lvms .
 USER 65532:65532
