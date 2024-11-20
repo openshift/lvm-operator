@@ -84,7 +84,8 @@ var (
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: filepath.Dir(util.FileLockDir),
-				Type: &HostPathDirectoryOrCreate},
+				Type: &HostPathDirectoryOrCreate,
+			},
 		},
 	}
 	FileLockVolMount = corev1.VolumeMount{
