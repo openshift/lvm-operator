@@ -8,7 +8,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
       (".tekton/lvm-operator-pull-request.yaml".pathChanged() || ".tekton/lvm-operator-push.yaml".pathChanged() ||
-      "Dockerfile".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
+      "konflux.Dockerfile".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
       "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged() || "vendor/***".pathChanged() ||
       "api/***".pathChanged())
   creationTimestamp: null
@@ -29,7 +29,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator:{{revision}}
   - name: dockerfile
-    value: Dockerfile
+    value: konflux.Dockerfile
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -66,7 +66,7 @@ spec:
         to build image.
       name: path-context
       type: string
-    - default: Dockerfile
+    - default: konflux.Dockerfile
       description: Path to the Dockerfile inside the context specified by parameter
         path-context
       name: dockerfile
