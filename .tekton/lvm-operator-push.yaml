@@ -30,6 +30,8 @@ spec:
     value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator:{{revision}}
   - name: dockerfile
     value: konflux.Dockerfile
+  - name: prefetch-input
+    value: '{"packages": [{"type": "gomod"}]}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -83,7 +85,7 @@ spec:
       description: Execute the build with network isolation
       name: hermetic
       type: string
-    - default: ""
+    - default: '{"packages": [{"type": "gomod"}], "flags": ["gomod-vendor-check"]}'
       description: Build dependencies to be prefetched by Cachi2
       name: prefetch-input
       type: string
