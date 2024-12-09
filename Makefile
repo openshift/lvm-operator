@@ -41,8 +41,8 @@ OPERATOR_VERSION ?= 0.0.1
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
-OPERATOR_SDK_VERSION ?= 1.37.0
-CONTROLLER_TOOLS_VERSION := 0.16.3
+OPERATOR_SDK_VERSION ?= 1.38.0
+CONTROLLER_TOOLS_VERSION := 0.16.5
 
 CONTROLLER_RUNTIME_VERSION := $(shell awk '/sigs\.k8s\.io\/controller-runtime/ {print substr($$2, 2)}' $(SELF_DIR)/go.mod)
 GINKGO_VERSION := $(shell awk '/github.com\/onsi\/ginkgo\/v2/ {print $$2}' $(SELF_DIR)/go.mod)
