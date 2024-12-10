@@ -1,5 +1,5 @@
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22 as builder
-ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:02c1ffb163f09522cda96969a726d6f7a5e281ddf0b5a528e7a26c02ac3db460
+ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:26256fe9c503be536aa63cc6e1797a5d414afd76ed562713f2361b91b105715a
 ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:6199d9658ccd6e97e1c2ecdf9771a5233caff2c637411ed207691e02394839d7
 WORKDIR /operator
 COPY ./ ./
