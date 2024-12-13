@@ -277,7 +277,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 	res := new(VGReport)
 
 	args := []string{
-		DefaultTag, "--units", "g", "--reportformat", "json",
+		DefaultTag, "--units", "b", "--nosuffix", "--reportformat", "json",
 	}
 	if err := hlvm.RunCommandAsHostInto(ctx, res, vgsCmd, args...); err != nil {
 		return VolumeGroup{}, fmt.Errorf("failed to list volume groups. %v", err)
@@ -314,7 +314,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error) {
 	res := new(PVReport)
 	args := []string{
-		"--units", "g", "-v", "--reportformat", "json",
+		"--units", "b", "--nosuffix", "-v", "--reportformat", "json",
 	}
 	if vgName != "" {
 		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
@@ -346,7 +346,7 @@ func (hlvm *HostLVM) ListVGs(ctx context.Context, tagged bool) ([]VolumeGroup, e
 	res := new(VGReport)
 
 	args := []string{
-		"-o", "vg_name,vg_size,vg_tags", "--units", "g", "--reportformat", "json",
+		"-o", "vg_name,vg_size,vg_tags", "--units", "b", "--nosuffix", "--reportformat", "json",
 	}
 	if tagged {
 		args = append(args, DefaultTag)

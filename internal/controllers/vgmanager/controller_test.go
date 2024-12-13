@@ -708,11 +708,8 @@ func testThinPoolExtension(ctx context.Context) {
 	err := r.extendThinPool(ctx, "vg1", "", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if lvSize is empty")
 
-	err = r.extendThinPool(ctx, "vg1", "1", &lvmv1alpha1.ThinPoolConfig{})
-	Expect(err).To(HaveOccurred(), "should error if lvSize has no unit")
-
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Once().Return(lvm.VolumeGroup{}, fmt.Errorf("mocked error"))
-	err = r.extendThinPool(ctx, "vg1", "26.96g", &lvmv1alpha1.ThinPoolConfig{})
+	err = r.extendThinPool(ctx, "vg1", "2147483648", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if GetVG fails")
 
 	err = r.extendThinPool(ctx, "vg1", "26.96gxxx", &lvmv1alpha1.ThinPoolConfig{})
@@ -720,46 +717,31 @@ func testThinPoolExtension(ctx context.Context) {
 
 	lvmVG := lvm.VolumeGroup{Name: "vg1"}
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
-	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
+	err = r.extendThinPool(ctx, "vg1", "2147483648", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if vgSize is empty")
-
-	lvmVG.VgSize = "1"
-	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
-	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
-	Expect(err).To(HaveOccurred(), "should error if vgSize has no unit")
-
-	lvmVG.VgSize = "1m"
-	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
-	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
-	Expect(err).To(HaveOccurred(), "should error if vg unit does not match lv unit")
-
-	lvmVG.VgSize = "1m"
-	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
-	err = r.extendThinPool(ctx, "vg1", "2m", &lvmv1alpha1.ThinPoolConfig{})
-	Expect(err).To(HaveOccurred(), "should error if unit is not gibibytes")
 
 	lvmVG.VgSize = "1123xxg"
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
-	err = r.extendThinPool(ctx, "vg1", "2g", &lvmv1alpha1.ThinPoolConfig{})
+	err = r.extendThinPool(ctx, "vg1", "2147483648", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).To(HaveOccurred(), "should error if vgSize is malformatted")
 
-	lvmVG.VgSize = "3g"
+	lvmVG.VgSize = "3221225472"
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
-	err = r.extendThinPool(ctx, "vg1", "3g", &lvmv1alpha1.ThinPoolConfig{})
+	err = r.extendThinPool(ctx, "vg1", "3221225472", &lvmv1alpha1.ThinPoolConfig{})
 	Expect(err).ToNot(HaveOccurred(), "should fast skip if no expansion is needed")
 
-	lvmVG.VgSize = "5g"
+	lvmVG.VgSize = "5368709120"
 	thinPool := &lvmv1alpha1.ThinPoolConfig{Name: "thin-pool-1", SizePercent: 90}
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	mockLVM.EXPECT().ExtendLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).
 		Once().Return(fmt.Errorf("failed to extend lv"))
-	err = r.extendThinPool(ctx, "vg1", "3g", thinPool)
+	err = r.extendThinPool(ctx, "vg1", "3221225472", thinPool)
 	Expect(err).To(HaveOccurred(), "should fail if lvm extension fails")
 
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Return(lvmVG, nil).Once()
 	mockLVM.EXPECT().ExtendLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).
 		Once().Return(nil)
-	err = r.extendThinPool(ctx, "vg1", "3g", thinPool)
+	err = r.extendThinPool(ctx, "vg1", "3221225472", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "succeed if lvm extension succeeds")
 }
 
@@ -805,9 +787,9 @@ func testThinPoolCreation(ctx context.Context) {
 	err = r.addThinPoolToVG(ctx, "vg1", thinPool)
 	Expect(err).ToNot(HaveOccurred(), "should create thin pool if it does not exist")
 
-	lvmVG := lvm.VolumeGroup{Name: "vg1", VgSize: "5g"}
+	lvmVG := lvm.VolumeGroup{Name: "vg1", VgSize: "5368709120"}
 	mockLVM.EXPECT().ListLVs(ctx, "vg1").Once().Return(&lvm.LVReport{Report: []lvm.LVReportItem{{
-		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "twi---tz--", LvSize: "3g"}},
+		Lv: []lvm.LogicalVolume{{Name: "thin-pool-1", VgName: "vg1", LvAttr: "twi---tz--", LvSize: "3221225472"}},
 	}}}, nil)
 	mockLVM.EXPECT().GetVG(ctx, "vg1").Once().Return(lvmVG, nil)
 	mockLVM.EXPECT().ExtendLV(ctx, thinPool.Name, "vg1", thinPool.SizePercent).
@@ -926,7 +908,7 @@ func testReconcileFailure(ctx context.Context) {
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
 		vgs := []lvm.VolumeGroup{
-			{Name: "vg1", VgSize: "1g"},
+			{Name: "vg1", VgSize: "1073741824"},
 		}
 		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(vgs, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
