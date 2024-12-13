@@ -642,11 +642,8 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	if lvSize == "" {
 		return fmt.Errorf("lvSize is empty and cannot be used for extension")
 	}
-	if len(lvSize) < 2 {
-		return fmt.Errorf("lvSize is too short (maybe missing unit) and cannot be used for extension")
-	}
 
-	thinPoolSize, err := strconv.ParseFloat(lvSize[:len(lvSize)-1], 64)
+	thinPoolSize, err := strconv.ParseFloat(lvSize, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse lvSize. %v", err)
 	}
@@ -658,19 +655,8 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	if vg.VgSize == "" {
 		return fmt.Errorf("VgSize is empty and cannot be used for extension")
 	}
-	if len(vg.VgSize) < 2 {
-		return fmt.Errorf("VgSize is too short (maybe missing unit) and cannot be used for extension")
-	}
 
-	if vgUnit, lvUnit := vg.VgSize[len(vg.VgSize)-1], lvSize[len(lvSize)-1]; vgUnit != lvUnit {
-		return fmt.Errorf("VgSize (%s) and lvSize (%s), units do not match and cannot be used for extension",
-			string(vgUnit), string(lvUnit))
-	} else if string(vgUnit) != "g" {
-		return fmt.Errorf("VgSize (%s) and lvSize (%s), units are not in floating point based gibibytes and cannot be used for extension",
-			string(vgUnit), string(lvUnit))
-	}
-
-	vgSize, err := strconv.ParseFloat(vg.VgSize[:len(vg.VgSize)-1], 64)
+	vgSize, err := strconv.ParseFloat(vg.VgSize, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse vgSize. %v", err)
 	}
