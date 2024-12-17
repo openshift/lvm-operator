@@ -35,6 +35,8 @@ spec:
     value: konflux.Dockerfile
   - name: prefetch-input
     value: ''
+  - name: hermetic
+    value: 'false'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
