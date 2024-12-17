@@ -31,7 +31,7 @@ spec:
   - name: dockerfile
     value: konflux.Dockerfile
   - name: prefetch-input
-    value: '{"packages": [{"type": "gomod"}]}'
+    value: ''
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
