@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22 as builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -40,12 +40,12 @@ USER 65532:65532
 LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
 LABEL com.redhat.component="lvms-operator-container"
 LABEL name="lvms4/lvms-rhel9-operator"
-LABEL version="4.18.0"
+LABEL version="4.19.0"
 LABEL description="LVM Storage Operator"
 LABEL summary="Provides the latest LVM Storage Operator package."
 LABEL io.k8s.display-name="LVM Storage Operator based on RHEL 9"
 LABEL io.k8s.description="LVM Storage Operator container based on Red Hat Enterprise Linux 9 Image"
 LABEL io.openshift.tags="lvms"
-LABEL lvms.tags="v4.18"
+LABEL lvms.tags="v4.19"
 
 ENTRYPOINT ["/lvms"]
