@@ -11,7 +11,7 @@ COPY go.sum go.sum
 # since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
 # reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
 COPY vendor vendor/
-#RUN go mod verify
+#RUN go mod verify # This is temporarily removed while we hold a carry patch
 
 # Copy the go source
 COPY api/ api/

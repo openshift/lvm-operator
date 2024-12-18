@@ -3,7 +3,12 @@ ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@s
 ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:6199d9658ccd6e97e1c2ecdf9771a5233caff2c637411ed207691e02394839d7
 WORKDIR /operator
 COPY ./ ./
-RUN CI_VERSION="4.19.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./hack/render_templates.sh
+
+RUN ls -al .
+RUN ls -al release
+RUN ls -al /
+
+RUN CI_VERSION="4.19.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/render_templates.sh
 
 FROM scratch
 

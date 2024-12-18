@@ -4,18 +4,20 @@ set -x
 # Register the container with RHSM
 subscription-manager register --activationkey="${RHSM_ACTIVATION_KEY}" --org="${RHSM_ORG}"
 
+arch=$(uname -m)
+
 # Activate the repos
 dnf config-manager \
-    --enable rhel-9-for-x86_64-appstream-rpms \
-    --enable rhel-9-for-x86_64-appstream-source-rpms \
-    --enable rhel-9-for-x86_64-baseos-rpms \
-    --enable rhel-9-for-x86_64-baseos-source-rpms
+    --enable rhel-9-for-${arch}-appstream-rpms \
+    --enable rhel-9-for-${arch}-appstream-source-rpms \
+    --enable rhel-9-for-${arch}-baseos-rpms \
+    --enable rhel-9-for-${arch}-baseos-source-rpms
 
 # Install pip, skopeo and rpm-lockfile-prototype
 dnf install -y pip skopeo
 pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.13.1.tar.gz
 
-cd build
+cd release
 
 cp /etc/yum.repos.d/redhat.repo ./redhat.repo
 

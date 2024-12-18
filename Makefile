@@ -431,4 +431,4 @@ vuln-scan-deps:
 vuln-scan-container:
 	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
 
-include build/konflux.make
+include release/konflux.make

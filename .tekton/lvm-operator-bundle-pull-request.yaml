@@ -10,7 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" &&
       (".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-bundle-push.yaml".pathChanged() ||
-      "build/bundle.konflux.Dockerfile".pathChanged() ||
+      "release/bundle.konflux.Dockerfile".pathChanged() ||
       "bundle/***".pathChanged())
   creationTimestamp: null
   labels:
@@ -32,7 +32,9 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: build/bundle.konflux.Dockerfile
+    value: release/bundle.konflux.Dockerfile
+  - name: prefetch-input
+    value: '{"type": "generic", "path": ".", "lockfile": "/release/bundleartifacts.lock.yaml"}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.

@@ -1,0 +1,9 @@
+metadata:
+  version: "1.0"
+artifacts:
+  - filename: "kustomize.tar.gz"
+    download_url: "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.1/kustomize_v5.4.1_linux_amd64.tar.gz"
+    checksum: "sha256:3d659a80398658d4fec4ec4ca184b432afa1d86451a60be63ca6e14311fc1c42"
+  - filename: "operator-sdk"
+    download_url: ""
+    checksum: "sha256:35f759010c05aef7fed9deb31a46a6682aedff7abf8c109331ccd931c966e6c0"

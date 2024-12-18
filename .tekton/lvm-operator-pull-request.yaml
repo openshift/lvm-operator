@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" &&
       (".tekton/lvm-operator-pull-request.yaml".pathChanged() || ".tekton/lvm-operator-push.yaml".pathChanged() ||
-      "build/konflux.Dockerfile".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
+      "release/konflux.Dockerfile".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
       "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged() || "vendor/***".pathChanged() ||
       "api/***".pathChanged())
   creationTimestamp: null
@@ -32,7 +32,7 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: build/konflux.Dockerfile
+    value: release/konflux.Dockerfile
   - name: prefetch-input
     value: '[{"type": "rpm", "path": "build"}]'
   pipelineSpec:
@@ -71,7 +71,7 @@ spec:
         to build image.
       name: path-context
       type: string
-    - default: build/konflux.Dockerfile
+    - default: release/konflux.Dockerfile
       description: Path to the Dockerfile inside the context specified by parameter
         path-context
       name: dockerfile
