@@ -28,7 +28,7 @@ if test "$CSV_Z_VERSION" -gt 0; then
         export REPLACES="lvms-operator.v$OCS_VERSION.$(($CSV_Z_VERSION - 1))"
 fi
 
-make bundle
+make bundle-base
 
 cat >> "bundle/manifests/lvms-operator.clusterserviceversion.yaml" << EOF
   relatedImages:

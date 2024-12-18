@@ -8,7 +8,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
       (".tekton/lvm-operator-pull-request.yaml".pathChanged() || ".tekton/lvm-operator-push.yaml".pathChanged() ||
-      "release/operator/konflux.Dockerfile".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
+      "release/operator/***".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
       "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged() || "vendor/***".pathChanged() ||
       "api/***".pathChanged())
   creationTimestamp: null
@@ -31,7 +31,7 @@ spec:
   - name: dockerfile
     value: release/operator/konflux.Dockerfile
   - name: prefetch-input
-    value: ''
+    value: '[{"type": "rpm", "path": "release/operator"}]'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -192,6 +192,8 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
       runAfter:
       - clone-repository
       taskRef:

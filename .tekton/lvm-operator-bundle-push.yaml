@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
       (".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-bundle-push.yaml".pathChanged() ||
-      "release/bundle/bundle.konflux.Dockerfile".pathChanged() ||
+      "release/bundle/***".pathChanged() ||
       "bundle/***".pathChanged())
   creationTimestamp: null
   labels:
@@ -30,6 +30,8 @@ spec:
     value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle:{{revision}}
   - name: dockerfile
     value: release/bundle/bundle.konflux.Dockerfile
+  - name: prefetch-input
+    value: '{"type": "generic", "path": "./release/bundle"}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.

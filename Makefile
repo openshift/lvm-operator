@@ -241,7 +241,11 @@ else
 endif
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle: build-prometheus-alert-rules bundle-base
+
+# Allow bundling without needing to run jsonnet which we can't acquire in hermetic builds
+.PHONY: bundle-base
+bundle-base: manifests kustomize operator-sdk rename-csv ## Generate bundle manifests and metadata, then validate generated files.
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
