@@ -5,7 +5,7 @@ echo "render_templates START..."
 export OCS_VERSION=$(echo $CI_VERSION | cut -d'.' -f -2)
 
 # Get an actual current release to update full_version properly
-RELEASE=$(cat bundle.konflux.Dockerfile|egrep -e 'release="' | sed -e 's|^.*release="\(.*\)".*$|\1|')
+RELEASE=$(cat release/bundle/bundle.konflux.Dockerfile|egrep -e 'release="' | sed -e 's|^.*release="\(.*\)".*$|\1|')
 
 # Set the version
 export CSV_VERSION="${CI_VERSION}"

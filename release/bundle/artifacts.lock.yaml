@@ -7,3 +7,6 @@ artifacts:
   - filename: "operator-sdk"
     download_url: "https://github.com/operator-framework/operator-sdk/releases/download/v1.38.0/operator-sdk_linux_amd64"
     checksum: "sha256:35f759010c05aef7fed9deb31a46a6682aedff7abf8c109331ccd931c966e6c0"
+  - filename: "controller-gen"
+    download_url: "https://github.com/kubernetes-sigs/controller-tools/releases/download/v0.16.5/controller-gen-linux-amd64"
+    checksum: "sha256:4ce969dde27e48e270c0233367c6d7fdc0219bd9762ae551a3ea6cb25ded8ff6"
