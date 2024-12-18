@@ -25,19 +25,20 @@ ENV GOEXPERIMENT=strictfipsruntime
 
 RUN go build -tags strictfipsruntime -mod=vendor -ldflags "-s -w" -a -o lvms cmd/main.go
 
-#FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
+FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 
-# RUN microdnf update -y && \
-#     microdnf install -y util-linux xfsprogs e2fsprogs glibc && \
-#     microdnf clean all
+RUN microdnf repolist
+RUN ls -al /etc/yum.repos.d
+RUN cat /etc/yum.repos.d/redhat.repo
+RUN cat /etc/yum.repos.d/cachi2.repo
 
-FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
-RUN dnf install -y util-linux xfsprogs e2fsprogs glibc
+RUN mkdir /var/lib/rhsm && rm -rf /etc/yum.repos.d/redhat.repo
 
-RUN dnf info util-linux
-RUN dnf info xfsprogs
-RUN dnf info e2fsprogs
-RUN dnf info glibc
+RUN microdnf install -y util-linux xfsprogs e2fsprogs && \
+    microdnf clean all
+
+# FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+# RUN dnf install -y util-linux xfsprogs e2fsprogs glibc
 
 RUN [ -d /run/lock ] || mkdir /run/lock
 

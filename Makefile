@@ -430,3 +430,5 @@ vuln-scan-deps:
 .PHONY: vuln-scan-container
 vuln-scan-container:
 	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+
+include build/konflux.make
