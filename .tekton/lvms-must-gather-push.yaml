@@ -8,7 +8,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
       (".tekton/lvms-must-gather-pull-request.yaml".pathChanged() || ".tekton/lvms-must-gather-push.yaml".pathChanged() ||
-      "must-gather/***".pathChanged() || "release/must-gather.konflux.Dockerfile".pathChanged())
+      "must-gather/***".pathChanged() || "release/must-gather/must-gather.konflux.Dockerfile".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
@@ -27,7 +27,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather:{{revision}}
   - name: dockerfile
-    value: release/must-gather.konflux.Dockerfile
+    value: release/must-gather/must-gather.konflux.Dockerfile
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.

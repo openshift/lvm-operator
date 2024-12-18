@@ -1,5 +1,4 @@
-# Building with Konflux
-## Generating rpms.lock.yaml
+# Generating rpms.lock.yaml
 In order to generate the rpms.lock.yaml file you will need the following:
 - podman
 - docker auth config for registry.redhat.io

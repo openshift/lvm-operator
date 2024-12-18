@@ -2,6 +2,7 @@
 set -x
 
 # Register the container with RHSM
+subscription-manager clean
 subscription-manager register --activationkey="${RHSM_ACTIVATION_KEY}" --org="${RHSM_ORG}"
 
 arch=$(uname -m)
@@ -19,13 +20,13 @@ pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/ta
 
 cd release
 
-cp /etc/yum.repos.d/redhat.repo ./redhat.repo
+cp /etc/yum.repos.d/redhat.repo ./operator/redhat.repo
 
 # Overwrite the arch listing so that we can do multiarch
-sed -i "s/$(uname -m)/\$basearch/g" ./redhat.repo
+sed -i "s/$(uname -m)/\$basearch/g" ./operator/redhat.repo
 
-# Generate the rpms.lock.yaml file
-rpm-lockfile-prototype --allowerasing --outfile="rpms.lock.yaml" rpms.in.yaml
+# Generate the rpms.lock.yaml file for the operator
+rpm-lockfile-prototype --allowerasing --outfile="operator/rpms.lock.yaml" operator/rpms.in.yaml
 
 # Cleanup the repo file
-rm -rf ./redhat.repo
+rm -rf ./operator/redhat.repo

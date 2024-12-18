@@ -4,11 +4,12 @@ ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lv
 WORKDIR /operator
 COPY ./ ./
 
-RUN ls -al .
-RUN ls -al release
-RUN ls -al /
+RUN mkdir bin && \
+    cp /cachi2/output/deps/generic/operator-sdk /cachi2/output/deps/generic/kustomize.tar.gz bin/ && \
+    tar -xvf bin/kustomize.tar.gz -C bin && \
+    chmod +x bin/operator-sdk
 
-RUN CI_VERSION="4.19.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/render_templates.sh
+RUN CI_VERSION="4.19.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/hack/render_templates.sh
 
 FROM scratch
 
