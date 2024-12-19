@@ -50,8 +50,9 @@ To update the dependencies, follow the steps below:
         patch -p1 -d $(SELF_DIR)vendor/github.com/kubernetes-csi/external-provisioner/v5 < $(SELF_DIR)hack/external-provisioner.patch
     ```
    This will use a regular file patch (which you can generate manually or preferably with an IDE as an exported patch from your clipboard) and will allow you to surgically update any discrepancies in the vendored code without having to wait for the vendor to update.
-6. Run `make rpm-lock` which will regenerate the `rpms.lock.yaml` file that will allow konflux to prefetch all of the RPM dependencies for the operator. Regenerating the file will 
-    make sure we are using the latest version of our dependencies in the released operator image. Documentation for re-generating the rpms lock file can be found in
+6. Run `make rpm-lock` which will regenerate the `rpms.lock.yaml` file that will allow konflux to prefetch all of the
+    RPM dependencies for the operator. Regenerating the file will make sure we are using the latest version of our
+    dependencies in the released operator image. Documentation for re-generating the rpms lock file can be found in
     [release/hack/generate-rpm-lock.md](release/hack/generate-rpm-lock.md)
 
 ## Expected Replacement of TopoLVM
