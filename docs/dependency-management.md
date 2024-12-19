@@ -30,6 +30,8 @@ To update the dependencies, follow the steps below:
     [They are found at the start of the Makefile](https://github.com/openshift/lvm-operator/blob/v4.16.0/Makefile#L43-L46).
     Note that some of these versions are getting their correct tag from the go.mod file.
     In this case, the go.mod dependency is the single source of truth and and upgrade there also will update the relevant client tools (e.g. the ginkgo testing CLI gets its version from the dependency of the go.mod file so as to not maintain the version twice)
+    - Make sure the dependencies match in the bundle `artifacts.lock.yaml` which is in `release/bundle/artifacts.lock.yaml`. The links will need to be updated with the new
+        version and the checksum value will need to be updated for the new dependency. You can generate the sha256 checksum by running `sha256sum` against the downloaded file.
 4. Run `make godeps-update docker-build` to update the dependencies as well as to build the operator image with the updated dependencies.
     This is a good first check if something broke during the upgrade. If it did, this is the time to debug further.
     If you are facing trouble, go slowly by upgrading one dependency group at a time and testing the operator to ensure that the operator is still functioning as expected.
@@ -48,6 +50,9 @@ To update the dependencies, follow the steps below:
         patch -p1 -d $(SELF_DIR)vendor/github.com/kubernetes-csi/external-provisioner/v5 < $(SELF_DIR)hack/external-provisioner.patch
     ```
    This will use a regular file patch (which you can generate manually or preferably with an IDE as an exported patch from your clipboard) and will allow you to surgically update any discrepancies in the vendored code without having to wait for the vendor to update.
+6. Run `make rpm-lock` which will regenerate the `rpms.lock.yaml` file that will allow konflux to prefetch all of the RPM dependencies for the operator. Regenerating the file will 
+    make sure we are using the latest version of our dependencies in the released operator image. Documentation for re-generating the rpms lock file can be found in
+    [release/hack/generate-rpm-lock.md](release/hack/generate-rpm-lock.md)
 
 ## Expected Replacement of TopoLVM
 

@@ -7,8 +7,7 @@ COPY ./ ./
 RUN mkdir bin && \
     cp /cachi2/output/deps/generic/* bin/ && \
     tar -xvf bin/kustomize.tar.gz -C bin && \
-    chmod +x bin/operator-sdk bin/controller-gen && \
-    ls -al bin
+    chmod +x bin/operator-sdk bin/controller-gen
 
 RUN CI_VERSION="4.19.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/hack/render_templates.sh
 
