@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" &&
       (".tekton/lvm-operator-pull-request.yaml".pathChanged() || ".tekton/lvm-operator-push.yaml".pathChanged() ||
-      "konflux.Dockerfile".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
+      "release/operator/***".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
       "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged() || "vendor/***".pathChanged() ||
       "api/***".pathChanged())
   creationTimestamp: null
@@ -32,7 +32,9 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: konflux.Dockerfile
+    value: release/operator/konflux.Dockerfile
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": "release/operator"}]'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -69,7 +71,7 @@ spec:
         to build image.
       name: path-context
       type: string
-    - default: konflux.Dockerfile
+    - default: release/operator/konflux.Dockerfile
       description: Path to the Dockerfile inside the context specified by parameter
         path-context
       name: dockerfile
@@ -82,7 +84,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
@@ -193,6 +195,8 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
       runAfter:
       - clone-repository
       taskRef:
