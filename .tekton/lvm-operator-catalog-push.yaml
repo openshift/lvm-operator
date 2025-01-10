@@ -25,6 +25,8 @@ spec:
     value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:{{revision}}
   - name: dockerfile
     value: konflux-catalog.Dockerfile
+  - name: hermetic
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
