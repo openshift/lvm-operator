@@ -13,7 +13,7 @@ import (
 
 func TestExecutor(t *testing.T) {
 	a := assert.New(t)
-	if os.Getuid() != 0 {
+	if os.Getuid() != 0 || os.Getenv("NON_ROOT") == "true" {
 		t.Skip("run as root")
 	}
 	executor := &CommandExecutor{}
