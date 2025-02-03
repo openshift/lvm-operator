@@ -1,4 +1,4 @@
-FROM registry.redhat.io/openshift4/ose-cli-rhel9:latest
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 
 # Copy all collection scripts to /usr/bin
 COPY must-gather/collection-scripts /usr/bin/
