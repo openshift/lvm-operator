@@ -27,7 +27,8 @@ RUN go build -tags strictfipsruntime -mod=vendor -ldflags "-s -w" -a -o lvms cmd
 
 FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 
-RUN microdnf install -y util-linux xfsprogs e2fsprogs && \
+RUN microdnf update -y && \
+    microdnf install -y util-linux xfsprogs e2fsprogs && \
     microdnf clean all
 
 RUN [ -d /run/lock ] || mkdir /run/lock
