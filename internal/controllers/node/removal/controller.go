@@ -7,8 +7,10 @@ import (
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -64,8 +66,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}).Watches(&v1.Node{},
-		handler.EnqueueRequestsFromMapFunc(r.GetNodeStatusFromNode)).Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}).
+		Watches(&v1.Node{}, handler.EnqueueRequestsFromMapFunc(r.GetNodeStatusFromNode)).
+		WithOptions(controller.Options{SkipNameValidation: ptr.To(true)}).
+		Complete(r)
 }
 
 // GetNodeStatusFromNode can be used to derive a reconcile.Request from a Node for a NodeStatus.
