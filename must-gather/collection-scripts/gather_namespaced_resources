@@ -46,7 +46,7 @@ commands_desc=()
 commands_desc+=("lvmcluster")
 commands_desc+=("logicalvolume")
 commands_desc+=("lvmvolumegroup")
-commands_desc+=("lvmvolumegroupsnodestatus")
+commands_desc+=("lvmvolumegroupnodestatus")
 commands_desc+=("pods")
 
 # collect yaml output of OC commands
