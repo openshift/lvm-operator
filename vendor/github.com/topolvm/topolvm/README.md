@@ -9,7 +9,6 @@
 TopoLVM is a [CSI][] plugin using LVM for Kubernetes.
 It can be considered as a specific implementation of [local persistent volumes](https://kubernetes.io/docs/concepts/storage/volumes/#local) using CSI and LVM.
 
-- **Project Status**: Testing for production
 - **Conformed CSI version**: [1.5.0](https://github.com/container-storage-interface/spec/blob/v1.5.0/spec.md)
 
 Our supported platform are:
@@ -23,6 +22,7 @@ Our supported platform are:
 \*1 The host's Linux Kernel must be v4.9 or later which supports `rmapbt` and `reflink`, if you use xfs filesystem with an official docker image.  
 \*2 Tier1 support. The official docker images are provided and all functionalities are tested by CI.  
 \*3 Tier2 support. The official docker images are provided, but no tests run by CI.  
+\*4 Tier3 support. No docker images are provided, and no tests run by CI, but binaries are built.
 
 Docker images are available on [ghcr.io](https://github.com/orgs/topolvm/packages).  
 
