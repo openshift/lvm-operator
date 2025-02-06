@@ -49,7 +49,7 @@ require (
 // if we do not do our own version of replace
 replace k8s.io/client-go v1.5.2 => k8s.io/client-go v0.30.3
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20240628112221-aae75a859ac5
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20250206134323-7242927baad9
 
 require (
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
