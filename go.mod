@@ -44,7 +44,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20250220161854-8f97658bca19
 
 require (
 	cel.dev/expr v0.19.1 // indirect
