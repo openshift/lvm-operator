@@ -59,7 +59,7 @@ type ThinPoolConfig struct {
 	// When set to Static, the chunk size is calculated based on the static size attribute provided within ChunkSize.
 	// +kubebuilder:default=Static
 	// +kubebuilder:validation:Enum=Host;Static
-	// +required
+	// +optional
 	ChunkSizeCalculationPolicy ChunkSizeCalculationPolicy `json:"chunkSizeCalculationPolicy,omitempty"`
 
 	// ChunkSize specifies the statically calculated chunk size for the thin pool.
@@ -80,7 +80,7 @@ type ThinPoolConfig struct {
 	// When set to Static, the metadata size is calculated based on the static size attribute provided within MetadataSize
 	// +kubebuilder:default=Host
 	// +kubebuilder:validation:Enum=Host;Static
-	// +required
+	// +optional
 	MetadataSizeCalculationPolicy MetadataSizePolicy `json:"metadataSizeCalculationPolicy,omitempty"`
 }
 
