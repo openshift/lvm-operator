@@ -1,10 +1,14 @@
 package selector
 
 import (
+	"fmt"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	corev1 "k8s.io/api/core/v1"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 )
+
+var ErrNotReadyTaintExists = fmt.Errorf("node has a %s taint", constants.NodeNotReadyTaintKey)
 
 // ExtractNodeSelectorAndTolerations combines and extracts scheduling parameters from the multiple deviceClass entries in an lvmCluster
 func ExtractNodeSelectorAndTolerations(lvmCluster *lvmv1alpha1.LVMCluster) (*corev1.NodeSelector, []corev1.Toleration) {
@@ -32,7 +36,11 @@ func ValidNodes(lvmCluster *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList) ([]c
 
 	for _, node := range nodes.Items {
 		// Check if node tolerates all taints
-		if !ToleratesAllTaints(node.Spec.Taints, tolerations) {
+		ok, err := ToleratesAllTaints(node.Spec.Taints, tolerations)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
 			continue
 		}
 
@@ -54,11 +62,14 @@ func ValidNodes(lvmCluster *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList) ([]c
 }
 
 // TolerateAllTaints returns true if all taints are tolerated by the provided tolerations
-func ToleratesAllTaints(taints []corev1.Taint, tolerations []corev1.Toleration) bool {
+func ToleratesAllTaints(taints []corev1.Taint, tolerations []corev1.Toleration) (bool, error) {
 	for _, taint := range taints {
 		if !corev1helper.TolerationsTolerateTaint(tolerations, &taint) {
-			return false
+			if taint.Key == constants.NodeNotReadyTaintKey {
+				return false, ErrNotReadyTaintExists
+			}
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
