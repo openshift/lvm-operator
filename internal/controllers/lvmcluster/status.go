@@ -277,7 +277,11 @@ func validateDeviceClassSetup(cluster *lvmv1alpha1.LVMCluster, nodes *corev1.Nod
 
 func isNodeValid(node *corev1.Node, cluster *lvmv1alpha1.LVMCluster, deviceClass *lvmv1alpha1.DeviceClass) (bool, error) {
 	// Check if node tolerates all taints
-	if !selector.ToleratesAllTaints(node.Spec.Taints, cluster.Spec.Tolerations) {
+	ok, err := selector.ToleratesAllTaints(node.Spec.Taints, cluster.Spec.Tolerations)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
 		return false, nil
 	}
 
