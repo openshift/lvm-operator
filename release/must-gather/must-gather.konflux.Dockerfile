@@ -3,6 +3,9 @@ FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 # Copy all collection scripts to /usr/bin
 COPY must-gather/collection-scripts /usr/bin/
 
+RUN mkdir /licenses
+COPY LICENSE /licenses
+
 LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
 LABEL com.redhat.component="lvms-must-gather-container"
 LABEL name="lvms4/lvms-must-gather-rhel9"
