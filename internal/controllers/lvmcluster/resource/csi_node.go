@@ -33,9 +33,6 @@ func (c csiNode) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 
 	csiNodes, err := c.GetAllCSINodeCandidates(ctx, r, cluster)
-	if err != nil {
-		return err
-	}
 
 	for _, csiNode := range csiNodes {
 		found := false
@@ -50,18 +47,17 @@ func (c csiNode) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1
 		}
 	}
 
-	logger.V(2).Info("All CSINode driver registrations have been created by the kubelet")
+	if err == nil {
+		logger.V(2).Info("All CSINode driver registrations have been created by the kubelet")
+	}
 
-	return nil
+	return err
 }
 
 func (c csiNode) EnsureDeleted(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 
 	csiNodes, err := c.GetAllCSINodeCandidates(ctx, r, cluster)
-	if err != nil {
-		return err
-	}
 
 	for _, csiNode := range csiNodes {
 		found := false
@@ -79,9 +75,11 @@ func (c csiNode) EnsureDeleted(r Reconciler, ctx context.Context, cluster *lvmv1
 		}
 	}
 
-	logger.V(2).Info("All CSINode driver registrations have been deleted by the kubelet")
+	if err == nil {
+		logger.V(2).Info("All CSINode driver registrations have been deleted by the kubelet")
+	}
 
-	return nil
+	return err
 }
 
 func (c csiNode) GetAllCSINodeCandidates(ctx context.Context, clnt client.Client, cluster *lvmv1alpha1.LVMCluster) ([]*storagev1.CSINode, error) {
@@ -91,9 +89,6 @@ func (c csiNode) GetAllCSINodeCandidates(ctx context.Context, clnt client.Client
 	}
 
 	valid, err := selector.ValidNodes(cluster, nodeList)
-	if err != nil {
-		return nil, err
-	}
 
 	csiNodes := make([]*storagev1.CSINode, 0, len(valid))
 	for _, node := range valid {
@@ -109,7 +104,7 @@ func (c csiNode) GetAllCSINodeCandidates(ctx context.Context, clnt client.Client
 
 	}
 
-	return csiNodes, nil
+	return csiNodes, err
 }
 
 var _ Manager = csiNode{}
