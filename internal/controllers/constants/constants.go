@@ -65,6 +65,8 @@ const (
 
 	PriorityClassNameUserCritical    = "openshift-user-critical"
 	PriorityClassNameClusterCritical = "system-cluster-critical"
+
+	NodeNotReadyTaintKey = "node.kubernetes.io/not-ready"
 )
 
 // these constants are derived from the TopoLVM recommendations but maintained separately to allow easy override.
