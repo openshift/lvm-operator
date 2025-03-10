@@ -35,6 +35,10 @@ RUN [ -d /run/lock ] || mkdir /run/lock
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .
+
+RUN mkdir /licenses
+COPY LICENSE /licenses
+
 USER 65532:65532
 
 LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
