@@ -201,6 +201,10 @@ spec:
         operator: in
         values:
           - "false"
+      - input: $(params.skip-preflight)
+        operator: in
+        values:
+          - "false"
   - name: sast-snyk-check
     params:
       - name: image-digest
@@ -411,6 +415,10 @@ spec:
   - default: "false"
     description: Skip checks against built image
     name: skip-checks
+    type: string
+  - default: "false"
+    description: Skip the ecosystem preflight checks (bundles should skip)
+    name: skip-preflight
     type: string
   - default: "true"
     description: Execute the build with network isolation
