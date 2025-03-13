@@ -56,11 +56,8 @@ func (l lvmVGNodeStatus) EnsureCreated(r Reconciler, ctx context.Context, cluste
 	}
 
 	validNodes, err := selector.ValidNodes(cluster, &nodes)
-	if err != nil {
-		return fmt.Errorf("failed to get valid nodes: %w", err)
-	}
 
-	logger.V(1).Info("nodes considered for LVMCluster",
+	logger.Info("nodes considered for LVMCluster",
 		"nodes", nodesToStringSummary(validNodes),
 		"total", nodesToStringSummary(nodes.Items),
 	)
@@ -91,7 +88,7 @@ func (l lvmVGNodeStatus) EnsureCreated(r Reconciler, ctx context.Context, cluste
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (l lvmVGNodeStatus) EnsureDeleted(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
@@ -107,9 +104,6 @@ func (l lvmVGNodeStatus) EnsureDeleted(r Reconciler, ctx context.Context, cluste
 	}
 
 	validNodes, err := selector.ValidNodes(cluster, &nodeList)
-	if err != nil {
-		return fmt.Errorf("failed to get valid nodes: %w", err)
-	}
 
 	for _, status := range nodeStatusList.Items {
 		if isValidNode(status.Name, validNodes) {
@@ -118,7 +112,8 @@ func (l lvmVGNodeStatus) EnsureDeleted(r Reconciler, ctx context.Context, cluste
 			}
 		}
 	}
-	return nil
+
+	return err
 }
 
 // isValidNode checks if the node is in the list of valid nodes for the LVMVolumeGroupNodeStatus.
