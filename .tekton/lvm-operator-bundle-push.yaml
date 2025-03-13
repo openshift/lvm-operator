@@ -35,6 +35,8 @@ spec:
     value: '{"type": "generic", "path": "./release/bundle"}'
   - name: skip-preflight
     value: "true"
+  - name: build-args-file
+    value: release/container-build.args
   pipelineRef:
     name: single-arch-build-pipeline
   workspaces:
