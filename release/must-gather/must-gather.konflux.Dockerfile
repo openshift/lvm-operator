@@ -17,4 +17,6 @@ LABEL io.k8s.description="LVM Storage data gathering image"
 LABEL io.openshift.tags="lvms"
 LABEL upstream-vcs-ref="${CI_LVM_OPERATOR_UPSTREAM_COMMIT}"
 
+USER 65532:65532
+
 ENTRYPOINT ["/usr/bin/gather"]
