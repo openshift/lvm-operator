@@ -1,15 +1,18 @@
 FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 
+ARG MAINTAINER
+ARG OPERATOR_VERSION
+
 # Copy all collection scripts to /usr/bin
 COPY must-gather/collection-scripts /usr/bin/
 
 RUN mkdir /licenses
 COPY LICENSE /licenses
 
-LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
+LABEL maintainer="${MAINTAINER}"
 LABEL com.redhat.component="lvms-must-gather-container"
 LABEL name="lvms4/lvms-must-gather-rhel9"
-LABEL version="${CI_CONTAINER_VERSION}"
+LABEL version="${OPERATOR_VERSION}"
 LABEL description="LVM Storage data gathering image"
 LABEL summary="LVM Storage data gathering image"
 LABEL io.k8s.display-name="LVM Storage must gather"

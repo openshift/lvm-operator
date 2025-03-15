@@ -31,6 +31,8 @@ spec:
     value: 5d
   - name: dockerfile
     value: release/must-gather/must-gather.konflux.Dockerfile
+  - name: build-args-file
+    value: release/container-build.args
   pipelineRef:
     name: build-pipeline
   taskRunTemplate: {}

@@ -1,6 +1,9 @@
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
 ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:68064cb24efee3d3baa1d87cee91d19c16f68a583f6e7499c86c787cae974d39
 ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:8aea8b83615ecf464fccd9364054dfa60e982375d1a3f8bdf53be28378c1a2e0
+
+ARG OPERATOR_VERSION
+
 WORKDIR /operator
 COPY ./ ./
 
@@ -9,9 +12,14 @@ RUN mkdir bin && \
     tar -xvf bin/kustomize.tar.gz -C bin && \
     chmod +x bin/operator-sdk bin/controller-gen
 
-RUN CI_VERSION="4.19.0" IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/hack/render_templates.sh
+RUN CI_VERSION=${OPERATOR_VERSION} IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/hack/render_templates.sh
 
 FROM scratch
+
+ARG MAINTAINER
+ARG OPERATOR_VERSION
+ARG OPENSHIFT_VERSIONS
+ARG LVMS_TAGS
 
 # Copy files to locations specified by labels.
 COPY --from=builder /operator/bundle/manifests /manifests/
@@ -26,21 +34,21 @@ LABEL operators.operatorframework.io.bundle.package.v1=lvms-operator
 
 # Operator bundle metadata
 LABEL com.redhat.delivery.operator.bundle=true
-LABEL com.redhat.openshift.versions="v4.19-v4.20"
+LABEL com.redhat.openshift.versions="${OPENSHIFT_VERSIONS}"
 LABEL com.redhat.delivery.backport=false
 
 # Standard Red Hat labels
 LABEL com.redhat.component="lvms-operator-bundle-container"
 LABEL name="lvms4/lvms-operator-bundle"
-LABEL version="4.19.0"
+LABEL version="${OPERATOR_VERSION}"
 LABEL release="1"
 LABEL summary="An operator bundle for LVM Storage Operator"
 LABEL io.k8s.display-name="lvms-operator-bundle"
-LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
+LABEL maintainer="${MAINTAINER}"
 LABEL description="An operator bundle for LVM Storage Operator"
 LABEL io.k8s.description="An operator bundle for LVM Storage Operator"
 LABEL url="https://github.com/openshift/lvm-operator"
 LABEL vendor="Red Hat, Inc."
 LABEL io.openshift.tags="lvms"
-LABEL lvms.tags="v4.19"
+LABEL lvms.tags="${LVMS_TAGS}"
 LABEL distribution-scope="public"
