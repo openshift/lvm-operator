@@ -2,6 +2,7 @@ FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
+ARG LVMS_TAGS
 
 # Copy all collection scripts to /usr/bin
 COPY must-gather/collection-scripts /usr/bin/
@@ -19,6 +20,7 @@ LABEL io.k8s.display-name="LVM Storage must gather"
 LABEL io.k8s.description="LVM Storage data gathering image"
 LABEL io.openshift.tags="lvms"
 LABEL upstream-vcs-ref="${CI_LVM_OPERATOR_UPSTREAM_COMMIT}"
+LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
 
 USER 65532:65532
 
