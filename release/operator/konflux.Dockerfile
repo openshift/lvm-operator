@@ -55,5 +55,7 @@ LABEL io.k8s.display-name="LVM Storage Operator based on RHEL 9"
 LABEL io.k8s.description="LVM Storage Operator container based on Red Hat Enterprise Linux 9 Image"
 LABEL io.openshift.tags="lvms"
 LABEL lvms.tags="${LVMS_TAGS}"
+LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
+
 
 ENTRYPOINT ["/lvms"]
