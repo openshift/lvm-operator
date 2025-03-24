@@ -407,6 +407,11 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+    when:
+      - input: $(params.skip-additional-tags)
+        operator: in
+        values:
+        - "false"
   params:
   - description: Source Repository URL
     name: git-url
@@ -439,6 +444,10 @@ spec:
   - default: "false"
     description: Skip the ecosystem preflight checks (bundles should skip)
     name: skip-preflight
+    type: string
+  - default: "false"
+    description: Skip the apply tags step to avoid additional tags
+    name: skip-additional-tags
     type: string
   - default: "true"
     description: Execute the build with network isolation

@@ -424,6 +424,11 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+    when:
+      - input: $(params.skip-additional-tags)
+        operator: in
+        values:
+        - "false"
   - name: rpms-signature-scan
     params:
     - name: image-url
@@ -497,6 +502,10 @@ spec:
     - default: "false"
       description: Skip checks against built image
       name: skip-checks
+      type: string
+    - default: "false"
+      description: Skip the apply tags step to avoid additional tags
+      name: skip-additional-tags
       type: string
     - default: "true"
       description: Execute the build with network isolation
