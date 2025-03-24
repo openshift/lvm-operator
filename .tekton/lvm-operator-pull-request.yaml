@@ -37,6 +37,8 @@ spec:
     value: '[{"type": "rpm", "path": "release/operator"}]'
   - name: build-args-file
     value: release/container-build.args
+  - name: skip-additional-tags
+    value: "true"
   pipelineRef:
     name: build-pipeline
   taskRunTemplate: {}
