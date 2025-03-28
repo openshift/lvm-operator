@@ -6,6 +6,7 @@ subscription-manager clean
 subscription-manager register --activationkey="${RHSM_ACTIVATION_KEY}" --org="${RHSM_ORG}"
 
 arch=$(uname -m)
+target="${1}"
 
 # Activate the repos
 dnf config-manager \
@@ -20,13 +21,13 @@ pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/ta
 
 cd release
 
-cp /etc/yum.repos.d/redhat.repo ./operator/redhat.repo
+cp /etc/yum.repos.d/redhat.repo ./$target/redhat.repo
 
 # Overwrite the arch listing so that we can do multiarch
-sed -i "s/$(uname -m)/\$basearch/g" ./operator/redhat.repo
+sed -i "s/$(uname -m)/\$basearch/g" ./$target/redhat.repo
 
 # Generate the rpms.lock.yaml file for the operator
-rpm-lockfile-prototype --allowerasing --outfile="operator/rpms.lock.yaml" operator/rpms.in.yaml
+rpm-lockfile-prototype --allowerasing --outfile="${target}/rpms.lock.yaml" ${target}/rpms.in.yaml
 
 # Cleanup the repo file
-rm -rf ./operator/redhat.repo
+rm -rf ./$target/redhat.repo
