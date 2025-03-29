@@ -4,6 +4,11 @@ ARG MAINTAINER
 ARG OPERATOR_VERSION
 ARG LVMS_TAGS
 
+RUN microdnf update -y && \
+    microdnf install -y --nodocs --setopt=install_weak_deps=0 tar rsync findutils gzip iproute tcpdump pciutils util-linux nftables procps-ng openshift-clients && \
+    microdnf clean all && \
+    rm -rf /var/cache/*
+
 # Copy all collection scripts to /usr/bin
 COPY must-gather/collection-scripts /usr/bin/
 

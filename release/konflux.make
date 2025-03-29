@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
 AUTH_FILE?=$(shell echo ${XDG_RUNTIME_DIR}/containers/auth.json)
+TARGET?="operator"
 
 .PHONY: rpm-lock
 rpm-lock: rhsm-keys
@@ -12,7 +13,7 @@ rpm-lock: rhsm-keys
 	--env 'RHSM_ACTIVATION_KEY=$(RHSM_ACTIVATION_KEY)' \
 	--env 'RHSM_ORG=$(RHSM_ORG)' \
 	--workdir /source \
-	registry.redhat.io/rhel9-4-els/rhel:9.4 ./release/hack/generate-rpm-lock.sh
+	registry.redhat.io/rhel9-4-els/rhel:9.4 ./release/hack/generate-rpm-lock.sh $(TARGET)
 
 .PHONY: rhsm-keys
 rhsm-keys:
