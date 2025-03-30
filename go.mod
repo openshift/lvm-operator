@@ -28,7 +28,7 @@ require (
 	github.com/topolvm/topolvm v0.36.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.68.1
-	gotest.tools/v3 v3.5.1
+	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.31.3
 	k8s.io/apiextensions-apiserver v0.31.3
 	k8s.io/apimachinery v0.31.3
