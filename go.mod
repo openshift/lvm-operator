@@ -10,7 +10,7 @@ require (
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/kubernetes-csi/csi-lib-utils v0.19.0
-	github.com/kubernetes-csi/external-provisioner/v5 v5.1.0
+	github.com/kubernetes-csi/external-provisioner/v5 v5.2.0
 	github.com/kubernetes-csi/external-resizer v1.12.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0
 	github.com/kubernetes-csi/external-snapshotter/v8 v8.1.0
