@@ -11,7 +11,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/kubernetes-csi/csi-lib-utils v0.19.0
 	github.com/kubernetes-csi/external-provisioner/v5 v5.1.0
-	github.com/kubernetes-csi/external-resizer v1.12.0
+	github.com/kubernetes-csi/external-resizer v1.13.2
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0
 	github.com/kubernetes-csi/external-snapshotter/v8 v8.1.0
 	github.com/onsi/ginkgo/v2 v2.22.0
