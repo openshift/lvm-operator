@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
@@ -54,6 +55,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := r.Delete(ctx, nodeStatus); err != nil {
 			return ctrl.Result{}, fmt.Errorf("error deleting LVMVolumeGroupNodeStatus for Node %s: %w", nodeStatus.GetName(), err)
 		}
+		logger.Info("initiated LVMVolumeGroupNodeStatus deletion", "nodeStatus", client.ObjectKeyFromObject(nodeStatus))
+
+		if removeDeleteProtectionFinalizer(nodeStatus) {
+			if err := r.Update(ctx, nodeStatus); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer from LVMVolumeGroupNodeStatus: %w", err)
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -93,4 +101,15 @@ func (r *Reconciler) GetNodeStatusFromNode(ctx context.Context, object client.Ob
 	}
 
 	return []reconcile.Request{{NamespacedName: nodeStatusKey}}
+}
+
+func removeDeleteProtectionFinalizer(status *lvmv1alpha1.LVMVolumeGroupNodeStatus) bool {
+	finalizers := status.GetFinalizers()
+	for i, finalizer := range finalizers {
+		if finalizer == constants.DeleteProtectionFinalizer {
+			status.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
+			return true
+		}
+	}
+	return false
 }
