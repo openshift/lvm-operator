@@ -2,8 +2,13 @@
 # /bin/opm (with serve subcommand)
 FROM quay.io/operator-framework/opm:latest as builder
 
+ARG CATALOG_VERSION
+
 # Copy FBC root into image at /configs and pre-populate serve cache
-ADD konflux-catalog /configs
+COPY "catalogs/lvm-operator-catalog-${CATALOG_VERSION}.yaml" /configs/
+
+RUN ["/bin/opm", "validate", "/configs"]
+
 RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 FROM quay.io/operator-framework/opm:latest
@@ -20,3 +25,4 @@ COPY --from=builder /tmp/cache /tmp/cache
 # Set FBC-specific label for the location of the FBC root directory
 # in the image
 LABEL operators.operatorframework.io.index.configs.v1=/configs
+LABEL konflux.additional-tags="${CATALOG_VERSION}"

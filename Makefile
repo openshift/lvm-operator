@@ -1,9 +1,20 @@
-catalog: opm
-	$(OPM) alpha render-template semver -o yaml catalog-template.yaml > konflux-catalog/lvm-operator-catalog.yaml
+all: templates catalogs
 
-.PHONY: verify
-verify: opm
-	$(OPM) validate konflux-catalog
+.PHONY: templates
+templates:
+	./hack/generate_released_templates.sh
+
+CATALOG_VERSION ?= v4.12
+catalog: opm
+	$(OPM) alpha render-template semver -o yaml templates/lvm-operator-catalog-$(CATALOG_VERSION)-template.yaml > catalogs/lvm-operator-catalog-$(CATALOG_VERSION).yaml
+
+catalogs: opm
+	./hack/generate_catalogs.sh $(OPM)
+
+IMAGE_BUILD_CMD ?= $(shell command -v docker 2>&1 >/dev/null && echo docker || echo podman)
+.PHONY: container
+container:
+	podman build --build-arg=CATALOG_VERSION="$(CATALOG_VERSION)" -t lvm-operator-catalog:$(CATALOG_VERSION) -f konflux-catalog.Dockerfile
 
 .PHONY: opm
 OPM = ./bin/opm

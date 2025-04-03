@@ -1,0 +1,4768 @@
+---
+defaultChannel: stable-v4.14
+name: lvms-operator
+schema: olm.package
+---
+entries:
+- name: lvms-operator.v4.13.0
+- name: lvms-operator.v4.13.1
+- name: lvms-operator.v4.13.2
+- name: lvms-operator.v4.13.3
+- name: lvms-operator.v4.13.4
+- name: lvms-operator.v4.13.5
+- name: lvms-operator.v4.13.6
+- name: lvms-operator.v4.13.7
+- name: lvms-operator.v4.13.8
+- name: lvms-operator.v4.13.9
+- name: lvms-operator.v4.13.10
+- name: lvms-operator.v4.13.11
+- name: lvms-operator.v4.13.12
+  skips:
+  - lvms-operator.v4.13.0
+  - lvms-operator.v4.13.1
+  - lvms-operator.v4.13.2
+  - lvms-operator.v4.13.3
+  - lvms-operator.v4.13.4
+  - lvms-operator.v4.13.5
+  - lvms-operator.v4.13.6
+  - lvms-operator.v4.13.7
+  - lvms-operator.v4.13.8
+  - lvms-operator.v4.13.9
+  - lvms-operator.v4.13.10
+  - lvms-operator.v4.13.11
+name: stable-v4.13
+package: lvms-operator
+schema: olm.channel
+---
+entries:
+- name: lvms-operator.v4.14.0
+- name: lvms-operator.v4.14.1
+- name: lvms-operator.v4.14.2
+- name: lvms-operator.v4.14.3
+- name: lvms-operator.v4.14.4
+- name: lvms-operator.v4.14.5
+- name: lvms-operator.v4.14.6
+- name: lvms-operator.v4.14.7
+- name: lvms-operator.v4.14.8
+- name: lvms-operator.v4.14.9
+- name: lvms-operator.v4.14.10
+- name: lvms-operator.v4.14.11
+- name: lvms-operator.v4.14.12
+  skips:
+  - lvms-operator.v4.14.0
+  - lvms-operator.v4.14.1
+  - lvms-operator.v4.14.2
+  - lvms-operator.v4.14.3
+  - lvms-operator.v4.14.4
+  - lvms-operator.v4.14.5
+  - lvms-operator.v4.14.6
+  - lvms-operator.v4.14.7
+  - lvms-operator.v4.14.8
+  - lvms-operator.v4.14.9
+  - lvms-operator.v4.14.10
+  - lvms-operator.v4.14.11
+name: stable-v4.14
+package: lvms-operator
+schema: olm.channel
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.0
+name: lvms-operator.v4.13.0
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.0
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Basic Install
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:830ada5cf7db992d6eb06581a60fa9716af3fb9d46585ad068fe24903b1b0d88
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.13.0'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operators.openshift.io/infrastructure-features: '["disconnected"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.0-8
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:f2c5044676df6075e7c4844d5b6ba8ff45aa8600510d9368cc10bd8450d89116
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.0
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:830ada5cf7db992d6eb06581a60fa9716af3fb9d46585ad068fe24903b1b0d88
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:09e4a3c8db6452c6a11d191ffa516e351f25f2c215d4015640e5dc8c6094fcaa
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:33617f49d30c6752e078e76bebcbf3f4384fb03286f2ef4d6ca9d2e6464ada43
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:b1f2103c4ddf702b2a135e68420af3e434c8b135735dbd33bf66afada0036976
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:f1955371a5f88d8984af4445f43864dad8cc315e714f40984ebdf973185ade92
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:d4228c6e797ec6b2d37e599c19c715b02f6cb955b2a7fb493c56844f4c75e687
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:eeed76c41bf3d2262a4d177241a315bc476421b8471cbba1555991aac8ef83b0
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:422e4fbe1ed81c79084f43a826dc0674510a7ff578e62b4ddda119ed3266d0b6
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.1
+name: lvms-operator.v4.13.1
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.1
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:3887400bdb33cb94054dbd5d979176be653c594c38c2c2f29e251e57d2ce288d
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.13.1'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operators.openshift.io/infrastructure-features: '["disconnected"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.1-5
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:e2e4ed72d810bd6ea55054c70b4dedb999f37544ce96f9fd80561ecbf477d0d6
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.1
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:3887400bdb33cb94054dbd5d979176be653c594c38c2c2f29e251e57d2ce288d
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:f676e20b8ecdbe9f5fc994e2ff236a02d2afe666bf325e8ac02cd3a043df107e
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:778aa6e5ea046bfcd865e665679c30362dc8c00cfb33a0cdcc56b2395e8ab504
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:837b32a0c432123e2605ad6d029e7f3b4489d9c52a9d272c7a133d41ad10db87
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:d511b504ffaa3bf8eeb5b4553429d0021344e11297cd76d96e243b33e71394d7
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:3c63c06561f20f5ead423946c6cc22030c397f0fe190004e6b5ccdb3bfaccdc4
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:71d42a2b26fca9690036c95e54aa3641702c4dc7ba1912f8804d777320f9fbf8
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:4564ca3dc5bac80d6faddaf94c817fbbc270698a9399d8a21ee1005d85ceda56
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.10
+name: lvms-operator.v4.13.10
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.10
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:2c63444403cefbaf6a70212afcc2c2e86de9493dd15e2d1c6b3dac38200bfbb8
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.10'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.10-4
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:f29def1aa86aedeb841af0bd121e014ba7509536e06c14357109dfc535671449
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.10
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:2c63444403cefbaf6a70212afcc2c2e86de9493dd15e2d1c6b3dac38200bfbb8
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:a3fbe385acb37bfbffa61d21d65a75016851457422f2dc4de5deee7a89f3a712
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:08af5ba1d911301dd7f1fb5e36fc75bd48275a039dd233bc47f2afa2a13ccba2
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:c3f7d2b6c823d1c2a35cc685ef3037a21a157c22dfd39534ea4d1ffbc07139cb
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:e374c720e157a718a33696f7d19fd1e5f96e45dd4f1921808a982009495ce8e3
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:88cddec766cf07d5d92405fa8bbee114fc4fee61de73e3bc9a859697410b8a88
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:488f4ad8e597816d61cb466b00f7d82769c12056426543a9ca6d15f3227545bd
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:f288292071ec742e0c420cc19b8abe0ab5d95c447f01ce800bf5bf434270b616
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.11
+name: lvms-operator.v4.13.11
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.11
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:c183122a2891e89586a2db0e4184c7f48c474d8c1c24684950fb9fd0dc64a8e9
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.11'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.11-3
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:235600631427528e8d871e9e39564bf16bf4a5f5b3d0d67b3c8b31dd3714655d
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.11
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:c183122a2891e89586a2db0e4184c7f48c474d8c1c24684950fb9fd0dc64a8e9
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:e6c93eec110a2f8f6327eb57c4427d17dc0917a604af5929e8176e455daacfe8
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:08af5ba1d911301dd7f1fb5e36fc75bd48275a039dd233bc47f2afa2a13ccba2
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:c3f7d2b6c823d1c2a35cc685ef3037a21a157c22dfd39534ea4d1ffbc07139cb
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:e374c720e157a718a33696f7d19fd1e5f96e45dd4f1921808a982009495ce8e3
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:88cddec766cf07d5d92405fa8bbee114fc4fee61de73e3bc9a859697410b8a88
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:488f4ad8e597816d61cb466b00f7d82769c12056426543a9ca6d15f3227545bd
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:f288292071ec742e0c420cc19b8abe0ab5d95c447f01ce800bf5bf434270b616
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.12
+name: lvms-operator.v4.13.12
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.12
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:edea9ef18a5ee168ee630b89b9eaddb78e44b6ccf7532c2891f4306daf32f720
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.12'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.12-1
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:5200487bfbd99ffaf590ab24873cf4754d04833371b1efbd910c4dde3256368b
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.12
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:edea9ef18a5ee168ee630b89b9eaddb78e44b6ccf7532c2891f4306daf32f720
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:555f38a625558ae9020e9491bda6a10d4a5f45ddd454e81beb049f6b889467cb
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:ae612a47e9096e0df71633c17f5385bf06800e86602698bb604479da01d6a610
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:f91911474f8b24b0f5b32627e503caccc6f17628ae4e1c649ada6b25b73cc8a4
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:40cfc78da681f31e0b3b7769f0a27a15dab50a4b8d888acff2bdd10b345e71a1
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:3f2f4a41c266131a04237c80a3f5107d714f1db37b7e184f71a50ea01551ff68
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:44120dccc70961d1a2421a553cf87ebbfa937d1c1ef8d774d130831c77c61334
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:3f2804bc2af437ff1f06c214b48a1a780dfcfab995650d901c03270057eb9f3c
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.2
+name: lvms-operator.v4.13.2
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.2
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:609fce8e361cceac0e28a7e2b205e7c3703ed3b551c882cc47ccfe6daefa69ce
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.13.2'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operators.openshift.io/infrastructure-features: '["disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.2-2
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:e62e89730c91e5db1a0dae5a004c74b529ec69d8496464d849f1c1a847c9950a
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.2
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:609fce8e361cceac0e28a7e2b205e7c3703ed3b551c882cc47ccfe6daefa69ce
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:4438b0e8a867bfc394726d85a24c06b060165b3b7eba53db820353ca1509e2d7
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:25fc68903896723c42b2cef56ed02f8bbc9d190e4b84ad5ec0d52606a759e8a7
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:61c237087babd6368c33194ffd67962c26407e747cfc533ba84619a14ac6bab9
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:5c27c46b2fff3f1c2ff83e9698817c635da85e1df1408b302ff42cb6fd9f9285
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:d309adf2529d43f4678e31fa2f1b1f875a6d3ea07a039088781b70f84d4da173
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:490159a241b6e734decd2ffaea530ffdd443cacd8acd37a148322b572f39d76c
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:d4de33150cb8c8faf0133b39553e6c972be5ace7ae787c98f3b77fca37748036
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.3
+name: lvms-operator.v4.13.3
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.3
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:1f5d4eb76cd50c5757cfe48a89b24e30484a9693cb8586f9782aab5cd94bf7d0
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.13.3'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.3-1
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:1fcdf6baaadaf883f6a81755b840154e625b762edeb021f3aba3615274c2f2c8
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.3
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:1f5d4eb76cd50c5757cfe48a89b24e30484a9693cb8586f9782aab5cd94bf7d0
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:dbb3a663756d605c58cdbd492f0dfdbe7fc355964b92decfc515eab33521edf9
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:3596cdff6e841402888fe7555f1a64ecbcfca15582a871cf21cee82147caeaaa
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:09c14d6e88025e2de971cb85bbdae8da01e9f4b164bd7a305653d78395f462c6
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:cdd6907e3a22c36f31a1212702cc570b672aed88dab812054ed38f6cd0485100
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:d6a5ace99465b757f1b3b06cec503def730196e5d9d0912c4efec1737d98e753
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:416baa36bf9bb3356521d72aa618bee934202181500dcc860de61c7c8d967e1b
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:4a3a76792d91621f3e030ba96504e4098ec71e80856660f15a91643bb73e9d66
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.4
+name: lvms-operator.v4.13.4
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.4
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:3a66a71cb4041d0bab2a90471c0ec80398d8d654b650acc3ce4c66f17bf5640e
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.13.4'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.4-2
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:a81ca564998f3451773976c2bd6e3bd54488d2a5aacfe4336b6e51fc7a9a62c5
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.4
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:3a66a71cb4041d0bab2a90471c0ec80398d8d654b650acc3ce4c66f17bf5640e
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:8ea8f9434e0e25805f0b2ad6a82e5bbe54f013c1f01a14f6b2eb096b31f70640
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:54b65c73e5c23abed7ad5816ff4e32951f3ab29f62317a04ad622ef8b68f63e7
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:7b653e527b6a5b23c349467a7c2c44853427837de15fb59a30974942f0a7491d
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:225ee860bffe4e76fa3b2ab52a1f51fc74fbf51859637c02dd5fdc3793bf7799
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:5d9c63240dd30ab9f782bbeb3c2d31e37203884f08f6175a9a9eaf95f347e7d0
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:e7a95470b47737292f4859e50d02da5c472f8e35cf4dbe9e2e52ea9ff6dc0c25
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:48cf6065279581d33647ab384b9b22c444cab82d3da729f51b34af29cd8987ec
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.5
+name: lvms-operator.v4.13.5
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.5
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:e9da3c25b2405a11bce2544ef2f9caab76abaeedc937153edd426d6d822789e0
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.5'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.5-3
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:9885fcf276d5492376dbc561610abdf0be16f4ee8c28678c1a2a5473c29b3712
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.5
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:e9da3c25b2405a11bce2544ef2f9caab76abaeedc937153edd426d6d822789e0
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:f9f5a51f955fcfbfb2deb1cafd6cb6bd6c40169cf99ea0e8d54cb90c841ef455
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:addd881307228623bb4e55c388f873d3824a3f9247b43ea7132334e001fbeea2
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:48dbd5445e3ad609061861786cdb4f77b83405a0e30b1b97ce9efdeccb988ef8
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:15a6e20ad82c794e5b45958863f8093ef3021301bc0a1589b5152ebc61d40fd1
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:3aac7c16746284df07559e782fee24441f126c2ff2cbacdc6fa1c64771fe2fb7
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:e2a04f4fd0c65f39e0a991ccd88f4a3ae58c679cdcc0391ff6f9c09dd95d91e6
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:12db245af3b8475c9b5680bb0035c566109819e05cfe62bd1dfdfb5d6ed25bea
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.6
+name: lvms-operator.v4.13.6
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.6
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:164f6ea57b15047ab05703cfd2894d4d0861e594393e8853697b65f198033836
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.6'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.6-3
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:a4b23999ed82fc44e397d076247202fa9b15f7a9d1eb9c0a10eeac86b6f95695
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.6
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:164f6ea57b15047ab05703cfd2894d4d0861e594393e8853697b65f198033836
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:dc0666c87fc32fb31980b8de7984bd32ea8e566630053c997395a8eee2c13f1c
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:74928c8255eb6f1d7ca078ad7b035e434a23a0603e6da66656c089ca85fae955
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:4c9600669fed4262e4d4a61d7990bef625a27cbc65f0377235dc3a2cf1eb7775
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:11581be8799cef941c3334a2d36574174f1c2b53bc3335b4761f8811b2081ff6
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:812f34cb2d910f006929f68e31548bf38ac09393bdac8d01da7a8c95a5fabab0
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:6be1ec1d2bf76cf2db4e695334a5011e8cfd099668f059700386dfd82ec7757d
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:c393a5673922a76f5e1b88f6d2ad6abac025b7b4b22c6b0b83750d5a9eac630d
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.7
+name: lvms-operator.v4.13.7
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.7
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:08b22d10f8a6caebd5d0b158dcfd5e31060e9796b92e156a32a65985146a8dad
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.7'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.7-6
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:48a1c956bfab176ccdd43ab3f1605ada226593d3d8d7c6b9dd287d166bb16071
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.7
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:08b22d10f8a6caebd5d0b158dcfd5e31060e9796b92e156a32a65985146a8dad
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:5776f4ea5ee9f946c47230966ddc6d090ef7972ce1da9a6644332a2719db1358
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:4e8aace290ce663bb7779760410b0351bfafe5c728efbbe2b31fe5c00154c01a
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:9eb97a2c7eec8a282f8196cfbb333a6a78c7f4032a33edaf55a0f216f9502da1
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:77cdae20204e53efa8f63118ac16a5162b647e77ddc8a9efa9d6607859326837
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:ac5ec1849dc22190a759da1bd6b954e16497aa661f71676d6c2b37f2ede58853
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:39ba7482de5a8a3604702f6e50e1aa0f705a3f071e29675932577509de92a4e9
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:d35dff5d59e748ef0404e7e76b0237ea96b2bb19b86fa04a3a34df7a379277b2
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.8
+name: lvms-operator.v4.13.8
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.8
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:b6d6982e973cb69d80d36a33afd2a4cf3780bd2647bc25b83399ace2ca1cb97d
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.8'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.8-2
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:963e8ceeee1cd038862dfdb631d1e23e29cb7cd34a75f303e0c93984d759780c
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.8
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:b6d6982e973cb69d80d36a33afd2a4cf3780bd2647bc25b83399ace2ca1cb97d
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:f1ee1a36b4a4637323fa15f7cd4be3ef6841acc4d493814ddc363dbca9cab00e
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:8ec4fce2e795ec451d02fdf9079be4ade68142c90f541106f46bd9127fcef622
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:68eb1f9af0f770cd37b028e2092176c3e5d259f62b991e89b4b1a452f6d56acf
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:1ccd5cdc22b39cceaaf7e1e0ef707b4b2fe9e5287e060d99550fa409ed2f0c57
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:fea464b2a1b3b7bbe1fa3af58ebfb77de0b8847b93546516e8dc78d4a985c7d6
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:d706d5b8b39a0c229ce84cbf00ead0c9a6495f50d162cb2be63a2ca70aaba76c
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:c36a557c9dc2ae4479c432933a9a4dbef38f2be53360a68a5b6befb614d01dac
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.9
+name: lvms-operator.v4.13.9
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.13.9
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:c2a6e4a7a9d988740aa1ca4c67a22af866d06768959d059fa3228517bc0c9991
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.13.9'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.13.9-4
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:4dccfb606af5b7fb5a78fd9dc86ae84685a364db2182101a91736170526e7fb1
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.13.9
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:c2a6e4a7a9d988740aa1ca4c67a22af866d06768959d059fa3228517bc0c9991
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel8@sha256:e16255398681da5f9f92cabf6d43a9ac5875da5978240b1be606b9c67bddedbf
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:3e126ef74e9194ee0ea89571b91a54b64ae5b2872ae21726779389300b8bef40
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:79eba140921f08d9b9a24b5cc2120390626f9a24f8b4f4125d7cd3f6d31c54b2
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:37c504ce73b6657b892780e57f43093564ec498fcf10a0b210684c2739b2bc24
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:1c4b34ee0674ef672ef98fa02b677fff4dfa16fbc2ce0ac9bc3a49528cf7b741
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:62146a01ba85900c1bfb617b197c34c40da85671530fd2426320734dafa20f72
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:86af06fb3b6c17b22be47118b0a8c797fa7fdd3c00dbe99a2d2a593ca8fc3d63
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.0
+name: lvms-operator.v4.14.0
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.0
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: quay.io/lvms_dev/lvms-operator:latest
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.14.0'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.0-10
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:7bb8393e8d0ed906c77291ab2ebd487b91e58c604f683f361b52bede202cd99d
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.0
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:738c376a13559223a9c258e9b24005621f1a2060ba22c951f046045581e5a353
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:b373c2b2a539ac09a5a3bbc545a10672c28936d1576b4fbb30bb5375acdc5852
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:4a3ff04824ca3574de2bc4649577817908e24f56c8417f2d2c0e5f4af55a0dc8
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:001ddd6d70067e50079acb4729cead7fcf6daed381730b11fc66114042ad99d4
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:2d52ca9e057a98fb35dde1be2a6a26663462caabe403e805e36a3c5015fa6417
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:96c20ac9142445ad7f7b71cd123d29cce0bbca90edfe9c73ef9fddc93a8fb18f
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:b4721c901f193207735c2b5b8cdba02c6959f8dee59553c34d0834a2382cd9a5
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:0848d89e9f94be04f17beeee75807d7fd11102737e6483ee674f2cf3ae28f213
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.1
+name: lvms-operator.v4.14.1
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.1
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:545a52518e54f927f3ddbfa7681132eea0536072db01f0f8cee89b2f8a9867e9
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.14.1'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+      target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.1-4
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:dfb4b61046c68380b1484dc8a271793c359fdae41abeb7d47d885da8e01b5bb0
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.1
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:545a52518e54f927f3ddbfa7681132eea0536072db01f0f8cee89b2f8a9867e9
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:d0c039eba8157965b0a7971ad4e01576d2c1e31b09fe938554163b324cc4dc73
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:b453a5c76ba4e975a978e31a51531b1d6233723b0d944622caf7844dedf9ad5a
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:7ee0257998b7f804fcde9c095b4dc240c510eb316d7223e8485f701b5c9f2fbf
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:06590e3725e496d47eb9893187acb163b1e5a9a0fd3f33d98bb43518176bc27f
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:829a8e4d34404abbd22fddb6ebfa0f74daa55f2697fb147da77b83fc8b473d8c
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:caa0bbab808d8cbed476e8fa3e296ceb90f8d7d253e36588fa77e639ea389d55
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:1dddb0988d1612c996707d43eb839bc49fc7e7554afaf085436eeddb37a12438
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.10
+name: lvms-operator.v4.14.10
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.10
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:e1aa39916c37d8e2de2857aeba28565a8e3780fa5e89b84d5fcd718e6e79c14c
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.10'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.10-3
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:5f296d08966fa10e840f6d23adb2f672612c4a5764178686caf3d0c3d2194cde
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.10
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:e1aa39916c37d8e2de2857aeba28565a8e3780fa5e89b84d5fcd718e6e79c14c
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:516fcb40cdecdbaef92f9a99af7feba89e5bb84198b04879599223f8389a7d77
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:f81682820de3ffe79d599e2e58e352b4459d3f2e1fd43bcca7b88c4e06b210d2
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:df647e9326951f68fd41ae92ab0a56bbe5dbdffac0130e32f555787832ae1de1
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:1db4ed63d1d55f245912a9befb005840171aced1544a5a6c236ca3935e72323f
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:50f02c34fa60e8586d3b6bfcfe1142c6349a8fef44be87891387f712c499aa14
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:296bc97cb126368168858c7cbf22a50b0cc062622363c64f8ecbba8ec25113a9
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:4c271935c67bea0746572365663cffca6f70a9d62ed4a686ca46962c5ceb2432
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.11
+name: lvms-operator.v4.14.11
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.11
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:3fc7b044c45638fc75c6286259e758ad5cdfd80cc19b1eda7c7890f9a2cba28e
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.11'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.11-4
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:c437a877398187ec1af10170618db62d4594aaf3832742ee4efa255a5c394df8
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.11
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:3fc7b044c45638fc75c6286259e758ad5cdfd80cc19b1eda7c7890f9a2cba28e
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:5b77927d2cfde47d0a5ae04ecf768bcbf70a91a0682fb67b65e3ffaf78b77a04
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:c5173e30b2cb85b3035463dc22be7a131ce249232a86533c6ac986f2d91ec25b
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:5cefc87a7eaf9daeeff2642fe842ce5954936c8634df6b4b12b71ddd8e669dca
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:362028779506af143ddc3e4c3660d25acacec025e9c6a79ef0ff234a2d68271b
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:b38f0bcb150c4d4030e77e84e04a2a7ab420a2f8fe06434260a53d33ac0e51f9
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:6f0897ea75f6f081ef4cb64941d5f304c0cc0255f30e1eb990ab00cc464cdafe
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:0c90e9a06033bdfb535acbb1bcd748813166bc7a9fe5a3746089b9e8b069d5c7
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.12
+name: lvms-operator.v4.14.12
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.12
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:473fae6f9a72292e18424fb4dac0b6dccd5476eb3eb53d5d98c54acd5e471ab0
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.12'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.12-6
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:3fec0dd154e96f9f9aad1c30f77136a05d02542f5379e531ea10cb4d178bad6b
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.12
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:473fae6f9a72292e18424fb4dac0b6dccd5476eb3eb53d5d98c54acd5e471ab0
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:917d4b1e325d005c13a97a24094e06753e9119413e1e2c2e362b9dceb8347e6a
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:44e26b6c98a4b8140fd85050c161aae88ac12bdd39f6477913c41e3a53e91ac9
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:b1415a6e8f98a76a21d77cbc83a7a5133d0d27799d2ca8e1d648075000422010
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:15f3618dcbead364e1fac9cae2a8d504882e5c7d7ad77dbf6df868e558f665f1
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:758fe42f58272d1fc129784d6a4c0cbdddb4be3245064a0308c7bf8ff5d15630
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:031c132b6221cdfd6f7ecc76fe633dd53f9c55d30420cedafc0b018a2e8de5d2
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:1fc9d5afd6c486643f127ef8f4f8ef09eb8d206422b496a4cd365f0b4ab0a2c2
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.2
+name: lvms-operator.v4.14.2
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.2
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:c5f972b10edc4bf9af57d06ffebd034e6f03cf07098f98f8377f752bae03de21
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.14.2'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.2-1
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:738d52124ba0f54966472bf105f5a1255ba8b455031fa86a29ec14097327ce48
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.2
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:c5f972b10edc4bf9af57d06ffebd034e6f03cf07098f98f8377f752bae03de21
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:cc2d3a4f51f13e9456b3d517a251192f77a7339d56040915358db351df4d996d
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:76a5646d4b8406ae9065a1605644ec641acc97aa471ebae744e8e06487cec765
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:94f4a9ad37891cfbf58ca7db58000e703ff4d9d7a7b207d50ec844c1610e2111
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:00d295b02a4f75baf3ded332cd9960f4860ce9aa200a4fd020b9498290442986
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:98ad03919da81c910aaa8a4f12fcae3048f2119735aeb7ca5271f7c16cf5e4e6
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:95691c21198e20d11777d592806fa00c018c17443d9b3aee853891dac6090470
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:9f9f8f69ab98c1f25cc301572339e0cc5c5b76f2e29ed26e10ac91ad20e0090c
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.3
+name: lvms-operator.v4.14.3
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.3
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:a289704af66f024e0ee3b7baa4ecc8820ba7c27c58f8ff605b96fbe0e860245a
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      olm.skipRange: '>=4.2.0 <4.14.3'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.3-1
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:5eab7e6641a987ff2fab1f49b60e43205f69714cb91fca14f1bb72ed60b986ad
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.3
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:a289704af66f024e0ee3b7baa4ecc8820ba7c27c58f8ff605b96fbe0e860245a
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:ebd13806f4e7d5531ac0b74913e78a90fb9bf34389dde7f9f669ad76e124688e
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:42284d1764deddb32d8021e4efc84da537428bdf4c2d7e2976bcac4f7f825f35
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:e01598767b8dbcbd7035e15267e3c9c1268ec2e81e7bd0fb47bfa14c33d14e6b
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:cc6e76c589b885c2ab2ae0473de66d82bfbdc1104eba28e44718a8d7f6b175ce
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:55917b090408d7f11fe83377fb9c5c2d64dab247171baedae7a04172760baaf5
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:39603d20310602ccac07f98d6a3ac40226945646559cb93265cdd0e22a993aac
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:ecbe2c0919df429655d90d0d0a6a795b5ddc5b27984e800555a8fbc2958d4342
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.4
+name: lvms-operator.v4.14.4
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.4
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:cf3fa373d4ba663ac45d42e2daefd8fa80db5450e1937e80e2bd6b186485f470
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.4'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.4-4
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:7708ea3dd139b9a70bcf35631a3c8aff6cb620158ef145aa99713af24131c943
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.4
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:cf3fa373d4ba663ac45d42e2daefd8fa80db5450e1937e80e2bd6b186485f470
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:6bc3f60a36406ac434f8c3be3a2ecd38298280346e47095ef99cc14ccad5fc50
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:dd610b660f1197fe4d01d4e89c0b13f5278bfa608f593fee2f4bfadf556d74d2
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:9396a139356e9cf09b492163eff2dfc24ec26e8d0cbbba02bac498cf67b239a2
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:3f7ccf6f5eb747a246694a0f0729b78f081f8d3cb89534e2c564aa7e77c631ad
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:bd8ab794bdcd3fa68c3757d4d4725b835311b3cb5382d52b43ad2b4674bc32cb
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:da0898f4cce07908d0223562edab44aa3dc086eda9fa23492300d0d7493ce4b5
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:a6ea11d4df5b439e6ceaf8e9f8799a56aee1cfbfad774af968e01c1e175514c0
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.5
+name: lvms-operator.v4.14.5
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.5
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:b593e07c1dee0ebddd6d3500542aebc20987e9557edfd5a31a15c1751a1ec40c
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.5'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Container Platform",
+        "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.5-3
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:03d672ebd6dec17319f2445606f8365d63e6cf81927f69ee6c72460cdf035873
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.5
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:b593e07c1dee0ebddd6d3500542aebc20987e9557edfd5a31a15c1751a1ec40c
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:2e70c330d28cb7f45dea91d18746f998baaf90aff9a6d626c93cee2bf6a786cc
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:53af987fd8ad10786f00f830722fd02865a272ba5bf49e5215092fe21670f465
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:bd6343e8e7865298394cc9e662aca3b3e744d291ec0e9c409e802145f3cb9425
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:4550b6f77763721ed8d1428c6c5201fedaeebb17cb56c90fcceff32d90591ef7
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:c8b2a5261f349b5393a09db5bc4a30855ac09963057fb84395817dfb0f935a01
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:57e50650afde90f2f1a43587025063daab852168a3e2ea4192017cedfde2bd45
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:7b85676b0e5a8b59e262f29e071f3fbb61828536d2ff720bf8fb50f7f19c685c
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.6
+name: lvms-operator.v4.14.6
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.6
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:e4de1a8e29fcc3f3d1969aef4fa5479aedc635d2cf1534bca3cf72e680ff8203
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.6'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.6-7
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:d3f391914408d722782c73899cfc754e29b0e31503c25abcfa89aff2de43358a
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.6
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:e4de1a8e29fcc3f3d1969aef4fa5479aedc635d2cf1534bca3cf72e680ff8203
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:235a72520fdf03dc1c39fd757d86bda55a33a348b9966eb510c8a7e3c3a00202
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:003fc249b342ec595c61751a4c6310a17619011078803facf025fadb0ec80c8e
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:dd0c323b17454a5c0781420d866946e1cb97be62d82a0f706431a2dab643dd10
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:51fe888bb8b7bc2314beba61c33039b30faaba42845eec41c98e59857af6cd2e
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:e5b8747dfa03628a86d9ce064bb098c4eb6affba5dff211b3ee1ca2f55032c69
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:f2c640c58afbdabc7d2fab6e722b59fcffdae6646c0c8d3793c97f9095510adb
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:b93645bd53122736a39f4fc5a11df6979b535791d996845dad18ab7eff83643d
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.7
+name: lvms-operator.v4.14.7
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.7
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:16459f073fea84c53880fadf5ea73be92b941fe49092d5739ff8a5f87e346c9c
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.7'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.7-7
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:5f4a7fa46bd29fff41888d014f10f774b6fd4c29e23b7a9e6d758f8c47064820
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.7
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:16459f073fea84c53880fadf5ea73be92b941fe49092d5739ff8a5f87e346c9c
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:d237c9778e14dacf41ffbd7c932b88d154aad9594838bf583f181297b0db8e8d
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:2114a2303f10f9674ce38d8d8cd00fa9fcd243b9dac9c7a2bab756a6a585a2fd
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:aae7ca34d6f23defb0ba87c87fb9eb95c8edfd9ee7ada15ed321258a08244325
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:e2939e805c379b4c540985408e55e11490a0b8d638d1ae642dcb656956cbcf24
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:cadf4cc0d08d4cdc739838ee7690b529300fc110a3c5fa05cec49c2bf0f6eebc
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:9c4dfb22d5b955c142438e4566bc15136930385256314e80b1a9960388d1b646
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:f4381aaf002b761a2ba614332a2af973f4de5f6a4c84dd96b8808725e561fa89
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.8
+name: lvms-operator.v4.14.8
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.8
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:79ea2bd2c729d1d27e04c6bf465986b6dba4f851ce348d31afe1ec54a7ff8cc3
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.8'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.8-2
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:a6b74531ea85ee7fa8bd69b1022fc059c03276c2510e1c4d94d6cf78c984571a
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.8
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:79ea2bd2c729d1d27e04c6bf465986b6dba4f851ce348d31afe1ec54a7ff8cc3
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:3fcfded9e351bf57781bfb1205fa5e6fe81d1ff1bd6174192f05c537ed5bc4f4
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:fee1f5b96afd008c381180b466de509a83621e1bc41469a0a808cc4b7ead4e1f
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:13029f74abc18572be953722241e3a894c2e71238f75f47632c54d53d53577e0
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:77a4d1381fcd2cfc7a05b25236c6f1177843ed5525dd3e4c27e4901d459dfeaf
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:b88f86ceac94ac40443ed0924db8fb4f59593117f10cc6caac4b1a3bdafe6410
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:7ded5cac3e0271e25c6242dd89a003ee4c2149346346368ef4009e11cf537d3a
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:fe71196193fc5dc0958df9caa0c7108155552bb5d8fa804c0f6eb1de79c2c16e
+  name: rbac-proxy
+schema: olm.bundle
+---
+image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.9
+name: lvms-operator.v4.14.9
+package: lvms-operator
+properties:
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMCluster
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroup
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: lvm.topolvm.io
+    kind: LVMVolumeGroupNodeStatus
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: topolvm.io
+    kind: LogicalVolume
+    version: v1
+- type: olm.package
+  value:
+    packageName: lvms-operator
+    version: 4.14.9
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "my-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "default": true,
+                    "fstype": "xfs",
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      capabilities: Seamless Upgrades
+      categories: Storage
+      containerImage: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:df51882990b898109c7cbfd4d2114a2dd0567b52815d1aad7265d14b563863a0
+      description: Logical volume manager storage provides dynamically provisioned
+        local storage for container workloads
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "true"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.2.0 <4.14.9'
+      operatorframework.io/cluster-monitoring: "true"
+      operatorframework.io/initialization-resource: |-
+        {
+            "apiVersion": "lvm.topolvm.io/v1alpha1",
+            "kind": "LVMCluster",
+            "metadata": {
+              "name": "test-lvmcluster"
+            },
+            "spec": {
+              "storage": {
+                "deviceClasses": [
+                  {
+                    "name": "vg1",
+                    "thinPoolConfig": {
+                      "name": "thin-pool-1",
+                      "overprovisionRatio": 10,
+                      "sizePercent": 90
+                    }
+                  }
+                ]
+              }
+            }
+          }
+      operatorframework.io/suggested-namespace: openshift-storage
+      operatorframework.io/suggested-namespace-template: |-
+        {
+          "apiVersion": "v1",
+          "kind": "Namespace",
+          "metadata": {
+            "name": "openshift-storage",
+            "annotations": {
+              "workload.openshift.io/allowed": "management"
+            }
+          }
+        }
+      operators.openshift.io/infrastructure-features: '["csi", "disconnected"]'
+      operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine",
+        "OpenShift Container Platform", "OpenShift Platform Plus"]'
+      operators.operatorframework.io/builder: operator-sdk-v1.23.0
+      operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
+        "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      repository: https://github.com/openshift/lvm-operator
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - kind: LogicalVolume
+        name: logicalvolumes.topolvm.io
+        version: v1
+      - description: LVMCluster is the Schema for the lvmclusters API
+        displayName: LVMCluster
+        kind: LVMCluster
+        name: lvmclusters.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroupNodeStatus
+        name: lvmvolumegroupnodestatuses.lvm.topolvm.io
+        version: v1alpha1
+      - kind: LVMVolumeGroup
+        name: lvmvolumegroups.lvm.topolvm.io
+        version: v1alpha1
+    description: Logical volume manager storage provides dynamically provisioned local
+      storage.
+    displayName: LVM Storage
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - local storage
+    - operator
+    - LVM
+    labels:
+      full_version: 4.14.9-4
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+      operatorframework.io/arch.ppc64le: supported
+      operatorframework.io/arch.s390x: supported
+    links:
+    - name: Source Repository
+      url: https://github.com/openshift/lvm-operator
+    maintainers:
+    - email: ocs-support@redhat.com
+      name: Red Hat Support
+    maturity: alpha
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:1d0b2ef045dfed2c954961d1364b690c43c1570f3b160cc2d2d4cadd2546325f
+  name: lvms-must-gather
+- image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.14.9
+  name: ""
+- image: registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:df51882990b898109c7cbfd4d2114a2dd0567b52815d1aad7265d14b563863a0
+  name: lvms-operator
+- image: registry.redhat.io/lvms4/topolvm-rhel9@sha256:9cb723ef46ed4ddceff1e5b08451544f515f6a944e284a2e013096c0a26cf61f
+  name: topolvm-csi
+- image: registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:6f586d06f917b658816ce326d2a7713e430a76e37e01e27b93c3e5a67a52eeea
+  name: topolvm-csi-provisioner
+- image: registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:064f28640e70314f9b467d8fd77bd1603c5f7eaf6d31aed1c732097b068774c0
+  name: topolvm-csi-resizer
+- image: registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:08a153ffba7e9c2716acf4bdfa874812f8a6c4d95cd71bfd05c9c690f30a8ef0
+  name: topolvm-csi-snapshotter
+- image: registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:347c3363d00716efa8301c7fa96e0f260d614aed7ef5e667937cb38b97e01dc1
+  name: topolvm-csi-livenessprobe
+- image: registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:28e453e1bf7efa5353df4a851048ba16eba983f86b42f1eab7dfde3971025446
+  name: topolvm-csi-registrar
+- image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:8204d45506297578c8e41bcc61135da0c7ca244ccbd1b39070684dfeb4c2f26c
+  name: rbac-proxy
+schema: olm.bundle
