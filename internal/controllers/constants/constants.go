@@ -65,6 +65,8 @@ const (
 
 	PriorityClassNameUserCritical    = "openshift-user-critical"
 	PriorityClassNameClusterCritical = "system-cluster-critical"
+
+	DeleteProtectionFinalizer = "delete-protection.lvm.openshift.io"
 )
 
 // these constants are derived from the TopoLVM recommendations but maintained separately to allow easy override.
