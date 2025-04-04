@@ -1,17 +1,22 @@
+# Global args to be used to build the final base image url
+ARG CATALOG_VERSION
+ARG BASE_IMAGE=registry.redhat.io/openshift4/ose-operator-registry-rhel9
+
 # The builder image is expected to contain
 # /bin/opm (with serve subcommand)
 FROM quay.io/operator-framework/opm:latest as builder
-
 ARG CATALOG_VERSION
+# Copy the FBC into the image at /configs/lvms-operator/catalog.json and pre-populate serve cache
+COPY "catalogs/lvm-operator-catalog-${CATALOG_VERSION}.json" /configs/lvms-operator/catalog.json
 
-# Copy FBC root into image at /configs and pre-populate serve cache
-COPY "catalogs/lvm-operator-catalog-${CATALOG_VERSION}.yaml" /configs/
-
-RUN ["/bin/opm", "validate", "/configs"]
+RUN ["/bin/opm", "validate", "/configs/lvms-operator"]
 
 RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
-FROM quay.io/operator-framework/opm:latest
+ARG BASE_IMAGE
+ARG CATALOG_VERSION
+FROM ${BASE_IMAGE}:${CATALOG_VERSION}
+ARG CATALOG_VERSION
 # The base image is expected to contain
 # /bin/opm (with serve subcommand) and /bin/grpc_health_probe
 

@@ -4,20 +4,19 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift/lvm-operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "catalog" &&
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "catalog" &&
       (".tekton/catalog-pipeline.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-v4.12-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-v4.12-push.yaml".pathChanged() ||
-      "catalogs/lvm-operator-catalog-v4.12.yaml".pathChanged() ||
+      "catalogs/lvm-operator-catalog-v4.12.json".pathChanged() ||
       "templates/lvm-operator-catalog-v4.12-template.yaml".pathChanged() ||
       "konflux-catalog.Dockerfile".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator-catalog
-    appstudio.openshift.io/component: lvm-operator-catalog
+    appstudio.openshift.io/component: lvm-operator-catalog-v4.12
     pipelines.appstudio.openshift.io/type: build
   name: lvm-operator-catalog-v4.12-on-push
   namespace: logical-volume-manag-tenant
@@ -34,6 +33,7 @@ spec:
   - name: build-args
     value:
     - CATALOG_VERSION=v4.12
+    - BASE_IMAGE=registry.redhat.io/openshift4/ose-operator-registry
   - name: hermetic
     value: "true"
   pipelineRef:
