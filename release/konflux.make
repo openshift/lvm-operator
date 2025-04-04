@@ -30,3 +30,7 @@ konflux-update: konflux-task-manifest-updates
 .PHONY: konflux-task-manifest-updates
 konflux-task-manifest-updates:
 	release/hack/update-konflux-task-refs.sh .tekton/single-arch-build-pipeline.yaml .tekton/multi-arch-build-pipeline.yaml
+
+.PHONY: konflux-generate-release
+konflux-generate-release:
+	release/hack/generate-release.sh
