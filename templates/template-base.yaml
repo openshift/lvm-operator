@@ -1,0 +1,3 @@
+Schema: olm.semver
+GenerateMajorChannels: false
+GenerateMinorChannels: true
