@@ -4,6 +4,7 @@ ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@s
 
 ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:3445ce8e7987ffe084292337ef9745da4631ba4e45bc4928e20ab4516785fe5a
 
+
 ARG OPERATOR_VERSION
 
 WORKDIR /operator
