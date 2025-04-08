@@ -61,10 +61,11 @@ func (ctrl *csiSnapshotSideCarController) syncContent(content *crdv1.VolumeSnaps
 	if ctrl.shouldDelete(content) {
 		klog.V(4).Infof("VolumeSnapshotContent[%s]: the policy is %s", content.Name, content.Spec.DeletionPolicy)
 		if content.Spec.DeletionPolicy == crdv1.VolumeSnapshotContentDelete &&
-			content.Status != nil && content.Status.SnapshotHandle != nil {
-			// issue a CSI deletion call if the snapshot has not been deleted yet from
-			// underlying storage system. Note that the deletion snapshot operation will
-			// update content SnapshotHandle to nil upon a successful deletion. At this
+			content.Status != nil && content.Status.SnapshotHandle != nil && content.Status.VolumeGroupSnapshotHandle == nil {
+			// issue a CSI deletion call if the snapshot does not belong to volumegroupsnapshot
+			// and it has not been deleted yet from underlying storage system.
+			// Note that the deletion snapshot operation will update content SnapshotHandle
+			// to nil upon a successful deletion. At this
 			// point, the finalizer on content should NOT be removed to avoid leaking.
 			err := ctrl.deleteCSISnapshot(content)
 			if err != nil {
@@ -73,9 +74,9 @@ func (ctrl *csiSnapshotSideCarController) syncContent(content *crdv1.VolumeSnaps
 			return false, nil
 		}
 		// otherwise, either the snapshot has been deleted from the underlying
-		// storage system, or the deletion policy is Retain, remove the finalizer
-		// if there is one so that API server could delete the object if there is
-		// no other finalizer.
+		// storage system, or it belongs to a volumegroupsnapshot, or the deletion policy is Retain,
+		// remove the finalizer if there is one so that API server could delete
+		// the object if there is no other finalizer.
 		err := ctrl.removeContentFinalizer(content)
 		if err != nil {
 			return true, err
@@ -83,10 +84,15 @@ func (ctrl *csiSnapshotSideCarController) syncContent(content *crdv1.VolumeSnaps
 		return false, nil
 
 	}
-	if content.Spec.Source.VolumeHandle != nil && content.Status == nil {
+
+	// Create snapshot calling the CSI driver only if it is a dynamic
+	// provisioning for an independent snapshot.
+	_, groupSnapshotMember := content.Annotations[utils.VolumeGroupSnapshotHandleAnnotation]
+	if content.Spec.Source.VolumeHandle != nil && content.Status == nil && !groupSnapshotMember {
 		klog.V(5).Infof("syncContent: Call CreateSnapshot for content %s", content.Name)
 		return ctrl.createSnapshot(content)
 	}
+
 	// Skip checkandUpdateContentStatus() if ReadyToUse is
 	// already true. We don't want to keep calling CreateSnapshot
 	// or ListSnapshots CSI methods over and over again for
@@ -229,13 +235,15 @@ func (ctrl *csiSnapshotSideCarController) getCSISnapshotInput(content *crdv1.Vol
 			return nil, nil, err
 		}
 	} else {
-		// If dynamic provisioning, return failure if no snapshot class
-		if content.Spec.Source.VolumeHandle != nil {
+		// If dynamic provisioning for an independent snapshot, return failure if no snapshot class
+		_, groupSnapshotMember := content.Annotations[utils.VolumeGroupSnapshotHandleAnnotation]
+		if content.Spec.Source.VolumeHandle != nil && !groupSnapshotMember {
 			klog.Errorf("failed to getCSISnapshotInput %s without a snapshot class", content.Name)
 			return nil, nil, fmt.Errorf("failed to take snapshot %s without a snapshot class", content.Name)
 		}
-		// For pre-provisioned snapshot, snapshot class is not required
-		klog.V(5).Infof("getCSISnapshotInput for content [%s]: no VolumeSnapshotClassName provided for pre-provisioned snapshot", content.Name)
+		// For pre-provisioned snapshot or an individual snapshot in a dynamically provisioned
+		// volume group snapshot, snapshot class is not required
+		klog.V(5).Infof("getCSISnapshotInput for content [%s]: no VolumeSnapshotClassName provided for pre-provisioned snapshot or an individual snapshot in a dynamically provisioned volume group snapshot", content.Name)
 	}
 
 	// Resolve snapshotting secret credentials.
@@ -253,11 +261,13 @@ func (ctrl *csiSnapshotSideCarController) checkandUpdateContentStatusOperation(c
 	var size int64
 	readyToUse := false
 	var driverName string
-	var snapshotID, groupSnapshotID string
+	var groupSnapshotID string
 	var snapshotterListCredentials map[string]string
 
-	if content.Spec.Source.SnapshotHandle != nil {
-		klog.V(5).Infof("checkandUpdateContentStatusOperation: call GetSnapshotStatus for snapshot which is pre-bound to content [%s]", content.Name)
+	volumeGroupSnapshotMemberWithGroupSnapshotHandle := content.Status != nil && content.Status.VolumeGroupSnapshotHandle != nil
+
+	if content.Spec.Source.SnapshotHandle != nil || (volumeGroupSnapshotMemberWithGroupSnapshotHandle && content.Status.SnapshotHandle != nil) {
+		klog.V(5).Infof("checkandUpdateContentStatusOperation: call GetSnapshotStatus for snapshot content [%s]", content.Name)
 
 		if content.Spec.VolumeSnapshotClassName != nil {
 			class, err := ctrl.getSnapshotClass(*content.Spec.VolumeSnapshotClassName)
@@ -286,7 +296,13 @@ func (ctrl *csiSnapshotSideCarController) checkandUpdateContentStatusOperation(c
 			return content, err
 		}
 		driverName = content.Spec.Driver
-		snapshotID = *content.Spec.Source.SnapshotHandle
+
+		var snapshotID string
+		if content.Spec.Source.SnapshotHandle != nil {
+			snapshotID = *content.Spec.Source.SnapshotHandle
+		} else {
+			snapshotID = *content.Status.SnapshotHandle
+		}
 
 		klog.V(5).Infof("checkandUpdateContentStatusOperation: driver %s, snapshotId %s, creationTime %v, size %d, readyToUse %t, groupSnapshotID %s", driverName, snapshotID, creationTime, size, readyToUse, groupSnapshotID)
 
@@ -300,7 +316,13 @@ func (ctrl *csiSnapshotSideCarController) checkandUpdateContentStatusOperation(c
 		}
 		return updatedContent, nil
 	}
-	return ctrl.createSnapshotWrapper(content)
+
+	_, groupSnapshotMember := content.Annotations[utils.VolumeGroupSnapshotHandleAnnotation]
+	if !groupSnapshotMember {
+		return ctrl.createSnapshotWrapper(content)
+	}
+
+	return content, nil
 }
 
 // This is a wrapper function for the snapshot creation process.

@@ -40,14 +40,13 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 OPERATOR_VERSION ?= 0.0.1
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.31.0
-OPERATOR_SDK_VERSION ?= 1.38.0
-CONTROLLER_TOOLS_VERSION := 0.16.5
+ENVTEST_K8S_VERSION = 1.32.0
+OPERATOR_SDK_VERSION ?= 1.39.2
+CONTROLLER_TOOLS_VERSION := 0.17.3
 
 CONTROLLER_RUNTIME_VERSION := $(shell awk '/sigs\.k8s\.io\/controller-runtime/ {print substr($$2, 2)}' $(SELF_DIR)/go.mod)
 GINKGO_VERSION := $(shell awk '/github.com\/onsi\/ginkgo\/v2/ {print $$2}' $(SELF_DIR)/go.mod)
 ENVTEST_BRANCH := release-$(shell echo $(CONTROLLER_RUNTIME_VERSION) | cut -d "." -f 1-2)
-ENVTEST_KUBERNETES_VERSION := $(shell echo $(KUBERNETES_VERSION) | cut -d "." -f 1-2)
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -150,7 +149,6 @@ vet: ## Run go vet against code.
 
 godeps-update: ## Run go mod tidy and go mod vendor.
 	go mod tidy && go mod vendor
-	patch -p1 -d $(SELF_DIR)vendor/github.com/kubernetes-csi/external-provisioner/v5 < $(SELF_DIR)hack/external-provisioner.patch
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
