@@ -73,7 +73,7 @@ func (r *Resizer) Start(ctx context.Context) error {
 	}
 
 	resizerController := controller.NewResizeController(r.options.DriverName, csiResizer, clientset, resyncPeriod, factory,
-		workqueue.NewTypedItemExponentialFailureRateLimiter[any](retryIntervalStart, retryIntervalMax),
+		workqueue.NewTypedItemExponentialFailureRateLimiter[string](retryIntervalStart, retryIntervalMax),
 		handleVolumeInUseError, 1*time.Hour)
 
 	factory.Start(ctx.Done())

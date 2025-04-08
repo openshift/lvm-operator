@@ -53,7 +53,7 @@ To update the dependencies, follow the steps below:
 6. Run `make rpm-lock` which will regenerate the `rpms.lock.yaml` file that will allow konflux to prefetch all of the
     RPM dependencies for the operator. Regenerating the file will make sure we are using the latest version of our
     dependencies in the released operator image. Documentation for re-generating the rpms lock file can be found in
-    [release/hack/generate-rpm-lock.md](release/hack/generate-rpm-lock.md)
+    [release/hack/generate-rpm-lock.md](../release/hack/generate-rpm-lock.md)
 
 ## Expected Replacement of TopoLVM
 
