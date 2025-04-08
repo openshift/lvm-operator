@@ -29,7 +29,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/v10/controller"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v11/controller"
 )
 
 const (
@@ -217,7 +217,7 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	claimInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
 
 	provisionController := controller.NewProvisionController(
-		logger,
+		ctx,
 		clientset,
 		p.options.DriverName,
 		provisioner,

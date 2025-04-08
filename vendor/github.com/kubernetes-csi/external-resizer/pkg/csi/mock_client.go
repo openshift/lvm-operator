@@ -15,7 +15,9 @@ func NewMockClient(
 	supportsControllerResize bool,
 	supportsControllerModify bool,
 	supportsPluginControllerService bool,
-	supportsControllerSingleNodeMultiWriter bool) *MockClient {
+	supportsControllerSingleNodeMultiWriter bool,
+	supportsExtraModifyMetada bool,
+) *MockClient {
 	return &MockClient{
 		name:                                    name,
 		supportsNodeResize:                      supportsNodeResize,
@@ -23,6 +25,7 @@ func NewMockClient(
 		supportsControllerModify:                supportsControllerModify,
 		supportsPluginControllerService:         supportsPluginControllerService,
 		supportsControllerSingleNodeMultiWriter: supportsControllerSingleNodeMultiWriter,
+		extraModifyMetadata:                     supportsExtraModifyMetada,
 	}
 }
 
@@ -36,10 +39,11 @@ type MockClient struct {
 	expandCalled                            atomic.Int32
 	modifyCalled                            atomic.Int32
 	expansionError                          error
-	modifyFailed                            bool
+	modifyError                             error
 	checkMigratedLabel                      bool
 	usedSecrets                             atomic.Pointer[map[string]string]
 	usedCapability                          atomic.Pointer[csi.VolumeCapability]
+	extraModifyMetadata                     bool
 }
 
 func (c *MockClient) GetDriverName(context.Context) (string, error) {
@@ -70,8 +74,8 @@ func (c *MockClient) SetExpansionError(err error) {
 	c.expansionError = err
 }
 
-func (c *MockClient) SetModifyFailed() {
-	c.modifyFailed = true
+func (c *MockClient) SetModifyError(err error) {
+	c.modifyError = err
 }
 
 func (c *MockClient) SetCheckMigratedLabel() {
@@ -131,8 +135,8 @@ func (c *MockClient) Modify(
 	secrets map[string]string,
 	mutableParameters map[string]string) error {
 	c.modifyCalled.Add(1)
-	if c.modifyFailed {
-		return fmt.Errorf("modify failed")
+	if c.modifyError != nil {
+		return c.modifyError
 	}
 	return nil
 }
