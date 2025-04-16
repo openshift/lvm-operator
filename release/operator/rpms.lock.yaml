@@ -81,13 +81,13 @@ arches:
     name: e2fsprogs-libs
     evr: 1.46.5-5.el9
     sourcerpm: e2fsprogs-1.46.5-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/e/expat-2.5.0-3.el9_5.1.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/e/expat-2.5.0-3.el9_5.3.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 116093
-    checksum: sha256:74734affbd72263c90faef8ab20297ef5cd5bde7805956029e1f36c60a99e973
+    size: 116872
+    checksum: sha256:a2e2bc5b5e823259ab88ee943b2ef90ca9494ea6effe68cd41cf1d3626989129
     name: expat
-    evr: 2.5.0-3.el9_5.1
-    sourcerpm: expat-2.5.0-3.el9_5.1.src.rpm
+    evr: 2.5.0-3.el9_5.3
+    sourcerpm: expat-2.5.0-3.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/f/fuse-libs-2.9.9-16.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 99675
@@ -207,13 +207,20 @@ arches:
     name: libuuid
     evr: 2.37.4-20.el9
     sourcerpm: util-linux-2.37.4-20.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/o/openssl-3.0.7-28.el9_4.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/o/openssl-3.2.2-6.el9_5.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 1246716
-    checksum: sha256:23aaee350db63934f7afc9fca10c65c1df6f95561659bbf6f3c045219b4252c9
+    size: 1398689
+    checksum: sha256:f914250a9ef52968e27af0f0e2520745df4443dc354367bec54dd06b4a2da60b
     name: openssl
-    evr: 1:3.0.7-28.el9_4
-    sourcerpm: openssl-3.0.7-28.el9_4.src.rpm
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/o/openssl-libs-3.2.2-6.el9_5.1.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 2085943
+    checksum: sha256:fb9062e4635959a929f278002c5ff1bf35323987538c71fa86442c980eab4a44
+    name: openssl-libs
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pam-1.5.1-22.el9_5.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 645036
@@ -314,12 +321,12 @@ arches:
     checksum: sha256:d54bf1aa0e66a1e45dceaa7add783b00fc6f958cafa74fe3c7a2986c35f7af4d
     name: e2fsprogs
     evr: 1.46.5-5.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.3.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 8358505
-    checksum: sha256:8b3c398f73e7cfb93de1c34252c19ebd0efe4232e9b921bd01f11442b5dec8d5
+    size: 8369857
+    checksum: sha256:7fe4d7bb620cf784d2b603266e81a86e318bd7304fd502ba8c032a13d90e8919
     name: expat
-    evr: 2.5.0-3.el9_5.1
+    evr: 2.5.0-3.el9_5.3
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/f/fuse-2.9.9-16.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 1832609
@@ -392,12 +399,12 @@ arches:
     checksum: sha256:f913e6a022b534c14a5ca569feda148df380f2da5c12beb18516b30c3d181609
     name: lvm2
     evr: 9:2.03.24-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/o/openssl-3.0.7-28.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/o/openssl-3.2.2-6.el9_5.1.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 15532127
-    checksum: sha256:6bd73879dc1bd9b14e71e477dd39b4b489433e95540f0506ec05f7ae0f72be2d
+    size: 17985138
+    checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
-    evr: 1:3.0.7-28.el9_4
+    evr: 1:3.2.2-6.el9_5.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/pam-1.5.1-22.el9_5.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 1112974
@@ -514,13 +521,13 @@ arches:
     name: e2fsprogs-libs
     evr: 1.46.5-5.el9
     sourcerpm: e2fsprogs-1.46.5-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/e/expat-2.5.0-3.el9_5.1.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/e/expat-2.5.0-3.el9_5.3.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 127090
-    checksum: sha256:cc94cc79f5a9c418f13e1d7298cbc2ae8f3083c7da652fd9ec77ea28ba82557f
+    size: 127840
+    checksum: sha256:916f86c33a48f5e6111fdca46bb0fcfaac1125cdd551a8f4b68ba2ba0c033035
     name: expat
-    evr: 2.5.0-3.el9_5.1
-    sourcerpm: expat-2.5.0-3.el9_5.1.src.rpm
+    evr: 2.5.0-3.el9_5.3
+    sourcerpm: expat-2.5.0-3.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/f/fuse-libs-2.9.9-16.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 109451
@@ -647,13 +654,20 @@ arches:
     name: libuuid
     evr: 2.37.4-20.el9
     sourcerpm: util-linux-2.37.4-20.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/o/openssl-3.0.7-28.el9_4.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/o/openssl-3.2.2-6.el9_5.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 1268664
-    checksum: sha256:301722f48ef0238b9013595a1454009f478e13ab8325addf99fecbc48ba3da21
+    size: 1422952
+    checksum: sha256:56283cbf84234ec9256fb68e2d2669bc5799862eb2ee40521b8ac59044567835
     name: openssl
-    evr: 1:3.0.7-28.el9_4
-    sourcerpm: openssl-3.0.7-28.el9_4.src.rpm
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/o/openssl-libs-3.2.2-6.el9_5.1.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 2320865
+    checksum: sha256:8e9f1ff32873b3531cd38d9583fe20526c790066785312301ea87ebbf980d8ce
+    name: openssl-libs
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pam-1.5.1-22.el9_5.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 687467
@@ -754,12 +768,12 @@ arches:
     checksum: sha256:d54bf1aa0e66a1e45dceaa7add783b00fc6f958cafa74fe3c7a2986c35f7af4d
     name: e2fsprogs
     evr: 1.46.5-5.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.3.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 8358505
-    checksum: sha256:8b3c398f73e7cfb93de1c34252c19ebd0efe4232e9b921bd01f11442b5dec8d5
+    size: 8369857
+    checksum: sha256:7fe4d7bb620cf784d2b603266e81a86e318bd7304fd502ba8c032a13d90e8919
     name: expat
-    evr: 2.5.0-3.el9_5.1
+    evr: 2.5.0-3.el9_5.3
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/f/fuse-2.9.9-16.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 1832609
@@ -838,12 +852,12 @@ arches:
     checksum: sha256:f913e6a022b534c14a5ca569feda148df380f2da5c12beb18516b30c3d181609
     name: lvm2
     evr: 9:2.03.24-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/o/openssl-3.0.7-28.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/o/openssl-3.2.2-6.el9_5.1.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 15532127
-    checksum: sha256:6bd73879dc1bd9b14e71e477dd39b4b489433e95540f0506ec05f7ae0f72be2d
+    size: 17985138
+    checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
-    evr: 1:3.0.7-28.el9_4
+    evr: 1:3.2.2-6.el9_5.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/pam-1.5.1-22.el9_5.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 1112974
@@ -960,13 +974,13 @@ arches:
     name: e2fsprogs-libs
     evr: 1.46.5-5.el9
     sourcerpm: e2fsprogs-1.46.5-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/e/expat-2.5.0-3.el9_5.1.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/e/expat-2.5.0-3.el9_5.3.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 118019
-    checksum: sha256:54556fc45154a9b70e55ccdbf91fa67d0e5c26534c78858bf48eab5e859db8f4
+    size: 118892
+    checksum: sha256:fd39337cc1af3c4ef11934e019b481630b79d8140007e56958a1f5bbe045299b
     name: expat
-    evr: 2.5.0-3.el9_5.1
-    sourcerpm: expat-2.5.0-3.el9_5.1.src.rpm
+    evr: 2.5.0-3.el9_5.3
+    sourcerpm: expat-2.5.0-3.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/f/fuse-libs-2.9.9-16.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 98920
@@ -1086,13 +1100,20 @@ arches:
     name: libuuid
     evr: 2.37.4-20.el9
     sourcerpm: util-linux-2.37.4-20.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/o/openssl-3.0.7-28.el9_4.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/o/openssl-3.2.2-6.el9_5.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 1254975
-    checksum: sha256:384948f0838d8a4dcf4fc1d10666ffa5982e574697f2643febda33d271a21eb0
+    size: 1407537
+    checksum: sha256:0a24289ee6324c2ecd6edad913f8ecfcfc6db43fbf6fed65458141e3ec0c104f
     name: openssl
-    evr: 1:3.0.7-28.el9_4
-    sourcerpm: openssl-3.0.7-28.el9_4.src.rpm
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/o/openssl-libs-3.2.2-6.el9_5.1.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 1830531
+    checksum: sha256:3d58f9488bc2a5113d852d6c78df07e414f6d95bb75f1ff78b7530bafdf1eb02
+    name: openssl-libs
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pam-1.5.1-22.el9_5.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 640693
@@ -1193,12 +1214,12 @@ arches:
     checksum: sha256:d54bf1aa0e66a1e45dceaa7add783b00fc6f958cafa74fe3c7a2986c35f7af4d
     name: e2fsprogs
     evr: 1.46.5-5.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.3.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 8358505
-    checksum: sha256:8b3c398f73e7cfb93de1c34252c19ebd0efe4232e9b921bd01f11442b5dec8d5
+    size: 8369857
+    checksum: sha256:7fe4d7bb620cf784d2b603266e81a86e318bd7304fd502ba8c032a13d90e8919
     name: expat
-    evr: 2.5.0-3.el9_5.1
+    evr: 2.5.0-3.el9_5.3
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/f/fuse-2.9.9-16.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 1832609
@@ -1271,12 +1292,12 @@ arches:
     checksum: sha256:f913e6a022b534c14a5ca569feda148df380f2da5c12beb18516b30c3d181609
     name: lvm2
     evr: 9:2.03.24-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/o/openssl-3.0.7-28.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/o/openssl-3.2.2-6.el9_5.1.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 15532127
-    checksum: sha256:6bd73879dc1bd9b14e71e477dd39b4b489433e95540f0506ec05f7ae0f72be2d
+    size: 17985138
+    checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
-    evr: 1:3.0.7-28.el9_4
+    evr: 1:3.2.2-6.el9_5.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/pam-1.5.1-22.el9_5.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 1112974
@@ -1393,13 +1414,13 @@ arches:
     name: e2fsprogs-libs
     evr: 1.46.5-5.el9
     sourcerpm: e2fsprogs-1.46.5-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/e/expat-2.5.0-3.el9_5.1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/e/expat-2.5.0-3.el9_5.3.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 121783
-    checksum: sha256:e9b4eb1c8a2ca7787a8ffea53b2a86533a1eb6aea72f05919c2748cd63dad32a
+    size: 122357
+    checksum: sha256:1f9ac75106263446eff27fb14e002ab228b57459b8830c58f4d1366a9987fbe5
     name: expat
-    evr: 2.5.0-3.el9_5.1
-    sourcerpm: expat-2.5.0-3.el9_5.1.src.rpm
+    evr: 2.5.0-3.el9_5.3
+    sourcerpm: expat-2.5.0-3.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/f/fuse-libs-2.9.9-16.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 101516
@@ -1519,13 +1540,20 @@ arches:
     name: libuuid
     evr: 2.37.4-20.el9
     sourcerpm: util-linux-2.37.4-20.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/o/openssl-3.0.7-28.el9_4.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/o/openssl-3.2.2-6.el9_5.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 1268306
-    checksum: sha256:255fb57a1b308c1f2df2027c63953955717498a76056f4d4e1279f02001e9aa8
+    size: 1420999
+    checksum: sha256:f379686df99db814e30568a896b417278775fc96864ac6d2660bf48ef94309e3
     name: openssl
-    evr: 1:3.0.7-28.el9_4
-    sourcerpm: openssl-3.0.7-28.el9_4.src.rpm
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/o/openssl-libs-3.2.2-6.el9_5.1.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 2218318
+    checksum: sha256:287d11706d44a53455ed8ac62faab4c4a0b8c0fa5e367adf122c7a76c6ddbbb8
+    name: openssl-libs
+    evr: 1:3.2.2-6.el9_5.1
+    sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pam-1.5.1-22.el9_5.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 647471
@@ -1626,12 +1654,12 @@ arches:
     checksum: sha256:d54bf1aa0e66a1e45dceaa7add783b00fc6f958cafa74fe3c7a2986c35f7af4d
     name: e2fsprogs
     evr: 1.46.5-5.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/e/expat-2.5.0-3.el9_5.3.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 8358505
-    checksum: sha256:8b3c398f73e7cfb93de1c34252c19ebd0efe4232e9b921bd01f11442b5dec8d5
+    size: 8369857
+    checksum: sha256:7fe4d7bb620cf784d2b603266e81a86e318bd7304fd502ba8c032a13d90e8919
     name: expat
-    evr: 2.5.0-3.el9_5.1
+    evr: 2.5.0-3.el9_5.3
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/f/fuse-2.9.9-16.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 1832609
@@ -1704,12 +1732,12 @@ arches:
     checksum: sha256:f913e6a022b534c14a5ca569feda148df380f2da5c12beb18516b30c3d181609
     name: lvm2
     evr: 9:2.03.24-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.0.7-28.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.2.2-6.el9_5.1.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 15532127
-    checksum: sha256:6bd73879dc1bd9b14e71e477dd39b4b489433e95540f0506ec05f7ae0f72be2d
+    size: 17985138
+    checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
-    evr: 1:3.0.7-28.el9_4
+    evr: 1:3.2.2-6.el9_5.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/pam-1.5.1-22.el9_5.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 1112974
