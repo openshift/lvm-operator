@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/selector"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +32,7 @@ import (
 )
 
 const (
-	lvmVGNodeStatusName       = "lvmvgnodestatus"
-	deleteProtectionFinalizer = "delete-protection.lvm.openshift.io"
+	lvmVGNodeStatusName = "lvmvgnodestatus"
 )
 
 func LVMVGNodeStatus() Manager {
@@ -74,7 +74,7 @@ func (l lvmVGNodeStatus) EnsureCreated(r Reconciler, ctx context.Context, cluste
 				return fmt.Errorf("failed to set controller reference: %w", err)
 			}
 			if !hasDeleteProtectionFinalizer(lvmVGNodeStatus.Finalizers) {
-				lvmVGNodeStatus.SetFinalizers(append(lvmVGNodeStatus.Finalizers, deleteProtectionFinalizer))
+				lvmVGNodeStatus.SetFinalizers(append(lvmVGNodeStatus.Finalizers, constants.DeleteProtectionFinalizer))
 			}
 			return nil
 		})
@@ -148,7 +148,7 @@ func (l lvmVGNodeStatus) deleteNodeStatus(r Reconciler, ctx context.Context, sta
 func removeDeleteProtectionFinalizer(status *lvmv1alpha1.LVMVolumeGroupNodeStatus) bool {
 	finalizers := status.GetFinalizers()
 	for i, finalizer := range finalizers {
-		if finalizer == deleteProtectionFinalizer {
+		if finalizer == constants.DeleteProtectionFinalizer {
 			status.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
 			return true
 		}
@@ -158,7 +158,7 @@ func removeDeleteProtectionFinalizer(status *lvmv1alpha1.LVMVolumeGroupNodeStatu
 
 func hasDeleteProtectionFinalizer(finalizers []string) bool {
 	for _, f := range finalizers {
-		if f == deleteProtectionFinalizer {
+		if f == constants.DeleteProtectionFinalizer {
 			return true
 		}
 	}
