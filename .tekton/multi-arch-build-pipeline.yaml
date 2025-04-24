@@ -299,7 +299,7 @@ spec:
     params:
     - name: image-url
       value: $(tasks.build-image-index.results.IMAGE_URL)
-    - name: IMAGE_DIGEST
+    - name: image-digest
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
     - name: IMAGE
       value: $(params.output-image)
@@ -391,7 +391,7 @@ spec:
     params:
     - name: image-url
       value: $(tasks.build-image-index.results.IMAGE_URL)
-    - name: IMAGE_DIGEST
+    - name: image-digest
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
     - name: SOURCE_ARTIFACT
       value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
