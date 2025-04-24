@@ -261,7 +261,7 @@ spec:
     - name: image-url
       value: $(tasks.build-container.results.IMAGE_URL)
     - name: IMAGE_DIGEST
-      value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+      value: $(tasks.build-container.results.IMAGE_DIGEST)
     - name: IMAGE
       value: $(params.output-image)
     - name: DOCKERFILE
