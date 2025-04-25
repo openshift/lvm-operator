@@ -253,7 +253,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	if err != nil {
 		return fmt.Errorf("unable to set up file watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer watcher.Close() //nolint:errcheck
 	// Start listening for events on TopoLVM files.
 	go watchTopoLVMAndNotify(opts, cancelWithCause, watcher)
 
