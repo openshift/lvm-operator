@@ -556,10 +556,10 @@ The CSI Drivers as well as all content behind TopoLVM will not be touched in thi
     - `LVMNodeSet` condition `ProviderReady=True`
     - `LVMNode` condition `VolumeGroupsHealthy=True`
     - `LVMNode` condition `DeviceClassesHealthy=True`
-    - openshift-storage/lvms-operator deployment and pods health
-    - openshift-storage/topolvm-controller deployment and pods health
-    - openshift-storage/topolvm-node daemon set and pods health
-    - openshift-storage/vgmanager daemon set and pods health
+    - openshift-lvm-storage/lvms-operator deployment and pods health
+    - openshift-lvm-storage/topolvm-controller deployment and pods health
+    - openshift-lvm-storage/topolvm-node daemon set and pods health
+    - openshift-lvm-storage/vgmanager daemon set and pods health
     - metric `lvm_nodes_healthy` which reports any `LVMNode` that is in `Ready` state
     - metric `lvm_nodes_degraded` which reports any `LVMNode` that drops out of `Ready` into `Degraded` state
     - metric `lvm_nodes_failed` which reports any `LVMNode` that drops out of `Ready` into `Failed` state

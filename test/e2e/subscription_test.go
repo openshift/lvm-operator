@@ -70,7 +70,7 @@ func generateClusterObjects(lvmCatalogImage string, subscriptionChannel string) 
 	// Operator Groups
 	lvmOG := v1.OperatorGroup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "openshift-storage-operatorgroup",
+			Name:      "openshift-lvm-storage-operatorgroup",
 			Namespace: installNamespace,
 		},
 		Spec: v1.OperatorGroupSpec{

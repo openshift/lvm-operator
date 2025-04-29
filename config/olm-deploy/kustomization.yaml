@@ -2,8 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- openshift-storage-namespace.yaml
-- openshift-storage-operatorgroup.yaml
+- openshift-lvm-storage-namespace.yaml
+- openshift-lvm-storage-operatorgroup.yaml
 - lvms-operator-subscription.yaml
 - lvms-catalogsource.yaml
 

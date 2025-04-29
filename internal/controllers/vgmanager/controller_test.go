@@ -142,7 +142,7 @@ func setupInstances() testInstances {
 	hostname := "test-host.vgmanager.test.io"
 	hostnameLabelKey := "kubernetes.io/hostname"
 
-	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-storage"}}
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-lvm-storage"}}
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node", Labels: map[string]string{
 		hostnameLabelKey: hostname,
 	}}}
@@ -522,7 +522,7 @@ func testNodeSelector(ctx context.Context) {
 	ctx = log.IntoContext(ctx, logger)
 	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
 	volumeGroup.SetName("vg1")
-	volumeGroup.SetNamespace("openshift-storage")
+	volumeGroup.SetNamespace("openshift-lvm-storage")
 	volumeGroup.Spec.NodeSelector = &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{
 		MatchExpressions: []corev1.NodeSelectorRequirement{{
 			Key:      "kubernetes.io/hostname",
@@ -642,7 +642,7 @@ func testErrorOnGetLVMVolumeGroup(ctx context.Context) {
 		Scheme: scheme.Scheme,
 	}
 	_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&lvmv1alpha1.LVMVolumeGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "openshift-storage"},
+		ObjectMeta: metav1.ObjectMeta{Name: "vg1", Namespace: "openshift-lvm-storage"},
 	})})
 	Expect(err).To(HaveOccurred(), "should error if volume group cannot be fetched")
 }

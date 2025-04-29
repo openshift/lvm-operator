@@ -41,7 +41,7 @@ func TestPersistentVolumeClaimReconciler_SetupWithManager(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
-	defaultNamespace := "openshift-storage"
+	defaultNamespace := "openshift-lvm-storage"
 
 	tests := []struct {
 		name                     string
