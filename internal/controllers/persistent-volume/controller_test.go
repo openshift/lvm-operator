@@ -38,7 +38,7 @@ func TestPersistentVolumeReconciler_SetupWithManager(t *testing.T) {
 func TestPersistentVolumeReconciler_Reconcile(t *testing.T) {
 
 	defaultRequest := controllerruntime.Request{NamespacedName: types.NamespacedName{
-		Namespace: "openshift-storage",
+		Namespace: "openshift-lvm-storage",
 		Name:      "test-pv",
 	}}
 

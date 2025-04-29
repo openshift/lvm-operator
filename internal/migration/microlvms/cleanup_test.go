@@ -40,7 +40,7 @@ func TestRemovePreMicroLVMSComponents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			namespace := "openshift-storage"
+			namespace := "openshift-lvm-storage"
 			fakeClientBuilder := fake.NewClientBuilder().
 				WithScheme(setUpScheme()).
 				WithObjects(setUpObjs(tt.exist, namespace)...)

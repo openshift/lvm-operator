@@ -5,4 +5,4 @@ resources:
 - vgmanager_metrics_service.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: openshift-storage
+namespace: openshift-lvm-storage

@@ -130,7 +130,7 @@ To actually access prometheus, we need to supply the performance test suite a to
 
 For Stress testing, one should create a new LVMCluster and corresponding StorageClass in advance, e.g.:
 ```shell
-oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage
+oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-lvm-storage
 ```
 
 One can run Stress Tests by running the performance tests like so:

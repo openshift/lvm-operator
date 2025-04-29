@@ -9,4 +9,4 @@ resources:
 
 configurations:
 - kustomizeconfig.yaml
-namespace: openshift-storage
+namespace: openshift-lvm-storage
