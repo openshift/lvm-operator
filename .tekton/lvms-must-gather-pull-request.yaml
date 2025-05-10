@@ -7,9 +7,10 @@ metadata:
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" &&
-      (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-pull-request.yaml".pathChanged() || ".tekton/lvms-must-gather-push.yaml".pathChanged() ||
-      "must-gather/***".pathChanged() || "release/must-gather/***".pathChanged())
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+      == "main" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-pull-request.yaml".pathChanged()
+      || ".tekton/lvms-must-gather-push.yaml".pathChanged() || "must-gather/***".pathChanged()
+      || "release/must-gather/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
@@ -18,8 +19,6 @@ metadata:
   name: lvms-must-gather-on-pull-request
   namespace: logical-volume-manag-tenant
 spec:
-  timeouts:
-    pipeline: 1h30m
   params:
   - name: git-url
     value: '{{source_url}}'
@@ -39,8 +38,12 @@ spec:
     value: '[{"type": "rpm", "path": "release/must-gather"}]'
   pipelineRef:
     name: build-pipeline
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-lvms-must-gather
+  timeouts:
+    pipeline: 1h30m0s
   workspaces:
   - name: git-auth
     secret:
       secretName: '{{ git_auth_secret }}'
+status: {}
