@@ -6,12 +6,10 @@ metadata:
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
-      (".tekton/single-arch-build-pipeline.yaml".pathChanged() ||
-      ".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged() ||
-      ".tekton/lvm-operator-bundle-push.yaml".pathChanged() ||
-      "release/bundle/***".pathChanged() ||
-      "bundle/***".pathChanged())
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "main" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged()
+      || ".tekton/lvm-operator-bundle-push.yaml".pathChanged() || "release/bundle/***".pathChanged()
+      || "bundle/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
@@ -20,8 +18,6 @@ metadata:
   name: lvm-operator-bundle-on-push
   namespace: logical-volume-manag-tenant
 spec:
-  timeouts:
-    pipeline: 1h30m
   params:
   - name: git-url
     value: '{{source_url}}'
@@ -39,7 +35,12 @@ spec:
     value: release/container-build.args
   pipelineRef:
     name: single-arch-build-pipeline
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-lvm-operator-bundle
+  timeouts:
+    pipeline: 1h30m0s
   workspaces:
   - name: git-auth
     secret:
       secretName: '{{ git_auth_secret }}'
+status: {}
