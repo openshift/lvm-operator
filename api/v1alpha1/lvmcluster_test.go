@@ -135,7 +135,7 @@ var _ = Describe("webhook acceptance tests", func() {
 	})
 
 	It("invalid namespace gets rejected", func(ctx SpecContext) {
-		acceptableNamespace := "openshift-storage"
+		acceptableNamespace := "openshift-lvm-storage"
 		GinkgoT().Setenv(cluster.OperatorNamespaceEnvVar, acceptableNamespace)
 		generatedName := generateUniqueNameForTestCase(ctx)
 		inacceptableNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: generatedName}}
