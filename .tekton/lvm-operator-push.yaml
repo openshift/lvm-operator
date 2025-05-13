@@ -6,11 +6,12 @@ metadata:
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
-      (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-pull-request.yaml".pathChanged() || ".tekton/lvm-operator-push.yaml".pathChanged() ||
-      "release/operator/***".pathChanged() || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged() ||
-      "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged() || "vendor/***".pathChanged() ||
-      "api/***".pathChanged())
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "main" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-pull-request.yaml".pathChanged()
+      || ".tekton/lvm-operator-push.yaml".pathChanged() || "release/operator/***".pathChanged()
+      || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged()
+      || "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged()
+      || "vendor/***".pathChanged() || "api/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
@@ -19,8 +20,6 @@ metadata:
   name: lvm-operator-on-push
   namespace: logical-volume-manag-tenant
 spec:
-  timeouts:
-    pipeline: 1h30m
   params:
   - name: git-url
     value: '{{source_url}}'
@@ -36,8 +35,12 @@ spec:
     value: release/container-build.args
   pipelineRef:
     name: build-pipeline
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-lvm-operator
+  timeouts:
+    pipeline: 1h30m0s
   workspaces:
   - name: git-auth
     secret:
       secretName: '{{ git_auth_secret }}'
+status: {}
