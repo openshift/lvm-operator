@@ -1,4 +1,5 @@
 exclude:
   global:
     - "vendor/**"
+    - "deps/**"
     - "**/*_test.go"
