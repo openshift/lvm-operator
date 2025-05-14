@@ -1,6 +1,6 @@
 module github.com/openshift/lvm-operator/v4
 
-go 1.22.4
+go 1.22.7
 
 require (
 	github.com/aws/aws-sdk-go v1.54.20
@@ -51,6 +51,9 @@ replace k8s.io/client-go v1.5.2 => k8s.io/client-go v0.30.3
 
 replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20250206134323-7242927baad9
 
+// see OCPEDGE-1867
+replace github.com/kubernetes-csi/external-provisioner => ./deps/github.com/kubernetes-csi/external-provisioner
+
 require (
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -82,7 +85,6 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/miekg/dns v1.1.61 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect

@@ -1,4 +1,4 @@
-exclude: ^vendor/
+exclude: '^vendor|^deps'
 repos:
   - repo: local
     hooks:

@@ -12,6 +12,7 @@ COPY ../go.sum go.sum
 # since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
 # reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
 COPY ../vendor vendor/
+COPY ../deps deps/
 RUN go mod verify
 
 # Copy the go source
