@@ -133,13 +133,13 @@ export CATALOG_PACKAGE
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./api/...;./internal/...;./cmd/..." output:crd:artifacts:config=config/crd/bases
 
 mocks: mockery ## Generate mocks for unit test code
 	$(shell $(MOCKERY) --log-level error)
 
 generate: controller-gen mocks ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations. Also retriggers mock generation
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./api/...;./internal/...;./cmd/..."
 
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -149,7 +149,6 @@ vet: ## Run go vet against code.
 
 godeps-update: ## Run go mod tidy and go mod vendor.
 	go mod tidy && go mod vendor
-	patch -p1 -d $(SELF_DIR)vendor/github.com/kubernetes-csi/external-provisioner < $(SELF_DIR)hack/external-provisioner.patch
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
@@ -335,7 +334,7 @@ envtest: ## Download envtest-setup locally if necessary.
 
 JSONNET = $(shell pwd)/bin/jsonnet
 jsonnet: ## Download jsonnet locally if necessary.
-	$(call go-get-tool,$(JSONNET),github.com/google/go-jsonnet/cmd/jsonnet@latest)
+	$(call go-get-tool,$(JSONNET),github.com/google/go-jsonnet/cmd/jsonnet@v0.20.0)
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo and gomega locally if necessary.
