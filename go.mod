@@ -46,6 +46,9 @@ require (
 
 replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9
 
+// see OCPEDGE-1867
+replace github.com/kubernetes-csi/external-provisioner/v5 => ./deps/github.com/kubernetes-csi/external-provisioner/v5
+
 require (
 	cel.dev/expr v0.19.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -80,7 +83,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
-	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
