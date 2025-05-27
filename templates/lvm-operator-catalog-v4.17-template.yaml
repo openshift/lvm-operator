@@ -13,9 +13,11 @@ Stable:
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.6
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.7
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.8
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.16.9
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.0
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.1
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.2
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.3
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.4
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.5
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle:v4.17.6
