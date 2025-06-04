@@ -36,7 +36,7 @@ spec:
   - name: build-args
     value:
     - CATALOG_VERSION=v4.19
-    - BASE_IMAGE=registry.stage.redhat.io/openshift4/ose-operator-registry-rhel9
+    - BASE_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-ose-operator-registry-rhel9
   - name: hermetic
     value: "true"
   - name: skip-additional-tags
