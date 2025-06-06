@@ -53,3 +53,34 @@ endif
 .PHONY: container
 container:
 	$(IMAGE_BUILD_CMD) build $(CATALOG_BUILD_ARGS) -t lvm-operator-catalog:$(CATALOG_VERSION) -f konflux-catalog.Dockerfile
+
+# Testing Workflow Commands
+CATALOG_SOURCE_IMAGE ?= quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
+CATALOG_SOURCE_IMAGE_TAG ?= $(CATALOG_VERSION)
+
+.PHONY: catalog-source
+catalog-source:
+	./hack/generate_catalogsource.sh
+
+CLUSTER_OS ?= rhel9
+
+.PHONY: image-digest-mirrors
+image-digest-mirrors:
+	./hack/generate_imagedigestmirrors.sh
+
+.PHONY: update-cluster-pull-secret
+update-cluster-pull-secret:
+	./hack/update_cluster_pull_secret.sh
+
+.PHONY: operator-install
+install-manifests:
+	./hack/generate_operator_install_manifests.sh
+
+.PHONY: test-manifests
+test-manifests:
+	rm -rf manifests
+	mkdir -p manifests
+	$(MAKE) catalog-source image-digest-mirrors install-manifests
+	@echo "Manifests generated in manifests/"
+	@echo "To update the cluster pull secret, run: make update-cluster-pull-secret"
+	@echo "To apply the manifests, run: oc apply -R -f manifests"
