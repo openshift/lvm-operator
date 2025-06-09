@@ -16,7 +16,7 @@ metadata:
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator-catalog
-    appstudio.openshift.io/component: lvm-operator-catalog-v4.13
+    appstudio.openshift.io/component: lvm-operator-catalog-v4-13
     pipelines.appstudio.openshift.io/type: build
   name: lvm-operator-catalog-v4.13-on-push
   namespace: logical-volume-manag-tenant
