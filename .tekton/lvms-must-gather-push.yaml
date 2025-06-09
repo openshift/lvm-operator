@@ -32,7 +32,7 @@ spec:
   - name: prefetch-input
     value: '[{"type": "rpm", "path": "release/operator"}]'
   pipelineRef:
-    name: build-pipeline
+    name: multi-arch-build-pipeline
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvms-must-gather
   timeouts:
