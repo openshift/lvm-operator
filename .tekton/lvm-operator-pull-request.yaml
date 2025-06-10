@@ -39,7 +39,7 @@ spec:
   - name: skip-additional-tags
     value: "true"
   pipelineRef:
-    name: build-pipeline
+    name: multi-arch-build-pipeline
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator
   timeouts:
