@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: openshift-storage
+  name: openshift-lvm-storage
   annotations:
     workload.openshift.io/allowed: "management"
   labels:
