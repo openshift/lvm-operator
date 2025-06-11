@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const pvLabel = "kubernetes.io/hostname"
+
 // Reconciler reconciles a PersistentVolume object
 type Reconciler struct {
 	client   client.Client
@@ -40,12 +42,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	pv := &corev1.PersistentVolume{}
 	err := r.client.Get(ctx, req.NamespacedName, pv)
-	switch {
-	case err == nil:
-	case apierrors.IsNotFound(err):
-		return ctrl.Result{}, nil
-	default:
+	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, err
+	}
+
+	if apierrors.IsNotFound(err) {
+		return ctrl.Result{}, nil
 	}
 
 	// Skip if the PV is deleted or PV does not use the lvms storage class.
@@ -57,6 +59,28 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if pv.Spec.ClaimRef == nil {
 		r.recorder.Event(pv, "Warning", "ClaimReferenceRemoved", "Claim reference has been removed. This PV is no longer dynamically managed by LVM Storage and will need to be cleaned up manually.")
 		logger.Info("Event published for the PV", "PV", req.NamespacedName)
+	}
+
+	if pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil {
+		return ctrl.Result{}, nil
+	}
+
+	for _, pvNodeSelectorTerms := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		for _, v := range pvNodeSelectorTerms.MatchExpressions {
+			if v.Key == "topology.topolvm.io/node" && v.Operator == corev1.NodeSelectorOpIn {
+				if pv.Labels == nil {
+					pv.Labels = make(map[string]string)
+				}
+				if pv.Labels[pvLabel] != v.Values[0] {
+					pv.Labels[pvLabel] = v.Values[0]
+					err = r.client.Update(ctx, pv)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
+				}
+
+			}
+		}
 	}
 
 	return ctrl.Result{}, nil
