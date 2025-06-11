@@ -25,8 +25,6 @@ LABEL io.k8s.display-name="LVM Storage must gather"
 LABEL io.k8s.description="LVM Storage data gathering image"
 LABEL io.openshift.tags="lvms"
 LABEL upstream-vcs-ref="${CI_LVM_OPERATOR_UPSTREAM_COMMIT}"
-LABEL lvms.tags="${LVMS_TAGS}"
-LABEL lvms.version="v${OPERATOR_VERSION}"
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
 
 USER 65532:65532
