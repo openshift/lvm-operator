@@ -17,6 +17,13 @@ endif
 
 all: templates catalogs
 
+.PHONY: konflux-update
+konflux-update: konflux-task-manifest-updates
+
+.PHONY: konflux-task-manifest-updates
+konflux-task-manifest-updates:
+	hack/update-konflux-task-refs.sh .tekton/catalog-pipeline.yaml
+
 .PHONY: templates
 templates:
 	./hack/generate_released_templates.sh
