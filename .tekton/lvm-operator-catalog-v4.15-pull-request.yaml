@@ -41,7 +41,14 @@ spec:
   - name: skip-additional-tags
     value: "true"
   pipelineRef:
-    name: catalog-pipeline
+    resolver: bundles
+    params:
+      - name: name
+        value: fbc-builder
+      - name: bundle
+        value: quay.io/konflux-ci/tekton-catalog/pipeline-fbc-builder:devel@sha256:828549e02575922b985173b8b77e82de87f746e60c743984eae524fbf7686162
+      - name: kind
+        value: pipeline
   workspaces:
   - name: git-auth
     secret:
