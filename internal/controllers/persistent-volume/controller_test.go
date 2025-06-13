@@ -3,6 +3,7 @@ package persistent_volume_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
@@ -123,6 +124,39 @@ func TestPersistentVolumeReconciler_Reconcile(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "persistent volume is present and contains node info in spec",
+			req:  defaultRequest,
+			objs: []client.Object{
+				&v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: defaultRequest.Namespace,
+						Name:      defaultRequest.Name,
+					},
+					Spec: v1.PersistentVolumeSpec{
+						StorageClassName: fmt.Sprintf("%s%s", constants.StorageClassPrefix, "example"),
+						ClaimRef: &v1.ObjectReference{
+							Name: "blub",
+						},
+						NodeAffinity: &v1.VolumeNodeAffinity{
+							Required: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "topology.topolvm.io/node",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"test-node"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -149,6 +183,13 @@ func TestPersistentVolumeReconciler_Reconcile(t *testing.T) {
 				assert.NotEmpty(t, recorder.Events)
 			} else {
 				assert.Empty(t, recorder.Events)
+			}
+
+			if strings.Contains(tt.name, "node info in spec") {
+				pv := &v1.PersistentVolume{}
+				err = clnt.Get(context.Background(), tt.req.NamespacedName, pv)
+				assert.NoError(t, err)
+				assert.Equal(t, "test-node", pv.Labels["kubernetes.io/hostname"])
 			}
 		})
 	}
