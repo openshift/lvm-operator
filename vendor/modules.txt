@@ -311,7 +311,7 @@ github.com/openshift/api/security/v1
 # github.com/openshift/client-go v0.0.0-20250402181141-b3bad3b645f2
 ## explicit; go 1.23.0
 github.com/openshift/client-go/route/clientset/versioned/scheme
-# github.com/openshift/library-go v0.0.0-20250402180609-ce2ba53fb2a4
+# github.com/openshift/library-go v0.0.0-20250609093359-ccdcf648dd95
 ## explicit; go 1.23.0
 github.com/openshift/library-go/pkg/config/leaderelection
 # github.com/operator-framework/api v0.30.0
