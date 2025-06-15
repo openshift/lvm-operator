@@ -374,7 +374,7 @@ github.com/stretchr/objx
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/mock
-# github.com/topolvm/topolvm v0.36.3 => github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9
+# github.com/topolvm/topolvm v0.36.4 => github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9
 ## explicit; go 1.22.0
 github.com/topolvm/topolvm
 github.com/topolvm/topolvm/api/legacy/v1
