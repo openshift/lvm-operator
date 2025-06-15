@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/container-storage-interface/spec v1.11.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
 	github.com/kubernetes-csi/csi-lib-utils v0.21.0
