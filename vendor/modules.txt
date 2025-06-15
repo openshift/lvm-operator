@@ -314,7 +314,7 @@ github.com/openshift/client-go/route/clientset/versioned/scheme
 # github.com/openshift/library-go v0.0.0-20250402180609-ce2ba53fb2a4
 ## explicit; go 1.23.0
 github.com/openshift/library-go/pkg/config/leaderelection
-# github.com/operator-framework/api v0.30.0
+# github.com/operator-framework/api v0.31.0
 ## explicit; go 1.23.0
 github.com/operator-framework/api/pkg/lib/version
 github.com/operator-framework/api/pkg/operators
