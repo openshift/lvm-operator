@@ -16,7 +16,7 @@ metadata:
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
-    appstudio.openshift.io/component: lvm-operator
+    appstudio.openshift.io/component: lvm-operator-4-20
     pipelines.appstudio.openshift.io/type: build
   name: lvm-operator-on-pull-request
   namespace: logical-volume-manag-tenant
