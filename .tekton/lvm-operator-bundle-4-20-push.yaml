@@ -4,19 +4,18 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift/lvm-operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged()
-      || ".tekton/lvm-operator-bundle-push.yaml".pathChanged() || "release/bundle/***".pathChanged()
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "main" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-4-20-pull-request.yaml".pathChanged()
+      || ".tekton/lvm-operator-bundle-4-20-push.yaml".pathChanged() || "release/bundle/***".pathChanged()
       || "bundle/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
-    appstudio.openshift.io/component: lvm-operator-bundle
+    appstudio.openshift.io/component: lvm-operator-bundle-4-20
     pipelines.appstudio.openshift.io/type: build
-  name: lvm-operator-bundle-on-pull-request
+  name: lvm-operator-bundle-4-20-on-push
   namespace: logical-volume-manag-tenant
 spec:
   params:
@@ -25,9 +24,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle:{{revision}}
   - name: dockerfile
     value: release/bundle/bundle.konflux.Dockerfile
   - name: prefetch-input
@@ -36,12 +33,10 @@ spec:
     value: "true"
   - name: build-args-file
     value: release/container-build.args
-  - name: skip-additional-tags
-    value: "true"
   pipelineRef:
     name: single-arch-build-pipeline
   taskRunTemplate:
-    serviceAccountName: build-pipeline-lvm-operator-bundle
+    serviceAccountName: build-pipeline-lvm-operator-bundle-4-20
   timeouts:
     pipeline: 1h30m0s
   workspaces:
