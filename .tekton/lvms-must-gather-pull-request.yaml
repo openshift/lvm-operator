@@ -14,7 +14,7 @@ metadata:
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
-    appstudio.openshift.io/component: lvms-must-gather
+    appstudio.openshift.io/component: lvms-must-gather-4-19
     pipelines.appstudio.openshift.io/type: build
   name: lvms-must-gather-on-pull-request
   namespace: logical-volume-manag-tenant
