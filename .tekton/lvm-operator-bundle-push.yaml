@@ -15,7 +15,7 @@ metadata:
     appstudio.openshift.io/application: lvm-operator
     appstudio.openshift.io/component: lvm-operator-bundle-4-19
     pipelines.appstudio.openshift.io/type: build
-  name: lvm-operator-bundle-on-push
+  name: lvm-operator-bundle-4-19-on-push
   namespace: logical-volume-manag-tenant
 spec:
   params:
@@ -36,7 +36,7 @@ spec:
   pipelineRef:
     name: single-arch-build-pipeline
   taskRunTemplate:
-    serviceAccountName: build-pipeline-lvm-operator-bundle
+    serviceAccountName: build-pipeline-lvm-operator-bundle-4-19
   timeouts:
     pipeline: 1h30m0s
   workspaces:
