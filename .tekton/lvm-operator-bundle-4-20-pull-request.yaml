@@ -8,15 +8,15 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-pull-request.yaml".pathChanged()
-      || ".tekton/lvms-must-gather-push.yaml".pathChanged() || "must-gather/***".pathChanged()
-      || "release/must-gather/***".pathChanged())
+      == "main" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-4-20-pull-request.yaml".pathChanged()
+      || ".tekton/lvm-operator-bundle-4-20-push.yaml".pathChanged() || "release/bundle/***".pathChanged()
+      || "bundle/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator
-    appstudio.openshift.io/component: lvms-must-gather
+    appstudio.openshift.io/component: lvm-operator-bundle-4-20
     pipelines.appstudio.openshift.io/type: build
-  name: lvms-must-gather-on-pull-request
+  name: lvm-operator-bundle-4-20-on-pull-request
   namespace: logical-volume-manag-tenant
 spec:
   params:
@@ -25,21 +25,23 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: release/must-gather/must-gather.konflux.Dockerfile
+    value: release/bundle/bundle.konflux.Dockerfile
+  - name: prefetch-input
+    value: '{"type": "generic", "path": "./release/bundle"}'
+  - name: skip-preflight
+    value: "true"
   - name: build-args-file
     value: release/container-build.args
   - name: skip-additional-tags
     value: "true"
-  - name: prefetch-input
-    value: '[{"type": "rpm", "path": "release/must-gather"}]'
   pipelineRef:
-    name: multi-arch-build-pipeline
+    name: single-arch-build-pipeline
   taskRunTemplate:
-    serviceAccountName: build-pipeline-lvms-must-gather
+    serviceAccountName: build-pipeline-lvm-operator-bundle-4-20
   timeouts:
     pipeline: 1h30m0s
   workspaces:
