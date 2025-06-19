@@ -1,6 +1,6 @@
 module github.com/openshift/lvm-operator/v4
 
-go 1.23.6
+go 1.23.7
 
 require (
 	github.com/aws/aws-sdk-go v1.55.6
@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
-	github.com/topolvm/topolvm v0.36.3
+	github.com/topolvm/topolvm v0.36.4
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.71.1
 	gotest.tools/v3 v3.5.2
@@ -44,7 +44,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20250513082748-91d096092910
 
 require (
 	cel.dev/expr v0.23.1 // indirect
