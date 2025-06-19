@@ -157,8 +157,8 @@ github.com/openshift/api v0.0.0-20250407083304-00e6260bd8b8 h1:n4r9Gzv4+WZxfuE4G
 github.com/openshift/api v0.0.0-20250407083304-00e6260bd8b8/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/openshift/client-go v0.0.0-20250402181141-b3bad3b645f2 h1:bPXR0R8zp1o12nSUphN26hSM+OKYq5pMorbDCpApzDQ=
 github.com/openshift/client-go v0.0.0-20250402181141-b3bad3b645f2/go.mod h1:dT1cJyVTperQ53GvVRa+GZ27r02fDZy2k5j+9QoQsCo=
-github.com/openshift/library-go v0.0.0-20250402180609-ce2ba53fb2a4 h1:MDnTCGqFUULZ4+0fr0sQYlB80yTun8nEZ062azvFSCk=
-github.com/openshift/library-go v0.0.0-20250402180609-ce2ba53fb2a4/go.mod h1:DAa3BGl0CFtkfJn/g5rU8kDDTErfMVA/QlFm4cvU+MI=
+github.com/openshift/library-go v0.0.0-20250609093359-ccdcf648dd95 h1:h6G+60Frk+tlX3MAcp5dznWAXGIwR2BeqXqttc9w9l0=
+github.com/openshift/library-go v0.0.0-20250609093359-ccdcf648dd95/go.mod h1:DAa3BGl0CFtkfJn/g5rU8kDDTErfMVA/QlFm4cvU+MI=
 github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9 h1:60+GvNo2qhn0ZPrHgpMMvxVaA8G33UuocyZUfG13828=
 github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9/go.mod h1:JeOjl+ooFvNwoneHmckmqCHZDBJqIzf97Z4dwApoQpM=
 github.com/operator-framework/api v0.30.0 h1:44hCmGnEnZk/Miol5o44dhSldNH0EToQUG7vZTl29kk=
