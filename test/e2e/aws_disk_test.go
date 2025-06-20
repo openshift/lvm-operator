@@ -19,6 +19,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -32,7 +33,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -192,27 +192,11 @@ func (m *AWSDiskManager) createAndAttachAWSVolumesForNode(ctx context.Context, n
 	return nil
 }
 
-func getEC2Client(ctx context.Context, region string) (*ec2.EC2, error) {
-	// get AWS credentials
-	awsCreds := &corev1.Secret{}
-	secretName := types.NamespacedName{Name: "aws-creds", Namespace: "kube-system"}
-	err := crClient.Get(ctx, secretName, awsCreds)
-	if err != nil {
-		return nil, fmt.Errorf("could not get aws credentials for EC2 Client: %w", err)
-	}
-	// detect region
-	// base64 decode
-	id, found := awsCreds.Data["aws_access_key_id"]
-	if !found {
-		return nil, fmt.Errorf("cloud credential id not found")
-	}
-	key, found := awsCreds.Data["aws_secret_access_key"]
-	if !found {
-		return nil, fmt.Errorf("cloud credential key not found")
-	}
+func getEC2Client(region string) (*ec2.EC2, error) {
+	// Create AWS session using custom credentials file path
 	sess, err := session.NewSession(&aws.Config{
 		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(string(id), string(key), ""),
+		Credentials: credentials.NewSharedCredentials(os.Getenv("CLUSTER_PROFILE_DIR")+"/.awscred", ""),
 		Logger: aws.LoggerFunc(func(args ...interface{}) {
 			GinkgoLogr.Info(fmt.Sprint(args), "source", "aws")
 		}),
