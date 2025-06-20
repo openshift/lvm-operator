@@ -18,7 +18,7 @@ func TestCollector(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte(parsed))
 	}))
-	collector := NewCollector(server.URL, "token", "openshift-storage",
+	collector := NewCollector(server.URL, "token", "openshift-lvm-storage",
 		time.Now().Add(-5*time.Minute), time.Now())
 
 	a.NoError(collector.collect(context.Background()))
