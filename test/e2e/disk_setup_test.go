@@ -39,7 +39,7 @@ func diskSetup(ctx context.Context) {
 
 	// initialize client
 	By("initializing ec2 client with the previously attained region")
-	ec2, err := getEC2Client(ctx, nodeInfo.Region)
+	ec2, err := getEC2Client(nodeInfo.Region)
 	Expect(err).NotTo(HaveOccurred(), "getEC2Client")
 
 	// represents the Disk layout to setup on the nodes.
@@ -84,7 +84,7 @@ func diskTeardown(ctx context.Context) {
 
 	// initialize client
 	By("initializing ec2 client with the previously attained region")
-	ec2, err := getEC2Client(ctx, nodeInfo.Region)
+	ec2, err := getEC2Client(nodeInfo.Region)
 	Expect(err).NotTo(HaveOccurred(), "getEC2Client")
 
 	// cleaning Disk
