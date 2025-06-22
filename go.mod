@@ -3,7 +3,7 @@ module github.com/openshift/lvm-operator/v4
 go 1.23.6
 
 require (
-	github.com/aws/aws-sdk-go v1.55.6
+	github.com/aws/aws-sdk-go v1.55.7
 	github.com/container-storage-interface/spec v1.11.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-logr/logr v1.4.2
