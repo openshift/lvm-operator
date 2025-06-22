@@ -243,8 +243,8 @@ github.com/kubernetes-csi/external-snapshotter/v8/pkg/utils
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/miekg/dns v1.1.65
-## explicit; go 1.22.0
+# github.com/miekg/dns v1.1.66
+## explicit; go 1.23.0
 github.com/miekg/dns
 # github.com/moby/spdystream v0.5.0
 ## explicit; go 1.13
