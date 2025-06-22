@@ -130,7 +130,7 @@ require (
 	k8s.io/cloud-provider v0.30.0 // indirect
 	k8s.io/controller-manager v0.31.0 // indirect
 	k8s.io/kms v0.31.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20240730131305-7a9a4e85957e // indirect
+	k8s.io/kube-openapi 8b98d1ed966a // indirect
 	k8s.io/kubectl v0.31.0 // indirect
 	k8s.io/kubelet v0.31.0 // indirect
 	k8s.io/mount-utils v0.31.0 // indirect
