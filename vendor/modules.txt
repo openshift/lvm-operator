@@ -303,7 +303,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20250407083304-00e6260bd8b8
+# github.com/openshift/api v0.0.0-20250620202921-c3cf9bb5ccab
 ## explicit; go 1.23.0
 github.com/openshift/api/config/v1
 github.com/openshift/api/route/v1
