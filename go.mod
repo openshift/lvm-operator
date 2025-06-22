@@ -44,7 +44,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20241127215054-5b9639422ac9
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm 30c04aa2cdf5
 
 // see OCPEDGE-1867
 replace github.com/kubernetes-csi/external-provisioner/v5 => ./deps/github.com/kubernetes-csi/external-provisioner/v5
