@@ -198,4 +198,4 @@ replace k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.0
 
 replace k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.31.0
 
-replace k8s.io/cri-client => k8s.io/cri-client v0.31.0
+replace k8s.io/cri-client => k8s.io/cri-client v0.33.2
