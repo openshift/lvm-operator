@@ -129,7 +129,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
 	k8s.io/cloud-provider v0.30.0 // indirect
 	k8s.io/controller-manager v0.31.0 // indirect
-	k8s.io/kms v0.31.0 // indirect
+	k8s.io/kms v0.33.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20240730131305-7a9a4e85957e // indirect
 	k8s.io/kubectl v0.31.0 // indirect
 	k8s.io/kubelet v0.31.0 // indirect
@@ -174,7 +174,7 @@ replace k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation
 
 replace k8s.io/endpointslice => k8s.io/endpointslice v0.31.0
 
-replace k8s.io/kms => k8s.io/kms v0.31.0
+replace k8s.io/kms => k8s.io/kms v0.33.2
 
 replace k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.31.0
 
