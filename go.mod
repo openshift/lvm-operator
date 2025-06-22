@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
-	github.com/topolvm/topolvm v0.36.3
+	github.com/topolvm/topolvm v0.36.4
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.71.1
 	gotest.tools/v3 v3.5.2
