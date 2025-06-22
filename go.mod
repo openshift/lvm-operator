@@ -27,7 +27,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/topolvm/topolvm v0.36.3
 	go.uber.org/zap v1.27.0
-	google.golang.org/grpc v1.71.1
+	google.golang.org/grpc v1.73.0
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.32.3
 	k8s.io/apiextensions-apiserver v0.32.3
