@@ -1,6 +1,8 @@
 module github.com/openshift/lvm-operator/v4
 
-go 1.22.7
+go 1.23.0
+
+toolchain go1.23.9
 
 require (
 	github.com/aws/aws-sdk-go v1.55.5
@@ -113,7 +115,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d // indirect
-	golang.org/x/mod v0.22.0 // indirect
+	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
