@@ -19,7 +19,7 @@ require (
 	github.com/openshift/api v0.0.0-20250407083304-00e6260bd8b8
 	github.com/openshift/client-go v0.0.0-20250402181141-b3bad3b645f2
 	github.com/openshift/library-go v0.0.0-20250402180609-ce2ba53fb2a4
-	github.com/operator-framework/api v0.30.0
+	github.com/operator-framework/api v0.31.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.22.0
 	github.com/spf13/cobra v1.9.1
