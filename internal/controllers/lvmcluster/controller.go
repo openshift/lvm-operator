@@ -169,12 +169,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The resource was deleted
 	if !lvmCluster.DeletionTimestamp.IsZero() {
 		// check for stale vgmanager finalizer in case if node deleted but vg still exist
-		err := r.checkDeletedNodeFinalizers(ctx)
+		healthyNodes, unhealthyNodes, err := r.healthyUnhealthyNodes(ctx)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get unhealthy nodes: %w", err)
+		}
+
+		err = r.checkStaleNodeFinalizers(ctx, healthyNodes, unhealthyNodes)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check for deleted nodes: %w", err)
 		}
 		// Check for existing LogicalVolumes
-		lvsExist, err := r.logicalVolumesExist(ctx)
+		lvsExist, err := r.logicalVolumesExist(ctx, healthyNodes, unhealthyNodes)
 		if err != nil {
 			// check every 10 seconds if there are still PVCs present
 			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
@@ -329,18 +334,30 @@ func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 	return nil
 }
 
-func (r *Reconciler) logicalVolumesExist(ctx context.Context) (bool, error) {
+func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhealthyNodes map[string]struct{}) (bool, error) {
 	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
 	if err := r.Client.List(ctx, logicalVolumeList); err != nil {
 		return false, fmt.Errorf("failed to get TopoLVM LogicalVolume list: %w", err)
 	}
-	if len(logicalVolumeList.Items) > 0 {
-		return true, nil
+
+	if len(logicalVolumeList.Items) == 0 {
+		return false, nil
 	}
+
+	for _, logicalVolume := range logicalVolumeList.Items {
+		if !contains(healthyNodes, logicalVolume.Spec.NodeName) || contains(unhealthyNodes, logicalVolume.Spec.NodeName) {
+			controllerutil.RemoveFinalizer(&logicalVolume, "topolvm.io/logicalvolume")
+			err := r.Client.Update(ctx, &logicalVolume)
+			if err != nil {
+				return false, fmt.Errorf("failed to delete finalizer from logicalvolume %s, error: %w", logicalVolume.Name, err)
+			}
+		}
+	}
+
 	return false, nil
 }
 
-func (r *Reconciler) checkDeletedNodeFinalizers(ctx context.Context) error {
+func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, healthyNodes, unhealthyNodes map[string]struct{}) error {
 	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
 	err := r.Client.List(ctx, volumeGroups, &client.ListOptions{Namespace: r.Namespace})
 	if k8serrors.IsNotFound(err) {
@@ -351,35 +368,19 @@ func (r *Reconciler) checkDeletedNodeFinalizers(ctx context.Context) error {
 		return fmt.Errorf("failed to list volume groups: %w", err)
 	}
 
-	vgNodeFinalizerMap := make(map[string]*lvmv1alpha1.LVMVolumeGroup, 0)
-	for _, volumeGroup := range volumeGroups.Items {
-		for _, finalizer := range volumeGroup.Finalizers {
-			if strings.HasPrefix(finalizer, vgmanager.NodeCleanupFinalizer) {
-				vgNodeFinalizerMap[finalizer] = &volumeGroup
-				break
+	for _, vg := range volumeGroups.Items {
+		for _, finalizer := range vg.Finalizers {
+			if !strings.HasPrefix(finalizer, vgmanager.NodeCleanupFinalizer) {
+				continue
 			}
-		}
-	}
 
-	if len(vgNodeFinalizerMap) == 0 {
-		return nil
-	}
-
-	nodes := &corev1.NodeList{}
-	err = r.Client.List(ctx, nodes)
-	if err != nil {
-		return fmt.Errorf("failed to get node list: %w", err)
-	}
-
-	for _, v := range nodes.Items {
-		delete(vgNodeFinalizerMap, fmt.Sprintf("%s/%s", vgmanager.NodeCleanupFinalizer, v.Name))
-	}
-
-	for finalizer, volumeGroup := range vgNodeFinalizerMap {
-		if controllerutil.RemoveFinalizer(volumeGroup, finalizer) {
-			err = r.Client.Update(ctx, volumeGroup)
-			if err != nil {
-				return fmt.Errorf("failed to delete finalizer from volumegroup %s, error: %w", volumeGroup.Name, err)
+			nodeName := strings.TrimPrefix(finalizer, vgmanager.NodeCleanupFinalizer+"/")
+			if contains(unhealthyNodes, nodeName) || !contains(healthyNodes, nodeName) {
+				controllerutil.RemoveFinalizer(&vg, finalizer)
+				err = r.Client.Update(ctx, &vg)
+				if err != nil {
+					return fmt.Errorf("failed to delete finalizer from volumegroup %s, error: %w", vg.Name, err)
+				}
 			}
 		}
 	}
@@ -424,6 +425,28 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 	return nil
 }
 
+func (r *Reconciler) healthyUnhealthyNodes(ctx context.Context) (map[string]struct{}, map[string]struct{}, error) {
+	nodes := &corev1.NodeList{}
+	err := r.Client.List(ctx, nodes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get node list: %w", err)
+	}
+
+	unhealthyNodes := make(map[string]struct{})
+	healthyNodes := make(map[string]struct{})
+	for _, node := range nodes.Items {
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionFalse {
+				unhealthyNodes[node.Name] = struct{}{}
+			} else {
+				healthyNodes[node.Name] = struct{}{}
+			}
+		}
+	}
+
+	return healthyNodes, unhealthyNodes, nil
+}
+
 func (r *Reconciler) WarningEvent(_ context.Context, obj client.Object, reason EventReasonError, err error) {
 	r.Event(obj, corev1.EventTypeWarning, string(reason), err.Error())
 }
@@ -433,4 +456,9 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj client.Object, reason 
 		return
 	}
 	r.Event(obj, corev1.EventTypeNormal, string(reason), message)
+}
+
+func contains[K comparable, T any](m map[K]T, key K) bool {
+	_, ok := m[key]
+	return ok
 }
