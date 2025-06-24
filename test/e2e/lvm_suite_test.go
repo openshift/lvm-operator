@@ -54,6 +54,7 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	// Configure the disk and install the operator
 	beforeTestSuiteSetup(ctx)
 	createNamespace(ctx, testNamespace)
+	createNamespace(ctx, installNamespace)
 })
 
 var _ = AfterSuite(func(ctx context.Context) {

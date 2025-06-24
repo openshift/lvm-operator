@@ -23,7 +23,7 @@ metadata:
     pod-security.kubernetes.io/warn: "privileged"
     pod-security.kubernetes.io/audit: "privileged"
     openshift.io/cluster-monitoring: "true"
-  name: openshift-storage
+  name: openshift-lvm-storage
 
 ---
 
@@ -31,7 +31,7 @@ apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
   name: lvms-operator
-  namespace: openshift-storage
+  namespace: openshift-lvm-storage
 
 ---
 
@@ -39,7 +39,7 @@ apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
   name: lvms-operator
-  namespace: openshift-storage
+  namespace: openshift-lvm-storage
 spec:
   output:
     to:

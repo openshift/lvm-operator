@@ -55,7 +55,7 @@ end
     * [Missing native LVM RAID Configuration support](#missing-native-lvm-raid-configuration-support)
     * [Missing LV-level encryption support](#missing-lv-level-encryption-support)
     * [Snapshotting and Cloning in Multi-Node Topologies](#snapshotting-and-cloning-in-multi-node-topologies)
-    * [Validation of `LVMCluster` CRs outside the `openshift-storage` namespace](#validation-of-lvmcluster-crs-outside-the-openshift-storage-namespace)
+    * [Validation of `LVMCluster` CRs outside the `openshift-lvm-storage` namespace](#validation-of-lvmcluster-crs-outside-the-openshift-lvm-storage-namespace)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -124,12 +124,12 @@ You can begin the deployment using the Operator Lifecycle Manager (OLM) by runni
 $ make deploy-with-olm
 ```
 
-The process involves the creation of several resources to deploy the Operator using OLM. These include a custom `CatalogSource` to define the Operator source, the `openshift-storage` namespace to contain the Operator components, an `OperatorGroup` to manage the lifecycle of the Operator, a `Subscription` to subscribe to the Operator catalog in the `openshift-storage` namespace, and finally, the creation of a `ClusterServiceVersion` to describe the Operator's capabilities and requirements.
+The process involves the creation of several resources to deploy the Operator using OLM. These include a custom `CatalogSource` to define the Operator source, the `openshift-lvm-storage` namespace to contain the Operator components, an `OperatorGroup` to manage the lifecycle of the Operator, a `Subscription` to subscribe to the Operator catalog in the `openshift-lvm-storage` namespace, and finally, the creation of a `ClusterServiceVersion` to describe the Operator's capabilities and requirements.
 
 Wait until the `ClusterServiceVersion` (CSV) reaches the `Succeeded` status:
 
 ```bash
-$ kubectl get csv -n openshift-storage
+$ kubectl get csv -n openshift-lvm-storage
 
 NAME                   DISPLAY       VERSION   REPLACES   PHASE
 lvms-operator.v0.0.1   LVM Storage   0.0.1                Succeeded
@@ -138,10 +138,10 @@ lvms-operator.v0.0.1   LVM Storage   0.0.1                Succeeded
 </p>
 </details>
 
-After the previous command has completed successfully, switch over to the `openshift-storage` namespace:
+After the previous command has completed successfully, switch over to the `openshift-lvm-storage` namespace:
 
 ```bash
-$ oc project openshift-storage
+$ oc project openshift-lvm-storage
 ```
 
 Wait until all pods have started running:
@@ -153,7 +153,7 @@ $ oc get pods -w
 Once all pods are running, create a sample `LVMCluster` custom resource (CR):
 
 ```bash
-$ oc create -n openshift-storage -f https://github.com/openshift/lvm-operator/raw/main/config/samples/lvm_v1alpha1_lvmcluster.yaml
+$ oc create -n openshift-lvm-storage -f https://github.com/openshift/lvm-operator/raw/main/config/samples/lvm_v1alpha1_lvmcluster.yaml
 ```
 
 After the CR is deployed, the following actions are executed:
@@ -315,10 +315,10 @@ To perform a full cleanup, follow these steps:
 
     If the previous command is stuck, it may be necessary to perform a [forced cleanup procedure](./docs/troubleshooting.md#forced-cleanup).
 
-4. Verify that the only remaining resource in the `openshift-storage` namespace is the Operator.
+4. Verify that the only remaining resource in the `openshift-lvm-storage` namespace is the Operator.
 
     ```bash
-    oc get pods -n openshift-storage
+    oc get pods -n openshift-lvm-storage
     NAME                                 READY   STATUS    RESTARTS   AGE
     lvms-operator-8bf864c85-8zjlp        3/3     Running   0          125m
     ```
@@ -345,7 +345,7 @@ Once the environment variables are set, you can run
 $ make deploy-local
 
 # Wait for the lvms-operator to have status=Running
-$ oc -n openshift-storage get pods
+$ oc -n openshift-lvm-storage get pods
 # NAME                             READY   STATUS    RESTARTS   AGE
 # lvms-operator-579fbf46d5-vjwhp   3/3     Running   0          3m27s
 
@@ -361,7 +361,7 @@ $ make undeploy
 To enable monitoring on OpenShift clusters, assign the `openshift.io/cluster-monitoring` label to the same namespace that you deployed LVMS to.
 
 ```bash
-$ oc patch namespace/openshift-storage -p '{"metadata": {"labels": {"openshift.io/cluster-monitoring": "true"}}}'
+$ oc patch namespace/openshift-lvm-storage -p '{"metadata": {"labels": {"openshift.io/cluster-monitoring": "true"}}}'
 ```
 
 LVMS provides [TopoLVM metrics](https://github.com/topolvm/topolvm/blob/v0.21.0/docs/topolvm-node.md#prometheus-metrics) and `controller-runtime` metrics, which can be accessed via OpenShift Console.
@@ -539,15 +539,15 @@ The easiest way to achieve this is to use precreated `PersistentVolumeClaims` an
 
 _NOTE: All of the above also applies for cloning the `PersistentVolumeClaims` directly by using the original `PersistentVolumeClaims` as data source instead of using a Snapshot._
 
-### Validation of `LVMCluster` CRs outside the `openshift-storage` namespace
+### Validation of `LVMCluster` CRs outside the `openshift-lvm-storage` namespace
 
-When creating an `LVMCluster` CR outside the `openshift-storage` namespace by installing it via `ClusterServiceVersion`, the Operator will not be able to validate the CR.
-This is because the `ValidatingWebhookConfiguration` is restricted to the `openshift-storage` namespace and does not have access to the `LVMCluster` CRs in other namespaces.
-Thus, the Operator will not be able to prevent the creation of invalid `LVMCluster` CRs outside the `openshift-storage` namespace.
+When creating an `LVMCluster` CR outside the `openshift-lvm-storage` namespace by installing it via `ClusterServiceVersion`, the Operator will not be able to validate the CR.
+This is because the `ValidatingWebhookConfiguration` is restricted to the `openshift-lvm-storage` namespace and does not have access to the `LVMCluster` CRs in other namespaces.
+Thus, the Operator will not be able to prevent the creation of invalid `LVMCluster` CRs outside the `openshift-lvm-storage` namespace.
 However, it will also not pick it up and simply ignore it.
 
 This is because Operator Lifecycle Manager (OLM) does not allow the creation of `ClusterServiceVersion` with installMode `OwnNamespace` while also not restricting the webhook configuration.
-Validation in the `openshift-storage` namespace is processed normally.
+Validation in the `openshift-lvm-storage` namespace is processed normally.
 
 ## Troubleshooting
 
