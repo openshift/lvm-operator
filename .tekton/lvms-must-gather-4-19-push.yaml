@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-pull-request.yaml".pathChanged()
+      == "release-4.19" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-pull-request.yaml".pathChanged()
       || ".tekton/lvms-must-gather-push.yaml".pathChanged() || "must-gather/***".pathChanged()
       || "release/must-gather/***".pathChanged())
   creationTimestamp: null
