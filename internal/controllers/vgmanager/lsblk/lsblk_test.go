@@ -11,7 +11,7 @@ import (
 )
 
 func TestHostLSBLK(t *testing.T) {
-	if os.Getuid() != 0 {
+	if os.Getuid() != 0 || os.Getenv("NON_ROOT") == "true" {
 		t.Skip("run as root")
 	}
 	ctx := log.IntoContext(context.Background(), testr.New(t))
