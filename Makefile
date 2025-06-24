@@ -240,7 +240,10 @@ else
 endif
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle:  build-prometheus-alert-rules bundle-base ## Generate bundle manifests and metadata, then validate generated files.
+
+.PHONY: bundle-base
+bundle-base: manifests kustomize operator-sdk rename-csv
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
@@ -429,3 +432,5 @@ vuln-scan-deps:
 .PHONY: vuln-scan-container
 vuln-scan-container:
 	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+
+include release/konflux.make

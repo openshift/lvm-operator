@@ -11,8 +11,7 @@ COPY go.sum go.sum
 # since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
 # reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
 COPY vendor vendor/
-COPY deps deps/
-RUN go mod verify
+#RUN go mod verify # This is temporarily removed while we hold a carry patch
 
 # Copy the go source
 COPY api/ api/
@@ -28,25 +27,35 @@ RUN go build -tags strictfipsruntime -mod=vendor -ldflags "-s -w" -a -o lvms cmd
 
 FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
 
+ARG MAINTAINER
+ARG OPERATOR_VERSION
+ARG LVMS_TAGS
+
 RUN microdnf update -y && \
-    microdnf install -y util-linux xfsprogs e2fsprogs glibc && \
+    microdnf install -y util-linux xfsprogs e2fsprogs && \
     microdnf clean all
 
 RUN [ -d /run/lock ] || mkdir /run/lock
 
 WORKDIR /
 COPY --from=builder /workspace/lvms .
+
+RUN mkdir /licenses
+COPY LICENSE /licenses
+
 USER 65532:65532
 
-LABEL maintainer="Suleyman Akbas <sakbas@redhat.com>"
+LABEL maintainer="${MAINTAINER}"
 LABEL com.redhat.component="lvms-operator-container"
 LABEL name="lvms4/lvms-rhel9-operator"
-LABEL version="4.18.0"
+LABEL version="${OPERATOR_VERSION}"
 LABEL description="LVM Storage Operator"
 LABEL summary="Provides the latest LVM Storage Operator package."
 LABEL io.k8s.display-name="LVM Storage Operator based on RHEL 9"
 LABEL io.k8s.description="LVM Storage Operator container based on Red Hat Enterprise Linux 9 Image"
 LABEL io.openshift.tags="lvms"
-LABEL lvms.tags="v4.18"
+LABEL lvms.tags="${LVMS_TAGS}"
+LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
+
 
 ENTRYPOINT ["/lvms"]
