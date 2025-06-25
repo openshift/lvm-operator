@@ -8,20 +8,57 @@
     "enabled": false
   },
   "commitBody": "Signed-off-by: {{{gitAuthor}}}",
+  "packageRules": [
+    {
+      "addLabels": [
+        "approved",
+        "lgtm"
+      ],
+      "autoApprove": true,
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "rebase",
+      "enabled": true,
+      "includePaths": [
+        "release/**"
+      ],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "platformAutomerge": true,
+      "commitMessagePrefix": "NO-JIRA:"
+    },
+    {
+      "matchUpdateTypes": ["minor"],
+      "enabled": false
+    }
+  ],
   "prConcurrentLimit": 5,
   "pruneBranchAfterAutomerge": true,
   "pruneStaleBranches": true,
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
   "tekton": {
+    "automerge": true,
+    "automergeType": "pr",
+    "automergeStrategy": "rebase",
+    "addLabels": [
+      "approved",
+      "lgtm"
+    ],
     "enabled": true,
     "fileMatch": [
       "\\.yaml$",
       "\\.yml$"
     ],
-    "ignoreTests": false,
+    "ignoreTests": true,
     "includePaths": [
       ".tekton/**"
-    ]
+    ],
+    "platformAutomerge": true,
+    "commitMessagePrefix": "NO-JIRA:"
   }
 }
