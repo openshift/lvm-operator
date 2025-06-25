@@ -28,5 +28,5 @@ func (chk *masterSNOCheck) IsSNO(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("unable to retrieve nodes for SNO check with lease configuration: %w", err)
 
 	}
-	return nodes.Items != nil && len(nodes.Items) == 1, nil
+	return len(nodes.Items) == 1, nil
 }
