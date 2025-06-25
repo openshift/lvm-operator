@@ -1,0 +1,55 @@
+kind: Pipeline
+apiVersion: tekton.dev/v1
+metadata:
+  name: integration-tests
+  namespace: logical-volume-manag-tenant
+spec:
+  tasks:
+    - name: test
+      description: Runs lvm operator integration tests
+      taskSpec:
+        volumes:
+          - name: source
+            emptyDir: { }
+        steps:
+        - image: registry.redhat.io/openshift4/ose-cli:latest
+          env:
+          - name: URL
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-repo-url']
+          - name: REVISION
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/sha']
+          volumeMounts:
+            - name: source
+              mountPath: /workspace
+          script: |
+            #!/bin/bash
+            set -exuo pipefail
+            if [ -z "$URL" ] || [ -z "$REVISION" ]; then
+              echo "URL and REVISION must be set"
+              exit 1
+            fi
+
+            # Install Deps
+            dnf -y install git make golang patch
+
+            # Runtime Env Config
+            export GOPATH=$HOME/.go
+            export PATH="$PATH:$GOPATH/bin"
+            export GOTOOLCHAIN=auto
+
+            echo "Initializing the env vars"
+            echo "URL: $URL"
+            echo "REVISION: $REVISION"
+            mkdir /workspace/source
+            cd /workspace/source
+            git init
+            git remote add origin $URL
+            git fetch origin $REVISION
+            git checkout FETCH_HEAD
+
+            NON_ROOT=true make test
+            exit $? # exit with the status of the tests
