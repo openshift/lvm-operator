@@ -10,7 +10,7 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: check-added-large-files
       - id: fix-byte-order-marker
@@ -45,7 +45,7 @@ repos:
         entry: bashate --error . --ignore=E006,E040,E020,E012,E011
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.59.1
+    rev: v1.64.8
     hooks:
       - id: golangci-lint
         entry: golangci-lint run --fix
@@ -57,12 +57,12 @@ repos:
         require_serial: true
         pass_filenames: false
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.6
+    rev: v2.4.1
     hooks:
       - id: codespell
         args: [
           "--ignore-words-list",
-          "afterall",
+          "afterall,NotIn",
           "--check-filenames",
           "--check-hidden",
           "-S",
@@ -70,7 +70,7 @@ repos:
         ]
         pass_filenames: true
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v9.5.0
+    rev: v9.22.0
     hooks:
       - id: commitlint
         stages: [commit-msg]
