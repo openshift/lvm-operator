@@ -1,4 +1,4 @@
-FROM registry-proxy.engineering.redhat.com/rh-osbs/openshift-golang-builder:rhel_9_1.21 as builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21 as builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
