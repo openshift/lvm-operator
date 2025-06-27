@@ -52,6 +52,7 @@ ENVTEST_KUBERNETES_VERSION := $(shell echo $(KUBERNETES_VERSION) | cut -d "." -f
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
 
+
 ## Variables for the images
 
 # Image URL to use all building/pushing image targets
@@ -157,7 +158,7 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-catalog.sh
 	hack/verify-generated.sh
 
-test: manifests generate envtest godeps-update ## Run tests.
+test: envtest godeps-update ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
 ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
@@ -233,7 +234,10 @@ else
 endif
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle:  build-prometheus-alert-rules bundle-base ## Generate bundle manifests and metadata, then validate generated files.
+
+.PHONY: bundle-base
+bundle-base: manifests kustomize operator-sdk rename-csv
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
@@ -311,32 +315,44 @@ performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS 
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION))
+ifeq (,$(wildcard $(CONTROLLER_GEN)))
+	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION))
+endif
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.4.1)
+ifeq (,$(wildcard $(KUSTOMIZE)))
+	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5@v5.4.1)
+endif
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH))
+ifeq (,$(wildcard $(ENVTEST)))
+	$(call go-get-tool,sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH))
+endif
 
 JSONNET = $(shell pwd)/bin/jsonnet
 jsonnet: ## Download jsonnet locally if necessary.
-	$(call go-get-tool,$(JSONNET),github.com/google/go-jsonnet/cmd/jsonnet@latest)
+ifeq (,$(wildcard $(JSONNET)))
+	$(call go-get-tool,github.com/google/go-jsonnet/cmd/jsonnet@v0.20.0)
+endif
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo and gomega locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION))
+ifeq (,$(wildcard $(GINKGO)))
+	$(call go-get-tool,github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION))
+endif
 
 MOCKERY = $(shell pwd)/bin/mockery
 mockery: ## Download mockery and add locally if necessary
-	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.40.3)
+ifeq (,$(wildcard $(MOCKERY)))
+	$(call go-get-tool,github.com/vektra/mockery/v2@v2.40.3)
+endif
 
-# go-get-tool will 'go get' any package $2 and install it to $1.
+# go-get-tool will 'go get' any package $1 and install it.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-get-tool
-@[ -f $(1) ] || echo "Downloading $(2)"; GOBIN=$(PROJECT_DIR)/bin go install -mod=readonly $(2)
+	@echo "Downloading $(1)"; GOBIN=$(PROJECT_DIR)/bin go install -mod=readonly $(1)
 endef
 
 .PHONY: opm
@@ -359,11 +375,19 @@ endif
 .PHONY: operator-sdk
 OPERATOR_SDK = ./bin/operator-sdk
 operator-sdk: ## Download operator-sdk locally.
+ifeq (,$(wildcard $(OPERATOR_SDK)))
+ifeq (,$(shell which operator-sdk 2>/dev/null))
+	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
 	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH};\
 	chmod +x $(OPERATOR_SDK) ;\
+	}
+else
+OPERATOR_SDK = $(shell which opm)
+endif
+endif
 
 .PHONY: git-sanitize
 git-sanitize:
@@ -410,3 +434,5 @@ vuln-scan-deps:
 .PHONY: vuln-scan-container
 vuln-scan-container:
 	snyk container test $(IMAGE_REPO)/$(IMAGE_TAG) --severity-threshold=$(SEVERITY_THRESHOLD) --org=$(SNYK_ORG)
+
+include release/konflux.make
