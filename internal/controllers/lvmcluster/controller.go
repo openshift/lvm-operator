@@ -351,6 +351,8 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhe
 			if err != nil {
 				return false, fmt.Errorf("failed to delete finalizer from logicalvolume %s, error: %w", logicalVolume.Name, err)
 			}
+		} else {
+			return true, nil
 		}
 	}
 
@@ -436,10 +438,10 @@ func (r *Reconciler) healthyUnhealthyNodes(ctx context.Context) (map[string]stru
 	healthyNodes := make(map[string]struct{})
 	for _, node := range nodes.Items {
 		for _, condition := range node.Status.Conditions {
-			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionFalse {
-				unhealthyNodes[node.Name] = struct{}{}
-			} else {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
 				healthyNodes[node.Name] = struct{}{}
+			} else {
+				unhealthyNodes[node.Name] = struct{}{}
 			}
 		}
 	}
