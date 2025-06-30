@@ -18,14 +18,17 @@ COPY api/ api/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY controllers/ controllers/
-
+COPY monitoring/ monitoring/
+COPY main.go main.go
 
 ENV CGO_ENABLED=1
 ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 ENV GOEXPERIMENT=strictfipsruntime
 
-RUN go build -tags strictfipsruntime -mod=vendor -ldflags "-s -w" -a -o lvms cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
 
 FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2
 
@@ -40,7 +43,7 @@ RUN microdnf update -y && \
 RUN [ -d /run/lock ] || mkdir /run/lock
 
 WORKDIR /
-COPY --from=builder /workspace/lvms .
+COPY --from=builder /workspace/manager /workspace/vgmanager /workspace/metricsexporter /
 
 RUN mkdir /licenses
 COPY LICENSE /licenses
@@ -59,5 +62,4 @@ LABEL io.openshift.tags="lvms"
 LABEL lvms.tags="${LVMS_TAGS}"
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
 
-
-ENTRYPOINT ["/lvms"]
+ENTRYPOINT ["/manager"]
