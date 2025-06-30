@@ -16,7 +16,9 @@ COPY vendor vendor/
 # Copy the go source
 COPY api/ api/
 COPY cmd/ cmd/
-COPY internal/ internal/
+COPY pkg/ pkg/
+COPY controllers/ controllers/
+
 
 ENV CGO_ENABLED=1
 ENV GOOS=$TARGETOS
