@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/lvm-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+      == "release-4.14" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-4-14-pull-request.yaml".pathChanged()
+      || ".tekton/lvms-must-gather-4-14-push.yaml".pathChanged() || "must-gather/***".pathChanged()
+      || "release/must-gather/***".pathChanged())
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: lvm-operator
+    appstudio.openshift.io/component: lvms-must-gather-4-14
+    pipelines.appstudio.openshift.io/type: build
+  name: lvms-must-gather-4-14-on-pull-request
+  namespace: logical-volume-manag-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
+  - name: dockerfile
+    value: release/must-gather/must-gather.konflux.Dockerfile
+  - name: build-args-file
+    value: release/container-build.args
+  - name: skip-additional-tags
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": "release/must-gather"}]'
+  pipelineRef:
+    name: multi-arch-build-pipeline
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-lvms-must-gather-4-14
+  timeouts:
+    pipeline: 1h30m0s
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
