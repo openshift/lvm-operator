@@ -10,7 +10,7 @@ RUN microdnf update -y && \
     rm -rf /var/cache/*
 
 # Copy all collection scripts to /usr/bin
-COPY must-gather/collection-scripts /usr/bin/
+COPY must-gather/collection-scripts/* /usr/bin/
 
 RUN mkdir /licenses
 COPY LICENSE /licenses
