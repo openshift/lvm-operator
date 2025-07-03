@@ -169,17 +169,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// The resource was deleted
 	if !lvmCluster.DeletionTimestamp.IsZero() {
 		// check for stale vgmanager finalizer in case if node deleted but vg still exist
-		healthyNodes, unhealthyNodes, err := r.healthyUnhealthyNodes(ctx)
+		nodes, err := r.clusterNodes(ctx)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get unhealthy nodes: %w", err)
 		}
 
-		err = r.checkStaleNodeFinalizers(ctx, healthyNodes, unhealthyNodes)
+		err = r.checkStaleNodeFinalizers(ctx, nodes)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check for deleted nodes: %w", err)
 		}
 		// Check for existing LogicalVolumes
-		lvsExist, err := r.logicalVolumesExist(ctx, healthyNodes, unhealthyNodes)
+		lvsExist, err := r.logicalVolumesExist(ctx, nodes)
 		if err != nil {
 			// check every 10 seconds if there are still PVCs present
 			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
@@ -334,7 +334,7 @@ func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 	return nil
 }
 
-func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhealthyNodes map[string]struct{}) (bool, error) {
+func (r *Reconciler) logicalVolumesExist(ctx context.Context, nodes map[string]struct{}) (bool, error) {
 	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
 	if err := r.Client.List(ctx, logicalVolumeList); err != nil {
 		return false, fmt.Errorf("failed to get TopoLVM LogicalVolume list: %w", err)
@@ -345,7 +345,7 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhe
 	}
 
 	for _, logicalVolume := range logicalVolumeList.Items {
-		if !contains(healthyNodes, logicalVolume.Spec.NodeName) || contains(unhealthyNodes, logicalVolume.Spec.NodeName) {
+		if _, ok := nodes[logicalVolume.Spec.NodeName]; !ok {
 			controllerutil.RemoveFinalizer(&logicalVolume, "topolvm.io/logicalvolume")
 			err := r.Client.Update(ctx, &logicalVolume)
 			if err != nil {
@@ -359,7 +359,7 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhe
 	return false, nil
 }
 
-func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, healthyNodes, unhealthyNodes map[string]struct{}) error {
+func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, nodes map[string]struct{}) error {
 	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
 	err := r.Client.List(ctx, volumeGroups, &client.ListOptions{Namespace: r.Namespace})
 	if k8serrors.IsNotFound(err) {
@@ -377,7 +377,7 @@ func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, healthyNodes,
 			}
 
 			nodeName := strings.TrimPrefix(finalizer, vgmanager.NodeCleanupFinalizer+"/")
-			if contains(unhealthyNodes, nodeName) || !contains(healthyNodes, nodeName) {
+			if _, ok := nodes[nodeName]; !ok {
 				controllerutil.RemoveFinalizer(&vg, finalizer)
 				err = r.Client.Update(ctx, &vg)
 				if err != nil {
@@ -427,26 +427,19 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 	return nil
 }
 
-func (r *Reconciler) healthyUnhealthyNodes(ctx context.Context) (map[string]struct{}, map[string]struct{}, error) {
+func (r *Reconciler) clusterNodes(ctx context.Context) (map[string]struct{}, error) {
 	nodes := &corev1.NodeList{}
 	err := r.Client.List(ctx, nodes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get node list: %w", err)
+		return nil, fmt.Errorf("failed to get node list: %w", err)
 	}
 
-	unhealthyNodes := make(map[string]struct{})
-	healthyNodes := make(map[string]struct{})
+	names := make(map[string]struct{})
 	for _, node := range nodes.Items {
-		for _, condition := range node.Status.Conditions {
-			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
-				healthyNodes[node.Name] = struct{}{}
-			} else {
-				unhealthyNodes[node.Name] = struct{}{}
-			}
-		}
+		names[node.Name] = struct{}{}
 	}
 
-	return healthyNodes, unhealthyNodes, nil
+	return names, nil
 }
 
 func (r *Reconciler) WarningEvent(_ context.Context, obj client.Object, reason EventReasonError, err error) {
@@ -458,9 +451,4 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj client.Object, reason 
 		return
 	}
 	r.Event(obj, corev1.EventTypeNormal, string(reason), message)
-}
-
-func contains[K comparable, T any](m map[K]T, key K) bool {
-	_, ok := m[key]
-	return ok
 }
