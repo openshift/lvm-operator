@@ -336,13 +336,13 @@ performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 ifeq (,$(wildcard $(CONTROLLER_GEN)))
-	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION))
+	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen)
 endif
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 ifeq (,$(wildcard $(KUSTOMIZE)))
-	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5@v5.4.1)
+	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5)
 endif
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
