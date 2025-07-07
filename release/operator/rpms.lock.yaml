@@ -60,13 +60,6 @@ arches:
     name: device-mapper-libs
     evr: 9:1.02.202-6.el9
     sourcerpm: lvm2-2.03.28-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/d/diffutils-3.7-12.el9.aarch64.rpm
-    repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 405687
-    checksum: sha256:524412f7ce56095508190116cb8ae141737857e4447979330c3cf75ca7017e6b
-    name: diffutils
-    evr: 3.7-12.el9
-    sourcerpm: diffutils-3.7-12.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/e/e2fsprogs-1.46.5-7.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 1048609
@@ -130,13 +123,13 @@ arches:
     name: libcom_err
     evr: 1.46.5-7.el9
     sourcerpm: e2fsprogs-1.46.5-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libdb-5.3.28-55.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 727578
-    checksum: sha256:9b20dcbdf347278363c3305a35be0691444e295c43b64181cb67d1b73499f10e
+    size: 727417
+    checksum: sha256:3a912b2a0a6226695a5773138ce5ce090c9fb155151dffe732b8d52e6dd22d63
     name: libdb
-    evr: 5.3.28-55.el9
-    sourcerpm: libdb-5.3.28-55.el9.src.rpm
+    evr: 5.3.28-57.el9_6
+    sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libeconf-0.4.1-4.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 29577
@@ -179,13 +172,6 @@ arches:
     name: libseccomp
     evr: 2.5.2-2.el9
     sourcerpm: libseccomp-2.5.2-2.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libselinux-utils-3.6-1.el9.aarch64.rpm
-    repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 198305
-    checksum: sha256:8272ab39ab64ab4bde0c5e31387be6e28270a1b1d81a33ba621e6e677b9e974e
-    name: libselinux-utils
-    evr: 3.6-1.el9
-    sourcerpm: libselinux-3.6-1.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libsmartcols-2.37.4-21.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 65074
@@ -228,41 +214,41 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pam-1.5.1-23.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pam-1.5.1-25.el9_6.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 645611
-    checksum: sha256:9455e74b37d76386da70810917219eae05cf4524733e660ea9492b07050b8f68
+    size: 635353
+    checksum: sha256:b02671f696fa1025b8e1634f6080e268c8d4e949b05b7a98050489db601c8415
     name: pam
-    evr: 1.5.1-23.el9
-    sourcerpm: pam-1.5.1-23.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/policycoreutils-3.6-2.1.el9.aarch64.rpm
+    evr: 1.5.1-25.el9_6
+    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-252-51.el9_6.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 251813
-    checksum: sha256:81e7f4a37458072b2f0f86bdb36321ea5e30ef114ffb6a4e0a37fb29fd1c99a6
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-252-32.el9_4.7.aarch64.rpm
-    repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 4160614
-    checksum: sha256:51098e78ba77ea06c086d24a3dac37ce2133cc708f216af9b1d5c5a24f8953f7
+    size: 4159641
+    checksum: sha256:637a250407d7133871cdfa6db6bacf928b48796ed2c03038e5a98f4d14dce25b
     name: systemd
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-pam-252-32.el9_4.7.aarch64.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-libs-252-51.el9_6.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 279190
-    checksum: sha256:4e25eeb838ce6d062353160e558bb2d6f420ef10009d35885030e82cd8e335e7
+    size: 658289
+    checksum: sha256:00247a0b6761ce08ef8d1956d63bddfb3c599e91cb1a2b012958983f64501eb9
+    name: systemd-libs
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-pam-252-51.el9_6.1.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 279139
+    checksum: sha256:f16452ca776e59be465c04156e07fc93f040865bca250992a69eb59e2f252324
     name: systemd-pam
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-rpm-macros-252-32.el9_4.7.noarch.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/systemd-rpm-macros-252-51.el9_6.1.noarch.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 72883
-    checksum: sha256:27dfee433fe47cd843c8e610428f5167b1b12bc03e2bc831bca27dee15aadaf1
+    size: 72567
+    checksum: sha256:0d93329b435c0a3e8352abad07516b7715b8687e504f457e5220e24b52a88e5e
     name: systemd-rpm-macros
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/u/userspace-rcu-0.12.1-6.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 117032
@@ -316,12 +302,6 @@ arches:
     checksum: sha256:aced3097fbb8a424ca1816b8cb3e79960a9ccf7ba139538282886e692c317b29
     name: dbus-broker
     evr: 28-7.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/d/diffutils-3.7-12.el9.src.rpm
-    repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 1477522
-    checksum: sha256:7a10e2d961f8d755f8ccf51a1fb7f68687671b82d9486e4b8d648561af1a185e
-    name: diffutils
-    evr: 3.7-12.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/e/e2fsprogs-1.46.5-7.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 7418303
@@ -358,12 +338,12 @@ arches:
     checksum: sha256:28b89be6334167a3a6b3d73c82c11301e1ca065c853b18509eca456c4ee06508
     name: kmod
     evr: 28-10.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libdb-5.3.28-55.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libdb-5.3.28-57.el9_6.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 35290654
-    checksum: sha256:28c77966dc7ce27e5c6e6a1e069d97dcc25529ab0b902f2d0816fd06879ade43
+    size: 35290920
+    checksum: sha256:6a74a3d96bd4657659524050945e2a47e93779addf2de374a13e1baf32b4ab8d
     name: libdb
-    evr: 5.3.28-55.el9
+    evr: 5.3.28-57.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libeconf-0.4.1-4.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 201501
@@ -388,12 +368,6 @@ arches:
     checksum: sha256:43dd0fa2cd26306e2017704075e628bbe675c8731b17848df82f3b59337f1be8
     name: libseccomp
     evr: 2.5.2-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libselinux-3.6-1.el9.src.rpm
-    repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 268594
-    checksum: sha256:cc4ad1925bfe7cbdf29ec71bf7fd743017f05a92ae1fa94d9b0814fe3cf557a6
-    name: libselinux
-    evr: 3.6-1.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libutempter-1.2.1-6.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 30093
@@ -412,24 +386,18 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/pam-1.5.1-23.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 1116237
-    checksum: sha256:6f1b61c1038266830d09be523ff9a25b8a133e6253efaac6ddc0e17479fcedbc
+    size: 1121432
+    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
     name: pam
-    evr: 1.5.1-23.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/policycoreutils-3.6-2.1.el9.src.rpm
+    evr: 1.5.1-25.el9_6
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/s/systemd-252-51.el9_6.1.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 7982064
-    checksum: sha256:3ee0c11e4cb602eb81993a8492688246c3d750bc0f592ba895dbce0aa734580a
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/s/systemd-252-32.el9_4.7.src.rpm
-    repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 13157861
-    checksum: sha256:06d6012342057d8f66d2c0f56e8bb1150fbf856a0f4f6d41516a9f683e062302
+    size: 43216691
+    checksum: sha256:8b77610e9eaf7817801a8d9bb70eab4999352f5367c72fca3c290465cd08f192
     name: systemd
-    evr: 252-32.el9_4.7
+    evr: 252-51.el9_6.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/u/userspace-rcu-0.12.1-6.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 542890
@@ -507,13 +475,6 @@ arches:
     name: device-mapper-libs
     evr: 9:1.02.202-6.el9
     sourcerpm: lvm2-2.03.28-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/d/diffutils-3.7-12.el9.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 426776
-    checksum: sha256:1e58188524109f7f021d2a4a7b7ac5ab9ecab60dba1b1a0defc950a0f3b91f64
-    name: diffutils
-    evr: 3.7-12.el9
-    sourcerpm: diffutils-3.7-12.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/e/e2fsprogs-1.46.5-7.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 1094998
@@ -577,13 +538,13 @@ arches:
     name: libcom_err
     evr: 1.46.5-7.el9
     sourcerpm: e2fsprogs-1.46.5-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libdb-5.3.28-55.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 827261
-    checksum: sha256:999f2d8e844a135dd0b751e5a2dc4dd278e72a989dd795c0bedac8c152a0eee6
+    size: 837087
+    checksum: sha256:3c73512cfb5cff3477193e37e80fbd416449035f909998b7873bcade57aa242c
     name: libdb
-    evr: 5.3.28-55.el9
-    sourcerpm: libdb-5.3.28-55.el9.src.rpm
+    evr: 5.3.28-57.el9_6
+    sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libeconf-0.4.1-4.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 32878
@@ -633,13 +594,6 @@ arches:
     name: libseccomp
     evr: 2.5.2-2.el9
     sourcerpm: libseccomp-2.5.2-2.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libselinux-utils-3.6-1.el9.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 204169
-    checksum: sha256:4b7684b331dcbc1e3c753ed20e62994fa457217bf35bbab6e7a7b1c1119ea33d
-    name: libselinux-utils
-    evr: 3.6-1.el9
-    sourcerpm: libselinux-3.6-1.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libsmartcols-2.37.4-21.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 72046
@@ -682,41 +636,41 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pam-1.5.1-23.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pam-1.5.1-25.el9_6.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 686519
-    checksum: sha256:4af67a0a6f58135ed562682c60146cdd9be61d7f5e35d83dbe9f3d48c936ce75
+    size: 676327
+    checksum: sha256:78aebdbf2d285b23a00a54d2acaaf45f573b3fda9397e9ee95cd6c3f3220d657
     name: pam
-    evr: 1.5.1-23.el9
-    sourcerpm: pam-1.5.1-23.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/policycoreutils-3.6-2.1.el9.ppc64le.rpm
+    evr: 1.5.1-25.el9_6
+    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-252-51.el9_6.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 253170
-    checksum: sha256:a6fe4abb1aa92ea761b046298129ad6f38693675115794e028204b94443883a3
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-252-32.el9_4.7.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 4440974
-    checksum: sha256:f9d80b3a936403da9bd27b41ed7f3ac5a2aec8a82e4e0df9b28a012bf03936ae
+    size: 4435974
+    checksum: sha256:11e1e17eaefa95727c8a4cba48bbb588f7b4d7df7f837d57eba4d66b5292490e
     name: systemd
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-pam-252-32.el9_4.7.ppc64le.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-libs-252-51.el9_6.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 307365
-    checksum: sha256:8e8293315cd9120ab93f3f11c34ac9b85478d64db0b4a113452c0c41db8fb348
+    size: 723999
+    checksum: sha256:70ee06e3be186470d404ad6d3b45dfb2ec6ebf0c61c608713243b7adffe2c624
+    name: systemd-libs
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-pam-252-51.el9_6.1.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 307275
+    checksum: sha256:8cc62cbbc3de747eba55dc78e62833aba34c881f371952787fef7138b962a512
     name: systemd-pam
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-rpm-macros-252-32.el9_4.7.noarch.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/systemd-rpm-macros-252-51.el9_6.1.noarch.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 72883
-    checksum: sha256:27dfee433fe47cd843c8e610428f5167b1b12bc03e2bc831bca27dee15aadaf1
+    size: 72567
+    checksum: sha256:0d93329b435c0a3e8352abad07516b7715b8687e504f457e5220e24b52a88e5e
     name: systemd-rpm-macros
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/u/userspace-rcu-0.12.1-6.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 119500
@@ -770,12 +724,6 @@ arches:
     checksum: sha256:aced3097fbb8a424ca1816b8cb3e79960a9ccf7ba139538282886e692c317b29
     name: dbus-broker
     evr: 28-7.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/d/diffutils-3.7-12.el9.src.rpm
-    repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 1477522
-    checksum: sha256:7a10e2d961f8d755f8ccf51a1fb7f68687671b82d9486e4b8d648561af1a185e
-    name: diffutils
-    evr: 3.7-12.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/e/e2fsprogs-1.46.5-7.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 7418303
@@ -812,12 +760,12 @@ arches:
     checksum: sha256:28b89be6334167a3a6b3d73c82c11301e1ca065c853b18509eca456c4ee06508
     name: kmod
     evr: 28-10.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libdb-5.3.28-55.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libdb-5.3.28-57.el9_6.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 35290654
-    checksum: sha256:28c77966dc7ce27e5c6e6a1e069d97dcc25529ab0b902f2d0816fd06879ade43
+    size: 35290920
+    checksum: sha256:6a74a3d96bd4657659524050945e2a47e93779addf2de374a13e1baf32b4ab8d
     name: libdb
-    evr: 5.3.28-55.el9
+    evr: 5.3.28-57.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libeconf-0.4.1-4.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 201501
@@ -848,12 +796,6 @@ arches:
     checksum: sha256:43dd0fa2cd26306e2017704075e628bbe675c8731b17848df82f3b59337f1be8
     name: libseccomp
     evr: 2.5.2-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libselinux-3.6-1.el9.src.rpm
-    repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 268594
-    checksum: sha256:cc4ad1925bfe7cbdf29ec71bf7fd743017f05a92ae1fa94d9b0814fe3cf557a6
-    name: libselinux
-    evr: 3.6-1.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libutempter-1.2.1-6.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 30093
@@ -872,24 +814,18 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/pam-1.5.1-23.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 1116237
-    checksum: sha256:6f1b61c1038266830d09be523ff9a25b8a133e6253efaac6ddc0e17479fcedbc
+    size: 1121432
+    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
     name: pam
-    evr: 1.5.1-23.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/policycoreutils-3.6-2.1.el9.src.rpm
+    evr: 1.5.1-25.el9_6
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/s/systemd-252-51.el9_6.1.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 7982064
-    checksum: sha256:3ee0c11e4cb602eb81993a8492688246c3d750bc0f592ba895dbce0aa734580a
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/s/systemd-252-32.el9_4.7.src.rpm
-    repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 13157861
-    checksum: sha256:06d6012342057d8f66d2c0f56e8bb1150fbf856a0f4f6d41516a9f683e062302
+    size: 43216691
+    checksum: sha256:8b77610e9eaf7817801a8d9bb70eab4999352f5367c72fca3c290465cd08f192
     name: systemd
-    evr: 252-32.el9_4.7
+    evr: 252-51.el9_6.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/u/userspace-rcu-0.12.1-6.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 542890
@@ -967,13 +903,6 @@ arches:
     name: device-mapper-libs
     evr: 9:1.02.202-6.el9
     sourcerpm: lvm2-2.03.28-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/d/diffutils-3.7-12.el9.s390x.rpm
-    repoid: rhel-9-for-s390x-baseos-rpms
-    size: 410465
-    checksum: sha256:a8015025ca40048059576a71f398c47d4b563e6a91e1e27a453f9212312df259
-    name: diffutils
-    evr: 3.7-12.el9
-    sourcerpm: diffutils-3.7-12.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/e/e2fsprogs-1.46.5-7.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 1046236
@@ -1037,13 +966,13 @@ arches:
     name: libcom_err
     evr: 1.46.5-7.el9
     sourcerpm: e2fsprogs-1.46.5-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libdb-5.3.28-55.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 721628
-    checksum: sha256:66f5e4ba2a0ea44e3bc9d876ab96a20491ecb2120953a2babebe49a4f812a179
+    size: 721041
+    checksum: sha256:150208aa151d6351c3926632a7f9850022788d16d647d4151915a79af3c3c74f
     name: libdb
-    evr: 5.3.28-55.el9
-    sourcerpm: libdb-5.3.28-55.el9.src.rpm
+    evr: 5.3.28-57.el9_6
+    sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libeconf-0.4.1-4.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 30401
@@ -1086,13 +1015,6 @@ arches:
     name: libseccomp
     evr: 2.5.2-2.el9
     sourcerpm: libseccomp-2.5.2-2.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libselinux-utils-3.6-1.el9.s390x.rpm
-    repoid: rhel-9-for-s390x-baseos-rpms
-    size: 197252
-    checksum: sha256:6172f1da939db3823defa499e1dbbd163c3800340b0f5d276da100b84066729e
-    name: libselinux-utils
-    evr: 3.6-1.el9
-    sourcerpm: libselinux-3.6-1.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libsmartcols-2.37.4-21.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 65620
@@ -1135,41 +1057,41 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pam-1.5.1-23.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pam-1.5.1-25.el9_6.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 640084
-    checksum: sha256:0a3f4b31fe59b05d49263a2fb68acd7f8a1ca613f966f24e184e3348888466bd
+    size: 627191
+    checksum: sha256:437129b562f49d0e03b66a0ede15bed12f3ce511faf07e1bf4b4de9577be261d
     name: pam
-    evr: 1.5.1-23.el9
-    sourcerpm: pam-1.5.1-23.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/policycoreutils-3.6-2.1.el9.s390x.rpm
+    evr: 1.5.1-25.el9_6
+    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-252-51.el9_6.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 250884
-    checksum: sha256:7644ce00b6c873350865682790524f50ea81f3ae72a81f4547d6f9bdfa0fd49c
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-252-32.el9_4.7.s390x.rpm
-    repoid: rhel-9-for-s390x-baseos-rpms
-    size: 4172042
-    checksum: sha256:5a6026a26be9a71a1689d89e4de1aa515e444f7477bf6b1593b8eed6443c5609
+    size: 4168154
+    checksum: sha256:61044d2e9c21a9a58dc79b57e09e81b19eb0f74b2c2e2fba5b9d37f3ed319e7f
     name: systemd
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-pam-252-32.el9_4.7.s390x.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-libs-252-51.el9_6.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 278827
-    checksum: sha256:1473b0485faae4ead7aee18f70c349532c0a162730e9488e4b1de5ee3322cd30
+    size: 653067
+    checksum: sha256:3a0d48298c2676b249bfce6f69aa3dcf7d7610791ba47f831982d37235a84f84
+    name: systemd-libs
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-pam-252-51.el9_6.1.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 279140
+    checksum: sha256:e1bf0aaa0e45df73386a9b142cdd36222c4243823a1011e039ebf57bbb75bc0c
     name: systemd-pam
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-rpm-macros-252-32.el9_4.7.noarch.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/systemd-rpm-macros-252-51.el9_6.1.noarch.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 72883
-    checksum: sha256:27dfee433fe47cd843c8e610428f5167b1b12bc03e2bc831bca27dee15aadaf1
+    size: 72567
+    checksum: sha256:0d93329b435c0a3e8352abad07516b7715b8687e504f457e5220e24b52a88e5e
     name: systemd-rpm-macros
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/u/userspace-rcu-0.12.1-6.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 117481
@@ -1223,12 +1145,6 @@ arches:
     checksum: sha256:aced3097fbb8a424ca1816b8cb3e79960a9ccf7ba139538282886e692c317b29
     name: dbus-broker
     evr: 28-7.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/d/diffutils-3.7-12.el9.src.rpm
-    repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 1477522
-    checksum: sha256:7a10e2d961f8d755f8ccf51a1fb7f68687671b82d9486e4b8d648561af1a185e
-    name: diffutils
-    evr: 3.7-12.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/e/e2fsprogs-1.46.5-7.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 7418303
@@ -1265,12 +1181,12 @@ arches:
     checksum: sha256:28b89be6334167a3a6b3d73c82c11301e1ca065c853b18509eca456c4ee06508
     name: kmod
     evr: 28-10.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libdb-5.3.28-55.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libdb-5.3.28-57.el9_6.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 35290654
-    checksum: sha256:28c77966dc7ce27e5c6e6a1e069d97dcc25529ab0b902f2d0816fd06879ade43
+    size: 35290920
+    checksum: sha256:6a74a3d96bd4657659524050945e2a47e93779addf2de374a13e1baf32b4ab8d
     name: libdb
-    evr: 5.3.28-55.el9
+    evr: 5.3.28-57.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libeconf-0.4.1-4.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 201501
@@ -1295,12 +1211,6 @@ arches:
     checksum: sha256:43dd0fa2cd26306e2017704075e628bbe675c8731b17848df82f3b59337f1be8
     name: libseccomp
     evr: 2.5.2-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libselinux-3.6-1.el9.src.rpm
-    repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 268594
-    checksum: sha256:cc4ad1925bfe7cbdf29ec71bf7fd743017f05a92ae1fa94d9b0814fe3cf557a6
-    name: libselinux
-    evr: 3.6-1.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libutempter-1.2.1-6.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 30093
@@ -1319,24 +1229,18 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/pam-1.5.1-23.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 1116237
-    checksum: sha256:6f1b61c1038266830d09be523ff9a25b8a133e6253efaac6ddc0e17479fcedbc
+    size: 1121432
+    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
     name: pam
-    evr: 1.5.1-23.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/policycoreutils-3.6-2.1.el9.src.rpm
+    evr: 1.5.1-25.el9_6
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/s/systemd-252-51.el9_6.1.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 7982064
-    checksum: sha256:3ee0c11e4cb602eb81993a8492688246c3d750bc0f592ba895dbce0aa734580a
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/s/systemd-252-32.el9_4.7.src.rpm
-    repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 13157861
-    checksum: sha256:06d6012342057d8f66d2c0f56e8bb1150fbf856a0f4f6d41516a9f683e062302
+    size: 43216691
+    checksum: sha256:8b77610e9eaf7817801a8d9bb70eab4999352f5367c72fca3c290465cd08f192
     name: systemd
-    evr: 252-32.el9_4.7
+    evr: 252-51.el9_6.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/u/userspace-rcu-0.12.1-6.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 542890
@@ -1414,13 +1318,6 @@ arches:
     name: device-mapper-libs
     evr: 9:1.02.202-6.el9
     sourcerpm: lvm2-2.03.28-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/d/diffutils-3.7-12.el9.x86_64.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 411559
-    checksum: sha256:2d4c4fdfc10215af3c957c24995b79a26e27e6d76de4ed1f5198d25bf7ef9671
-    name: diffutils
-    evr: 3.7-12.el9
-    sourcerpm: diffutils-3.7-12.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/e/e2fsprogs-1.46.5-7.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 1056089
@@ -1484,13 +1381,13 @@ arches:
     name: libcom_err
     evr: 1.46.5-7.el9
     sourcerpm: e2fsprogs-1.46.5-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libdb-5.3.28-55.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 754739
-    checksum: sha256:b019fc2c6ec5d05c7225a189c0e751be4c1c572b82991022809cc8c1f4fa0a89
+    size: 755192
+    checksum: sha256:3246e76f197e2b60eb470b9b55d3e0dda2301b029f295fed9c38ff70b87c5b6b
     name: libdb
-    evr: 5.3.28-55.el9
-    sourcerpm: libdb-5.3.28-55.el9.src.rpm
+    evr: 5.3.28-57.el9_6
+    sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libeconf-0.4.1-4.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 30371
@@ -1533,13 +1430,6 @@ arches:
     name: libseccomp
     evr: 2.5.2-2.el9
     sourcerpm: libseccomp-2.5.2-2.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libselinux-utils-3.6-1.el9.x86_64.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 198772
-    checksum: sha256:479229e7c3d8cb005dafd637b2973fbee0bb507cfed8e72f7076318513200abd
-    name: libselinux-utils
-    evr: 3.6-1.el9
-    sourcerpm: libselinux-3.6-1.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libsmartcols-2.37.4-21.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 66253
@@ -1582,41 +1472,41 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pam-1.5.1-23.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pam-1.5.1-25.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 647096
-    checksum: sha256:5f261b23e11d27a49e5ddcb83ee93f37834a8160c82a0b82dbe6bf07acdfd96b
+    size: 635820
+    checksum: sha256:9094077ad952dd3d65543ebec57cbf52213cb3b17cdd180531652218c2282187
     name: pam
-    evr: 1.5.1-23.el9
-    sourcerpm: pam-1.5.1-23.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/policycoreutils-3.6-2.1.el9.x86_64.rpm
+    evr: 1.5.1-25.el9_6
+    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-252-51.el9_6.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 251967
-    checksum: sha256:8dcd39960d3103f7a4ad2b9f7a0e15469ebf4da98f6c215cddfffdb830dc12b5
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-252-32.el9_4.7.x86_64.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 4405104
-    checksum: sha256:46c294f00ff7f4f617d301238ea711e38f7f66b98a23e716a94cc32b4a638e68
+    size: 4406105
+    checksum: sha256:f1513095807cd040f2192efbf1d152053dbd8ba266f348f0b87305c0aa3cb2f2
     name: systemd
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-pam-252-32.el9_4.7.x86_64.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-libs-252-51.el9_6.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 289236
-    checksum: sha256:11b5976c85a098b0a06e47094c54c0f0cb7ca27009c798012b55fd95f2f4bbaa
+    size: 691366
+    checksum: sha256:e27482e850e7dee18f2d1042a68529d8161eaef22348159a040aa8699d6e66f0
+    name: systemd-libs
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-pam-252-51.el9_6.1.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 289579
+    checksum: sha256:b03c085f98981e6e9754adf2765789728f871809a38657000a90915eeb6a8265
     name: systemd-pam
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-rpm-macros-252-32.el9_4.7.noarch.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/systemd-rpm-macros-252-51.el9_6.1.noarch.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 72883
-    checksum: sha256:27dfee433fe47cd843c8e610428f5167b1b12bc03e2bc831bca27dee15aadaf1
+    size: 72567
+    checksum: sha256:0d93329b435c0a3e8352abad07516b7715b8687e504f457e5220e24b52a88e5e
     name: systemd-rpm-macros
-    evr: 252-32.el9_4.7
-    sourcerpm: systemd-252-32.el9_4.7.src.rpm
+    evr: 252-51.el9_6.1
+    sourcerpm: systemd-252-51.el9_6.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/u/userspace-rcu-0.12.1-6.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 116929
@@ -1670,12 +1560,6 @@ arches:
     checksum: sha256:aced3097fbb8a424ca1816b8cb3e79960a9ccf7ba139538282886e692c317b29
     name: dbus-broker
     evr: 28-7.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/d/diffutils-3.7-12.el9.src.rpm
-    repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 1477522
-    checksum: sha256:7a10e2d961f8d755f8ccf51a1fb7f68687671b82d9486e4b8d648561af1a185e
-    name: diffutils
-    evr: 3.7-12.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/e/e2fsprogs-1.46.5-7.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 7418303
@@ -1712,12 +1596,12 @@ arches:
     checksum: sha256:28b89be6334167a3a6b3d73c82c11301e1ca065c853b18509eca456c4ee06508
     name: kmod
     evr: 28-10.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libdb-5.3.28-55.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libdb-5.3.28-57.el9_6.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 35290654
-    checksum: sha256:28c77966dc7ce27e5c6e6a1e069d97dcc25529ab0b902f2d0816fd06879ade43
+    size: 35290920
+    checksum: sha256:6a74a3d96bd4657659524050945e2a47e93779addf2de374a13e1baf32b4ab8d
     name: libdb
-    evr: 5.3.28-55.el9
+    evr: 5.3.28-57.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libeconf-0.4.1-4.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 201501
@@ -1742,12 +1626,6 @@ arches:
     checksum: sha256:43dd0fa2cd26306e2017704075e628bbe675c8731b17848df82f3b59337f1be8
     name: libseccomp
     evr: 2.5.2-2.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libselinux-3.6-1.el9.src.rpm
-    repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 268594
-    checksum: sha256:cc4ad1925bfe7cbdf29ec71bf7fd743017f05a92ae1fa94d9b0814fe3cf557a6
-    name: libselinux
-    evr: 3.6-1.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libutempter-1.2.1-6.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 30093
@@ -1766,24 +1644,18 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/pam-1.5.1-23.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 1116237
-    checksum: sha256:6f1b61c1038266830d09be523ff9a25b8a133e6253efaac6ddc0e17479fcedbc
+    size: 1121432
+    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
     name: pam
-    evr: 1.5.1-23.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/policycoreutils-3.6-2.1.el9.src.rpm
+    evr: 1.5.1-25.el9_6
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/s/systemd-252-51.el9_6.1.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 7982064
-    checksum: sha256:3ee0c11e4cb602eb81993a8492688246c3d750bc0f592ba895dbce0aa734580a
-    name: policycoreutils
-    evr: 3.6-2.1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/s/systemd-252-32.el9_4.7.src.rpm
-    repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 13157861
-    checksum: sha256:06d6012342057d8f66d2c0f56e8bb1150fbf856a0f4f6d41516a9f683e062302
+    size: 43216691
+    checksum: sha256:8b77610e9eaf7817801a8d9bb70eab4999352f5367c72fca3c290465cd08f192
     name: systemd
-    evr: 252-32.el9_4.7
+    evr: 252-51.el9_6.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/u/userspace-rcu-0.12.1-6.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 542890
