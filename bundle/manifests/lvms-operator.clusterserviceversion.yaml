@@ -85,6 +85,7 @@ metadata:
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+    operators.openshift.io/must-gather-image: quay.io/lvms_dev/lvms-must-gather:latest
     repository: https://github.com/openshift/lvm-operator
   labels:
     operatorframework.io/arch.amd64: supported
