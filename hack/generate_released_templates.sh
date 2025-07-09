@@ -1,9 +1,12 @@
 #!/bin/bash
 supported_versions=("v4.14" "v4.15" "v4.16" "v4.17" "v4.18" "v4.19" "v4.20")
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
+pre_release_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
+lvms_all_tags="$(skopeo list-tags docker://${pre_release_bundle_path})"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
-released_versions=($(echo "${lvms_released_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
-verbose_versions=$(echo "${lvms_released_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$"))]')
+all_versions=($(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
+verbose_versions=$(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$"))]')
+released_versions=$(echo "${lvms_released_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")')
 base_template_file="templates/template-base.yaml"
 template=$(yq '.Stable.Bundles = []' ${base_template_file})
 
@@ -11,10 +14,10 @@ declare -A digests
 
 for i in "${!released_versions[@]}"; do
     maxVersion=""
-    minVersion="${released_versions[${i}]}"
+    minVersion="${all_versions[${i}]}"
 
-    if [ "${i}" -lt ${#released_versions[@]} ] && [ "${i}" -gt 0 ]; then
-        maxVersion="${released_versions[${i}-1]}"
+    if [ "${i}" -lt ${#all_versions[@]} ] && [ "${i}" -gt 0 ]; then
+        maxVersion="${all_versions[${i}-1]}"
     else
         maxVersion="${released_versions[${i}]}"
     fi
