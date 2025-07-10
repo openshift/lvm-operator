@@ -147,8 +147,8 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-godeps-update: ## Run go mod tidy and go mod vendor.
-	go mod tidy && go mod vendor
+godeps-update: ## Run go mod tidy
+	go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
