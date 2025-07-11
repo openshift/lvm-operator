@@ -12,7 +12,7 @@ metadata:
       || "release/must-gather/***".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: lvm-operator
+    appstudio.openshift.io/application: lvm-operator-4-17
     appstudio.openshift.io/component: lvms-must-gather-4-17
     pipelines.appstudio.openshift.io/type: build
   name: lvms-must-gather-4-17-on-push
