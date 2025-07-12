@@ -1,19 +1,28 @@
+FROM brew.registry.redhat.io/rh-osbs/openshift-ose-operator-sdk-rhel9:v4.19 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
 
 ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:15ffa7583b2ccb3bc874f2440433dfe233e20be2dc9c1fa82c36e82e376201e8
 
 ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:076542f71b3741c3ccb6ecd7a8f4dc4752fef8e50fc057f564699a682013c5c1
 
-
 ARG OPERATOR_VERSION
 
 WORKDIR /operator
 COPY ./ ./
 
+#RUN mkdir bin && \
+    # cp /cachi2/output/deps/generic/* bin/ && \
+    # tar -xvf bin/kustomize.tar.gz -C bin && \
+    # chmod +x bin/operator-sdk bin/controller-gen
+
+ENV GOFLAGS="-mod=readonly"
+ENV GOBIN=/operator/bin
+
 RUN mkdir bin && \
-    cp /cachi2/output/deps/generic/* bin/ && \
-    tar -xvf bin/kustomize.tar.gz -C bin && \
-    chmod +x bin/operator-sdk bin/controller-gen
+    go install -mod=readonly sigs.k8s.io/controller-tools/cmd/controller-gen && \
+    go install -mod=readonly sigs.k8s.io/kustomize/kustomize/v5
+
+COPY --from=operator-sdk /usr/local/bin/operator-sdk ./bin/operator-sdk
 
 RUN CI_VERSION=${OPERATOR_VERSION} IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/hack/render_templates.sh
 
