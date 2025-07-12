@@ -15,7 +15,7 @@ metadata:
       || "vendor/***".pathChanged() || "api/***".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: lvm-operator
+    appstudio.openshift.io/application: lvm-operator-4-20
     appstudio.openshift.io/component: lvm-operator-4-20
     pipelines.appstudio.openshift.io/type: build
   name: lvm-operator-4-20-on-pull-request
