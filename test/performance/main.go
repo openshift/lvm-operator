@@ -164,7 +164,7 @@ Idle: go run ./test/performance -t $(oc whoami -t) --run-stress false --long-ter
 	}
 
 	cmd.Flags().IntVarP(&perfTest.Instances, "instances", "i", 4, "Number of Workloads/Pvcs (each Workload uses a different PVC) to create in the test")
-	cmd.Flags().StringVarP(&perfTest.TestNamespace, "namespace", "n", "openshift-storage", "Namespace where operator is deployed and the PVCs and test pods will be deployed/undeployed")
+	cmd.Flags().StringVarP(&perfTest.TestNamespace, "namespace", "n", "openshift-lvm-storage", "Namespace where operator is deployed and the PVCs and test pods will be deployed/undeployed")
 	cmd.Flags().StringVarP(&perfTest.TestStorageClassName, "storage-class", "s", "lvms-vg1", "Name of the topolvm storage class that will be used in the PVCs")
 	cmd.Flags().StringVarP(&perfTest.NamePattern, "pattern", "p", "operf", "Pattern used to build the PVCs/Workloads names")
 	cmd.Flags().StringVarP(&perfTest.Token, "token", "t", "", "authentication token needed to connect with the Openshift cluster.")

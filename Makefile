@@ -49,7 +49,7 @@ GINKGO_VERSION := $(shell awk '/github.com\/onsi\/ginkgo\/v2/ {print $$2}' $(SEL
 ENVTEST_BRANCH := release-$(shell echo $(CONTROLLER_RUNTIME_VERSION) | cut -d "." -f 1-2)
 
 MANAGER_NAME_PREFIX ?= lvms-
-OPERATOR_NAMESPACE ?= openshift-storage
+OPERATOR_NAMESPACE ?= openshift-lvm-storage
 KUSTOMIZATION_BASE ?= config/default
 
 ## Variables for the images
@@ -322,14 +322,14 @@ e2e: ginkgo ## Build and run e2e tests.
 		-ginkgo.v
 
 performance-stress-test: ## Build and run stress tests. Requires a fully setup LVMS installation. if you receive an error during running because of a missing token it might be because you have not logged in via token authentication but OIDC. you need a token login to run the performance test.
-	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage
+	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-lvm-storage
 	go run ./test/performance -t $(oc whoami -t) -s lvms-vg1 -i 64
-	oc delete -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage --cascade=foreground --wait
+	oc delete -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-lvm-storage --cascade=foreground --wait
 
 performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS installation. if you receive an error during running because of a missing token it might be because you have not logged in via token authentication but OIDC. you need a token login to run the performance test.
-	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage
+	oc apply -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-lvm-storage
 	go run ./test/performance -t $(oc whoami -t) --run-stress false --long-term-observation-window=30m
-	oc delete -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-storage --cascade=foreground --wait
+	oc delete -f ./config/samples/lvm_v1alpha1_lvmcluster.yaml -n openshift-lvm-storage --cascade=foreground --wait
 
 ##@ Tools
 
@@ -430,12 +430,12 @@ create-buildconfig:
 
 .PHONY: cluster-build
 cluster-build:
-	oc -n openshift-storage start-build lvms-operator --follow --wait
+	oc -n openshift-lvm-storage start-build lvms-operator --follow --wait
 
 .PHONY: cluster-deploy
 cluster-deploy:
 	IMAGE_REGISTRY=image-registry.openshift-image-registry.svc:5000 \
-	REGISTRY_NAMESPACE=openshift-storage \
+	REGISTRY_NAMESPACE=openshift-lvm-storage \
 	$(MAKE) deploy
 
 # Security Analysis
