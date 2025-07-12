@@ -1,6 +1,6 @@
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
 
-ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:ab58c097ff6df3d00b5cc0a908b44331294691eec4cfea896d522fe4c91cd42d
+ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:15ffa7583b2ccb3bc874f2440433dfe233e20be2dc9c1fa82c36e82e376201e8
 
 ARG LVM_MUST_GATHER=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather@sha256:076542f71b3741c3ccb6ecd7a8f4dc4752fef8e50fc057f564699a682013c5c1
 
