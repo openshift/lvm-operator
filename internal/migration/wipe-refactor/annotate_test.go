@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-const namespace = "openshift-storage"
+const namespace = "openshift-lvm-storage"
 
 func TestAnnotateExistingLVMVolumeGroupsIfWipingEnabled(t *testing.T) {
 	truePtr := true

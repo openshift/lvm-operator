@@ -12,7 +12,7 @@ if [ "${BASE_COLLECTION_PATH}" = "" ]; then
 fi
 
 # Use a global variable for namespace
-INSTALL_NAMESPACE=openshift-storage
+INSTALL_NAMESPACE=openshift-lvm-storage
 
 # Add general resources to list if necessary
 

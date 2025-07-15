@@ -67,7 +67,7 @@ func TestAPIs(t *testing.T) {
 const (
 	testLvmClusterName      = "test-lvmcluster"
 	testThinPoolName        = "test-thinPool"
-	testLvmClusterNamespace = "openshift-storage"
+	testLvmClusterNamespace = "openshift-lvm-storage"
 	testDeviceClassName     = "test"
 	testImageName           = "test"
 	testNodeName            = "test-node"

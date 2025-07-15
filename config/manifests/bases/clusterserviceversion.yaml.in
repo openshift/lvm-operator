@@ -31,13 +31,13 @@ metadata:
           }
         }
     repository: https://github.com/openshift/lvm-operator
-    operatorframework.io/suggested-namespace: openshift-storage
+    operatorframework.io/suggested-namespace: openshift-lvm-storage
     operatorframework.io/suggested-namespace-template: |-
       {
         "apiVersion": "v1",
         "kind": "Namespace",
         "metadata": {
-          "name": "openshift-storage",
+          "name": "openshift-lvm-storage",
           "annotations": {
             "workload.openshift.io/allowed": "management"
           }

@@ -25,7 +25,7 @@ To troubleshoot the issue, inspect the events associated with the PVC. These eve
 If you encounter a `storageclass.storage.k8s.io 'lvms-vg1' not found` error, verify the presence of the `LVMCluster` resource:
 
  ```bash
- $ oc get lvmcluster -n openshift-storage
+ $ oc get lvmcluster -n openshift-lvm-storage
  NAME            AGE
  my-lvmcluster   65m
  ```
@@ -33,13 +33,13 @@ If you encounter a `storageclass.storage.k8s.io 'lvms-vg1' not found` error, ver
 If an `LVMCluster` resource is not found, you can create one. See [samples/lvm_v1alpha1_lvmcluster.yaml](../config/samples/lvm_v1alpha1_lvmcluster.yaml) for an example CR that you can modify.
 
 ```bash
-$ oc create -n openshift-storage -f https://github.com/openshift/lvm-operator/raw/main/config/samples/lvm_v1alpha1_lvmcluster.yaml
+$ oc create -n openshift-lvm-storage -f https://github.com/openshift/lvm-operator/raw/main/config/samples/lvm_v1alpha1_lvmcluster.yaml
 ```
 
-If an `LVMCluster` already exists, check if all the pods from LVMS are in the `Running` state in the `openshift-storage` namespace:
+If an `LVMCluster` already exists, check if all the pods from LVMS are in the `Running` state in the `openshift-lvm-storage` namespace:
 
  ```bash
- $ oc get pods -n openshift-storage
+ $ oc get pods -n openshift-lvm-storage
  NAME                                  READY   STATUS    RESTARTS      AGE
  lvms-operator-7b9fb858cb-6nsml        1/1     Running   0             70m
  vg-manager-r6zdv                      1/1     Running   0             66m
@@ -52,7 +52,7 @@ There should be one running instance of `lvms-operator` and `vg-manager` (per No
 This error indicates a failure in locating an available disk for LVMS utilization. To investigate further and obtain relevant information, review the status of the `LVMCluster` CR:
 
 ```bash
-$ oc describe lvmcluster -n openshift-storage
+$ oc describe lvmcluster -n openshift-lvm-storage
 ```
 
 If you encounter a failure message such as `no available devices found` while inspecting the status, establish a direct connection to the host where the problem is occurring. From there, run:
@@ -68,7 +68,7 @@ This prints information about the disks on the host. Review this information to 
 You can also review the logs of the `vg-manager` pod to see if there are any further issues:
 
 ```bash
-$ oc logs -l app.kubernetes.io/name=vg-manager -n openshift-storage
+$ oc logs -l app.kubernetes.io/name=vg-manager -n openshift-lvm-storage
 ```
 
 ### Disk failure
@@ -90,7 +90,7 @@ To investigate the issue further, establish a direct connection to the host wher
 If PVCs associated with a specific node remain in a `Pending` state, it suggests a potential issue with that particular node. To identify the problematic node, you can examine the restart count of the `vg-manager` pod. An increased restart count indicates potential problems with the underlying node, which may require further investigation and troubleshooting.
 
  ```bash
- $ oc get pods -n openshift-storage
+ $ oc get pods -n openshift-lvm-storage
  NAME                                  READY   STATUS    RESTARTS      AGE
  lvms-operator-7b9fb858cb-6nsml        3/3     Running   0             70m
  vg-manager-r6zdv                      1/1     Running   17 (8s ago)   66m
@@ -105,10 +105,10 @@ After resolving the issue with the respective node, if the problem persists and 
 After resolving any disk or node-related problem, if the recurring issue persists despite the resolution, it may be necessary to perform a forced cleanup procedure for LVMS. This procedure aims to comprehensively address any persistent issues and ensure the proper functioning of the LVMS solution.
 
 1. Remove all the PVCs created using LVMS, and pods using those PVCs.
-2. Switch to `openshift-storage` namespace:
+2. Switch to `openshift-lvm-storage` namespace:
 
     ```bash
-    $ oc project openshift-storage
+    $ oc project openshift-lvm-storage
     ```
 
 3. Make sure there are no `LogicalVolume` resources left:
