@@ -1,4 +1,5 @@
 #!/bin/bash
+supported_versions=("v4.14" "v4.15" "v4.16" "v4.17" "v4.18" "v4.19" "v4.20")
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
 released_versions=($(echo "${lvms_released_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
@@ -14,6 +15,11 @@ for i in "${!released_versions[@]}"; do
         maxVersion="${released_versions[${i}-1]}"
     else
         maxVersion="${released_versions[${i}]}"
+    fi
+
+    if ! [[ " ${supported_versions[*]} " =~ " ${minVersion} " ]]; then
+        echo "Skipping ${minVersion} since it is no longer supported"
+        continue
     fi
 
     echo "Generating catalog template for LVM Operator ${minVersion}"

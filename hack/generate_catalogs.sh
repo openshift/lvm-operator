@@ -16,7 +16,7 @@ for file in ${files}; do
     fi
 
     # 4.17+ needs the --migrate-level=bundle-object-to-csv-metadata flag
-    skip_flag_versions="v4.12 v4.13 v4.14 v4.15 v4.16"
+    skip_flag_versions="v4.14 v4.15 v4.16"
     opm_migrate_level_flag="--migrate-level=bundle-object-to-csv-metadata"
 
     if [[ $skip_flag_versions =~ $version ]]; then
