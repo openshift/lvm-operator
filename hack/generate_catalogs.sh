@@ -24,7 +24,11 @@ for file in ${files}; do
         opm_migrate_level_flag=""
     fi
 
-    ${opm_path} alpha render-template semver ${opm_migrate_level_flag} -o json ${file} > ${output_file}
-    echo "Catalog generated: ${output_file}"
+    catalog=$(${opm_path} alpha render-template semver ${opm_migrate_level_flag} -o yaml ${file})
 
+    # The semver render-template function by default names the channels "stable-vX.Y" but we historically don't use the "v" in our channel names
+    patched_catalog=$(echo "${catalog}" | yq -o=json eval-all '(.. | select(tag == "!!str")) |= sub("stable-v", "stable-") | (.. | select(tag == "!!str")) |= sub("candidate-v", "candidate-")')
+    echo "${patched_catalog}" > ${output_file}
+
+    echo "Catalog generated: ${output_file}"
 done
