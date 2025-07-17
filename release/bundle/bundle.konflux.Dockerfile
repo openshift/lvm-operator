@@ -1,5 +1,5 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-ose-operator-sdk-rhel9:v4.19 as operator-sdk
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9:v4.18 as operator-sdk
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.24 as builder
 
 ARG IMG=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator@sha256:3cb11b8a1ccbd164cf996628e6a26c6897de36242a4b2071301ffd04d055561f
 
@@ -9,11 +9,6 @@ ARG OPERATOR_VERSION
 
 WORKDIR /operator
 COPY ./ ./
-
-#RUN mkdir bin && \
-    # cp /cachi2/output/deps/generic/* bin/ && \
-    # tar -xvf bin/kustomize.tar.gz -C bin && \
-    # chmod +x bin/operator-sdk bin/controller-gen
 
 ENV GOFLAGS="-mod=readonly"
 ENV GOBIN=/operator/bin
