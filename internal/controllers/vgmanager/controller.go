@@ -113,7 +113,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Check if this LVMVolumeGroup needs to be processed on this node
 	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
-	if err := r.Client.Get(ctx, req.NamespacedName, volumeGroup); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, volumeGroup); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -148,16 +148,16 @@ func (r *Reconciler) reconcile(
 	} else {
 		if added := controllerutil.AddFinalizer(volumeGroup, r.getFinalizer()); added {
 			logger.Info("adding finalizer")
-			return ctrl.Result{}, r.Client.Update(ctx, volumeGroup)
+			return ctrl.Result{}, r.Update(ctx, volumeGroup)
 		}
 	}
 
-	blockDevices, err := r.LSBLK.ListBlockDevices(ctx)
+	blockDevices, err := r.ListBlockDevices(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
 	}
 
-	vgs, err := r.LVM.ListVGs(ctx, true)
+	vgs, err := r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -167,15 +167,15 @@ func (r *Reconciler) reconcile(
 	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, resolver); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
 	} else if updated {
-		return ctrl.Result{}, r.Client.Update(ctx, volumeGroup)
+		return ctrl.Result{}, r.Update(ctx, volumeGroup)
 	}
 
-	pvs, err := r.LVM.ListPVs(ctx, "")
+	pvs, err := r.ListPVs(ctx, "")
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("physical volumes could not be fetched: %w", err)
 	}
 
-	bdi, err := r.LSBLK.BlockDeviceInfos(ctx, blockDevices)
+	bdi, err := r.BlockDeviceInfos(ctx, blockDevices)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get block device infos: %w", err)
 	}
@@ -289,7 +289,7 @@ func (r *Reconciler) reconcile(
 	}
 
 	// refresh list of vgs to be used in status
-	vgs, err = r.LVM.ListVGs(ctx, true)
+	vgs, err = r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
@@ -433,7 +433,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 	}
 
 	// Check if volume group exists
-	vgs, err := r.LVM.ListVGs(ctx, true)
+	vgs, err := r.ListVGs(ctx, true)
 	if err != nil {
 		return fmt.Errorf("failed to list volume groups, %w", err)
 	}
@@ -454,13 +454,13 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 		if volumeGroup.Spec.ThinPoolConfig != nil {
 			thinPoolName := volumeGroup.Spec.ThinPoolConfig.Name
 			logger := logger.WithValues("ThinPool", thinPoolName)
-			thinPoolExists, err := r.LVM.LVExists(ctx, thinPoolName, volumeGroup.Name)
+			thinPoolExists, err := r.LVExists(ctx, thinPoolName, volumeGroup.Name)
 			if err != nil {
 				return fmt.Errorf("failed to check existence of thin pool %q in volume group %q. %v", thinPoolName, volumeGroup.Name, err)
 			}
 
 			if thinPoolExists {
-				if err := r.LVM.DeleteLV(ctx, thinPoolName, volumeGroup.Name); err != nil {
+				if err := r.DeleteLV(ctx, thinPoolName, volumeGroup.Name); err != nil {
 					err := fmt.Errorf("failed to delete thin pool %s in volume group %s: %w", thinPoolName, volumeGroup.Name, err)
 					if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
 						logger.Error(err, "failed to set status to failed")
@@ -473,7 +473,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			}
 		}
 
-		if err = r.LVM.DeleteVG(ctx, existingVG); err != nil {
+		if err = r.DeleteVG(ctx, existingVG); err != nil {
 			err := fmt.Errorf("failed to delete volume group %s: %w", volumeGroup.Name, err)
 			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); err != nil {
 				logger.Error(err, "failed to set status to failed", "VGName", volumeGroup.GetName())
@@ -510,7 +510,7 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 
 	if removed := controllerutil.RemoveFinalizer(volumeGroup, r.getFinalizer()); removed {
 		logger.Info("removing finalizer")
-		return r.Client.Update(ctx, volumeGroup)
+		return r.Update(ctx, volumeGroup)
 	}
 	return nil
 }
@@ -525,7 +525,7 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 		return nil
 	}
 
-	resp, err := r.LVM.ListLVs(ctx, volumeGroup.Name)
+	resp, err := r.ListLVs(ctx, volumeGroup.Name)
 	if err != nil {
 		return fmt.Errorf("could not get logical volumes found inside volume group, volume group content is degraded or corrupt: %w", err)
 	}
@@ -558,7 +558,7 @@ func (r *Reconciler) validateLVs(ctx context.Context, volumeGroup *lvmv1alpha1.L
 
 			if lvAttr.State != StateActive {
 				// If inactive, try activating it
-				err := r.LVM.ActivateLV(ctx, lv.Name, volumeGroup.Name)
+				err := r.ActivateLV(ctx, lv.Name, volumeGroup.Name)
 				if err != nil {
 					return fmt.Errorf("could not activate the inactive logical volume, maybe external repairs are necessary/already happening or there is another"+
 						"entity conflicting with vg-manager, cannot proceed until volume is activated again: lv_attr: %s", lvAttr)
@@ -596,7 +596,7 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	}
 	logger := log.FromContext(ctx).WithValues("VGName", vgName, "ThinPool", config.Name)
 
-	resp, err := r.LVM.ListLVs(ctx, vgName)
+	resp, err := r.ListLVs(ctx, vgName)
 	if err != nil {
 		return fmt.Errorf("failed to list logical volumes in the volume group %q. %v", vgName, err)
 	}
@@ -623,7 +623,7 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 
 	logger.Info("creating lvm thinpool")
 
-	if err := r.LVM.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config), convertMetadataSize(config)); err != nil {
+	if err := r.CreateLV(ctx, config.Name, vgName, config.SizePercent, convertChunkSize(config), convertMetadataSize(config)); err != nil {
 		return fmt.Errorf("failed to create thinpool: %w", err)
 	}
 	logger.Info("successfully created thinpool")
@@ -665,7 +665,7 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 		return fmt.Errorf("failed to parse lvSize. %v", err)
 	}
 
-	vg, err := r.LVM.GetVG(ctx, vgName)
+	vg, err := r.GetVG(ctx, vgName)
 	if err != nil {
 		return fmt.Errorf("failed to get volume group. %q, %v", vgName, err)
 	}
@@ -684,7 +684,7 @@ func (r *Reconciler) extendThinPool(ctx context.Context, vgName string, lvSize s
 	}
 
 	logger.Info("extending lvm thinpool")
-	if err := r.LVM.ExtendLV(ctx, config.Name, vgName, config.SizePercent); err != nil {
+	if err := r.ExtendLV(ctx, config.Name, vgName, config.SizePercent); err != nil {
 		return fmt.Errorf("failed to extend thinpool: %w", err)
 	}
 	logger.Info("successfully extended thinpool")
@@ -705,7 +705,7 @@ func (r *Reconciler) verifyMetadataSize(ctx context.Context, vgName, lvName stri
 		return nil
 	}
 
-	err = r.LVM.ExtendThinPoolMetadata(ctx, lvName, vgName, newMetadataSize)
+	err = r.ExtendThinPoolMetadata(ctx, lvName, vgName, newMetadataSize)
 	if err != nil {
 		return fmt.Errorf("failed to extend thinpool metadata: %w", err)
 	}
@@ -714,7 +714,7 @@ func (r *Reconciler) verifyMetadataSize(ctx context.Context, vgName, lvName stri
 
 func (r *Reconciler) matchesThisNode(ctx context.Context, selector *corev1.NodeSelector) (bool, error) {
 	node := &corev1.Node{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: r.NodeName}, node)
+	err := r.Get(ctx, types.NamespacedName{Name: r.NodeName}, node)
 	if err != nil {
 		return false, err
 	}

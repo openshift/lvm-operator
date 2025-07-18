@@ -233,7 +233,7 @@ func templateVGManagerDaemonset(
 	// aggregate nodeSelector and tolerations from all deviceClasses
 	confMapVolume := LVMDConfMapVol
 	if clusterType == cluster.TypeMicroShift {
-		confMapVolume.VolumeSource.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
+		confMapVolume.HostPath.Path = filepath.Dir(lvmd.MicroShiftFileConfigPath)
 	}
 
 	nodeSelector, tolerations := selector.ExtractNodeSelectorAndTolerations(lvmCluster)

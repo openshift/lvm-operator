@@ -64,7 +64,7 @@ func VerifyDaemonSetReadiness(ds *appsv1.DaemonSet) error {
 	}
 
 	expectedReady := int(ds.Status.DesiredNumberScheduled) - maxUnavailable
-	if !(int(ds.Status.NumberReady) >= expectedReady) {
+	if int(ds.Status.NumberReady) < expectedReady {
 		return fmt.Errorf("the DaemonSet is not ready: %s/%s. %d out of %d expected pods are ready", ds.Namespace, ds.Name, ds.Status.NumberReady, expectedReady)
 	}
 	return nil

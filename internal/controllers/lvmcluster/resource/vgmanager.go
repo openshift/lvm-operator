@@ -89,16 +89,16 @@ func (v vgManager) EnsureCreated(r Reconciler, ctx context.Context, lvmCluster *
 		}
 
 		// if update, update only mutable fields
-		initMapIfNil(&ds.ObjectMeta.Labels)
-		initMapIfNil(&ds.Spec.Template.ObjectMeta.Labels)
+		initMapIfNil(&ds.Labels)
+		initMapIfNil(&ds.Spec.Template.Labels)
 		for key, value := range dsTemplate.Labels {
-			ds.ObjectMeta.Labels[key] = value
-			ds.Spec.Template.ObjectMeta.Labels[key] = value
+			ds.Labels[key] = value
+			ds.Spec.Template.Labels[key] = value
 		}
 
-		initMapIfNil(&ds.ObjectMeta.Annotations)
+		initMapIfNil(&ds.Annotations)
 		for key, value := range dsTemplate.Annotations {
-			ds.ObjectMeta.Annotations[key] = value
+			ds.Annotations[key] = value
 		}
 
 		initMapIfNil(&ds.Spec.Template.Annotations)

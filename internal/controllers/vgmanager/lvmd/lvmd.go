@@ -128,7 +128,10 @@ func (c FileConfig) Load(ctx context.Context) (*Config, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to open config file %s: %w", c.path, err)
 	}
-	defer file.Close()
+
+	defer func() {
+		_ = file.Close()
+	}()
 
 	limitedReader := &io.LimitedReader{R: file, N: maxReadLength}
 	cfgBytes, err := io.ReadAll(limitedReader)

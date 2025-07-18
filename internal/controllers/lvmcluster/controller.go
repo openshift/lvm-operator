@@ -148,7 +148,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Checks that only a single LVMCluster instance exists
 	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
-	if err := r.Client.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
+	if err := r.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list LVMCluster instances: %w", err)
 	}
 	if size := len(lvmClusterList.Items); size > 1 {
@@ -157,7 +157,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// get lvmcluster
 	lvmCluster := &lvmv1alpha1.LVMCluster{}
-	if err := r.Client.Get(ctx, req.NamespacedName, lvmCluster); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, lvmCluster); err != nil {
 		// Error reading the object - requeue the request unless not found.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -211,7 +211,7 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 	setVolumeGroupsReadyConditionInProgress(instance)
 
 	if updated := controllerutil.AddFinalizer(instance, lvmClusterFinalizer); updated {
-		if err := r.Client.Update(ctx, instance); err != nil {
+		if err := r.Update(ctx, instance); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to update LvmCluster with finalizer: %w", err)
 		}
 		logger.Info("successfully added finalizer")
@@ -284,11 +284,11 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 		setVolumeGroupsReadyConditionUnmanaged(instance)
 	} else {
 		vgNodeStatusList := &lvmv1alpha1.LVMVolumeGroupNodeStatusList{}
-		if err := r.Client.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
+		if err := r.List(ctx, vgNodeStatusList, client.InNamespace(r.Namespace)); err != nil {
 			return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
 		}
 		nodes := &corev1.NodeList{}
-		if err := r.Client.List(ctx, nodes); err != nil {
+		if err := r.List(ctx, nodes); err != nil {
 			return fmt.Errorf("failed to list Nodes: %w", err)
 		}
 		setVolumeGroupsReadyCondition(ctx, instance, nodes, vgNodeStatusList)
@@ -336,7 +336,7 @@ func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 
 func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhealthyNodes map[string]struct{}) (bool, error) {
 	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
-	if err := r.Client.List(ctx, logicalVolumeList); err != nil {
+	if err := r.List(ctx, logicalVolumeList); err != nil {
 		return false, fmt.Errorf("failed to get TopoLVM LogicalVolume list: %w", err)
 	}
 
@@ -347,7 +347,7 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhe
 	for _, logicalVolume := range logicalVolumeList.Items {
 		if !contains(healthyNodes, logicalVolume.Spec.NodeName) || contains(unhealthyNodes, logicalVolume.Spec.NodeName) {
 			controllerutil.RemoveFinalizer(&logicalVolume, "topolvm.io/logicalvolume")
-			err := r.Client.Update(ctx, &logicalVolume)
+			err := r.Update(ctx, &logicalVolume)
 			if err != nil {
 				return false, fmt.Errorf("failed to delete finalizer from logicalvolume %s, error: %w", logicalVolume.Name, err)
 			}
@@ -361,7 +361,7 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, healthyNodes, unhe
 
 func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, healthyNodes, unhealthyNodes map[string]struct{}) error {
 	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
-	err := r.Client.List(ctx, volumeGroups, &client.ListOptions{Namespace: r.Namespace})
+	err := r.List(ctx, volumeGroups, &client.ListOptions{Namespace: r.Namespace})
 	if k8serrors.IsNotFound(err) {
 		return nil
 	}
@@ -379,7 +379,7 @@ func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, healthyNodes,
 			nodeName := strings.TrimPrefix(finalizer, vgmanager.NodeCleanupFinalizer+"/")
 			if contains(unhealthyNodes, nodeName) || !contains(healthyNodes, nodeName) {
 				controllerutil.RemoveFinalizer(&vg, finalizer)
-				err = r.Client.Update(ctx, &vg)
+				err = r.Update(ctx, &vg)
 				if err != nil {
 					return fmt.Errorf("failed to delete finalizer from volumegroup %s, error: %w", vg.Name, err)
 				}
@@ -419,7 +419,7 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 	}
 
 	if update := controllerutil.RemoveFinalizer(instance, lvmClusterFinalizer); update {
-		if err := r.Client.Update(ctx, instance); err != nil {
+		if err := r.Update(ctx, instance); err != nil {
 			return fmt.Errorf("failed to remove finalizer from LVMCluster %s: %w", instance.GetName(), err)
 		}
 	}
@@ -429,7 +429,7 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 
 func (r *Reconciler) healthyUnhealthyNodes(ctx context.Context) (map[string]struct{}, map[string]struct{}, error) {
 	nodes := &corev1.NodeList{}
-	err := r.Client.List(ctx, nodes)
+	err := r.List(ctx, nodes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get node list: %w", err)
 	}

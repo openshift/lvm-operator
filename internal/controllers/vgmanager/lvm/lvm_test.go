@@ -89,13 +89,14 @@ func TestHostLVM_GetVG(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
 			executor := &test.MockExecutor{
 				MockRunCommandAsHostInto: func(ctx context.Context, into any, command string, args ...string) error {
-					if command == vgsCmd {
+					switch command {
+					case vgsCmd:
 						if tt.vgsErr {
 							return fmt.Errorf("mocked error")
 						}
 
 						return json.Unmarshal([]byte(mockVgsOutput), &into)
-					} else if command == pvsCmd {
+					case pvsCmd:
 						if tt.pvsErr {
 							return fmt.Errorf("mocked error")
 						}
@@ -251,12 +252,13 @@ func TestHostLVM_ListVGs(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
 			executor := &test.MockExecutor{
 				MockRunCommandAsHostInto: func(ctx context.Context, into any, command string, args ...string) error {
-					if command == vgsCmd {
+					switch command {
+					case vgsCmd:
 						if tt.vgsErr {
 							return fmt.Errorf("mocked error on vgs")
 						}
 						return json.Unmarshal([]byte(mockVgsOutput), &into)
-					} else if command == pvsCmd {
+					case pvsCmd:
 						if tt.pvsErr {
 							return fmt.Errorf("mocked error on pvs")
 						}
