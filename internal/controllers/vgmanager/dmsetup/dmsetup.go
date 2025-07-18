@@ -41,7 +41,7 @@ func (dmsetup *HostDmsetup) Remove(ctx context.Context, deviceName string) error
 		return errors.New("failed to remove device-mapper reference. Device name is empty")
 	}
 
-	output, err := dmsetup.Executor.CombinedOutputCommandAsHost(ctx, dmsetup.dmsetup, "remove", "--force", deviceName)
+	output, err := dmsetup.CombinedOutputCommandAsHost(ctx, dmsetup.dmsetup, "remove", "--force", deviceName)
 
 	if err == nil {
 		log.FromContext(ctx).Info(fmt.Sprintf("successfully removed the reference from device-mapper %q: %s", deviceName, string(output)))

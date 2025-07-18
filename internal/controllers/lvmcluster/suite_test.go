@@ -203,7 +203,7 @@ func (r *csiNodeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 
 func (r *csiNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lvmClusterList := &lvmv1alpha1.LVMClusterList{}
-	if err := r.Client.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
+	if err := r.List(context.TODO(), lvmClusterList, &client.ListOptions{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list LVMCluster instances: %w", err)
 	}
 	if size := len(lvmClusterList.Items); size > 1 {
@@ -216,7 +216,7 @@ func (r *csiNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	node := &corev1.Node{}
-	if err := r.Client.Get(ctx, req.NamespacedName, node); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, node); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get node: %w", err)
 	}
 	csiNode := &v1.CSINode{}
@@ -248,7 +248,7 @@ func (r *csiNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, fmt.Errorf("failed to create or update CSINode: %w", err)
 			}
 		} else {
-			if err := r.Client.Delete(ctx, csiNode); err != nil {
+			if err := r.Delete(ctx, csiNode); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to delete CSINode: %w", err)
 			}
 		}

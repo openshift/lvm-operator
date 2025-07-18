@@ -42,7 +42,6 @@ OPERATOR_VERSION ?= 0.0.1
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.32.0
 OPERATOR_SDK_VERSION ?= 1.39.2
-CONTROLLER_TOOLS_VERSION := 0.17.3
 
 CONTROLLER_RUNTIME_VERSION := $(shell awk '/sigs\.k8s\.io\/controller-runtime/ {print substr($$2, 2)}' $(SELF_DIR)/go.mod)
 GINKGO_VERSION := $(shell awk '/github.com\/onsi\/ginkgo\/v2/ {print $$2}' $(SELF_DIR)/go.mod)
@@ -147,8 +146,8 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-godeps-update: ## Run go mod tidy and go mod vendor.
-	go mod tidy && go mod vendor
+godeps-update: ## Run go mod tidy
+	go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
@@ -336,13 +335,13 @@ performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 ifeq (,$(wildcard $(CONTROLLER_GEN)))
-	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONTROLLER_TOOLS_VERSION))
+	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen)
 endif
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 ifeq (,$(wildcard $(KUSTOMIZE)))
-	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5@v5.4.1)
+	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5)
 endif
 
 ENVTEST = $(shell pwd)/bin/setup-envtest

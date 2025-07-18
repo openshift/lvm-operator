@@ -48,7 +48,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	logger.V(2).Info("verifying if node status is orphaned", "node", nodeStatus.GetName())
 
 	node := &v1.Node{}
-	err := r.Client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), node)
+	err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), node)
 
 	if errors.IsNotFound(err) {
 		logger.Info("node not found, removing LVMVolumeGroupNodeStatus", "node", nodeStatus.GetName())

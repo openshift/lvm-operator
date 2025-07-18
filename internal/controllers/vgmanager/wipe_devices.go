@@ -112,7 +112,7 @@ func (r *Reconciler) wipeDevice(ctx context.Context, deviceName string, blockDev
 			}
 			logger.Info("wipe device", "deviceName", deviceName)
 			// wipe all signatures once more and cause ioctl reload
-			if err := r.Wipefs.Wipe(ctx, device.KName); err != nil {
+			if err := r.Wipe(ctx, device.KName); err != nil {
 				return false, err
 			}
 			logger.Info("device wiped successfully")
@@ -146,7 +146,7 @@ func (r *Reconciler) removeMapperReference(ctx context.Context, device lsblk.Blo
 		logger.Info("removing device-mapper reference", "childName", device.KName, "deviceType", device.Type)
 	}
 
-	if err := r.Dmsetup.Remove(ctx, device.KName); err != nil {
+	if err := r.Remove(ctx, device.KName); err != nil {
 		if errors.Is(err, dmsetup.ErrReferenceNotFound) {
 			logger.Info("skipping the removal of device-mapper reference as the reference does not exist", "childName", device.KName)
 		} else {

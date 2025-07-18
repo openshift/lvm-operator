@@ -3,16 +3,15 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETPLATFORM
 # Build the manager binary
-FROM golang:1.23 as builder
+FROM golang:1.24 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
-# reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
-COPY vendor vendor/
+# Download all dependencies and verify
+RUN go mod download
 RUN go mod verify
 
 # Copy the go source
@@ -21,7 +20,7 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 
 # Build
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o lvms cmd/main.go
 
 FROM --platform=$TARGETPLATFORM fedora:latest
 

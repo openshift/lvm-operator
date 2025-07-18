@@ -28,9 +28,10 @@ func TestWipe(t *testing.T) {
 			if args[0] != "--all" || args[1] != "--force" {
 				return nil, fmt.Errorf("invalid args %q", args[0:2])
 			}
-			if args[2] == "/dev/loop1" {
+			switch args[2] {
+			case "/dev/loop1":
 				return nil, nil
-			} else if args[2] == "/dev/loop2" {
+			case "/dev/loop2":
 				return nil, errors.New("no such file or directory")
 			}
 			return nil, fmt.Errorf("invalid args %q", args[2])
