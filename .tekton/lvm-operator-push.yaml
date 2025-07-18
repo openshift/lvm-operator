@@ -11,7 +11,7 @@ metadata:
       || ".tekton/lvm-operator-push.yaml".pathChanged() || "release/operator/***".pathChanged()
       || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged()
       || "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged()
-      || "vendor/***".pathChanged() || "api/***".pathChanged())
+      || "api/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator-4-19
@@ -30,7 +30,7 @@ spec:
   - name: dockerfile
     value: release/operator/konflux.Dockerfile
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": "release/operator"}]'
+    value: '[{"type": "rpm", "path": "release/operator"},{"type": "gomod", "path": "."}]'
   - name: build-args-file
     value: release/container-build.args
   pipelineRef:

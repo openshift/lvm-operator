@@ -1,4 +1,0 @@
-# This file is the config file for helm/chart-releaser
-owner: topolvm
-git-repo: topolvm
-release-name-template: "{{ .Name }}-chart-v{{ .Version }}"

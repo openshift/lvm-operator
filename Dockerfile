@@ -10,10 +10,8 @@ WORKDIR /workspace
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
-# reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
-COPY vendor vendor/
-RUN go mod verify
+# Download all dependencies
+RUN go mod download
 
 # Copy the go source
 COPY api/ api/
@@ -21,7 +19,7 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 
 # Build
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build --ldflags "-s -w" -a -o lvms cmd/main.go
 
 FROM --platform=$TARGETPLATFORM fedora:latest
 
