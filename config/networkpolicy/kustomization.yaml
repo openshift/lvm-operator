@@ -1,0 +1,5 @@
+resources:
+- lvm-operator-networkpolicy.yaml
+- vgmanager-networkpolicy.yaml
+
+namespace: openshift-lvm-storage

@@ -29,6 +29,7 @@ resources:
 - ../rbac
 - ../manager
 - ../webhook
+- ../networkpolicy
 patches:
 - path: manager_metrics_patch.yaml
 - path: manager_webhook_patch.yaml
