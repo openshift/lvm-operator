@@ -12,7 +12,7 @@ metadata:
       || ".tekton/lvm-operator-push.yaml".pathChanged() || "release/operator/***".pathChanged()
       || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged()
       || "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged()
-      || "vendor/***".pathChanged() || "api/***".pathChanged())
+      || "vendor/***".pathChanged() || "api/***".pathChanged() || "release/container-build.args".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator-4-16
