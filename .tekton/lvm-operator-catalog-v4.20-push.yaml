@@ -1,0 +1,51 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/lvm-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "catalog" &&
+      (".tekton/catalog-pipeline.yaml".pathChanged() ||
+      ".tekton/lvm-operator-catalog-v4.20-pull-request.yaml".pathChanged() ||
+      ".tekton/lvm-operator-catalog-v4.20-push.yaml".pathChanged() ||
+      "catalogs/lvm-operator-catalog-v4.20.json".pathChanged() ||
+      "templates/lvm-operator-catalog-v4.20-template.yaml".pathChanged() ||
+      "konflux-catalog.Dockerfile".pathChanged())
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: lvm-operator-catalog-4-20
+    appstudio.openshift.io/component: lvm-operator-catalog-4-20
+    pipelines.appstudio.openshift.io/type: build
+  name: lvm-operator-catalog-v4.20-on-push
+  namespace: logical-volume-manag-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.20-{{revision}}
+  - name: dockerfile
+    value: konflux-catalog.Dockerfile
+  - name: build-args
+    value:
+    - CATALOG_VERSION=v4.20
+    - BASE_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-ose-operator-registry-rhel9
+  - name: hermetic
+    value: "true"
+  pipelineRef:
+    resolver: bundles
+    params:
+      - name: name
+        value: fbc-builder
+      - name: bundle
+        value: quay.io/konflux-ci/tekton-catalog/pipeline-fbc-builder:devel@sha256:b916bc77bd1965a0ac4d6613e9b1be010a473f641572271ecf1b6024a1653560
+      - name: kind
+        value: pipeline
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
