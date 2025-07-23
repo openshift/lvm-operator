@@ -12,8 +12,7 @@ You will need the following to be installed:
 
 ### Adding newly released images
 In order to add newly released images, you will need to update the template files located in `./templates`.
-You can run `make templates` which will automatically poll the released images via skopeo and generate catalogs for each released y-stream and add all related
-z-stream tags to the template file. By default, the script will add the operator versions in line with our support matrix. This means that the catalog for **v4.18** will have operator references for **v4.17.z** and **v4.18.z**.
+You can run `TARGET_CATALOGS="v4.20" make templates` to regenerate a single template or specify multiple with space delineation `TARGET_CATALOGS="v4.19 v4.20" make templates`. You can also run `make templates` without any `TARGET_CATALOGS` specified which will generate catalogs for every y-stream and add all related z-stream tags to the template file. By default, the script will add the operator versions in line with our support matrix. This means that the catalog for **v4.18** will have operator references for **v4.17.z** and **v4.18.z**.
 Once the template has been updated you can either run a single catalog update or run an update for all catalogs. It is recommended to run the single catalog update if there are only a few updates as the update for all catalogs can take a long time.
 
 > **NOTE** you will need to run the `make templates` command for any catalog updates
