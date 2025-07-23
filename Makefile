@@ -41,7 +41,7 @@ OPERATOR_VERSION ?= 0.0.1
 ENVTEST_K8S_VERSION = 1.26.0
 
 OPERATOR_SDK_VERSION ?= 1.23.0
-RBAC_PROXY_IMG ?= registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:6ba961c2c2a29750c0132fe6dd6fa9f6001010afbc5f19b98add87b31b54bcf6
+RBAC_PROXY_IMG ?= registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:71c2421379d1573fd2b94d5d05809935db272465d6b5f9a4c4deb70ea53f1213
 
 MANAGER_NAME_PREFIX ?= lvms-
 OPERATOR_NAMESPACE ?= openshift-storage
