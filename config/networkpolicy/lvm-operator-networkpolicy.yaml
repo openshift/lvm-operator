@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lvms-operator-network-policy
+  namespace: system
+  labels:
+    app.kubernetes.io/name: lvms-operator-network-policy
+    app.kubernetes.io/part-of: lvms-provisioner
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: lvms-operator
+      app.kubernetes.io/name: lvms-operator
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow webhook server access
+  - ports:
+    - protocol: TCP
+      port: 9443
+  # Allow metrics endpoint access
+  - ports:
+    - protocol: TCP
+      port: 8443
+    from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+  egress:
+  # Allow Kubernetes API access
+  - ports:
+    - protocol: TCP
+      port: 6443
