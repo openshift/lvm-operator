@@ -136,6 +136,8 @@ func (r *Reconciler) GetLogPassthroughOptions() *logpassthrough.Options {
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotcontents/status,verbs=update;patch
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotcontents/status,verbs=update;patch
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -224,6 +226,7 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		resource.LVMVGNodeStatus(),
 		resource.TopoLVMStorageClass(),
 		resource.CSINode(),
+		resource.ServiceMonitor(),
 	}
 
 	if r.ClusterType == cluster.TypeOCP {
@@ -399,6 +402,7 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 			resource.CSIDriver(),
 			resource.VGManager(r.ClusterType),
 			resource.CSINode(),
+			resource.ServiceMonitor(),
 		}
 
 		if r.ClusterType == cluster.TypeOCP {
