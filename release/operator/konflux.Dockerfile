@@ -51,7 +51,6 @@ LABEL io.k8s.description="LVM Storage Operator container based on Red Hat Enterp
 LABEL io.openshift.tags="lvms"
 LABEL lvms.tags="${LVMS_TAGS}"
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
-LABEL test="test"
 
 
 ENTRYPOINT ["/lvms"]
