@@ -147,7 +147,9 @@ type DeviceClass struct {
 	// +optional
 	Default bool `json:"default,omitempty"`
 
-	// FilesystemType sets the filesystem the device should use. Select either `ext4` or `xfs`.
+	// FilesystemType sets the default filesystem type for persistent volumes created from this device class.
+	// This determines the filesystem used when provisioning PVCs with volumeMode: Filesystem.
+	// Select either `ext4` or `xfs`. This does not filter devices during discovery.
 	// +kubebuilder:validation:Enum=xfs;ext4;""
 	// +kubebuilder:default=xfs
 	// +optional
