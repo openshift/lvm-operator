@@ -17,16 +17,17 @@ endif
 
 all: templates catalogs
 
+TARGET_CATALOGS ?= "v4.14 v4.15 v4.16 v4.17 v4.18 v4.19 v4.20"
+
 .PHONY: templates
 templates:
-	./hack/generate_released_templates.sh
-	@echo "Templates generated in templates/"
+	TARGET_VERSIONS=$(TARGET_CATALOGS) ./hack/generate_templates.sh
+	@echo "Templates generation completed"
 	@echo "To build the catalog files, run: make catalogs"
 	@echo "To build a single catalog file, run: CATALOG_VERSION={{ catalog_version }} make catalog"
 
 # Catalog generation
-CATALOG_VERSION ?= v4.12
-
+CATALOG_VERSION ?= v4.14
 OPM_NO_FLAG_VERSIONS = v4.12 v4.13 v4.14 v4.15 v4.16
 OPM_CMD = $(OPM) alpha render-template semver --migrate-level=bundle-object-to-csv-metadata
 ifneq ($(filter $(CATALOG_VERSION),$(OPM_NO_FLAG_VERSIONS)),) # Pre-4.17
