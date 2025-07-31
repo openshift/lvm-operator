@@ -1,4 +1,0 @@
-OPERATOR_VERSION=4.20.0
-LVMS_TAGS=v4.20
-OPENSHIFT_VERSIONS=v4.20-v4.21
-MAINTAINER=Bulat Zamalut <bzamalut@redhat.com>

@@ -1,6 +1,0 @@
-apiVersion: lvm.topolvm.io/v1alpha1
-kind: LVMVolumeGroupNodeStatus
-metadata:
-  name: lvmvolumegroupnodestatus-sample
-spec:
-  # Add fields here

@@ -1,12 +1,5 @@
 aliases:
-  edge-enablement-reviewers:
-  - jerpeter1
-  - eggfoobar
-  - jeff-roche
-  - suleymanakbas91
-  - qJkee
-  - jaypoulz
-  edge-enablement-approvers:
+  edge-enablement-dev:
   - jerpeter1
   - eggfoobar
   - jeff-roche
@@ -14,3 +7,6 @@ aliases:
   - brandisher
   - qJkee
   - jaypoulz
+  edge-enablement-qe:
+  - mmakwana30
+  - neilhamza

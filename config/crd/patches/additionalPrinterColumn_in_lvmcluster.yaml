@@ -1,7 +1,0 @@
-# The following patch adds an additionalPrinterColumn called Status into the LVMCluster CRD.
-- op: add
-  path: /spec/versions/0/additionalPrinterColumns
-  value:
-    - name: Status
-      type: string
-      jsonPath: .status.state
