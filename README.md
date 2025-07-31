@@ -46,7 +46,7 @@ users:
 #### Pull Secret
 You will need to have your pull secret saved to `${HOME}/.docker/config.json` with credentials defined for the following repos:
 - `registry.redhat.io`
-- `registry.stage.redhat.io`
+- `registry.stage.redhat.io` - This is optional
 - `quay.io`
 
 #### CLI Tools
@@ -69,4 +69,4 @@ Once your dev environment is configured, you can configure the test cluster by r
 2. Identify and apply the catalog that will be used for testing to the test cluster
     - `CANDIDATE_VERSION=4.19 make cluster-catalog-config`
 3. Install the operator
-    - `CANDIDATE_VERSION=4.19 make operator-install`
+    - `CANDIDATE_VERSION=4.19 make install-operator`

@@ -8,7 +8,7 @@
 version=$(echo "${TARGET_VERSION}" | tr . -)
 
 konflux_namespace="logical-volume-manag-tenant"
-
+unset KUBECONFIG
 export KUBECONFIG="${KONFLUX_CLUSTER_KUBECONFIG}"
 oc config use-context "${KONFLUX_CLUSTER_CONTEXT}"
 
