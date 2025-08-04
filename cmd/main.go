@@ -14,11 +14,9 @@ import (
 	"github.com/openshift/lvm-operator/v4/cmd/operator"
 	"github.com/openshift/lvm-operator/v4/cmd/vgmanager"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -46,8 +44,6 @@ func NewCmd(setupLog logr.Logger) *cobra.Command {
 	utilruntime.Must(snapapi.AddToScheme(scheme))
 	utilruntime.Must(secv1.Install(scheme))
 	utilruntime.Must(configv1.Install(scheme))
-	utilruntime.Must(monitoringv1.AddToScheme(scheme))
-	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
 	zapOpts := zap.Options{}
 	zapFlagSet := flag.NewFlagSet("zap", flag.ExitOnError)

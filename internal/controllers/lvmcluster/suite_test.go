@@ -33,7 +33,6 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/node/removal"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/storage/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -110,9 +109,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = configv1.Install(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = apiextensions.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
