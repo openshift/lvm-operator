@@ -24,3 +24,5 @@ testbin/*
 *.swo
 *~
 .dccache
+
+manifests/

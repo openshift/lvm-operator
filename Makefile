@@ -12,6 +12,7 @@ update-cluster-pull-secret:
 
 .PHONY: cluster-config
 cluster-config: image-digest-mirrors update-cluster-pull-secret
+	rm -rf manifests
 
 .PHONY: cluster-catalog-config
 cluster-catalog-config:
