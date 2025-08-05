@@ -46,5 +46,3 @@ spec:
 EOF
 
 oc apply -Rf manifests
-
-rm -rf manifests

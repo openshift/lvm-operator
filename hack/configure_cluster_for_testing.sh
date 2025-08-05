@@ -5,6 +5,8 @@
 : ${TEST_CLUSTER_CONTEXT:="admin"}
 : ${KONFLUX_CLUSTER_KUBECONFIG:="${HOME}/.kube/konflux.kubeconfig"}
 : ${KONFLUX_CLUSTER_CONTEXT:="konflux"}
+: ${TEST_SNAPSHOT:=""}
+: ${CATALOG_SNAPSHOT:=""}
 version=$(echo "${TARGET_VERSION}" | tr . -)
 
 konflux_namespace="logical-volume-manag-tenant"
@@ -12,7 +14,16 @@ unset KUBECONFIG
 export KUBECONFIG="${KONFLUX_CLUSTER_KUBECONFIG}"
 oc config use-context "${KONFLUX_CLUSTER_CONTEXT}"
 
-snapshot_name=$(oc -n "${konflux_namespace}" get releases -o custom-columns=SNAPSHOT:.spec.snapshot --sort-by=.metadata.creationTimestamp | grep "lvm-operator-${TARGET_VERSION}" | tail -n 1)
+snapshot_name="${TEST_SNAPSHOT}"
+if ! [ -n "${TEST_SNAPSHOT}" ]; then
+    # If no snapshot is provided, find the newest one for the target version
+    snapshot_name=$(oc -n "${konflux_namespace}" get releases -o custom-columns=SNAPSHOT:.spec.snapshot --sort-by=.metadata.creationTimestamp | grep "lvm-operator-${TARGET_VERSION}" | tail -n 1)
+elif ! [ -n "${CATALOG_SNAPSHOT}" ]; then
+    # If the snapshot is specified, we also need the catalog specified since there is no concrete method of relating catalog snapshot to bundle snapshot
+    echo "ERROR: If the 'TEST_SNAPSHOT' env is defined, you must also specify CATALOG_SNAPSHOT. Exiting..."
+    exit 1
+fi
+
 bundle_image=$(oc -n "${konflux_namespace}" get snapshot "${snapshot_name}" -o yaml | yq '.spec.components[] | select(.name == "lvm-operator-bundle-*") | .containerImage')
 
 echo "Target Snapshot: ${snapshot_name}"
@@ -27,11 +38,13 @@ then
     exit 1
 fi
 
-bundle_sha=${bundle_image##*@}
-
 # Get the latest release for the requested version
-catalog_release=$(oc -n "${konflux_namespace}" get releases -o custom-columns=RELEASE:.metadata.name --sort-by=.metadata.creationTimestamp | grep "lvm-operator-catalog-${version}" | tail -n 1)
-catalog_snapshot=$(oc -n "${konflux_namespace}" get release "${catalog_release}" -o yaml | yq '.spec.snapshot')
+catalog_snapshot="${CATALOG_SNAPSHOT}"
+if ! [ -n "${CATALOG_SNAPSHOT}" ]; then
+    catalog_release=$(oc -n "${konflux_namespace}" get releases -o custom-columns=RELEASE:.metadata.name --sort-by=.metadata.creationTimestamp | grep "lvm-operator-catalog-${version}" | tail -n 1)
+    catalog_snapshot=$(oc -n "${konflux_namespace}" get release "${catalog_release}" -o yaml | yq '.spec.snapshot')
+fi
+
 catalog_image=$(oc -n "${konflux_namespace}" get snapshot "${catalog_snapshot}" -o yaml | yq ".spec.components[] | select(.name == \"lvm-operator-catalog-${version}\") | .containerImage")
 
 echo "Catalog Image: ${catalog_image}"
@@ -57,3 +70,16 @@ oc config use-context "${TEST_CLUSTER_CONTEXT}"
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
 echo "${catalog_source}" | oc -n openshift-marketplace apply -f -
+
+echo "Validating the installed catalog source contains the bundle under test"
+
+bundle_sha=${bundle_image##*@}
+staging_bundle_image="registry.stage.redhat.io/lvms4/lvms-operator-bundle@${bundle_sha}"
+bundle_channel=$(oc -n openshift-marketplace get packagemanifest lvms-operator -o yaml | yq ".status.channels[] | select(.currentCSVDesc.relatedImages[] == \"${staging_bundle_image}\") | .name")
+
+if [ -n "${bundle_channel}" ]; then
+    echo "Bundle with manifest ${bundle_sha} successfully identified in channel ${bundle_channel}"
+else
+    echo "ERROR: could not find the bundle in the sourced catalog. Exiting..."
+    exit 1
+fi
