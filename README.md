@@ -60,6 +60,10 @@ You will need to have your pull secret saved to `${HOME}/.docker/config.json` wi
 | `CANDIDATE_VERSION` | **required** | `4.19` | The version of the operator under test (exclude the `v` in the version number) |
 | `CATALOG_SOURCE` | *not required* | `lvm-operator-catalogsource` | The catalog source name for the catalog source that will be injected into the test cluster |
 | `CLUSTER_OS` | *not required* | `rhel9` | For specifying the operator index |
+| `TEST_SNAPSHOT` | *not required* | `lvm-operator-4-19-xkw2b` | For specifying the operator snapshot you want to test |
+| `CATALOG_SNAPSHOT` | *not required* | `lvm-operator-catalog-4-19-fq2mp` | For specifying the catalog that contains the artifacts from `TEST_SNAPSHOT` |
+
+> **NOTE** - `CATALOG_SNAPSHOT` **is required** if you specify `TEST_SNAPSHOT`
 
 ### Cluster Configuration
 Once your dev environment is configured, you can configure the test cluster by running the following commands:
@@ -68,5 +72,11 @@ Once your dev environment is configured, you can configure the test cluster by r
     - This will update the cluster pull secret and apply the `ImageDigestMirrorSet` required for testing
 2. Identify and apply the catalog that will be used for testing to the test cluster
     - `CANDIDATE_VERSION=4.19 make cluster-catalog-config`
+
+    OR
+
+    - If you don't want to test the latest staging release and instead want to test an earlier release:
+
+      `CANDIDATE_VERSION=4.19 TEST_SNAPSHOT='lvm-operator-4-19-abcde' CATALOG_SNAPSHOT='lvm-operator-catalog-4-19-abcde' make cluster-catalog-config`
 3. Install the operator
     - `CANDIDATE_VERSION=4.19 make install-operator`
