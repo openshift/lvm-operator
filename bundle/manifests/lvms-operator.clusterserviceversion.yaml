@@ -652,7 +652,7 @@ spec:
                 - name: TOPOLVM_CSI_IMAGE
                   value: quay.io/lvms_dev/topolvm:latest
                 - name: RBAC_PROXY_IMAGE
-                  value: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
+                  value: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:9b7aabfbead92df3a4afeb1854e45a92f23da52321d1705fce444510fa856145
                 - name: CSI_LIVENESSPROBE_IMAGE
                   value: k8s.gcr.io/sig-storage/livenessprobe:v2.9.0
                 - name: CSI_PROVISIONER_IMAGE
