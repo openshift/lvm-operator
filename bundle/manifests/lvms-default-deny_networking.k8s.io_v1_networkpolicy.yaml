@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/name: lvms-operator-network-policy
+    app.kubernetes.io/part-of: lvms-provisioner
+  name: lvms-default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress

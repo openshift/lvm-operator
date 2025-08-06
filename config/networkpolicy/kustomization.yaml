@@ -1,5 +1,6 @@
 resources:
 - lvm-operator-networkpolicy.yaml
 - vgmanager-networkpolicy.yaml
+- default-deny-networkpolicy.yaml
 
 namespace: openshift-lvm-storage
