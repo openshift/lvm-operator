@@ -4,6 +4,10 @@ opm_path="${1}"
 
 files="templates/*-template.yaml"
 
+if [[ -n "${CATALOG_VERSION}" ]]; then
+    files="templates/lvm-operator-catalog-${CATALOG_VERSION}-template.yaml"
+fi
+
 for file in ${files}; do
     echo "Generating catalog based on ${file}"
     file_name=$(basename "${file}")
@@ -28,6 +32,10 @@ for file in ${files}; do
 
     # The semver render-template function by default names the channels "stable-vX.Y" but we historically don't use the "v" in our channel names
     patched_catalog=$(echo "${catalog}" | yq -o=json eval-all '(.. | select(tag == "!!str")) |= sub("stable-v", "stable-") | (.. | select(tag == "!!str")) |= sub("candidate-v", "candidate-")')
+
+    # Update any pre-release references to be registry.redhat.io
+    patched_catalog="${patched_catalog//registry.stage/registry}"
+
     echo "${patched_catalog}" > ${output_file}
 
     echo "Catalog generated: ${output_file}"

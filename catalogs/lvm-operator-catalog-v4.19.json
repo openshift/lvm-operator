@@ -6,16 +6,6 @@
 {
   "entries": [
     {
-      "name": "lvms-operator.v4.19.1"
-    }
-  ],
-  "name": "candidate-4.19",
-  "package": "lvms-operator",
-  "schema": "olm.channel"
-}
-{
-  "entries": [
-    {
       "name": "lvms-operator.v4.18.0"
     },
     {
@@ -41,6 +31,12 @@
   "entries": [
     {
       "name": "lvms-operator.v4.19.0"
+    },
+    {
+      "name": "lvms-operator.v4.19.1",
+      "skips": [
+        "lvms-operator.v4.19.0"
+      ]
     }
   ],
   "name": "stable-4.19",
@@ -904,7 +900,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:b109d64c4383af42a50d94efd508d7cc24bfd402242ec4bbcaff02181e7de46f",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:abb20af302cb9d46dc0054a573d870dcef558d9d572393e01d4f7f95fc324646",
   "name": "lvms-operator.v4.19.1",
   "package": "lvms-operator",
   "properties": [
@@ -954,7 +950,7 @@
           "alm-examples": "[\n  {\n    \"apiVersion\": \"lvm.topolvm.io/v1alpha1\",\n    \"kind\": \"LVMCluster\",\n    \"metadata\": {\n      \"name\": \"my-lvmcluster\"\n    },\n    \"spec\": {\n      \"storage\": {\n        \"deviceClasses\": [\n          {\n            \"default\": true,\n            \"fstype\": \"xfs\",\n            \"name\": \"vg1\",\n            \"thinPoolConfig\": {\n              \"name\": \"thin-pool-1\",\n              \"overprovisionRatio\": 10,\n              \"sizePercent\": 90\n            }\n          }\n        ]\n      }\n    }\n  }\n]",
           "capabilities": "Seamless Upgrades",
           "categories": "Storage",
-          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:c9b40b891b4b6c3a504e179ce39d6a695874a61ea8202bc5950672c98c220820",
+          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:d78c6984735b1066d7de0abc3ee7e366492d512586699748c1f99697277abdaa",
           "description": "Logical volume manager storage provides dynamically provisioned local storage for container workloads",
           "features.operators.openshift.io/cnf": "false",
           "features.operators.openshift.io/cni": "false",
@@ -1061,11 +1057,11 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:c9b40b891b4b6c3a504e179ce39d6a695874a61ea8202bc5950672c98c220820",
+      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:d78c6984735b1066d7de0abc3ee7e366492d512586699748c1f99697277abdaa",
       "name": "lvms-operator"
     },
     {
-      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:b109d64c4383af42a50d94efd508d7cc24bfd402242ec4bbcaff02181e7de46f",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:abb20af302cb9d46dc0054a573d870dcef558d9d572393e01d4f7f95fc324646",
       "name": ""
     }
   ],
