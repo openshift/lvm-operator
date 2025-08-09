@@ -34,7 +34,7 @@
   "schema": "olm.channel"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:6cec0bc33b40e14b424fa4bd64010f604e1a2589bcd35d0406f59c427dce8828",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ed217bc665a9f6713f27583985618e84bc4c028911fc765018b2d701c08a7c30",
   "name": "lvms-operator.v4.19.0",
   "package": "lvms-operator",
   "properties": [
@@ -191,7 +191,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:6cec0bc33b40e14b424fa4bd64010f604e1a2589bcd35d0406f59c427dce8828",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ed217bc665a9f6713f27583985618e84bc4c028911fc765018b2d701c08a7c30",
       "name": ""
     },
     {
@@ -202,7 +202,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:e7e880df9853e95aa4aa7159d75b4f4e1cbcb2209be25fb2684499d56cce74ee",
+  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:ed217bc665a9f6713f27583985618e84bc4c028911fc765018b2d701c08a7c30",
   "name": "lvms-operator.v4.19.1",
   "package": "lvms-operator",
   "properties": [
@@ -363,14 +363,14 @@
       "name": "lvms-operator"
     },
     {
-      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:e7e880df9853e95aa4aa7159d75b4f4e1cbcb2209be25fb2684499d56cce74ee",
+      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:ed217bc665a9f6713f27583985618e84bc4c028911fc765018b2d701c08a7c30",
       "name": ""
     }
   ],
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:c443b5ab31b7bce943f77dae52a418eebf6871e3224981dedbf4c0b111b7643e",
+  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:ed217bc665a9f6713f27583985618e84bc4c028911fc765018b2d701c08a7c30",
   "name": "lvms-operator.v4.20.0",
   "package": "lvms-operator",
   "properties": [
@@ -532,7 +532,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:c443b5ab31b7bce943f77dae52a418eebf6871e3224981dedbf4c0b111b7643e",
+      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:ed217bc665a9f6713f27583985618e84bc4c028911fc765018b2d701c08a7c30",
       "name": ""
     }
   ],
