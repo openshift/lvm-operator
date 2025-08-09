@@ -4,11 +4,11 @@ GenerateMajorChannels: false
 GenerateMinorChannels: true
 Stable:
   Bundles:
-    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:17324bccd53f395d4141c4c16ccf51de60ba3ac9cf9612ff44993fc2f40223ab # v4.18.0
-    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:17324bccd53f395d4141c4c16ccf51de60ba3ac9cf9612ff44993fc2f40223ab # v4.18.1
-    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:17324bccd53f395d4141c4c16ccf51de60ba3ac9cf9612ff44993fc2f40223ab # v4.18.2
-    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:17324bccd53f395d4141c4c16ccf51de60ba3ac9cf9612ff44993fc2f40223ab # v4.18.3
-    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:17324bccd53f395d4141c4c16ccf51de60ba3ac9cf9612ff44993fc2f40223ab # v4.19.0
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:8fe8a8c96aa153fcf6c5614621edf9c0c835d8e2cfeec77c4e399a41b9fa2007 # v4.18.0
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:8fe8a8c96aa153fcf6c5614621edf9c0c835d8e2cfeec77c4e399a41b9fa2007 # v4.18.1
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:8fe8a8c96aa153fcf6c5614621edf9c0c835d8e2cfeec77c4e399a41b9fa2007 # v4.18.2
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:8fe8a8c96aa153fcf6c5614621edf9c0c835d8e2cfeec77c4e399a41b9fa2007 # v4.18.3
+    - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:8fe8a8c96aa153fcf6c5614621edf9c0c835d8e2cfeec77c4e399a41b9fa2007 # v4.19.0
 Candidate:
   Bundles:
-    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:17324bccd53f395d4141c4c16ccf51de60ba3ac9cf9612ff44993fc2f40223ab # v4.19.1
+    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:8fe8a8c96aa153fcf6c5614621edf9c0c835d8e2cfeec77c4e399a41b9fa2007 # v4.19.1
