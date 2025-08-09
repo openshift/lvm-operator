@@ -1,5 +1,4 @@
 resources:
-- monitor.yaml
 - prometheus_rules.yaml
 - metrics_service.yaml
 - vgmanager_metrics_service.yaml

@@ -24,12 +24,14 @@ import (
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	secv1 "github.com/openshift/api/security/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	operatorv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -82,6 +84,8 @@ func init() {
 	utilruntime.Must(snapapi.AddToScheme(scheme))
 	utilruntime.Must(secv1.Install(scheme))
 	utilruntime.Must(configv1.Install(scheme))
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
 	kubeconfig := os.Getenv("KUBECONFIG")
 	config, err := getKubeconfig(kubeconfig)
