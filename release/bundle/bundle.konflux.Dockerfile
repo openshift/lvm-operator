@@ -1,6 +1,6 @@
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21 as builder
 
-ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:b9d80bb263a54192501d5ba9366a4f0c19b34875b51bad4fa75ef22c60bb3ee7
+ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:7e9075dbfa1abc39feba289f949bae401301799983efcb6ff4121a242d420624
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:20b28b87b3fe6d6bf739181376231d6f8b7454c34b59eaf2e06c04a9fca8f41d
 
