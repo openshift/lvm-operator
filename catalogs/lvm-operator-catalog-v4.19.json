@@ -48,7 +48,7 @@
   "schema": "olm.channel"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
   "name": "lvms-operator.v4.18.0",
   "package": "lvms-operator",
   "properties": [
@@ -205,7 +205,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
       "name": ""
     },
     {
@@ -220,7 +220,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
   "name": "lvms-operator.v4.18.1",
   "package": "lvms-operator",
   "properties": [
@@ -377,7 +377,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
       "name": ""
     },
     {
@@ -392,7 +392,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
   "name": "lvms-operator.v4.18.2",
   "package": "lvms-operator",
   "properties": [
@@ -549,7 +549,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
       "name": ""
     },
     {
@@ -564,7 +564,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
   "name": "lvms-operator.v4.18.3",
   "package": "lvms-operator",
   "properties": [
@@ -721,7 +721,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
       "name": ""
     },
     {
@@ -736,7 +736,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
   "name": "lvms-operator.v4.19.0",
   "package": "lvms-operator",
   "properties": [
@@ -893,7 +893,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
       "name": ""
     },
     {
@@ -904,7 +904,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
   "name": "lvms-operator.v4.19.1",
   "package": "lvms-operator",
   "properties": [
@@ -1065,7 +1065,7 @@
       "name": "lvms-operator"
     },
     {
-      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:ab575aa74325950388ade3a7c060ac50548e9465b51b8f3fa41c1a6082a72ee3",
+      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:18ca7c8ed92b5e114741d8eef64997c11e4b0717d26abed9e9d0d8e0efa55e10",
       "name": ""
     }
   ],
