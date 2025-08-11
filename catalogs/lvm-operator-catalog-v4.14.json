@@ -6,16 +6,6 @@
 {
   "entries": [
     {
-      "name": "lvms-operator.v4.14.14"
-    }
-  ],
-  "name": "candidate-4.14",
-  "package": "lvms-operator",
-  "schema": "olm.channel"
-}
-{
-  "entries": [
-    {
       "name": "lvms-operator.v4.13.0"
     },
     {
@@ -115,7 +105,10 @@
       "name": "lvms-operator.v4.14.12"
     },
     {
-      "name": "lvms-operator.v4.14.13",
+      "name": "lvms-operator.v4.14.13"
+    },
+    {
+      "name": "lvms-operator.v4.14.14",
       "skips": [
         "lvms-operator.v4.14.0",
         "lvms-operator.v4.14.1",
@@ -129,7 +122,8 @@
         "lvms-operator.v4.14.9",
         "lvms-operator.v4.14.10",
         "lvms-operator.v4.14.11",
-        "lvms-operator.v4.14.12"
+        "lvms-operator.v4.14.12",
+        "lvms-operator.v4.14.13"
       ]
     }
   ],
@@ -3653,7 +3647,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:b109d64c4383af42a50d94efd508d7cc24bfd402242ec4bbcaff02181e7de46f",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:7e82bf7337691809688e6961fca730d9e281286f9d1b3445f3c959678a361f97",
   "name": "lvms-operator.v4.14.14",
   "package": "lvms-operator",
   "properties": [
@@ -3831,7 +3825,7 @@
       "name": "rbac-proxy"
     },
     {
-      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:b109d64c4383af42a50d94efd508d7cc24bfd402242ec4bbcaff02181e7de46f",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:7e82bf7337691809688e6961fca730d9e281286f9d1b3445f3c959678a361f97",
       "name": ""
     }
   ],
