@@ -64,10 +64,6 @@ metadata:
   name: lvms-operator.v0.0.0
   namespace: placeholder
 spec:
-  nativeAPIs:
-  - group: "networking.k8s.io"
-    version: v1
-    kind: NetworkPolicy
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
