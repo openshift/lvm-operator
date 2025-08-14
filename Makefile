@@ -21,3 +21,7 @@ cluster-catalog-config:
 .PHONY: install-operator
 install-operator:
 	OPERATOR_CHANNEL="candidate-$(CANDIDATE_VERSION)" CATALOG_SOURCE=$(CATALOG_SOURCE) ./hack/generate_operator_install_manifests.sh
+
+.PHONY: release
+release:
+	./hack/generate-release.sh
