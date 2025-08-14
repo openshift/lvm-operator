@@ -298,7 +298,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 			Name: vg.GetName(),
 			PVs:  []lvm.PhysicalVolume{lvmPV},
 		}
-		instances.LVM.EXPECT().CreateVG(ctx, lvmVG).Return(nil).Once()
+		instances.LVM.EXPECT().CreateVG(ctx, lvmVG, false).Return(nil).Once()
 	})
 
 	// addThinPoolToVG

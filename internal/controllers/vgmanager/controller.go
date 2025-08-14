@@ -258,7 +258,7 @@ func (r *Reconciler) reconcile(
 	logger.Info("new available devices discovered", "available", devices.Available)
 
 	// Create VG/extend VG
-	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, devices.Available); err != nil {
+	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, devices.Available, r.shouldWipeDevicesOnVolumeGroup(volumeGroup)); err != nil {
 		err = fmt.Errorf("failed to create/extend volume group %s: %w", volumeGroup.Name, err)
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorVGCreateOrExtendFailed, err)
 		if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
