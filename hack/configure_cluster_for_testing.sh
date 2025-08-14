@@ -71,15 +71,26 @@ oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disab
 
 echo "${catalog_source}" | oc -n openshift-marketplace apply -f -
 
-echo "Validating the installed catalog source contains the bundle under test"
+# Wait for the packagemanifest to be ready
+while [ true ]; do
+    packagemanifest_ready=$(oc -n openshift-marketplace get packagemanifest | grep "lvms-operator")
+    if ! [ -n "${packagemanifest_ready}" ]; then
+        echo "packagemanifest not yet ready, trying again in a few seconds..."
+        sleep 5
+        continue
+    fi
 
+    break
+done
+
+echo "Validating the installed catalog source contains the bundle under test"
 bundle_sha=${bundle_image##*@}
-staging_bundle_image="registry.stage.redhat.io/lvms4/lvms-operator-bundle@${bundle_sha}"
+staging_bundle_image="registry.redhat.io/lvms4/lvms-operator-bundle@${bundle_sha}"
 bundle_channel=$(oc -n openshift-marketplace get packagemanifest lvms-operator -o yaml | yq ".status.channels[] | select(.currentCSVDesc.relatedImages[] == \"${staging_bundle_image}\") | .name")
 
 if [ -n "${bundle_channel}" ]; then
     echo "Bundle with manifest ${bundle_sha} successfully identified in channel ${bundle_channel}"
 else
-    echo "ERROR: could not find the bundle in the sourced catalog. Exiting..."
+    echo "ERROR: could not find the bundle with manifest ${bundle_sha} in the sourced catalog. Exiting..."
     exit 1
 fi
