@@ -28,7 +28,7 @@ spec:
   - name: dockerfile
     value: release/bundle/bundle.konflux.Dockerfile
   - name: prefetch-input
-    value: '[{"type": "generic", "path": "./release/bundle"},{"type": "gomod", "path": "."}]'
+    value: '[{"type": "gomod", "path": "."}]'
   - name: skip-preflight
     value: "true"
   - name: build-args-file

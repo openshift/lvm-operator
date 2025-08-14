@@ -29,7 +29,10 @@
         "digest"
       ],
       "platformAutomerge": true,
-      "commitMessagePrefix": "NO-JIRA:"
+      "commitMessagePrefix": "NO-JIRA:",
+      "schedule": [
+        "at any time"
+      ]
     },
     {
       "matchUpdateTypes": ["minor"],
@@ -59,6 +62,9 @@
       ".tekton/**"
     ],
     "platformAutomerge": true,
-    "commitMessagePrefix": "NO-JIRA:"
+    "commitMessagePrefix": "NO-JIRA:",
+    "schedule": [
+      "at any time"
+    ]
   }
 }
