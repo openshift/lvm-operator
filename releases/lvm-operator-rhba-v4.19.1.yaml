@@ -1,0 +1,24 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.19.1
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: 'Jeff Roche <jeroche@redhat.com>'
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-19
+  snapshot: lvm-operator-4-19-xkw2b
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be seen.
+
+        This erratum implements the following changes:
+
+        - Fixes the lvms-operator-metrics-monitor targets being down with a TLS certificate error
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        - id: OCPBUGS-59177
+          source: issues.redhat.com
