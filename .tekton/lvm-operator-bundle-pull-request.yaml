@@ -13,7 +13,7 @@ metadata:
       || "bundle/***".pathChanged() || "release/hack/render_templates.sh".pathChanged() || "release/container-build.args".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: lvm-operator4-19
+    appstudio.openshift.io/application: lvm-operator-4-19
     appstudio.openshift.io/component: lvm-operator-bundle-4-19
     pipelines.appstudio.openshift.io/type: build
   name: lvm-operator-bundle-4-19-on-pull-request
@@ -31,7 +31,7 @@ spec:
   - name: dockerfile
     value: release/bundle/bundle.konflux.Dockerfile
   - name: prefetch-input
-    value: '[{"type": "generic", "path": "./release/bundle"},{"type": "gomod", "path": "."}]'
+    value: '[{"type": "gomod", "path": "."}]'
   - name: skip-preflight
     value: "true"
   - name: build-args-file
