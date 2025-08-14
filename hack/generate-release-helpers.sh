@@ -3,11 +3,11 @@
 function append_jiras {
     # $1 is the base release notes
     # $2 is the comma separated list of jiras
-    rc=$(echo -e "${1}" | yq '.spec.data.releaseNotes.issues += []')
+    rc=$(echo -e "${1}" | yq '.spec.data.releaseNotes.issues.fixed += []')
 
     IFS=', ' read -ra jira_keys <<< "${2}"
     for key in ${jira_keys[@]}; do
-        yqformat=".spec.data.releaseNotes.issues += {\"id\": \"$key\", \"source\": \"issues.redhat.com\"}"
+        yqformat=".spec.data.releaseNotes.issues.fixed += {\"id\": \"$key\", \"source\": \"issues.redhat.com\"}"
         rc=$(echo -e "$rc" | yq "$yqformat")
     done
 
