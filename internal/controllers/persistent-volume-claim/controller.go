@@ -87,7 +87,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// Skip if the PVC is not in Pending state.
-	if pvc.Status.Phase != "Pending" {
+	if pvc.Status.Phase != corev1.ClaimPending {
 		return ctrl.Result{}, nil
 	}
 

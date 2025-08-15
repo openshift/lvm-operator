@@ -57,7 +57,7 @@ func (e *CommandExecutor) RunCommandAsHost(ctx context.Context, command string, 
 // it finishes the run and the output will be printed to the log.
 func (e *CommandExecutor) CombinedOutputCommandAsHost(ctx context.Context, command string, arg ...string) ([]byte, error) {
 	command, arg = e.WrapCommandWithNSenter(command, arg...)
-	cmd := exec.Command(command, arg...)
+	cmd := exec.CommandContext(ctx, command, arg...)
 	log.FromContext(ctx).Info("executing", "command", cmd.String())
 	return cmd.CombinedOutput()
 }
@@ -91,7 +91,7 @@ func (e *CommandExecutor) RunCommandAsHostInto(ctx context.Context, into any, co
 // Not calling close on this method will result in a resource leak.
 func (e *CommandExecutor) StartCommandWithOutputAsHost(ctx context.Context, command string, arg ...string) (io.ReadCloser, error) {
 	command, arg = e.WrapCommandWithNSenter(command, arg...)
-	cmd := exec.Command(command, arg...)
+	cmd := exec.CommandContext(ctx, command, arg...)
 	log.FromContext(ctx).Info("executing", "command", cmd.String())
 	return runCommandWithOutput(cmd)
 }
