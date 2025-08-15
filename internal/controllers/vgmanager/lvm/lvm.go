@@ -103,7 +103,7 @@ type LogicalVolume struct {
 }
 
 type LVM interface {
-	CreateVG(ctx context.Context, vg VolumeGroup) error
+	CreateVG(ctx context.Context, vg VolumeGroup, isWiped bool) error
 	ExtendVG(ctx context.Context, vg VolumeGroup, pvs []string) (VolumeGroup, error)
 	AddTagToVG(ctx context.Context, vgName string) error
 	DeleteVG(ctx context.Context, vg VolumeGroup) error
@@ -177,7 +177,7 @@ type PhysicalVolume struct {
 }
 
 // CreateVG creates a new volume group
-func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup) error {
+func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup, isWiped bool) error {
 	if vg.Name == "" {
 		return fmt.Errorf("failed to create volume group: volume group name is empty")
 	}
@@ -187,6 +187,12 @@ func (hlvm *HostLVM) CreateVG(ctx context.Context, vg VolumeGroup) error {
 	}
 
 	args := []string{vg.Name, "--addtag", DefaultTag}
+
+	// If the volume group is being created with a wiped physical volume, we need to pass the --yes flag to the command
+	// to avoid the command from asking for confirmation for wiping leftover signatures on the physical volume.
+	if isWiped {
+		args = append(args, "-y")
+	}
 
 	for _, pv := range vg.PVs {
 		args = append(args, pv.PvName)

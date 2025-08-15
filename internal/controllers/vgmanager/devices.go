@@ -30,7 +30,7 @@ import (
 )
 
 // addDevicesToVG creates or extends a volume group using the provided devices.
-func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice) error {
+func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, vgName string, devices []lsblk.BlockDevice, isWiped bool) error {
 	logger := log.FromContext(ctx)
 
 	if len(devices) < 1 {
@@ -61,7 +61,7 @@ func (r *Reconciler) addDevicesToVG(ctx context.Context, vgs []lvm.VolumeGroup, 
 		for _, pvName := range args {
 			pvs = append(pvs, lvm.PhysicalVolume{PvName: pvName})
 		}
-		if err := r.CreateVG(ctx, lvm.VolumeGroup{Name: vgName, PVs: pvs}); err != nil {
+		if err := r.CreateVG(ctx, lvm.VolumeGroup{Name: vgName, PVs: pvs}, isWiped); err != nil {
 			return fmt.Errorf("failed to create volume group %s: %w", vgName, err)
 		}
 	}

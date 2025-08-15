@@ -168,17 +168,17 @@ func (_c *MockLVM_CreateLV_Call) RunAndReturn(run func(context.Context, string, 
 	return _c
 }
 
-// CreateVG provides a mock function with given fields: ctx, vg
-func (_m *MockLVM) CreateVG(ctx context.Context, vg lvm.VolumeGroup) error {
-	ret := _m.Called(ctx, vg)
+// CreateVG provides a mock function with given fields: ctx, vg, isWiped
+func (_m *MockLVM) CreateVG(ctx context.Context, vg lvm.VolumeGroup, isWiped bool) error {
+	ret := _m.Called(ctx, vg, isWiped)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateVG")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, lvm.VolumeGroup) error); ok {
-		r0 = rf(ctx, vg)
+	if rf, ok := ret.Get(0).(func(context.Context, lvm.VolumeGroup, bool) error); ok {
+		r0 = rf(ctx, vg, isWiped)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -194,13 +194,14 @@ type MockLVM_CreateVG_Call struct {
 // CreateVG is a helper method to define mock.On call
 //   - ctx context.Context
 //   - vg lvm.VolumeGroup
-func (_e *MockLVM_Expecter) CreateVG(ctx interface{}, vg interface{}) *MockLVM_CreateVG_Call {
-	return &MockLVM_CreateVG_Call{Call: _e.mock.On("CreateVG", ctx, vg)}
+//   - isWiped bool
+func (_e *MockLVM_Expecter) CreateVG(ctx interface{}, vg interface{}, isWiped interface{}) *MockLVM_CreateVG_Call {
+	return &MockLVM_CreateVG_Call{Call: _e.mock.On("CreateVG", ctx, vg, isWiped)}
 }
 
-func (_c *MockLVM_CreateVG_Call) Run(run func(ctx context.Context, vg lvm.VolumeGroup)) *MockLVM_CreateVG_Call {
+func (_c *MockLVM_CreateVG_Call) Run(run func(ctx context.Context, vg lvm.VolumeGroup, isWiped bool)) *MockLVM_CreateVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(lvm.VolumeGroup))
+		run(args[0].(context.Context), args[1].(lvm.VolumeGroup), args[2].(bool))
 	})
 	return _c
 }
@@ -210,7 +211,7 @@ func (_c *MockLVM_CreateVG_Call) Return(_a0 error) *MockLVM_CreateVG_Call {
 	return _c
 }
 
-func (_c *MockLVM_CreateVG_Call) RunAndReturn(run func(context.Context, lvm.VolumeGroup) error) *MockLVM_CreateVG_Call {
+func (_c *MockLVM_CreateVG_Call) RunAndReturn(run func(context.Context, lvm.VolumeGroup, bool) error) *MockLVM_CreateVG_Call {
 	_c.Call.Return(run)
 	return _c
 }

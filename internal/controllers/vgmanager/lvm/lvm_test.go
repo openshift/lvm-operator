@@ -301,7 +301,7 @@ func TestHostLVM_CreateVG(t *testing.T) {
 					return nil
 				},
 			}
-			err := NewHostLVM(executor).CreateVG(ctx, tt.volumeGroup)
+			err := NewHostLVM(executor).CreateVG(ctx, tt.volumeGroup, false)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
