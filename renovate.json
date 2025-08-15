@@ -8,36 +8,6 @@
     "enabled": false
   },
   "commitBody": "Signed-off-by: {{{gitAuthor}}}",
-  "packageRules": [
-    {
-      "addLabels": [
-        "approved",
-        "lgtm"
-      ],
-      "autoApprove": true,
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "rebase",
-      "enabled": true,
-      "includePaths": [
-        "templates/**",
-        "catalogs"
-      ],
-      "matchManagers": [
-        "custom.regex",
-        "custom.jsonata"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
-      "platformAutomerge": true,
-      "commitMessagePrefix": "NO-JIRA:"
-    },
-    {
-      "matchUpdateTypes": ["minor"],
-      "enabled": false
-    }
-  ],
   "prConcurrentLimit": 5,
   "pruneBranchAfterAutomerge": true,
   "pruneStaleBranches": true,
@@ -61,6 +31,9 @@
       ".tekton/**"
     ],
     "platformAutomerge": true,
-    "commitMessagePrefix": "NO-JIRA:"
+    "commitMessagePrefix": "NO-JIRA:",
+    "schedule": [
+      "at any time"
+    ]
   }
 }
