@@ -20,5 +20,6 @@ spec:
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
       issues:
-        - id: OCPBUGS-59177
-          source: issues.redhat.com
+        fixed:
+          - id: OCPBUGS-59177
+            source: issues.redhat.com
