@@ -8,7 +8,7 @@ metadata:
     release.appstudio.openshift.io/author: 'Jeff Roche <jeroche@redhat.com>'
 spec:
   releasePlan: lvm-operator-production-releaseplan-4-19
-  snapshot: lvm-operator-4-19-xkw2b
+  snapshot: lvm-operator-4-19-285lc
   data:
     releaseNotes:
       description: |
