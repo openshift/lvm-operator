@@ -1,4 +1,5 @@
 #!/bin/bash
+
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
 staging_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
