@@ -1,7 +1,8 @@
 #!/bin/bash
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
-staging_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+#staging_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
 lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
 all_y_streams=($(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
@@ -60,30 +61,42 @@ for i in "${!all_y_streams[@]}"; do
         catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
     done
 
+    catalog_versions=($(echo "${candidate_versions}" | yq "[.[] | select(contains(\"${maxVersion}\"))] | join(\" \")"))
+
     # Check for and add any candidates if SKIP_CANDIDATES was not specified
-    if [ -z "${SKIP_CANDIDATES+x}" ]; then
+    if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
+
         candidate_snapshots=($(oc get releases --sort-by=metadata.creationTimestamp -o yaml | yq "[.items[] | select(.spec.releasePlan == \"lvm-operator-staging-releaseplan-${maxVersion//v4./4-}\")] | .[] | [.spec.snapshot] | join(\" \")"))
 
-        newest_snapshot=""
-        if (( ${#candidate_snapshots[@]} )); then
-            newest_snapshot="${candidate_snapshots[-1]}"
-        fi
+        for ver in "${catalog_versions[@]}"; do
+            if ! [[ -n "${digests["${ver}"]}" ]]; then
+                digests["${ver}"]=$(skopeo inspect "docker://${staging_bundle_path}:${ver}" --format "{{.Digest}}")
+                echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
+            fi
 
-        image_digest=""
-        if ! [ -z "${newest_snapshot}" ]; then
-            # There should only ever be 1 active candidate per z stream so go find the latest one and make sure it isn't already released
-            image_digest="$(oc get snapshot ${newest_snapshot} -o yaml | yq ".spec.components[] | select(.name == \"lvm-operator-bundle-${maxVersion//v4./4-}\") | .containerImage | split(\"@\") | .[1]")"
-        fi
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"Candidate ${ver}\")")
+        done
 
-        if [ -z "${image_digest}" ]; then
-            echo "No candidates detected for ${maxVersion}"
-        elif [[ ${digests[@]} =~ $image_digest ]]; then # If the digest has already been cached, it was found in registry.redhat.io
-            echo "Latest candidate snapshot for ${maxVersion} has already been released. Skipping candidates."
-        else
-            digests["candidate-${maxVersion}"]=$image_digest
-            echo "Pinning pre-release candidate-${maxVersion} to ${image_digest}"
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${image_digest}\"} | (.Image | key) line_comment=\"candidate-${maxVersion}\")")
-        fi
+        # newest_snapshot=""
+        # if (( ${#candidate_snapshots[@]} )); then
+        #     newest_snapshot="${candidate_snapshots[-1]}"
+        # fi
+
+        # image_digest=""
+        # if ! [ -z "${newest_snapshot}" ]; then
+        #     # There should only ever be 1 active candidate per z stream so go find the latest one and make sure it isn't already released
+        #     image_digest="$(oc get snapshot ${newest_snapshot} -o yaml | yq ".spec.components[] | select(.name == \"lvm-operator-bundle-${maxVersion//v4./4-}\") | .containerImage | split(\"@\") | .[1]")"
+        # fi
+
+        # if [ -z "${image_digest}" ]; then
+        #     echo "No candidates detected for ${maxVersion}"
+        # elif [[ ${digests[@]} =~ $image_digest ]]; then # If the digest has already been cached, it was found in registry.redhat.io
+        #     echo "Latest candidate snapshot for ${maxVersion} has already been released. Skipping candidates."
+        # else
+        #     digests["candidate-${maxVersion}"]=$image_digest
+        #     echo "Pinning pre-release candidate-${maxVersion} to ${image_digest}"
+        #     catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${image_digest}\"} | (.Image | key) line_comment=\"candidate-${maxVersion}\")")
+        # fi
     else
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
     fi
