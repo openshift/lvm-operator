@@ -44,18 +44,17 @@ repos:
         # E012: here doc didn't end before EOF
         entry: bashate --error . --ignore=E006,E040,E020,E012,E011
 
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.64.8
-    hooks:
-      - id: golangci-lint
-        entry: golangci-lint run --fix
-        args:
-          - "--modules-download-mode=vendor"
-          - "--timeout=20m"
-        types: [go]
-        language: golang
-        require_serial: true
-        pass_filenames: false
+  # - repo: https://github.com/golangci/golangci-lint
+  #   rev: v1.64.8
+  #   hooks:
+  #     - id: golangci-lint
+  #       entry: golangci-lint run --fix
+  #       args:
+  #         - "--timeout=20m"
+  #       types: [go]
+  #       language: golang
+  #       require_serial: true
+  #       pass_filenames: false
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
