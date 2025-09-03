@@ -8,11 +8,6 @@ WORKDIR /workspace
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
-# reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
-COPY vendor vendor/
-#RUN go mod verify # This is temporarily removed while we hold a carry patch
-
 # Copy the go source
 COPY api/ api/
 COPY cmd/ cmd/
@@ -21,10 +16,10 @@ COPY controllers/ controllers/
 COPY monitoring/ monitoring/
 COPY main.go main.go
 
-ENV CGO_ENABLED=1
 ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 ENV GOEXPERIMENT=strictfipsruntime
+ENV GOFLAGS="-mod=readonly"
 
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o manager main.go
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go

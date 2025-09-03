@@ -148,12 +148,11 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-godeps-update: ## Run go mod tidy and go mod vendor.
-	go mod tidy && go mod vendor
+godeps-update: ## Run go mod tidy
+	go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
-	hack/verify-deps.sh
 	hack/verify-bundle.sh
 	hack/verify-generated.sh
 
@@ -304,13 +303,13 @@ e2e-test: ginkgo ## Build and run e2e tests.
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 ifeq (,$(wildcard $(CONTROLLER_GEN)))
-	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0)
+	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen)
 endif
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 ifeq (,$(wildcard $(KUSTOMIZE)))
-	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
+	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v4)
 endif
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
