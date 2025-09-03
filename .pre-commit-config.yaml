@@ -55,7 +55,6 @@ repos:
       - id: golangci-lint
         entry: golangci-lint run --fix
         args:
-          - "--modules-download-mode=vendor"
           - "--timeout=20m"
         types: [go]
         language: golang
