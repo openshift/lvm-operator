@@ -1,3 +1,4 @@
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel8:v4.14 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21 as builder
 
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:81feb58a7f128be4efba588fa04def5712f901a9a41c21055ca184a1c4646600
@@ -25,10 +26,15 @@ ENV RBAC_PROXY_IMAGE="${RBAC_PROXY_IMAGE}"
 WORKDIR /operator
 COPY ./ ./
 
+ENV GOFLAGS="-mod=readonly"
+ENV GOBIN=/operator/bin
+
+
 RUN mkdir bin && \
-    cp /cachi2/output/deps/generic/* bin/ && \
-    tar -xvf bin/kustomize.tar.gz -C bin && \
-    chmod +x bin/operator-sdk bin/controller-gen
+    go install -mod=readonly sigs.k8s.io/controller-tools/cmd/controller-gen && \
+    go install -mod=readonly sigs.k8s.io/kustomize/kustomize/v4
+
+COPY --from=operator-sdk /usr/local/bin/operator-sdk ./bin/operator-sdk
 
 RUN ./release/hack/render_templates.sh
 
