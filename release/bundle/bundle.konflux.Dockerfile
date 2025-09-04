@@ -2,7 +2,7 @@ FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel8:v4.14 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21 as builder
 
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:2f7b9f622928848421460d94a304ecbbcf1776b36a0c0d7a0fd4e90b3534176e
-ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:382ceea1151da56d0931403207c9f85721d58a66b39b1cd79790eca6219807d0
+ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:156fd9c75f41512229fb846850eb4a61436873d86d48bc1f5a527c54bea10f2b
 ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel9@sha256:92bfeb0daf3f3dcde65571f6f3aa20a5dfac59da364db633e64a7c30e34588ad
 ARG CSI_REGISTRAR_IMAGE=registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:2e7eac2a2c52f7c6f7ec5a1b2a9c1a211e56be6233d6b1fc5a29bb7d05f26fae
 ARG CSI_LIVENESSPROBE_IMAGE=registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:0b1a832cfe80115e575006eff8ba530173feb4b5a09894f39fcaec74f34301f9
