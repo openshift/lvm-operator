@@ -39,7 +39,7 @@
       "enabled": false
     }
   ],
-  "prConcurrentLimit": 5,
+  "prConcurrentLimit": 0,
   "pruneBranchAfterAutomerge": true,
   "pruneStaleBranches": true,
   "semanticCommits": "enabled",
