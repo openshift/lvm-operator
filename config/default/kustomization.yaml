@@ -50,6 +50,6 @@ resources:
 - ../prometheus
 - ../webhook
 images:
-- digest: sha256:9b7aabfbead92df3a4afeb1854e45a92f23da52321d1705fce444510fa856145
+- digest: sha256:6a9e10a4aad59f7e01dac0407641e9cb5cd5b8ed21f62ea4b2271f8aede4cbec
   name: rbac-proxy
   newName: registry.redhat.io/openshift4/ose-kube-rbac-proxy
