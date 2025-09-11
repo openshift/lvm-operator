@@ -35,9 +35,7 @@ OPM_CMD = $(OPM) alpha render-template semver
 endif
 .PHONY: catalog
 catalog: opm
-	$(OPM_CMD) -o json templates/lvm-operator-catalog-$(CATALOG_VERSION)-template.yaml > catalogs/lvm-operator-catalog-$(CATALOG_VERSION).json
-	@echo "Catalog $(CATALOG_VERSION) generated in catalogs/lvm-operator-catalog-$(CATALOG_VERSION).json"
-	@echo "To build the catalog image, run: CATALOG_VERSION=$(CATALOG_VERSION) make container"
+	CATALOG_VERSION=$(CATALOG_VERSION) $(MAKE) catalogs
 
 .PHONY: catalogs
 catalogs: opm
