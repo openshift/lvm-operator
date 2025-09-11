@@ -17,18 +17,18 @@ endif
 
 all: templates catalogs
 
-TARGET_CATALOGS ?= "v4.14 v4.15 v4.16 v4.17 v4.18 v4.19 v4.20"
+TARGET_CATALOGS ?= "v4.14 v4.16 v4.17 v4.18 v4.19 v4.20"
 
 .PHONY: templates
 templates:
-	TARGET_VERSIONS=$(TARGET_CATALOGS) ./hack/generate_templates.sh
+	TARGET_VERSIONS="$(TARGET_CATALOGS)" ./hack/generate_templates.sh
 	@echo "Templates generation completed"
 	@echo "To build the catalog files, run: make catalogs"
 	@echo "To build a single catalog file, run: CATALOG_VERSION={{ catalog_version }} make catalog"
 
 # Catalog generation
 CATALOG_VERSION ?= v4.14
-OPM_NO_FLAG_VERSIONS = v4.12 v4.13 v4.14 v4.15 v4.16
+OPM_NO_FLAG_VERSIONS = v4.12 v4.13 v4.14  v4.16
 OPM_CMD = $(OPM) alpha render-template semver --migrate-level=bundle-object-to-csv-metadata
 ifneq ($(filter $(CATALOG_VERSION),$(OPM_NO_FLAG_VERSIONS)),) # Pre-4.17
 OPM_CMD = $(OPM) alpha render-template semver
@@ -45,7 +45,7 @@ catalogs: opm
 
 # Catalog Container Builds
 IMAGE_BUILD_CMD ?= $(shell command -v podman 2>&1 >/dev/null && echo podman || echo docker)
-RHEL8_VERSIONS = v4.12 v4.13 v4.14
+RHEL8_VERSIONS = v4.12 v4.14
 CATALOG_BUILD_ARGS = --build-arg=CATALOG_VERSION="$(CATALOG_VERSION)"
 ifneq ($(filter $(CATALOG_VERSION),$(RHEL8_VERSIONS)),) # Pre-4.15
 CATALOG_BUILD_ARGS += --build-arg=BASE_IMAGE="registry.redhat.io/openshift4/ose-operator-registry"
