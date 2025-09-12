@@ -34,7 +34,7 @@ for file in ${files}; do
     patched_catalog=$(echo "${catalog}" | yq -o=json eval-all '(.. | select(tag == "!!str")) |= sub("stable-v", "stable-") | (.. | select(tag == "!!str")) |= sub("candidate-v", "candidate-")')
 
     # Update any pre-release references to be registry.redhat.io
-    patched_catalog="${patched_catalog//quay.io\/redhat-user-workloads\/logical-volume-manag-tenant\/lvm/registry.redhat.io\/lvms4\/lvms}"
+    patched_catalog="${patched_catalog//registry.stage/registry}"
 
     echo "${patched_catalog}" > ${output_file}
 
