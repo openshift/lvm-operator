@@ -1072,7 +1072,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:447bfae89b17cdb39f35a868a5c707e771f2189ffe4f04e0f0e442604489c7c9",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:447bfae89b17cdb39f35a868a5c707e771f2189ffe4f04e0f0e442604489c7c9",
   "name": "lvms-operator.v4.19.2",
   "package": "lvms-operator",
   "properties": [
@@ -1233,7 +1233,7 @@
       "name": "lvms-operator"
     },
     {
-      "image": "registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:447bfae89b17cdb39f35a868a5c707e771f2189ffe4f04e0f0e442604489c7c9",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:447bfae89b17cdb39f35a868a5c707e771f2189ffe4f04e0f0e442604489c7c9",
       "name": ""
     }
   ],
