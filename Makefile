@@ -21,7 +21,7 @@ TARGET_CATALOGS ?= "v4.14 v4.16 v4.17 v4.18 v4.19 v4.20"
 
 .PHONY: templates
 templates:
-	TARGET_VERSIONS="$(TARGET_CATALOGS)" ./hack/generate_templates.sh
+	TARGET_VERSIONS=$(TARGET_CATALOGS) ./hack/generate_templates.sh
 	@echo "Templates generation completed"
 	@echo "To build the catalog files, run: make catalogs"
 	@echo "To build a single catalog file, run: CATALOG_VERSION={{ catalog_version }} make catalog"

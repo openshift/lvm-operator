@@ -31,4 +31,4 @@ Stable:
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:60f231e9d87e48672a685f86313845903f4dbefa89a7bb63e33b13b6af1efd6f # v4.14.7
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:6b815a875dc05c8f4eefbb651d21261a2aed1008d0c59bb1852d2bbcc3b0895c # v4.14.8
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:2bdcca623613f510e9931c4fbc109d4d75d1a8554a3b2d11b9fc9011725a7afd # v4.14.9
-    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:6dd1c8e7395dd1953199791e8116e40bd777d0bdf2265759f085dc06a673e842 # Candidate v4.14.14
+    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:92345afc21e99ca2db3145dbdaa50c629125d1a4377f46f0ac1f25201ce17f02 # Candidate v4.14.14
