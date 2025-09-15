@@ -11,6 +11,7 @@ metadata:
       (".tekton/catalog-pipeline.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-v4.19-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-v4.19-push.yaml".pathChanged() ||
+      ".tekton/images-mirror-set.yaml".pathChanged() ||
       "catalogs/lvm-operator-catalog-v4.19.json".pathChanged() ||
       "templates/lvm-operator-catalog-v4.19-template.yaml".pathChanged() ||
       "konflux-catalog.Dockerfile".pathChanged())
