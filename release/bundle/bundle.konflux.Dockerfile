@@ -45,6 +45,7 @@ LABEL com.redhat.openshift.versions="${OPENSHIFT_VERSIONS}"
 LABEL com.redhat.delivery.backport=false
 
 # Standard Red Hat labels
+LABEL cpe="cpe:/a:redhat:lvms:4.19::el9"
 LABEL com.redhat.component="lvms-operator-bundle-container"
 LABEL name="lvms4/lvms-operator-bundle"
 LABEL version="${OPERATOR_VERSION}"
