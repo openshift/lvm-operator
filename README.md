@@ -67,49 +67,12 @@ The release yaml will be output in the releases folder and can be committed to t
 ### Dev Environment Configuration
 #### Test Cluster Kubeconfig
 
-The kubeconfig for the cluster used for testing should be located at `${HOME/.kube/config}` and have an `admin` context
-
-#### Konflux Cluster Kubeconfig
-You will need to add a kubeconfig for the konflux cluster in `${HOME}/.kube/konflux.kubeconfig` and be defined like the following code block:
-
-<details>
-
-```yaml
-apiVersion: v1
-clusters:
-- cluster:
-    server: https://api-toolchain-host-operator.apps.stone-prd-host1.wdlc.p1.openshiftapps.com//workspaces/logical-volume-manag
-  name: konfluxInformation
-contexts:
-- context:
-    cluster: konflux
-    namespace: logical-volume-manag-tenant
-    user: oidc
-  name: konflux
-current-context: konflux
-kind: Config
-preferences: {}
-users:
-- name: oidc
-  user:
-    exec:
-      apiVersion: client.authentication.k8s.io/v1beta1
-      args:
-      - oidc-login
-      - get-token
-      - --oidc-issuer-url=https://sso.redhat.com/auth/realms/redhat-external
-      - --oidc-client-id=rhoas-cli-prod
-      command: kubectl
-      env: null
-      interactiveMode: IfAvailable
-      provideClusterInfo: false
-```
-</details>
+The kubeconfig for the cluster used for testing. You should set the path to the kubeconfig file in the `TEST_CLUSTER_KUBECONFIG` environment variable.
 
 #### Pull Secret
 You will need to have your pull secret saved to `${HOME}/.docker/config.json` with credentials defined for the following repos:
 - `registry.redhat.io`
-- `registry.stage.redhat.io` - This is optional
+- `registry.stage.redhat.io`
 - `quay.io`
 
 #### CLI Tools
@@ -120,26 +83,26 @@ You will need to have your pull secret saved to `${HOME}/.docker/config.json` wi
 #### Environment Variables
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
-| `CANDIDATE_VERSION` | **required** | `4.19` | The version of the operator under test (exclude the `v` in the version number) |
-| `CATALOG_SOURCE` | *not required* | `lvm-operator-catalogsource` | The catalog source name for the catalog source that will be injected into the test cluster |
+| `CANDIDATE_VERSION` | **REQUIRED** | `4.19` | The version of the operator under test (exclude the `v` in the version number) |
+| `TEST_SNAPSHOT` | **REQUIRED** | `lvm-operator-4-19-xkw2b` | For specifying the operator snapshot you want to test |
+| `CATALOG_SNAPSHOT` | **REQUIRED** | `lvm-operator-catalog-4-19-fq2mp` | For specifying the catalog that contains the artifacts from `TEST_SNAPSHOT` |
+| `TEST_CLUSTER_KUBECONFIG` | **REQUIRED** | `/path/to/my/cluster/kubeconfig` | For authenticating and applying changes to the cluster that will be used for testing |
+| `TEST_CLUSTER_CONTEXT` | *not required* | `"admin"` | The context from `$TEST_CLUSTER_KUBECONFIG` to use on the cluster. Defaults to "admin" |
 | `CLUSTER_OS` | *not required* | `rhel9` | For specifying the operator index |
-| `TEST_SNAPSHOT` | *not required* | `lvm-operator-4-19-xkw2b` | For specifying the operator snapshot you want to test |
-| `CATALOG_SNAPSHOT` | *not required* | `lvm-operator-catalog-4-19-fq2mp` | For specifying the catalog that contains the artifacts from `TEST_SNAPSHOT` |
-
-> **NOTE** - `CATALOG_SNAPSHOT` **is required** if you specify `TEST_SNAPSHOT`
 
 ### Cluster Configuration
 Once your dev environment is configured, you can configure the test cluster by running the following commands:
 
-1. Once per test cluster you need to run `make cluster-config`
+1. Export any environment variables needed for configuration
+    ```bash
+    $ export TEST_SNAPSHOT='lvm-operator-4-19-abcde'
+    $ export CATALOG_SNAPSHOT='lvm-operator-catalog-4-19-abcde'
+    $ export CANDIDATE_VERSION=4.19
+    $ export TEST_CLUSTER_KUBECONFIG=/path/to/my/kubeconfig
+    ```
+2. Once per test cluster you need to run `make cluster-config`
     - This will update the cluster pull secret and apply the `ImageDigestMirrorSet` required for testing
-2. Identify and apply the catalog that will be used for testing to the test cluster
-    - `CANDIDATE_VERSION=4.19 make cluster-catalog-config`
-
-    OR
-
-    - If you don't want to test the latest staging release and instead want to test an earlier release:
-
-      `CANDIDATE_VERSION=4.19 TEST_SNAPSHOT='lvm-operator-4-19-abcde' CATALOG_SNAPSHOT='lvm-operator-catalog-4-19-abcde' make cluster-catalog-config`
-3. Install the operator
-    - `CANDIDATE_VERSION=4.19 make install-operator`
+3. Identify and apply the catalog that will be used for testing to the test cluster
+    - `make cluster-catalog-config`
+4. Install the operator
+    - `make install-operator`

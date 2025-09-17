@@ -2,13 +2,15 @@ CLUSTER_OS ?= rhel9
 CANDIDATE_VERSION ?= 4.20
 CATALOG_SOURCE ?= lvm-operator-catalogsource
 
+TEST_CLUSTER_KUBECONFIG ?= $(HOME)/.kube/config
+
 .PHONY: image-digest-mirrors
 image-digest-mirrors:
-	./hack/generate_imagedigestmirrors.sh
+	KUBECONFIG=$(TEST_CLUSTER_KUBECONFIG) ./hack/generate_imagedigestmirrors.sh
 
 .PHONY: update-cluster-pull-secret
 update-cluster-pull-secret:
-	./hack/update_cluster_pull_secret.sh
+	KUBECONFIG=$(TEST_CLUSTER_KUBECONFIG) ./hack/update_cluster_pull_secret.sh
 
 .PHONY: cluster-config
 cluster-config: image-digest-mirrors update-cluster-pull-secret
