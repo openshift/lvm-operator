@@ -1,8 +1,10 @@
 #!/bin/bash
 
-oc="${OC:-oc}"
+: ${TEST_CLUSTER_CONTEXT:="admin"}
 
-cluster_pull_secret="$(${oc} get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}')"
+oc config use-context "${TEST_CLUSTER_CONTEXT}"
+
+cluster_pull_secret="$(oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}')"
 
 mkdir -p manifests
 

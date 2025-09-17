@@ -3,31 +3,35 @@
 : ${TARGET_VERSION:="4.20"}
 : ${TEST_CLUSTER_KUBECONFIG:="${HOME}/.kube/config"}
 : ${TEST_CLUSTER_CONTEXT:="admin"}
-: ${KONFLUX_CLUSTER_KUBECONFIG:="${HOME}/.kube/konflux.kubeconfig"}
-: ${KONFLUX_CLUSTER_CONTEXT:="konflux"}
 : ${TEST_SNAPSHOT:=""}
 : ${CATALOG_SNAPSHOT:=""}
+: ${CATALOG_SOURCE:="lvm-operator-catalogsource"}
 version=$(echo "${TARGET_VERSION}" | tr . -)
 
 konflux_namespace="logical-volume-manag-tenant"
-unset KUBECONFIG
-export KUBECONFIG="${KONFLUX_CLUSTER_KUBECONFIG}"
-oc config use-context "${KONFLUX_CLUSTER_CONTEXT}"
+konflux_cluster="https://api.stone-prd-rh01.pg1f.p1.openshiftapps.com:6443/"
 
-snapshot_name="${TEST_SNAPSHOT}"
 if ! [ -n "${TEST_SNAPSHOT}" ]; then
-    # If no snapshot is provided, find the newest one for the target version
-    snapshot_name=$(oc -n "${konflux_namespace}" get releases -o custom-columns=SNAPSHOT:.spec.snapshot --sort-by=.metadata.creationTimestamp | grep "lvm-operator-${TARGET_VERSION}" | tail -n 1)
-elif ! [ -n "${CATALOG_SNAPSHOT}" ]; then
-    # If the snapshot is specified, we also need the catalog specified since there is no concrete method of relating catalog snapshot to bundle snapshot
-    echo "ERROR: If the 'TEST_SNAPSHOT' env is defined, you must also specify CATALOG_SNAPSHOT. Exiting..."
+    echo "ERROR: An operator snapshot must be supplied by setting the TEST_SNAPSHOT environment variable. Exiting..."
     exit 1
 fi
 
-bundle_image=$(oc -n "${konflux_namespace}" get snapshot "${snapshot_name}" -o yaml | yq '.spec.components[] | select(.name == "lvm-operator-bundle-*") | .containerImage')
+if ! [ -n "${CATALOG_SNAPSHOT}" ]; then
+    echo "ERROR: A catalog snapshot must be supplied by setting the CATALOG_SNAPSHOT environment variable. Exiting..."
+    exit 1
+fi
 
-echo "Target Snapshot: ${snapshot_name}"
-echo "Target Bundle: ${bundle_image}"
+oc login --web $konflux_cluster
+
+bundle_image=$(oc -n "${konflux_namespace}" get snapshot "${TEST_SNAPSHOT}" -o yaml | yq '.spec.components[] | select(.name == "lvm-operator-bundle-*") | .containerImage')
+catalog_image=$(oc -n "${konflux_namespace}" get snapshot "${CATALOG_SNAPSHOT}" -o yaml | yq ".spec.components[] | select(.name == \"lvm-operator-catalog-${version}\") | .containerImage")
+
+oc -n "${konflux_namespace}" get snapshot "${CATALOG_SNAPSHOT}" -o yaml | yq ".spec.components[] | select(.name == \"lvm-operator-catalog-${version}\") | .containerImage"
+
+echo "Operator Snapshot: ${TEST_SNAPSHOT}"
+echo "Operator Bundle: ${bundle_image}"
+echo "Catalog Snapshot: ${CATALOG_SNAPSHOT}"
+echo "Catalog Image: ${catalog_image}"
 
 # Validate we got the correct information before doing configuration
 read -p "Is this correct? (y/n): " -n 1 -r
@@ -37,17 +41,6 @@ then
     echo "Aborting cluster configuration..."
     exit 1
 fi
-
-# Get the latest release for the requested version
-catalog_snapshot="${CATALOG_SNAPSHOT}"
-if ! [ -n "${CATALOG_SNAPSHOT}" ]; then
-    catalog_release=$(oc -n "${konflux_namespace}" get releases -o custom-columns=RELEASE:.metadata.name --sort-by=.metadata.creationTimestamp | grep "lvm-operator-catalog-${version}" | tail -n 1)
-    catalog_snapshot=$(oc -n "${konflux_namespace}" get release "${catalog_release}" -o yaml | yq '.spec.snapshot')
-fi
-
-catalog_image=$(oc -n "${konflux_namespace}" get snapshot "${catalog_snapshot}" -o yaml | yq ".spec.components[] | select(.name == \"lvm-operator-catalog-${version}\") | .containerImage")
-
-echo "Catalog Image: ${catalog_image}"
 
 catalog_source=$(cat << EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -63,6 +56,8 @@ spec:
 EOF
 )
 
+# Setup configuration for the test cluster
+unset KUBECONFIG
 export KUBECONFIG="${TEST_CLUSTER_KUBECONFIG}"
 oc config use-context "${TEST_CLUSTER_CONTEXT}"
 
