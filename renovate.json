@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>konflux-ci/mintmaker//config/renovate/renovate.json"],
+  "extends": [
+    "github>konflux-ci/mintmaker//config/renovate/renovate.json"
+  ],
   "gomod": {
     "enabled": false
   },
@@ -35,7 +37,9 @@
       ]
     },
     {
-      "matchUpdateTypes": ["minor"],
+      "matchUpdateTypes": [
+        "minor"
+      ],
       "enabled": false
     }
   ],
@@ -53,9 +57,9 @@
       "lgtm"
     ],
     "enabled": true,
-    "fileMatch": [
-      "\\.yaml$",
-      "\\.yml$"
+    "managerFilePatterns": [
+      "/\\.yaml$/",
+      "/\\.yml$/"
     ],
     "ignoreTests": true,
     "includePaths": [
