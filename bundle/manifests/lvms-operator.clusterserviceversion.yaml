@@ -79,6 +79,7 @@ metadata:
           }
         }
       }
+    operators.openshift.io/must-gather-image: registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:57f26d3fd9c344114d4c6589f68ad6cf979c111d4a56f05197c13baca1e05fe8
     operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift
       Container Platform", "OpenShift Platform Plus"]'
     operators.operatorframework.io/builder: operator-sdk-v1.38.0
