@@ -4,6 +4,11 @@
     "github>konflux-ci/mintmaker//config/renovate/renovate.json"
   ],
   "gomod": {
+    "packageRules":[
+      {
+        "enabled": false
+      }
+    ],
     "enabled": false
   },
   "pre-commit": {
@@ -63,9 +68,18 @@
     ],
     "ignoreTests": true,
     "includePaths": [
-      ".tekton/**"
+      ".tekton/**",
+      "release/**"
     ],
     "platformAutomerge": true,
-    "commitMessagePrefix": "NO-JIRA:"
+    "commitMessagePrefix": "NO-JIRA:",
+    "schedule": [
+      "at any time"
+    ]
+  },
+  "rpm-lockfile": {
+    "lockFileMaintenance": {
+      "enabled": true
+    }
   }
 }
