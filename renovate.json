@@ -4,15 +4,10 @@
     "github>konflux-ci/mintmaker//config/renovate/renovate.json"
   ],
   "gomod": {
-    "packageRules":[
-      {
-        "enabled": false
-      }
-    ],
     "enabled": false
   },
   "pre-commit": {
-    "enabled": false
+    "enabled": true
   },
   "commitBody": "Signed-off-by: {{{gitAuthor}}}",
   "packageRules": [
