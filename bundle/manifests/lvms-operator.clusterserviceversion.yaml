@@ -79,9 +79,9 @@ metadata:
           }
         }
       }
+    operators.openshift.io/must-gather-image: quay.io/lvms_dev/lvms-must-gather:latest
     operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift
       Container Platform", "OpenShift Platform Plus"]'
-    operators.openshift.io/must-gather-image: quay.io/lvms_dev/lvms-must-gather:latest
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/internal-objects: '["logicalvolumes.topolvm.io",
       "lvmvolumegroups.lvm.topolvm.io", "lvmvolumegroupnodestatuses.lvm.topolvm.io"]'
