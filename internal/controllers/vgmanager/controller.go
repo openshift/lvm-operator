@@ -19,6 +19,7 @@ package vgmanager
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -68,10 +69,12 @@ const EventReasonErrorInconsistentLVs EventReasonError = "InconsistentLVs"
 const EventReasonErrorVGCreateOrExtendFailed EventReasonError = "VGCreateOrExtendFailed"
 const EventReasonErrorThinPoolCreateOrExtendFailed EventReasonError = "ThinPoolCreateOrExtendFailed"
 const EventReasonErrorDevicePathCheckFailed EventReasonError = "DevicePathCheckFailed"
+const EventReasonErrorDeviceRemovalFailed EventReasonError = "DeviceRemovalFailed"
 const EventReasonLVMDConfigMissing EventReasonInfo = "LVMDConfigMissing"
 const EventReasonLVMDConfigUpdated EventReasonInfo = "LVMDConfigUpdated"
 const EventReasonLVMDConfigDeleted EventReasonInfo = "LVMDConfigDeleted"
 const EventReasonVolumeGroupReady EventReasonInfo = "VolumeGroupReady"
+const EventReasonDeviceRemoved EventReasonInfo = "DeviceRemoved"
 
 var (
 	reconcileAgain = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
@@ -216,6 +219,22 @@ func (r *Reconciler) reconcile(
 				logger.Error(err, "failed to set status to failed")
 			}
 			return ctrl.Result{}, err
+		}
+
+		deleted, err := r.deleteRemovedDevices(ctx, lvmVG, volumeGroup, resolver)
+		if err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, fmt.Errorf("failed to remove devices: %w", err)
+		}
+
+		if deleted {
+			// refresh vgs list if devices deleted
+			vgs, err = r.ListVGs(ctx, true)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+			}
 		}
 
 		logger.V(1).Info("no new available devices discovered, verifying existing setup")
@@ -629,6 +648,68 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	logger.Info("successfully created thinpool")
 
 	return nil
+}
+
+func (r *Reconciler) deleteRemovedDevices(
+	ctx context.Context,
+	currentVG *lvm.VolumeGroup,
+	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
+	resolver *symlinkResolver.Resolver,
+) (bool, error) {
+	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
+
+	// Check for device removal requests only if DeviceSelector exists
+	if volumeGroup.Spec.DeviceSelector == nil ||
+		len(volumeGroup.Spec.DeviceSelector.Paths) == 0 && len(volumeGroup.Spec.DeviceSelector.OptionalPaths) == 0 {
+		return false, nil
+	}
+
+	if currentVG.IsMissingDevices() {
+		err := fmt.Errorf("VG %s on node %s is missing one or more devices. Please fix the VG on the node first and update LVMCluster to reflect current state", volumeGroup.Name, r.NodeName)
+		logger.Error(err, "device removal canceled")
+		return false, err
+	}
+
+	userProvidedMappings, err := buildDevicePathMappings(ctx, volumeGroup, resolver)
+	if err != nil {
+		return false, err
+	}
+
+	devicesToRemove := make([]string, 0)
+
+	for _, pv := range currentVG.PVs {
+		if !slices.Contains(userProvidedMappings, pv.PvName) {
+			devicesToRemove = append(devicesToRemove, pv.PvName)
+		}
+	}
+
+	if len(devicesToRemove) == 0 {
+		return false, nil
+	}
+
+	if len(currentVG.PVs)-len(devicesToRemove) < 1 {
+		return false, fmt.Errorf("devices can't be deleted from VG %s because after deletion there will be less than 1 device in VG", volumeGroup.Name)
+	}
+
+	logger.Info("Detected devices to be removed", "devices", devicesToRemove)
+
+	// Remove devices directly from VG
+	for _, devicePath := range devicesToRemove {
+		if err = r.ReduceVG(ctx, volumeGroup.Name, devicePath); err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
+			return false, fmt.Errorf("failed to remove device %s from VG %s: %w", devicePath, volumeGroup.Name, err)
+		}
+
+		if err = r.RemovePV(ctx, devicePath); err != nil {
+			logger.Error(err, "failed to remove PV, please remove pv manually", "pv_name", devicePath)
+		}
+	}
+
+	msg := fmt.Sprintf("successfully removed %s device(s) from volume group", devicesToRemove)
+	logger.Info(msg)
+	r.NormalEvent(ctx, volumeGroup, EventReasonDeviceRemoved, msg)
+
+	return true, nil
 }
 
 // convertChunkSize converts the chunk size from the ThinPoolConfig to the correct value for the LVM API

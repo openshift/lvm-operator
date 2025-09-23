@@ -19,6 +19,7 @@ package lvm
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
@@ -40,6 +41,7 @@ const (
 	vgCreateCmd   = "/usr/sbin/vgcreate"
 	vgChangeCmd   = "/usr/sbin/vgchange"
 	vgExtendCmd   = "/usr/sbin/vgextend"
+	vgReduceCmd   = "/usr/sbin/vgreduce"
 	vgRemoveCmd   = "/usr/sbin/vgremove"
 	pvRemoveCmd   = "/usr/sbin/pvremove"
 	lvCreateCmd   = "/usr/sbin/lvcreate"
@@ -108,8 +110,10 @@ type LVM interface {
 	AddTagToVG(ctx context.Context, vgName string) error
 	DeleteVG(ctx context.Context, vg VolumeGroup) error
 	GetVG(ctx context.Context, name string) (VolumeGroup, error)
+	ReduceVG(ctx context.Context, vgName string, devices string) error
 
 	ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error)
+	RemovePV(ctx context.Context, devicePath string) error
 	ListVGs(ctx context.Context, taggedByLVMS bool) ([]VolumeGroup, error)
 	ListLVsByName(ctx context.Context, vgName string) ([]string, error)
 	ListLVs(ctx context.Context, vgName string) (*LVReport, error)
@@ -149,6 +153,15 @@ type VolumeGroup struct {
 	Tags []string `json:"vg_tags"`
 }
 
+func (vg *VolumeGroup) IsMissingDevices() bool {
+	for _, pv := range vg.PVs {
+		if pv.PvMissing != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // PhysicalVolume represents a physical volume of linux lvm.
 type PhysicalVolume struct {
 	// PvName is the name of the Physical Volume
@@ -171,6 +184,9 @@ type PhysicalVolume struct {
 
 	// PvFree describes the free space of the PhysicalVolume
 	PvFree string `json:"pv_free"`
+
+	// PvMissing describes if PV is missing
+	PvMissing string `json:"pv_missing"`
 
 	// DevSize describes the size of the underlying device on which the PhysicalVolume was created
 	DevSize string `json:"dev_size"`
@@ -323,7 +339,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error) {
 	res := new(PVReport)
 	args := []string{
-		"--units", "b", "--nosuffix", "-v", "--reportformat", "json",
+		"--units", "b", "--nosuffix", "-v", "--reportformat", "json", "-o", "+pv_missing",
 	}
 	if vgName != "" {
 		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
@@ -336,14 +352,15 @@ func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolu
 	for _, report := range res.Report {
 		for _, pv := range report.Pv {
 			pvs = append(pvs, PhysicalVolume{
-				PvName:  pv.PvName,
-				UUID:    pv.UUID,
-				VgName:  pv.VgName,
-				PvFmt:   pv.PvFmt,
-				PvAttr:  pv.PvAttr,
-				PvSize:  pv.PvSize,
-				PvFree:  pv.PvFree,
-				DevSize: pv.DevSize,
+				PvName:    pv.PvName,
+				UUID:      pv.UUID,
+				VgName:    pv.VgName,
+				PvFmt:     pv.PvFmt,
+				PvAttr:    pv.PvAttr,
+				PvSize:    pv.PvSize,
+				PvFree:    pv.PvFree,
+				DevSize:   pv.DevSize,
+				PvMissing: pv.PvMissing,
 			})
 		}
 	}
@@ -448,13 +465,7 @@ func (hlvm *HostLVM) LVExists(ctx context.Context, lvName, vgName string) (bool,
 		return false, err
 	}
 
-	for _, lv := range lvs {
-		if lv == lvName {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return slices.Contains(lvs, lvName), nil
 }
 
 // DeleteLV deactivates the logical volume and deletes it
@@ -573,17 +584,27 @@ func (hlvm *HostLVM) ActivateLV(ctx context.Context, lvName, vgName string) erro
 	return nil
 }
 
+// ReduceVG removes a physical volume from a volume group using vgreduce.
+func (hlvm *HostLVM) ReduceVG(ctx context.Context, vgName string, device string) error {
+	args := []string{vgName, device}
+	if err := hlvm.RunCommandAsHost(ctx, vgReduceCmd, args...); err != nil {
+		return fmt.Errorf("failed to reduce volume group %s by removing device %s: %w", vgName, device, err)
+	}
+	return nil
+}
+
+// RemovePV removes the LVM signature from a physical volume using pvremove.
+func (hlvm *HostLVM) RemovePV(ctx context.Context, devicePath string) error {
+	if err := hlvm.RunCommandAsHost(ctx, pvRemoveCmd, devicePath); err != nil {
+		return fmt.Errorf("failed to remove PV signature from device %s: %w", devicePath, err)
+	}
+	return nil
+}
+
 func untaggedVGs(vgs []VolumeGroup) []VolumeGroup {
 	var untaggedVGs []VolumeGroup
 	for _, vg := range vgs {
-		tagPresent := false
-		for _, tag := range vg.Tags {
-			if tag == DefaultTag {
-				tagPresent = true
-				break
-			}
-		}
-		if !tagPresent {
+		if !slices.Contains(vg.Tags, DefaultTag) {
 			untaggedVGs = append(untaggedVGs, vg)
 		}
 	}

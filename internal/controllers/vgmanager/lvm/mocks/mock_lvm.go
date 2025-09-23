@@ -818,6 +818,101 @@ func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool) ([]
 	return _c
 }
 
+// ReduceVG provides a mock function with given fields: ctx, vgName, devices
+func (_m *MockLVM) ReduceVG(ctx context.Context, vgName string, devices string) error {
+	ret := _m.Called(ctx, vgName, devices)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReduceVG")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, vgName, devices)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_ReduceVG_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReduceVG'
+type MockLVM_ReduceVG_Call struct {
+	*mock.Call
+}
+
+// ReduceVG is a helper method to define mock.On call
+//   - ctx context.Context
+//   - vgName string
+//   - devices string
+func (_e *MockLVM_Expecter) ReduceVG(ctx interface{}, vgName interface{}, devices interface{}) *MockLVM_ReduceVG_Call {
+	return &MockLVM_ReduceVG_Call{Call: _e.mock.On("ReduceVG", ctx, vgName, devices)}
+}
+
+func (_c *MockLVM_ReduceVG_Call) Run(run func(ctx context.Context, vgName string, devices string)) *MockLVM_ReduceVG_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_ReduceVG_Call) Return(_a0 error) *MockLVM_ReduceVG_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_ReduceVG_Call) RunAndReturn(run func(context.Context, string, string) error) *MockLVM_ReduceVG_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemovePV provides a mock function with given fields: ctx, devicePath
+func (_m *MockLVM) RemovePV(ctx context.Context, devicePath string) error {
+	ret := _m.Called(ctx, devicePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemovePV")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, devicePath)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLVM_RemovePV_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemovePV'
+type MockLVM_RemovePV_Call struct {
+	*mock.Call
+}
+
+// RemovePV is a helper method to define mock.On call
+//   - ctx context.Context
+//   - devicePath string
+func (_e *MockLVM_Expecter) RemovePV(ctx interface{}, devicePath interface{}) *MockLVM_RemovePV_Call {
+	return &MockLVM_RemovePV_Call{Call: _e.mock.On("RemovePV", ctx, devicePath)}
+}
+
+func (_c *MockLVM_RemovePV_Call) Run(run func(ctx context.Context, devicePath string)) *MockLVM_RemovePV_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockLVM_RemovePV_Call) Return(_a0 error) *MockLVM_RemovePV_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLVM_RemovePV_Call) RunAndReturn(run func(context.Context, string) error) *MockLVM_RemovePV_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockLVM creates a new instance of MockLVM. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockLVM(t interface {

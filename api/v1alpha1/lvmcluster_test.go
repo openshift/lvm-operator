@@ -496,40 +496,32 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
-	It("device paths cannot be removed from device class in update", func(ctx SpecContext) {
+	It("device paths can be removed but at least one device must remain", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths:         []DevicePath{"/dev/path1", "/dev/path2"},
+			OptionalPaths: []DevicePath{"/dev/optional1"},
+		}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
+		// Should succeed - removing some devices but keeping at least one
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []DevicePath{"/dev/otherpath"}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []DevicePath{"/dev/path1"}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []DevicePath{}
+		Expect(k8sClient.Update(ctx, updated)).To(Succeed())
 
-		err := k8sClient.Update(ctx, updated)
+		// Should fail - removing all devices (start from the updated state)
+		updated2 := updated.DeepCopy()
+		updated2.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []DevicePath{}
+		updated2.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []DevicePath{}
+		err := k8sClient.Update(ctx, updated2)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(Satisfy(k8serrors.IsForbidden))
 		statusError := &k8serrors.StatusError{}
 		Expect(errors.As(err, &statusError)).To(BeTrue())
-		Expect(statusError.Status().Message).To(ContainSubstring("required device paths were deleted from the LVMCluster"))
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrPathsOrOptionalPathsMandatoryWithNonNilDeviceSelector.Error()))
 
-		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-	})
-
-	It("optional device paths cannot be removed from device class in update", func(ctx SpecContext) {
-		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{"/dev/newpath"}}
-		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-
-		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []DevicePath{"/dev/otherpath"}
-
-		err := k8sClient.Update(ctx, updated)
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(Satisfy(k8serrors.IsForbidden))
-		statusError := &k8serrors.StatusError{}
-		Expect(errors.As(err, &statusError)).To(BeTrue())
-		Expect(statusError.Status().Message).To(ContainSubstring("optional device paths were deleted from the LVMCluster"))
-
-		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, updated2)).To(Succeed())
 	})
 
 	It("force wipe option cannot be added in update", func(ctx SpecContext) {
@@ -538,7 +530,7 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To[bool](true)
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(true)
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
@@ -552,11 +544,11 @@ var _ = Describe("webhook acceptance tests", func() {
 
 	It("force wipe option cannot be changed in update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
-		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}, ForceWipeDevicesAndDestroyAllData: ptr.To[bool](false)}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/newpath"}, ForceWipeDevicesAndDestroyAllData: ptr.To(false)}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 		updated := resource.DeepCopy()
-		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To[bool](true)
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.ForceWipeDevicesAndDestroyAllData = ptr.To(true)
 
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
