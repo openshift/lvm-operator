@@ -259,13 +259,8 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
-		if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
-			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
-		}
-
-		if err := validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
-			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
-		}
+		// Device removal is now handled by the controller with proper data validation
+		// The webhook no longer blocks device removal - safety checks are performed at runtime
 
 	}
 

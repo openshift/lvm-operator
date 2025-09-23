@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,10 +70,13 @@ const EventReasonErrorInconsistentLVs EventReasonError = "InconsistentLVs"
 const EventReasonErrorVGCreateOrExtendFailed EventReasonError = "VGCreateOrExtendFailed"
 const EventReasonErrorThinPoolCreateOrExtendFailed EventReasonError = "ThinPoolCreateOrExtendFailed"
 const EventReasonErrorDevicePathCheckFailed EventReasonError = "DevicePathCheckFailed"
+const EventReasonErrorDeviceRemovalFailed EventReasonError = "DeviceRemovalFailed"
+const EventReasonErrorDeviceRemovalUnsafe EventReasonError = "DeviceRemovalUnsafe"
 const EventReasonLVMDConfigMissing EventReasonInfo = "LVMDConfigMissing"
 const EventReasonLVMDConfigUpdated EventReasonInfo = "LVMDConfigUpdated"
 const EventReasonLVMDConfigDeleted EventReasonInfo = "LVMDConfigDeleted"
 const EventReasonVolumeGroupReady EventReasonInfo = "VolumeGroupReady"
+const EventReasonDeviceRemoved EventReasonInfo = "DeviceRemoved"
 
 var (
 	reconcileAgain = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
@@ -160,6 +165,24 @@ func (r *Reconciler) reconcile(
 	vgs, err := r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+	}
+
+	removedDevices, err := r.deleteRemovedDevices(ctx, volumeGroup, vgs, resolver)
+	if err != nil {
+		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
+		r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err)
+		return ctrl.Result{}, fmt.Errorf("failed to check if device was removed: %w", err)
+	}
+
+	// update vgs list if devices were removed
+	if removedDevices != nil {
+		msg := fmt.Sprintf("successfully removed %s device(s) from volume group using two-phase commit", strings.Join(removedDevices, ", "))
+		logger.Info(msg)
+		r.NormalEvent(ctx, volumeGroup, EventReasonDeviceRemoved, msg)
+		vgs, err = r.ListVGs(ctx, true)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+		}
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
@@ -292,6 +315,15 @@ func (r *Reconciler) reconcile(
 	vgs, err = r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+	}
+
+	userProvidedMappings, err := r.buildDevicePathMappings(ctx, volumeGroup, vgs, resolver)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.storeDevicePathMappings(ctx, volumeGroup.Name, userProvidedMappings); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if err := r.applyLVMDConfig(ctx, volumeGroup, vgs, devices); err != nil {
@@ -629,6 +661,56 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	logger.Info("successfully created thinpool")
 
 	return nil
+}
+
+func (r *Reconciler) deleteRemovedDevices(
+	ctx context.Context,
+	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
+	vgs []lvm.VolumeGroup,
+	resolver *symlinkResolver.Resolver,
+) ([]string, error) {
+	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
+
+	// Check for device removal requests only if DeviceSelector exists
+	if volumeGroup.Spec.DeviceSelector == nil ||
+		len(volumeGroup.Spec.DeviceSelector.Paths) == 0 && len(volumeGroup.Spec.DeviceSelector.OptionalPaths) == 0 {
+		return nil, nil
+	}
+
+	storedMappings, err := r.getStoredDevicePathMappings(ctx, volumeGroup.Name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	userProvidedMappings, err := r.buildDevicePathMappings(ctx, volumeGroup, vgs, resolver)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find devices that are in VG but not in current desired spec
+	var removedDevices []string
+	for devicePath, resolvedPath := range storedMappings {
+		if _, exists := userProvidedMappings[devicePath]; !exists {
+			removedDevices = append(removedDevices, resolvedPath)
+			logger.Info("detected device removal request", "device", devicePath)
+		}
+	}
+
+	if len(removedDevices) == 0 {
+		return nil, nil
+	}
+
+	// Use two-phase commit for atomic device removal
+	tx := r.NewDeviceRemovalTransaction(volumeGroup.Name, volumeGroup.Namespace, removedDevices)
+	err = tx.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return removedDevices, nil
 }
 
 // convertChunkSize converts the chunk size from the ThinPoolConfig to the correct value for the LVM API
