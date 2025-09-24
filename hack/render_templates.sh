@@ -43,3 +43,6 @@ sed -i "/^  labels:\$/a\    full_version: $CSV_VERSION-$RELEASE" bundle/manifest
 
 # Update the example lvms-operator image
 sed -i "s|quay.io/lvms_dev/lvms-operator:.*\$|$IMG|g" bundle/manifests/lvms-operator.clusterserviceversion.yaml
+
+# Update the must-gather image
+sed -i "s|quay.io/lvms_dev/lvms-must-gather:.*\$|$LVM_MUST_GATHER|g" bundle/manifests/lvms-operator.clusterserviceversion.yaml
