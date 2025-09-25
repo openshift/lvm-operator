@@ -171,7 +171,7 @@ func (r *Reconciler) reconcile(
 	if err != nil {
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
 		r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err)
-		return ctrl.Result{}, fmt.Errorf("failed to check if device was removed: %w", err)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("failed to check if device was removed: %w", err)
 	}
 
 	// update vgs list if devices were removed

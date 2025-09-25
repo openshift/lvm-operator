@@ -60,6 +60,7 @@ var (
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
+	ErrDevicesCantBeEmpty                                    = errors.New("can not delete all devices from device class")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -259,8 +260,9 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrDevicePathsCannotBeAddedInUpdate
 		}
 
-		// Device removal is now handled by the controller with proper data validation
-		// The webhook no longer blocks device removal - safety checks are performed at runtime
+		if len(newOptionalDevices)+len(newDevices) == 0 {
+			return warnings, ErrDevicesCantBeEmpty
+		}
 
 	}
 
