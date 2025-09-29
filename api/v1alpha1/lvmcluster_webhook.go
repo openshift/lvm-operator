@@ -60,7 +60,6 @@ var (
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
-	ErrDevicesCantBeEmpty                                    = errors.New("can not delete all devices from device class")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -250,20 +249,12 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrForceWipeOptionCannotBeChanged
 		}
 
-		// Make sure a device path list was not added
-		if len(oldDevices) == 0 && len(newDevices) > 0 {
-			return warnings, ErrDevicePathsCannotBeAddedInUpdate
+		// If originally no devices were specified, prevent adding any devices
+		if len(oldDevices) == 0 && len(oldOptionalDevices) == 0 {
+			if len(newDevices) > 0 || len(newOptionalDevices) > 0 {
+				return warnings, ErrDevicePathsCannotBeAddedInUpdate
+			}
 		}
-
-		// Make sure an optionalPaths list was not added
-		if len(oldOptionalDevices) == 0 && len(newOptionalDevices) > 0 {
-			return warnings, ErrDevicePathsCannotBeAddedInUpdate
-		}
-
-		if len(newOptionalDevices)+len(newDevices) == 0 {
-			return warnings, ErrDevicesCantBeEmpty
-		}
-
 	}
 
 	return warnings, nil
@@ -283,25 +274,6 @@ func validateDeviceClassesStillExist(old, new []DeviceClass) error {
 	// if any old device class is removed now
 	if len(deviceClassMap) != 0 {
 		return fmt.Errorf("device classes can not be removed from the LVMCluster once added oldDeviceClasses:%v, newDeviceClasses:%v", old, new)
-	}
-
-	return nil
-}
-
-func validateDevicePathsStillExist(old, new []DevicePath) error {
-	deviceMap := make(map[DevicePath]struct{})
-
-	for _, device := range old {
-		deviceMap[device] = struct{}{}
-	}
-
-	for _, device := range new {
-		delete(deviceMap, device)
-	}
-
-	// if any old device is removed now
-	if len(deviceMap) != 0 {
-		return fmt.Errorf("devices can not be removed from the LVMCluster once added oldDevices:%s, newDevices:%s", old, new)
 	}
 
 	return nil

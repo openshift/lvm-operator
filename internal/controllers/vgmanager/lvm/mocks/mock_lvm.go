@@ -525,7 +525,7 @@ func (_c *MockLVM_GetVG_Call) RunAndReturn(run func(context.Context, string) (lv
 }
 
 // HasAllocatedExtents provides a mock function with given fields: ctx, devicePath
-func (_m *MockLVM) HasAllocatedExtents(ctx context.Context, devicePath string) (bool, []string, error) {
+func (_m *MockLVM) HasAllocatedExtents(ctx context.Context, devicePath string) (bool, error) {
 	ret := _m.Called(ctx, devicePath)
 
 	if len(ret) == 0 {
@@ -533,9 +533,8 @@ func (_m *MockLVM) HasAllocatedExtents(ctx context.Context, devicePath string) (
 	}
 
 	var r0 bool
-	var r1 []string
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, []string, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
 		return rf(ctx, devicePath)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
@@ -544,21 +543,13 @@ func (_m *MockLVM) HasAllocatedExtents(ctx context.Context, devicePath string) (
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) []string); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(ctx, devicePath)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]string)
-		}
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string) error); ok {
-		r2 = rf(ctx, devicePath)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // MockLVM_HasAllocatedExtents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasAllocatedExtents'
@@ -580,12 +571,12 @@ func (_c *MockLVM_HasAllocatedExtents_Call) Run(run func(ctx context.Context, de
 	return _c
 }
 
-func (_c *MockLVM_HasAllocatedExtents_Call) Return(_a0 bool, _a1 []string, _a2 error) *MockLVM_HasAllocatedExtents_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *MockLVM_HasAllocatedExtents_Call) Return(_a0 bool, _a1 error) *MockLVM_HasAllocatedExtents_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockLVM_HasAllocatedExtents_Call) RunAndReturn(run func(context.Context, string) (bool, []string, error)) *MockLVM_HasAllocatedExtents_Call {
+func (_c *MockLVM_HasAllocatedExtents_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockLVM_HasAllocatedExtents_Call {
 	_c.Call.Return(run)
 	return _c
 }

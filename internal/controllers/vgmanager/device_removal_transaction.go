@@ -38,10 +38,9 @@ type DeviceRemovalTransaction struct {
 }
 
 type deviceOperation struct {
-	devicePath   string
-	originalPath string // The user-provided path (symlink) corresponding to devicePath
-	phase        operationPhase
-	rollback     func(ctx context.Context) error
+	devicePath string
+	phase      operationPhase
+	rollback   func(ctx context.Context) error
 }
 
 type operationPhase int

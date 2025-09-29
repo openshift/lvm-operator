@@ -11,5 +11,5 @@ generatorOptions:
 
 images:
 - name: controller
-  newName: quay.io/bzamalut/lvms
+  newName: quay.io/lvms_dev/lvms-operator
   newTag: latest

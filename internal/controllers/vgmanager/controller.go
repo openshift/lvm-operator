@@ -170,7 +170,10 @@ func (r *Reconciler) reconcile(
 	removedDevices, err := r.deleteRemovedDevices(ctx, volumeGroup, vgs, resolver)
 	if err != nil {
 		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
-		r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err)
+		_, errStatus := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err)
+		if errStatus != nil {
+			logger.Error(err, "failed to set status to failed")
+		}
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("failed to check if device was removed: %w", err)
 	}
 
