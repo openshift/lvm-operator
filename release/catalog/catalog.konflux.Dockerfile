@@ -1,12 +1,12 @@
+ARG CATALOG_VERSION
+ARG BASE_IMAGE=registry.redhat.io/openshift4/ose-operator-registry-rhel9
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.24 as builder
 # Patch the staging references to be post-release compatible
 WORKDIR /catalog
-COPY ./release/catalog/lvm-operator-catalog.json ./release/catalog/lvm-operator-catalog.json
-COPY ./release/hack/render-catalog.sh ./release/hack/render-catalog.sh
+COPY release/catalog/lvm-operator-catalog.json ./release/catalog/lvm-operator-catalog.json
+COPY release/hack/render-catalog.sh ./release/hack/render-catalog.sh
 
 # Global args to be used to build the final base image url
-ARG CATALOG_VERSION
-ARG BASE_IMAGE=registry.redhat.io/openshift4/ose-operator-registry-rhel9
 FROM ${BASE_IMAGE}:${CATALOG_VERSION}
 ARG CATALOG_VERSION
 
