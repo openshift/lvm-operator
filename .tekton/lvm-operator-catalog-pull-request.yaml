@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" &&
       (".tekton/lvm-operator-catalog-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-push.yaml".pathChanged() ||
       ".tekton/images-mirror-set.yaml".pathChanged() ||
@@ -51,7 +51,7 @@ spec:
       - name: name
         value: fbc-builder
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/pipeline-fbc-builder:devel@sha256:cec1dccba8c8f70fbab5bd066bebfead670d1ffd39fe573f6ec03afaa2fb90b3
+        value: quay.io/konflux-ci/tekton-catalog/pipeline-fbc-builder@sha256:a992c017ccd22b9cf3e1fb2cd1e8e316ee703484d2014a3015f582e6012ec312
       - name: kind
         value: pipeline
   workspaces:
