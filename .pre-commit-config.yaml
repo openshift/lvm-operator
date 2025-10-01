@@ -23,6 +23,7 @@ repos:
         args: [-m]
         exclude: ^test/e2e/testdata|^vendor
       - id: check-json
+        exclude: ^release/catalog/lvm-operator-catalog.json
       - id: detect-private-key
       - id: end-of-file-fixer
       - id: no-commit-to-branch
