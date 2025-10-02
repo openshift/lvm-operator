@@ -8,7 +8,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged()
+      == "release-4.20" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged()
       || ".tekton/lvm-operator-bundle-push.yaml".pathChanged() || "release/bundle/***".pathChanged()
       || "bundle/***".pathChanged() || "release/hack/render_templates.sh".pathChanged() || "release/container-build.args".pathChanged()
       || ".tekton/images-mirror-set.yaml".pathChanged())
