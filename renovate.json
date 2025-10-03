@@ -6,6 +6,9 @@
   "gomod": {
     "enabled": false
   },
+  "pre-commit": {
+    "enabled": false
+  },
   "commitBody": "Signed-off-by: {{{gitAuthor}}}",
   "packageRules": [
     {
