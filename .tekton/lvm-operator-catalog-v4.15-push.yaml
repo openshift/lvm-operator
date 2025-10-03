@@ -42,7 +42,7 @@ spec:
       - name: name
         value: fbc-builder
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/pipeline-fbc-builder:devel@sha256:d0c88d77ecd1c7ae4c244c16e18f368d04e4c8e2ae7ec3e1c16f7d5f5b3298d5
+        value: quay.io/konflux-ci/tekton-catalog/pipeline-fbc-builder:devel@sha256:d6fd96a7bb6fe67082518ea59a916dde15a9584b3b2e109e48fc2ca104d8e8e5
       - name: kind
         value: pipeline
   workspaces:
