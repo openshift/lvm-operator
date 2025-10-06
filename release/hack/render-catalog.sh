@@ -7,5 +7,5 @@ catalog_content=$(cat ${catalog_file})
 # Update any pre-release references to be registry.redhat.io
 catalog_content="${catalog_content//registry.stage/registry}"
 
-echo -e "${catalog_content}" > $catalog_file
+echo "${catalog_content}" > $catalog_file
 echo "Catalog patched at ${catalog_file}"
