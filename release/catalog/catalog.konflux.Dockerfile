@@ -6,6 +6,8 @@ WORKDIR /catalog
 COPY release/catalog/lvm-operator-catalog.json ./release/catalog/lvm-operator-catalog.json
 COPY release/hack/render-catalog.sh ./release/hack/render-catalog.sh
 
+RUN ./release/hack/render-catalog.sh
+
 # Global args to be used to build the final base image url
 FROM ${BASE_IMAGE}:${CATALOG_VERSION}
 ARG CATALOG_VERSION
