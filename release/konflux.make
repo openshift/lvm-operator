@@ -46,4 +46,4 @@ IMAGE_BUILD_CMD ?= $(shell command -v podman 2>&1 >/dev/null && echo podman || e
 
 .PHONY: catalog-container
 catalog-container:
-	$(IMAGE_BUILD_CMD) build --build-arg=CATALOG_VERSION=$(Y_STREAM) -t lvm-operator-catalog:$(Y_STREAM) -f release/catalog/catalog.konflux.Dockerfile
+	$(IMAGE_BUILD_CMD) build --build-arg=CATALOG_VERSION=$(Y_STREAM) -t lvm-operator-catalog:$(Y_STREAM) -f release/catalog/catalog.konflux.Dockerfile .
