@@ -1,0 +1,51 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/lvm-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-4.16" &&
+      (".tekton/lvm-operator-catalog-pull-request.yaml".pathChanged() ||
+      ".tekton/lvm-operator-catalog-push.yaml".pathChanged() ||
+      ".tekton/images-mirror-set.yaml".pathChanged() ||
+      "release/catalog/***".pathChanged())
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: lvm-operator-catalog-4-16
+    appstudio.openshift.io/component: lvm-operator-catalog-4-16
+    pipelines.appstudio.openshift.io/type: build
+  name: lvm-operator-catalog-4-16-on-push
+  namespace: logical-volume-manag-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.16-{{revision}}
+  - name: dockerfile
+    value: release/catalog/catalog.konflux.Dockerfile
+  - name: build-args
+    value:
+    - CATALOG_VERSION=v4.16
+    - BASE_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-ose-operator-registry-rhel9
+  - name: hermetic
+    value: "true"
+  - name: build-platforms
+    value:
+    - linux/x86_64
+    - linux/arm64
+    - linux/ppc64le
+    - linux/s390x
+  pipelineRef:
+    name: catalog-build-pipeline
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-lvm-operator-catalog-4-16
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}

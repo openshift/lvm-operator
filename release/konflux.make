@@ -2,6 +2,7 @@ SHELL := /bin/bash
 
 AUTH_FILE?=$(shell echo ${XDG_RUNTIME_DIR}/containers/auth.json)
 TARGET?="operator"
+Y_STREAM?="v4.16"
 
 .PHONY: rpm-lock
 rpm-lock: rhsm-keys
@@ -30,8 +31,20 @@ konflux-update: konflux-task-manifest-updates
 
 .PHONY: konflux-task-manifest-updates
 konflux-task-manifest-updates:
-	release/hack/update-konflux-task-refs.sh .tekton/single-arch-build-pipeline.yaml .tekton/multi-arch-build-pipeline.yaml
+	release/hack/update-konflux-task-refs.sh .tekton/single-arch-build-pipeline.yaml .tekton/multi-arch-build-pipeline.yaml .tekton/catalog-build-pipeline.yaml
 
-.PHONY: konflux-generate-release
-konflux-generate-release:
-	release/hack/generate-release.sh
+.PHONY: catalog-template
+catalog-template:
+	TARGET_VERSIONS=$(Y_STREAM) release/hack/generate_catalog_template.sh
+	@echo "Templates generation completed"
+	@echo "To build the catalog file, run: make catalog-source"
+
+.PHONY: catalog-source
+catalog-source: opm
+	CATALOG_VERSION=$(Y_STREAM) release/hack/generate_catalog.sh $(OPM)
+
+IMAGE_BUILD_CMD ?= $(shell command -v podman 2>&1 >/dev/null && echo podman || echo docker)
+
+.PHONY: catalog-container
+catalog-container:
+	$(IMAGE_BUILD_CMD) build --build-arg=CATALOG_VERSION=$(Y_STREAM) -t lvm-operator-catalog:$(Y_STREAM) -f release/catalog/catalog.konflux.Dockerfile .
