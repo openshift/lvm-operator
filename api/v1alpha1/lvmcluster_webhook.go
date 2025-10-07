@@ -255,6 +255,11 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 				return warnings, ErrDevicePathsCannotBeAddedInUpdate
 			}
 		}
+
+		// Ensure at least one device path remains when removing devices
+		if len(oldDevices)+len(oldOptionalDevices) > 0 && len(newDevices)+len(newOptionalDevices) == 0 {
+			return warnings, fmt.Errorf("cannot remove all device paths from device class %s: at least one device path must remain", deviceClass.Name)
+		}
 	}
 
 	return warnings, nil

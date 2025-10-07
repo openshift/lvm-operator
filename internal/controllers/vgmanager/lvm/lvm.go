@@ -38,7 +38,6 @@ type ExitError interface {
 const (
 	vgsCmd        = "/usr/sbin/vgs"
 	pvsCmd        = "/usr/sbin/pvs"
-	pvDisplayCmd  = "/usr/sbin/pvdisplay"
 	lvsCmd        = "/usr/sbin/lvs"
 	vgCreateCmd   = "/usr/sbin/vgcreate"
 	vgChangeCmd   = "/usr/sbin/vgchange"
@@ -106,6 +105,20 @@ type LogicalVolume struct {
 	MetadataSize    string `json:"lv_metadata_size"`
 }
 
+// PVInfo represents physical volume information from pvs command
+type PVInfo struct {
+	PVName string `json:"pv_name"`
+	PVUsed string `json:"pv_used"`
+	VGName string `json:"vg_name"`
+}
+
+// PVSReport represents the output of the `pvs --reportformat json` command for specific queries
+type PVSReport struct {
+	Report []struct {
+		PV []PVInfo `json:"pv"`
+	} `json:"report"`
+}
+
 type LVM interface {
 	CreateVG(ctx context.Context, vg VolumeGroup, isWiped bool) error
 	ExtendVG(ctx context.Context, vg VolumeGroup, pvs []string) (VolumeGroup, error)
@@ -127,7 +140,7 @@ type LVM interface {
 
 	// Device removal methods
 	HasAllocatedExtents(ctx context.Context, devicePath string) (bool, error)
-	ReduceVG(ctx context.Context, vgName, devicePath string) error
+	ReduceVG(ctx context.Context, vgName string, devices string) error
 	RemovePV(ctx context.Context, devicePath string) error
 }
 
@@ -180,6 +193,9 @@ type PhysicalVolume struct {
 
 	// PvFree describes the free space of the PhysicalVolume
 	PvFree string `json:"pv_free"`
+
+	// PvMissing describes if PV is missing
+	PvMissing string `json:"pv_missing"`
 
 	// DevSize describes the size of the underlying device on which the PhysicalVolume was created
 	DevSize string `json:"dev_size"`
@@ -332,7 +348,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error) {
 	res := new(PVReport)
 	args := []string{
-		"--units", "b", "--nosuffix", "-v", "--reportformat", "json",
+		"--units", "b", "--nosuffix", "-v", "--reportformat", "json", "-o", "+pv_missing",
 	}
 	if vgName != "" {
 		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
@@ -345,14 +361,15 @@ func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolu
 	for _, report := range res.Report {
 		for _, pv := range report.Pv {
 			pvs = append(pvs, PhysicalVolume{
-				PvName:  pv.PvName,
-				UUID:    pv.UUID,
-				VgName:  pv.VgName,
-				PvFmt:   pv.PvFmt,
-				PvAttr:  pv.PvAttr,
-				PvSize:  pv.PvSize,
-				PvFree:  pv.PvFree,
-				DevSize: pv.DevSize,
+				PvName:    pv.PvName,
+				UUID:      pv.UUID,
+				VgName:    pv.VgName,
+				PvFmt:     pv.PvFmt,
+				PvAttr:    pv.PvAttr,
+				PvSize:    pv.PvSize,
+				PvFree:    pv.PvFree,
+				DevSize:   pv.DevSize,
+				PvMissing: pv.PvMissing,
 			})
 		}
 	}
@@ -594,18 +611,6 @@ func (hlvm *HostLVM) HasAllocatedExtents(ctx context.Context, devicePath string)
 	}
 
 	// Parse JSON output from pvs --reportformat json
-	type PVInfo struct {
-		PVName string `json:"pv_name"`
-		PVUsed string `json:"pv_used"`
-		VGName string `json:"vg_name"`
-	}
-
-	type PVSReport struct {
-		Report []struct {
-			PV []PVInfo `json:"pv"`
-		} `json:"report"`
-	}
-
 	var report PVSReport
 	if err := json.Unmarshal(output, &report); err != nil {
 		return false, fmt.Errorf("failed to parse pvs JSON output: %w", err)
@@ -626,10 +631,10 @@ func (hlvm *HostLVM) HasAllocatedExtents(ctx context.Context, devicePath string)
 }
 
 // ReduceVG removes a physical volume from a volume group using vgreduce.
-func (hlvm *HostLVM) ReduceVG(ctx context.Context, vgName, devicePath string) error {
-	args := []string{vgName, devicePath}
+func (hlvm *HostLVM) ReduceVG(ctx context.Context, vgName string, device string) error {
+	args := []string{vgName, device}
 	if err := hlvm.RunCommandAsHost(ctx, vgReduceCmd, args...); err != nil {
-		return fmt.Errorf("failed to reduce volume group %s by removing device %s: %w", vgName, devicePath, err)
+		return fmt.Errorf("failed to reduce volume group %s by removing device %s: %w", vgName, device, err)
 	}
 	return nil
 }

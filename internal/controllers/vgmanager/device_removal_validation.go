@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Red Hat, Inc.
+Copyright © 2025 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,21 +19,17 @@ package vgmanager
 import (
 	"context"
 	"fmt"
-
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // validateDeviceRemoval checks if a device can be safely removed from the volume group.
 // This function is used by the transaction system for validation.
 func (r *Reconciler) validateDeviceRemoval(ctx context.Context, devicePath, vgName string) error {
-	logger := log.FromContext(ctx).WithValues("VGName", vgName, "device", devicePath)
-	logger.V(1).Info("validating device for safe removal")
-
 	// Check if device has allocated extents
 	hasAllocatedExtents, err := r.HasAllocatedExtents(ctx, devicePath)
 	if err != nil {
 		return fmt.Errorf("failed to check if device %s has allocated extents: %w", devicePath, err)
 	}
+
 	if hasAllocatedExtents {
 		return fmt.Errorf("device %s has allocated logical volume extents and cannot be safely removed", devicePath)
 	}
@@ -48,6 +44,5 @@ func (r *Reconciler) validateDeviceRemoval(ctx context.Context, devicePath, vgNa
 		return fmt.Errorf("cannot remove the last device from volume group %s", vgName)
 	}
 
-	logger.V(1).Info("device validated for safe removal")
 	return nil
 }

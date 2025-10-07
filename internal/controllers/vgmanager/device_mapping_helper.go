@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Red Hat, Inc.
+Copyright © 2025 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package vgmanager
 
 import (
 	"context"
+	"fmt"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
@@ -27,43 +28,24 @@ import (
 
 // buildDevicePathMappings creates a mapping from user-provided paths to resolved device paths
 // for devices that are actually in the VG (using VG state from ListVGs)
-func (r *Reconciler) buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, resolver *symlinkResolver.Resolver) (map[string]string, error) {
+func buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, resolver *symlinkResolver.Resolver) ([]string, error) {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	if volumeGroup.Spec.DeviceSelector == nil {
 		return nil, nil
 	}
 
-	// Find our VG and get its actual devices
-	acutalVGDevices := make(map[string]struct{})
-	for _, vg := range vgs {
-		if vg.Name == volumeGroup.Name {
-			for _, pv := range vg.PVs {
-				acutalVGDevices[pv.PvName] = struct{}{}
-			}
-			break
-		}
-	}
-
-	if len(acutalVGDevices) == 0 {
-		logger.V(3).Info("VG not found in ListVGs output, skipping mapping creation")
-		return nil, nil
-	}
-
-	mappings := make(map[string]string)
+	resolvedPaths := make([]string, 0)
 
 	// Process required paths
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
 		originalPath := path.Unresolved()
 		resolved, err := resolver.Resolve(originalPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve path %s, %w", originalPath, err)
 		}
 
-		// Only store mapping if this device is actually in the VG
-		if _, ok := acutalVGDevices[resolved]; ok {
-			mappings[originalPath] = resolved
-		}
+		resolvedPaths = append(resolvedPaths, resolved)
 	}
 
 	// Process optional paths
@@ -71,15 +53,21 @@ func (r *Reconciler) buildDevicePathMappings(ctx context.Context, volumeGroup *l
 		originalPath := path.Unresolved()
 		resolved, err := resolver.Resolve(originalPath)
 		if err != nil {
-			logger.V(3).Info("failed to resolve optional device path during mapping build", "path", originalPath, "error", err)
+			logger.Info("failed to resolve optional device path during mapping build", "path", originalPath, "error", err)
 			continue
 		}
 
-		// Only store mapping if this device is actually in the VG
-		if _, ok := acutalVGDevices[resolved]; ok {
-			mappings[originalPath] = resolved
-		}
+		resolvedPaths = append(resolvedPaths, resolved)
 	}
 
-	return mappings, nil
+	return resolvedPaths, nil
+}
+
+func isVgMissingDevices(vg *lvm.VolumeGroup) bool {
+	for _, pv := range vg.PVs {
+		if pv.PvMissing != "" {
+			return true
+		}
+	}
+	return false
 }

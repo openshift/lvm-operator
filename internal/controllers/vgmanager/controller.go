@@ -19,8 +19,8 @@ package vgmanager
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -35,7 +35,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -167,27 +166,6 @@ func (r *Reconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
 
-	removedDevices, err := r.deleteRemovedDevices(ctx, volumeGroup, vgs, resolver)
-	if err != nil {
-		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
-		_, errStatus := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err)
-		if errStatus != nil {
-			logger.Error(err, "failed to set status to failed")
-		}
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("failed to check if device was removed: %w", err)
-	}
-
-	// update vgs list if devices were removed
-	if removedDevices != nil {
-		msg := fmt.Sprintf("successfully removed %s device(s) from volume group using two-phase commit", strings.Join(removedDevices, ", "))
-		logger.Info(msg)
-		r.NormalEvent(ctx, volumeGroup, EventReasonDeviceRemoved, msg)
-		vgs, err = r.ListVGs(ctx, true)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
-		}
-	}
-
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
 
 	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, resolver); err != nil {
@@ -242,6 +220,22 @@ func (r *Reconciler) reconcile(
 				logger.Error(err, "failed to set status to failed")
 			}
 			return ctrl.Result{}, err
+		}
+
+		deleted, err := r.deleteRemovedDevices(ctx, lvmVG, volumeGroup, resolver)
+		if err != nil {
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, fmt.Errorf("failed to remove devices: %w", err)
+		}
+
+		if deleted {
+			// refresh vgs list if devices deleted
+			vgs, err = r.ListVGs(ctx, true)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+			}
 		}
 
 		logger.V(1).Info("no new available devices discovered, verifying existing setup")
@@ -318,15 +312,6 @@ func (r *Reconciler) reconcile(
 	vgs, err = r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
-	}
-
-	userProvidedMappings, err := r.buildDevicePathMappings(ctx, volumeGroup, vgs, resolver)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.storeDevicePathMappings(ctx, volumeGroup.Name, userProvidedMappings); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	if err := r.applyLVMDConfig(ctx, volumeGroup, vgs, devices); err != nil {
@@ -668,52 +653,66 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 
 func (r *Reconciler) deleteRemovedDevices(
 	ctx context.Context,
+	currentVG *lvm.VolumeGroup,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
-	vgs []lvm.VolumeGroup,
 	resolver *symlinkResolver.Resolver,
-) ([]string, error) {
+) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	// Check for device removal requests only if DeviceSelector exists
 	if volumeGroup.Spec.DeviceSelector == nil ||
 		len(volumeGroup.Spec.DeviceSelector.Paths) == 0 && len(volumeGroup.Spec.DeviceSelector.OptionalPaths) == 0 {
-		return nil, nil
+		return false, nil
 	}
 
-	storedMappings, err := r.getStoredDevicePathMappings(ctx, volumeGroup.Name)
+	if isVgMissingDevices(currentVG) {
+		err := fmt.Errorf("VG %s on node %s is missing one or more devices. Please fix the VG on the node first and update LVM CR to reflect current state", volumeGroup.Name, r.NodeName)
+		logger.Error(err, "device removal canceled")
+		return false, err
+	}
+
+	userProvidedMappings, err := buildDevicePathMappings(ctx, volumeGroup, resolver)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
+		return false, err
 	}
 
-	userProvidedMappings, err := r.buildDevicePathMappings(ctx, volumeGroup, vgs, resolver)
-	if err != nil {
-		return nil, err
-	}
+	devicesToRemove := make([]string, 0)
 
-	// Find devices that are in VG but not in current desired spec
-	var removedDevices []string
-	for devicePath, resolvedPath := range storedMappings {
-		if _, exists := userProvidedMappings[devicePath]; !exists {
-			removedDevices = append(removedDevices, resolvedPath)
-			logger.Info("detected device removal request", "device", devicePath)
+	for _, pv := range currentVG.PVs {
+		if !slices.Contains(userProvidedMappings, pv.PvName) {
+			devicesToRemove = append(devicesToRemove, pv.PvName)
 		}
 	}
 
-	if len(removedDevices) == 0 {
-		return nil, nil
+	if len(devicesToRemove) == 0 {
+		return false, nil
 	}
 
-	// Use two-phase commit for atomic device removal
-	tx := r.NewDeviceRemovalTransaction(volumeGroup.Name, volumeGroup.Namespace, removedDevices)
-	err = tx.Execute(ctx)
-	if err != nil {
-		return nil, err
+	logger.Info("Detected devices to be removed", "devices", devicesToRemove)
+
+	// Remove devices directly from VG
+	for _, devicePath := range devicesToRemove {
+		err = r.validateDeviceRemoval(ctx, devicePath, volumeGroup.Name)
+		if err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalUnsafe, err)
+			return false, fmt.Errorf("device %s can't be deleted from VG %s, %w", devicePath, volumeGroup.Name, err)
+		}
+		if err = r.ReduceVG(ctx, volumeGroup.Name, devicePath); err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
+			return false, fmt.Errorf("failed to remove device %s from VG %s: %w", devicePath, volumeGroup.Name, err)
+		}
+
+		if err = r.RemovePV(ctx, devicePath); err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorDeviceRemovalFailed, err)
+			return false, fmt.Errorf("failed to remove pv %s from LVM: %w", devicePath, err)
+		}
 	}
 
-	return removedDevices, nil
+	msg := fmt.Sprintf("successfully removed %s device(s) from volume group", devicesToRemove)
+	logger.Info(msg)
+	r.NormalEvent(ctx, volumeGroup, EventReasonDeviceRemoved, msg)
+
+	return true, nil
 }
 
 // convertChunkSize converts the chunk size from the ThinPoolConfig to the correct value for the LVM API
