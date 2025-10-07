@@ -875,9 +875,9 @@ func (_c *MockLVM_ListVGs_Call) RunAndReturn(run func(context.Context, bool) ([]
 	return _c
 }
 
-// ReduceVG provides a mock function with given fields: ctx, vgName, devicePath
-func (_m *MockLVM) ReduceVG(ctx context.Context, vgName string, devicePath string) error {
-	ret := _m.Called(ctx, vgName, devicePath)
+// ReduceVG provides a mock function with given fields: ctx, vgName, devices
+func (_m *MockLVM) ReduceVG(ctx context.Context, vgName string, devices string) error {
+	ret := _m.Called(ctx, vgName, devices)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReduceVG")
@@ -885,7 +885,7 @@ func (_m *MockLVM) ReduceVG(ctx context.Context, vgName string, devicePath strin
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, vgName, devicePath)
+		r0 = rf(ctx, vgName, devices)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -901,12 +901,12 @@ type MockLVM_ReduceVG_Call struct {
 // ReduceVG is a helper method to define mock.On call
 //   - ctx context.Context
 //   - vgName string
-//   - devicePath string
-func (_e *MockLVM_Expecter) ReduceVG(ctx interface{}, vgName interface{}, devicePath interface{}) *MockLVM_ReduceVG_Call {
-	return &MockLVM_ReduceVG_Call{Call: _e.mock.On("ReduceVG", ctx, vgName, devicePath)}
+//   - devices string
+func (_e *MockLVM_Expecter) ReduceVG(ctx interface{}, vgName interface{}, devices interface{}) *MockLVM_ReduceVG_Call {
+	return &MockLVM_ReduceVG_Call{Call: _e.mock.On("ReduceVG", ctx, vgName, devices)}
 }
 
-func (_c *MockLVM_ReduceVG_Call) Run(run func(ctx context.Context, vgName string, devicePath string)) *MockLVM_ReduceVG_Call {
+func (_c *MockLVM_ReduceVG_Call) Run(run func(ctx context.Context, vgName string, devices string)) *MockLVM_ReduceVG_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
