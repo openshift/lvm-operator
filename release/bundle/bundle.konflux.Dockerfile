@@ -10,6 +10,9 @@ ARG OPERATOR_VERSION
 WORKDIR /operator
 COPY ./ ./
 
+# Remove the tests folder to avoid interference
+RUN rm -rf ./test
+
 ENV GOFLAGS="-mod=readonly"
 ENV GOBIN=/operator/bin
 
