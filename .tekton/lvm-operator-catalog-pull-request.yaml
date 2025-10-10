@@ -46,7 +46,14 @@ spec:
     - linux/ppc64le
     - linux/s390x
   pipelineRef:
-    name: catalog-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/catalog-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-catalog-4-18
   workspaces:
