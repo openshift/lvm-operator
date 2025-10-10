@@ -8,7 +8,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-4.19" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvms-must-gather-pull-request.yaml".pathChanged()
+      == "release-4.19" && (".tekton/lvms-must-gather-pull-request.yaml".pathChanged()
       || ".tekton/lvms-must-gather-push.yaml".pathChanged() || "must-gather/***".pathChanged()
       || "release/must-gather/***".pathChanged() || "release/container-build.args".pathChanged())
   creationTimestamp: null
@@ -37,7 +37,14 @@ spec:
   - name: prefetch-input
     value: '[{"type": "rpm", "path": "release/must-gather"}]'
   pipelineRef:
-    name: multi-arch-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/multi-arch-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvms-must-gather-4-19
   timeouts:
