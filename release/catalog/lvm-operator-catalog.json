@@ -60,7 +60,8 @@
         "lvms-operator.v4.18.1",
         "lvms-operator.v4.18.2",
         "lvms-operator.v4.18.3"
-      ]
+      ],
+      "skipRange": ">=4.2.0 <4.18.4"
     }
   ],
   "name": "stable-4.18",
