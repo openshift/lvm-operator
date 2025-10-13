@@ -40,7 +40,8 @@
       "skips": [
         "lvms-operator.v4.19.0",
         "lvms-operator.v4.19.1"
-      ]
+      ],
+      "skipRange": ">=4.2.0 <4.19.2"
     }
   ],
   "name": "stable-4.19",
