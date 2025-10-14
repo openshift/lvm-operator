@@ -25,9 +25,6 @@ ifndef RHSM_ORG
 	$(error environment variable RHSM_ORG is required)
 endif
 
-.PHONY: konflux-update
-konflux-update: konflux-task-manifest-updates
-
 .PHONY: catalog-template
 catalog-template:
 	TARGET_VERSIONS=$(Y_STREAM) release/hack/generate_catalog_template.sh
