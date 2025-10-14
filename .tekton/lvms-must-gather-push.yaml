@@ -32,7 +32,14 @@ spec:
   - name: prefetch-input
     value: '[{"type": "rpm", "path": "release/must-gather"}]'
   pipelineRef:
-    name: multi-arch-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/multi-arch-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvms-must-gather-4-16
   timeouts:

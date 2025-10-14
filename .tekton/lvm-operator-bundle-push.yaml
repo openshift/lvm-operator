@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-4.16" && (".tekton/single-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged()
+      == "release-4.16" && (".tekton/lvm-operator-bundle-pull-request.yaml".pathChanged()
       || ".tekton/lvm-operator-bundle-push.yaml".pathChanged() || "release/bundle/***".pathChanged()
       || "bundle/***".pathChanged() || "release/hack/render_templates.sh".pathChanged() || "release/container-build.args".pathChanged())
   creationTimestamp: null
@@ -33,8 +33,18 @@ spec:
     value: "true"
   - name: build-args-file
     value: release/container-build.args
+  - name: build-platforms
+    value:
+    - linux/x86_64
   pipelineRef:
-    name: single-arch-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/multi-arch-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-bundle-4-16
   timeouts:
