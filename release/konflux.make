@@ -25,13 +25,6 @@ ifndef RHSM_ORG
 	$(error environment variable RHSM_ORG is required)
 endif
 
-.PHONY: konflux-update
-konflux-update: konflux-task-manifest-updates
-
-.PHONY: konflux-task-manifest-updates
-konflux-task-manifest-updates:
-	release/hack/update-konflux-task-refs.sh .tekton/single-arch-build-pipeline.yaml .tekton/multi-arch-build-pipeline.yaml .tekton/catalog-build-pipeline.yaml
-
 .PHONY: catalog-template
 catalog-template:
 	TARGET_VERSIONS=$(Y_STREAM) release/hack/generate_catalog_template.sh
