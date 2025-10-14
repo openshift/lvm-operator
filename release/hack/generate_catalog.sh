@@ -22,6 +22,9 @@ patched_catalog=$(echo "${catalog}" | ch="${channel}" sr="${skip_range}" yq -e e
 echo "Patching the channel names to use legacy naming conventions"
 patched_catalog=$(echo "${patched_catalog}" | yq -o=json eval-all '(.. | select(tag == "!!str")) |= sub("stable-v", "stable-") | (.. | select(tag == "!!str")) |= sub("candidate-v", "candidate-")')
 
+# Update any pre-release references to be registry.redhat.io
+patched_catalog="${patched_catalog//registry.stage/registry}"
+
 echo "${patched_catalog}" > ${output_file}
 
 echo "Catalog generated: ${output_file}"
