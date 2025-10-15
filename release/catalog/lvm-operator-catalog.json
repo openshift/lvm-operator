@@ -1968,7 +1968,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:9a7ed147d862533185c304836add66b17ada974136d25ca646fa7bc21e8b1c85",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:82bcaba7f44d28e8529915af868c847107932a6f8cc9d2eaf34796c578c7a5ba",
   "name": "lvms-operator.v4.18.4",
   "package": "lvms-operator",
   "properties": [
@@ -2018,7 +2018,7 @@
           "alm-examples": "[\n  {\n    \"apiVersion\": \"lvm.topolvm.io/v1alpha1\",\n    \"kind\": \"LVMCluster\",\n    \"metadata\": {\n      \"name\": \"my-lvmcluster\"\n    },\n    \"spec\": {\n      \"storage\": {\n        \"deviceClasses\": [\n          {\n            \"default\": true,\n            \"fstype\": \"xfs\",\n            \"name\": \"vg1\",\n            \"thinPoolConfig\": {\n              \"name\": \"thin-pool-1\",\n              \"overprovisionRatio\": 10,\n              \"sizePercent\": 90\n            }\n          }\n        ]\n      }\n    }\n  }\n]",
           "capabilities": "Seamless Upgrades",
           "categories": "Storage",
-          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:69c64d13957544857865dd8b32123ff6ceb1d49ea5218ee101991e72943125a6",
+          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:be49109ec5be53a783b2de9bc6529db99930a69021577c05cfa0bf1312e06d69",
           "description": "Logical volume manager storage provides dynamically provisioned local storage for container workloads",
           "features.operators.openshift.io/cnf": "false",
           "features.operators.openshift.io/cni": "false",
@@ -2035,6 +2035,7 @@
           "operatorframework.io/initialization-resource": "{\n    \"apiVersion\": \"lvm.topolvm.io/v1alpha1\",\n    \"kind\": \"LVMCluster\",\n    \"metadata\": {\n      \"name\": \"test-lvmcluster\"\n    },\n    \"spec\": {\n      \"storage\": {\n        \"deviceClasses\": [\n          {\n            \"name\": \"vg1\",\n            \"thinPoolConfig\": {\n              \"name\": \"thin-pool-1\",\n              \"overprovisionRatio\": 10,\n              \"sizePercent\": 90\n            }\n          }\n        ]\n      }\n    }\n  }",
           "operatorframework.io/suggested-namespace": "openshift-storage",
           "operatorframework.io/suggested-namespace-template": "{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Namespace\",\n  \"metadata\": {\n    \"name\": \"openshift-storage\",\n    \"annotations\": {\n      \"workload.openshift.io/allowed\": \"management\"\n    }\n  }\n}",
+          "operators.openshift.io/must-gather-image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:28ae7c5619df383b6a0b9d5293c3b58bbefa845efb8b70c7c2935a3ff9f9ac0c",
           "operators.openshift.io/valid-subscription": "[\"OpenShift Kubernetes Engine\", \"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
           "operators.operatorframework.io/builder": "operator-sdk-v1.38.0-ocp",
           "operators.operatorframework.io/internal-objects": "[\"logicalvolumes.topolvm.io\", \"lvmvolumegroups.lvm.topolvm.io\", \"lvmvolumegroupnodestatuses.lvm.topolvm.io\"]",
@@ -2121,15 +2122,15 @@
   ],
   "relatedImages": [
     {
-      "image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:904889c45ff55769e6c8956762f5dc2692cb16c2a3dc26447e593ca0230a101e",
+      "image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:28ae7c5619df383b6a0b9d5293c3b58bbefa845efb8b70c7c2935a3ff9f9ac0c",
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:69c64d13957544857865dd8b32123ff6ceb1d49ea5218ee101991e72943125a6",
+      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:be49109ec5be53a783b2de9bc6529db99930a69021577c05cfa0bf1312e06d69",
       "name": "lvms-operator"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:9a7ed147d862533185c304836add66b17ada974136d25ca646fa7bc21e8b1c85",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:82bcaba7f44d28e8529915af868c847107932a6f8cc9d2eaf34796c578c7a5ba",
       "name": ""
     }
   ],
