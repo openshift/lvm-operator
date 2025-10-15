@@ -367,7 +367,7 @@
   "schema": "olm.bundle"
 }
 {
-  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:668dde95ed7782491e98fe1fd0ffb319487aadcff3fb2941161332d0a3784738",
+  "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:f2270236ca0f96bac3d2f616b349b3b5d44ffa3889fa91838508be3d9b58fe3b",
   "name": "lvms-operator.v4.20.0",
   "package": "lvms-operator",
   "properties": [
@@ -417,7 +417,7 @@
           "alm-examples": "[\n  {\n    \"apiVersion\": \"lvm.topolvm.io/v1alpha1\",\n    \"kind\": \"LVMCluster\",\n    \"metadata\": {\n      \"name\": \"my-lvmcluster\"\n    },\n    \"spec\": {\n      \"storage\": {\n        \"deviceClasses\": [\n          {\n            \"default\": true,\n            \"fstype\": \"xfs\",\n            \"name\": \"vg1\",\n            \"thinPoolConfig\": {\n              \"name\": \"thin-pool-1\",\n              \"overprovisionRatio\": 10,\n              \"sizePercent\": 90\n            }\n          }\n        ]\n      }\n    }\n  }\n]",
           "capabilities": "Seamless Upgrades",
           "categories": "Storage",
-          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:23085104f5c4ab630fdd137969ea7a607e4e9490181c549a079b0e61e7c943c2",
+          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:ffd7f0e091cbc9a788a0c857187a3a558f123b4373f33e556486a2fdf8f57d27",
           "description": "Logical volume manager storage provides dynamically provisioned local storage for container workloads",
           "features.operators.openshift.io/cnf": "false",
           "features.operators.openshift.io/cni": "false",
@@ -434,7 +434,7 @@
           "operatorframework.io/initialization-resource": "{\n    \"apiVersion\": \"lvm.topolvm.io/v1alpha1\",\n    \"kind\": \"LVMCluster\",\n    \"metadata\": {\n      \"name\": \"test-lvmcluster\"\n    },\n    \"spec\": {\n      \"storage\": {\n        \"deviceClasses\": [\n          {\n            \"name\": \"vg1\",\n            \"thinPoolConfig\": {\n              \"name\": \"thin-pool-1\",\n              \"overprovisionRatio\": 10,\n              \"sizePercent\": 90\n            }\n          }\n        ]\n      }\n    }\n  }",
           "operatorframework.io/suggested-namespace": "openshift-lvm-storage",
           "operatorframework.io/suggested-namespace-template": "{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Namespace\",\n  \"metadata\": {\n    \"name\": \"openshift-lvm-storage\",\n    \"annotations\": {\n      \"workload.openshift.io/allowed\": \"management\"\n    }\n  }\n}",
-          "operators.openshift.io/must-gather-image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:f2bc444857d325746ab98d13c0bb32cbf49f9771f13852a44eaa62bf5c8ec8d6",
+          "operators.openshift.io/must-gather-image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:d264281158ca5ac4885905231900d435e273be059ec6432477da5086916a2108",
           "operators.openshift.io/valid-subscription": "[\"OpenShift Kubernetes Engine\", \"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
           "operators.operatorframework.io/builder": "operator-sdk-v1.38.0-ocp",
           "operators.operatorframework.io/internal-objects": "[\"logicalvolumes.topolvm.io\", \"lvmvolumegroups.lvm.topolvm.io\", \"lvmvolumegroupnodestatuses.lvm.topolvm.io\"]",
@@ -521,15 +521,15 @@
   ],
   "relatedImages": [
     {
-      "image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:f2bc444857d325746ab98d13c0bb32cbf49f9771f13852a44eaa62bf5c8ec8d6",
+      "image": "registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:d264281158ca5ac4885905231900d435e273be059ec6432477da5086916a2108",
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:23085104f5c4ab630fdd137969ea7a607e4e9490181c549a079b0e61e7c943c2",
+      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:ffd7f0e091cbc9a788a0c857187a3a558f123b4373f33e556486a2fdf8f57d27",
       "name": "lvms-operator"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:668dde95ed7782491e98fe1fd0ffb319487aadcff3fb2941161332d0a3784738",
+      "image": "registry.redhat.io/lvms4/lvms-operator-bundle@sha256:f2270236ca0f96bac3d2f616b349b3b5d44ffa3889fa91838508be3d9b58fe3b",
       "name": ""
     }
   ],
