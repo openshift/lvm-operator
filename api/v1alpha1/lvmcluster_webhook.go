@@ -249,24 +249,17 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 			return warnings, ErrForceWipeOptionCannotBeChanged
 		}
 
-		// Make sure a device path list was not added
-		if len(oldDevices) == 0 && len(newDevices) > 0 {
-			return warnings, ErrDevicePathsCannotBeAddedInUpdate
+		// If originally no devices were specified, prevent adding any devices
+		if len(oldDevices) == 0 && len(oldOptionalDevices) == 0 {
+			if len(newDevices) > 0 || len(newOptionalDevices) > 0 {
+				return warnings, ErrDevicePathsCannotBeAddedInUpdate
+			}
 		}
 
-		// Make sure an optionalPaths list was not added
-		if len(oldOptionalDevices) == 0 && len(newOptionalDevices) > 0 {
-			return warnings, ErrDevicePathsCannotBeAddedInUpdate
+		// Ensure at least one device path remains when removing devices
+		if len(oldDevices)+len(oldOptionalDevices) > 0 && len(newDevices)+len(newOptionalDevices) == 0 {
+			return warnings, fmt.Errorf("cannot remove all device paths from device class %s: at least one device path must remain", deviceClass.Name)
 		}
-
-		if err := validateDevicePathsStillExist(oldDevices, newDevices); err != nil {
-			return warnings, fmt.Errorf("invalid: required device paths were deleted from the LVMCluster: %w", err)
-		}
-
-		if err := validateDevicePathsStillExist(oldOptionalDevices, newOptionalDevices); err != nil {
-			return warnings, fmt.Errorf("invalid: optional device paths were deleted from the LVMCluster: %w", err)
-		}
-
 	}
 
 	return warnings, nil
@@ -286,25 +279,6 @@ func validateDeviceClassesStillExist(old, new []DeviceClass) error {
 	// if any old device class is removed now
 	if len(deviceClassMap) != 0 {
 		return fmt.Errorf("device classes can not be removed from the LVMCluster once added oldDeviceClasses:%v, newDeviceClasses:%v", old, new)
-	}
-
-	return nil
-}
-
-func validateDevicePathsStillExist(old, new []DevicePath) error {
-	deviceMap := make(map[DevicePath]struct{})
-
-	for _, device := range old {
-		deviceMap[device] = struct{}{}
-	}
-
-	for _, device := range new {
-		delete(deviceMap, device)
-	}
-
-	// if any old device is removed now
-	if len(deviceMap) != 0 {
-		return fmt.Errorf("devices can not be removed from the LVMCluster once added oldDevices:%s, newDevices:%s", old, new)
 	}
 
 	return nil

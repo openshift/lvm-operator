@@ -18,7 +18,9 @@ package lvm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/exec"
@@ -40,6 +42,7 @@ const (
 	vgCreateCmd   = "/usr/sbin/vgcreate"
 	vgChangeCmd   = "/usr/sbin/vgchange"
 	vgExtendCmd   = "/usr/sbin/vgextend"
+	vgReduceCmd   = "/usr/sbin/vgreduce"
 	vgRemoveCmd   = "/usr/sbin/vgremove"
 	pvRemoveCmd   = "/usr/sbin/pvremove"
 	lvCreateCmd   = "/usr/sbin/lvcreate"
@@ -102,6 +105,20 @@ type LogicalVolume struct {
 	MetadataSize    string `json:"lv_metadata_size"`
 }
 
+// PVInfo represents physical volume information from pvs command
+type PVInfo struct {
+	PVName string `json:"pv_name"`
+	PVUsed string `json:"pv_used"`
+	VGName string `json:"vg_name"`
+}
+
+// PVSReport represents the output of the `pvs --reportformat json` command for specific queries
+type PVSReport struct {
+	Report []struct {
+		PV []PVInfo `json:"pv"`
+	} `json:"report"`
+}
+
 type LVM interface {
 	CreateVG(ctx context.Context, vg VolumeGroup, isWiped bool) error
 	ExtendVG(ctx context.Context, vg VolumeGroup, pvs []string) (VolumeGroup, error)
@@ -120,6 +137,11 @@ type LVM interface {
 	ExtendThinPoolMetadata(ctx context.Context, lvName, vgName string, metadataSizeBytes int64) error
 	ActivateLV(ctx context.Context, lvName, vgName string) error
 	DeleteLV(ctx context.Context, lvName, vgName string) error
+
+	// Device removal methods
+	HasAllocatedExtents(ctx context.Context, devicePath string) (bool, error)
+	ReduceVG(ctx context.Context, vgName string, devices string) error
+	RemovePV(ctx context.Context, devicePath string) error
 }
 
 type HostLVM struct {
@@ -171,6 +193,9 @@ type PhysicalVolume struct {
 
 	// PvFree describes the free space of the PhysicalVolume
 	PvFree string `json:"pv_free"`
+
+	// PvMissing describes if PV is missing
+	PvMissing string `json:"pv_missing"`
 
 	// DevSize describes the size of the underlying device on which the PhysicalVolume was created
 	DevSize string `json:"dev_size"`
@@ -323,7 +348,7 @@ func (hlvm *HostLVM) GetVG(ctx context.Context, name string) (VolumeGroup, error
 func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolume, error) {
 	res := new(PVReport)
 	args := []string{
-		"--units", "b", "--nosuffix", "-v", "--reportformat", "json",
+		"--units", "b", "--nosuffix", "-v", "--reportformat", "json", "-o", "+pv_missing",
 	}
 	if vgName != "" {
 		args = append(args, "-S", fmt.Sprintf("vgname=%s", vgName))
@@ -336,14 +361,15 @@ func (hlvm *HostLVM) ListPVs(ctx context.Context, vgName string) ([]PhysicalVolu
 	for _, report := range res.Report {
 		for _, pv := range report.Pv {
 			pvs = append(pvs, PhysicalVolume{
-				PvName:  pv.PvName,
-				UUID:    pv.UUID,
-				VgName:  pv.VgName,
-				PvFmt:   pv.PvFmt,
-				PvAttr:  pv.PvAttr,
-				PvSize:  pv.PvSize,
-				PvFree:  pv.PvFree,
-				DevSize: pv.DevSize,
+				PvName:    pv.PvName,
+				UUID:      pv.UUID,
+				VgName:    pv.VgName,
+				PvFmt:     pv.PvFmt,
+				PvAttr:    pv.PvAttr,
+				PvSize:    pv.PvSize,
+				PvFree:    pv.PvFree,
+				DevSize:   pv.DevSize,
+				PvMissing: pv.PvMissing,
 			})
 		}
 	}
@@ -448,13 +474,7 @@ func (hlvm *HostLVM) LVExists(ctx context.Context, lvName, vgName string) (bool,
 		return false, err
 	}
 
-	for _, lv := range lvs {
-		if lv == lvName {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return slices.Contains(lvs, lvName), nil
 }
 
 // DeleteLV deactivates the logical volume and deletes it
@@ -573,17 +593,64 @@ func (hlvm *HostLVM) ActivateLV(ctx context.Context, lvName, vgName string) erro
 	return nil
 }
 
+// HasAllocatedExtents uses pvs to check if a physical device has any allocated space.
+// This is more efficient than pvdisplay -m and provides the essential information needed.
+// Returns: hasAllocatedExtents (bool), error
+func (hlvm *HostLVM) HasAllocatedExtents(ctx context.Context, devicePath string) (bool, error) {
+	args := []string{"--reportformat", "json", "--units", "b", "-o", "pv_name,pv_used,vg_name", devicePath}
+
+	output, err := hlvm.CombinedOutputCommandAsHost(ctx, pvsCmd, args...)
+	if err != nil {
+		// If pvs fails, the device might not be a PV or might not exist
+		// This is actually good - no LVM metadata means no allocated extents
+		if exitErr, ok := err.(ExitError); ok && exitErr.ExitCode() == 5 {
+			// Exit code 5 means "No volume groups found" - device is clean
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to run pvs for %s: %w", devicePath, err)
+	}
+
+	// Parse JSON output from pvs --reportformat json
+	var report PVSReport
+	if err := json.Unmarshal(output, &report); err != nil {
+		return false, fmt.Errorf("failed to parse pvs JSON output: %w", err)
+	}
+
+	// Check if any PV has allocated space
+	for _, reportSection := range report.Report {
+		for _, pv := range reportSection.PV {
+			// If pv_used is not "0" or empty, then the device has allocated space
+			if pv.PVUsed != "0B" {
+				return true, nil
+			}
+		}
+	}
+
+	// No allocated space found
+	return false, nil
+}
+
+// ReduceVG removes a physical volume from a volume group using vgreduce.
+func (hlvm *HostLVM) ReduceVG(ctx context.Context, vgName string, device string) error {
+	args := []string{vgName, device}
+	if err := hlvm.RunCommandAsHost(ctx, vgReduceCmd, args...); err != nil {
+		return fmt.Errorf("failed to reduce volume group %s by removing device %s: %w", vgName, device, err)
+	}
+	return nil
+}
+
+// RemovePV removes the LVM signature from a physical volume using pvremove.
+func (hlvm *HostLVM) RemovePV(ctx context.Context, devicePath string) error {
+	if err := hlvm.RunCommandAsHost(ctx, pvRemoveCmd, devicePath); err != nil {
+		return fmt.Errorf("failed to remove PV signature from device %s: %w", devicePath, err)
+	}
+	return nil
+}
+
 func untaggedVGs(vgs []VolumeGroup) []VolumeGroup {
 	var untaggedVGs []VolumeGroup
 	for _, vg := range vgs {
-		tagPresent := false
-		for _, tag := range vg.Tags {
-			if tag == DefaultTag {
-				tagPresent = true
-				break
-			}
-		}
-		if !tagPresent {
+		if !slices.Contains(vg.Tags, DefaultTag) {
 			untaggedVGs = append(untaggedVGs, vg)
 		}
 	}
