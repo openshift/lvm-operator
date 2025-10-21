@@ -17,7 +17,7 @@ dnf config-manager \
 
 # Install pip, skopeo and rpm-lockfile-prototype
 dnf install -y pip skopeo
-pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.13.1.tar.gz
+pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.18.0.tar.gz
 
 cd release
 
