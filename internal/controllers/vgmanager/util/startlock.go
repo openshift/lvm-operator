@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -51,6 +52,7 @@ func (l *FileLock) WaitForLock(ctx context.Context) error {
 				return fmt.Errorf("could not wait for lock because it was already locked by another process: %w", err)
 			}
 			logger.Info("Waiting for lock to be released", "lockFile", l.file.Name())
+			time.Sleep(3 * time.Second)
 		}
 	}
 }
