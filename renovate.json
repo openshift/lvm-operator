@@ -71,10 +71,5 @@
     "schedule": [
       "at any time"
     ]
-  },
-  "rpm-lockfile": {
-    "lockFileMaintenance": {
-      "enabled": true
-    }
   }
 }

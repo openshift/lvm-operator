@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.aarch64.rpm
     repoid: rhocp-4.18-for-rhel-9-aarch64-rpms
-    size: 59341901
-    checksum: sha256:df1a729e4c5abbcac8c42865faf537cac7d13d2a47473ae96fa433d9240d54b0
+    size: 59320592
+    checksum: sha256:41ab09dc83c3dfccf743d1db9ff8b9d7b24a1d07901135af78a6bfb81e4b1b1e
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 548341
@@ -242,13 +242,13 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pam-1.5.1-25.el9_6.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pam-1.5.1-26.el9_6.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 635353
-    checksum: sha256:b02671f696fa1025b8e1634f6080e268c8d4e949b05b7a98050489db601c8415
+    size: 636107
+    checksum: sha256:fd8dc3ae80d01e90bed08e84e32e3b47b568fe5ddc857dffbae36cc4bde0887b
     name: pam
-    evr: 1.5.1-25.el9_6
-    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+    evr: 1.5.1-26.el9_6
+    sourcerpm: pam-1.5.1-26.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pciutils-3.7.0-7.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 95797
@@ -327,12 +327,12 @@ arches:
     evr: 2.37.4-21.el9
     sourcerpm: util-linux-2.37.4-21.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-aarch64-source-rpms
-    size: 17173961
-    checksum: sha256:2c82192ad33d2d294fd1dc6d2b71b2490298e56d92e3c19d50b24c51a74490a2
+    size: 17186585
+    checksum: sha256:07c582cb9e3a533664cac18ccefb968a343349aafd673ca361b69794c2e8769d
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-aarch64-appstream-source-rpms
     size: 2138254
@@ -477,12 +477,12 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/pam-1.5.1-26.el9_6.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 1121432
-    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
+    size: 1130406
+    checksum: sha256:9a351f0455da788ff63026af9a8ee30e744017941c82283f970d1ed066000bb6
     name: pam
-    evr: 1.5.1-25.el9_6
+    evr: 1.5.1-26.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/p/pciutils-3.7.0-7.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 397757
@@ -534,13 +534,13 @@ arches:
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.ppc64le.rpm
     repoid: rhocp-4.18-for-rhel-9-ppc64le-rpms
-    size: 55832203
-    checksum: sha256:7597dab39a768b8005d03279085d13fa74ceb21cf655881efd5275793483bf39
+    size: 55855414
+    checksum: sha256:53859969bb389d2cd9eb5977e364993c8204d769ab9fc85436087bdcf928c652
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 577736
@@ -779,13 +779,13 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pam-1.5.1-25.el9_6.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pam-1.5.1-26.el9_6.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 676327
-    checksum: sha256:78aebdbf2d285b23a00a54d2acaaf45f573b3fda9397e9ee95cd6c3f3220d657
+    size: 677447
+    checksum: sha256:93eb19dd21e5bb33d1d004c9e49e49d0049aca990074b8c6f4204e5af4c3c38e
     name: pam
-    evr: 1.5.1-25.el9_6
-    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+    evr: 1.5.1-26.el9_6
+    sourcerpm: pam-1.5.1-26.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pciutils-3.7.0-7.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 101575
@@ -864,12 +864,12 @@ arches:
     evr: 2.37.4-21.el9
     sourcerpm: util-linux-2.37.4-21.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-ppc64le-source-rpms
-    size: 17173961
-    checksum: sha256:2c82192ad33d2d294fd1dc6d2b71b2490298e56d92e3c19d50b24c51a74490a2
+    size: 17186585
+    checksum: sha256:07c582cb9e3a533664cac18ccefb968a343349aafd673ca361b69794c2e8769d
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-ppc64le-appstream-source-rpms
     size: 2138254
@@ -1020,12 +1020,12 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/pam-1.5.1-26.el9_6.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 1121432
-    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
+    size: 1130406
+    checksum: sha256:9a351f0455da788ff63026af9a8ee30e744017941c82283f970d1ed066000bb6
     name: pam
-    evr: 1.5.1-25.el9_6
+    evr: 1.5.1-26.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/p/pciutils-3.7.0-7.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 397757
@@ -1077,13 +1077,13 @@ arches:
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.s390x.rpm
     repoid: rhocp-4.18-for-rhel-9-s390x-rpms
-    size: 57906041
-    checksum: sha256:1be140c49d48a967bb5c71f3f47da437cb9b31ddf5abe57c7345182fda02cefc
+    size: 57927069
+    checksum: sha256:3abe6819c444e03535de9519b8c7ede5d45eb516fe3a9dbdc270d862d4bee692
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 527514
@@ -1315,13 +1315,13 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pam-1.5.1-25.el9_6.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pam-1.5.1-26.el9_6.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 627191
-    checksum: sha256:437129b562f49d0e03b66a0ede15bed12f3ce511faf07e1bf4b4de9577be261d
+    size: 628673
+    checksum: sha256:0817657a9c8638a20357b6d057abe3448dd9cf8c3fed61a74772e18a9d5a209b
     name: pam
-    evr: 1.5.1-25.el9_6
-    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+    evr: 1.5.1-26.el9_6
+    sourcerpm: pam-1.5.1-26.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pciutils-3.7.0-7.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 95492
@@ -1400,12 +1400,12 @@ arches:
     evr: 2.37.4-21.el9
     sourcerpm: util-linux-2.37.4-21.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-s390x-source-rpms
-    size: 17173961
-    checksum: sha256:2c82192ad33d2d294fd1dc6d2b71b2490298e56d92e3c19d50b24c51a74490a2
+    size: 17186585
+    checksum: sha256:07c582cb9e3a533664cac18ccefb968a343349aafd673ca361b69794c2e8769d
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-s390x-appstream-source-rpms
     size: 2138254
@@ -1550,12 +1550,12 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/pam-1.5.1-26.el9_6.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 1121432
-    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
+    size: 1130406
+    checksum: sha256:9a351f0455da788ff63026af9a8ee30e744017941c82283f970d1ed066000bb6
     name: pam
-    evr: 1.5.1-25.el9_6
+    evr: 1.5.1-26.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/p/pciutils-3.7.0-7.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 397757
@@ -1607,13 +1607,13 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.x86_64.rpm
     repoid: rhocp-4.18-for-rhel-9-x86_64-rpms
-    size: 59810910
-    checksum: sha256:c69bc13490bec8afd9a2be09dcad5f9f1620b4023e13499f9f8e13e7c1011a01
+    size: 59784306
+    checksum: sha256:7efe68eedc5ee3a23a2866ba89920aa331539b45016aba3fb99de8aa442f522d
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 559754
@@ -1845,13 +1845,13 @@ arches:
     name: openssl-libs
     evr: 1:3.2.2-6.el9_5.1
     sourcerpm: openssl-3.2.2-6.el9_5.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pam-1.5.1-25.el9_6.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pam-1.5.1-26.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 635820
-    checksum: sha256:9094077ad952dd3d65543ebec57cbf52213cb3b17cdd180531652218c2282187
+    size: 636788
+    checksum: sha256:247027fa7a2236c1fb46756ed372637f85cf85886603a2ad5ba918e4231324bc
     name: pam
-    evr: 1.5.1-25.el9_6
-    sourcerpm: pam-1.5.1-25.el9_6.src.rpm
+    evr: 1.5.1-26.el9_6
+    sourcerpm: pam-1.5.1-26.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pciutils-3.7.0-7.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 98775
@@ -1930,12 +1930,12 @@ arches:
     evr: 2.37.4-21.el9
     sourcerpm: util-linux-2.37.4-21.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-x86_64-source-rpms
-    size: 17173961
-    checksum: sha256:2c82192ad33d2d294fd1dc6d2b71b2490298e56d92e3c19d50b24c51a74490a2
+    size: 17186585
+    checksum: sha256:07c582cb9e3a533664cac18ccefb968a343349aafd673ca361b69794c2e8769d
     name: openshift-clients
-    evr: 4.18.0-202506241202.p0.g04e91ac.assembly.stream.el9
+    evr: 4.18.0-202507080904.p0.g4fcb2d0.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-x86_64-appstream-source-rpms
     size: 2138254
@@ -2080,12 +2080,12 @@ arches:
     checksum: sha256:56c0b951be3e5ad6a1da594f9d4f09b8b752e2fb3d6827bcc03892f22f622b22
     name: openssl
     evr: 1:3.2.2-6.el9_5.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/pam-1.5.1-25.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/pam-1.5.1-26.el9_6.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 1121432
-    checksum: sha256:2024d0a5bee19e1582f49d455422ce70e297f728bb0c119dd05be7e35f2d6df8
+    size: 1130406
+    checksum: sha256:9a351f0455da788ff63026af9a8ee30e744017941c82283f970d1ed066000bb6
     name: pam
-    evr: 1.5.1-25.el9_6
+    evr: 1.5.1-26.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/p/pciutils-3.7.0-7.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 397757
