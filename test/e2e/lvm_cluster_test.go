@@ -90,4 +90,54 @@ func lvmClusterTest() {
 			VerifyLVMSSetup(ctx, cluster)
 		})
 	})
+
+	Describe("Device Removal", Serial, func() {
+		It("should remove devices from volume group successfully", func(ctx SpecContext) {
+			// Configure cluster with multiple devices for removal testing
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
+				Paths: []v1alpha1.DevicePath{"/dev/sdg", "/dev/sdh"},
+			}
+
+			By("Creating cluster with multiple devices")
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Removing one device from the volume group")
+			// Update cluster to remove /dev/sdi
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
+				"/dev/sdg",
+			}
+
+			err := crClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying device removal completed successfully")
+			Eventually(func(ctx SpecContext) bool {
+				return validateDeviceRemovalSuccess(ctx, cluster, 1)
+			}, 5*timeout, interval).WithContext(ctx).Should(BeTrue())
+		})
+
+		It("should handle optional device removal", func(ctx SpecContext) {
+			// Configure cluster with both required and optional devices
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
+				Paths:         []v1alpha1.DevicePath{"/dev/sdh"},
+				OptionalPaths: []v1alpha1.DevicePath{"/dev/sdl", "/dev/sdm"},
+			}
+
+			By("Creating cluster with required and optional devices")
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Removing optional devices")
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []v1alpha1.DevicePath{}
+
+			err := crClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred(), "Should allow removal of optional devices")
+
+			By("Verifying cluster remains Ready with required device only")
+			Eventually(func(ctx SpecContext) bool {
+				return validateClusterReady(ctx, cluster)
+			}, timeout, interval).WithContext(ctx).Should(BeTrue())
+		})
+	})
 }

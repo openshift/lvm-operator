@@ -148,7 +148,7 @@ func (m *AWSDiskManager) createAndAttachAWSVolumesForNode(ctx context.Context, n
 			return fmt.Errorf("failed to create and attach aws Disks for Node %s with %v: %w",
 				nodeEntry.Node, createInput, err)
 		}
-		log.Info("creating volume", "size", volume.Size, "id", volume.VolumeId)
+		log.Info("creating volume", "size", volume.Size, "id", volume.VolumeId, "path", diskName)
 		volumes[i] = volume
 		volumeIDs = append(volumeIDs, volume.VolumeId)
 	}
