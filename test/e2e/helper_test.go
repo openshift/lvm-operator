@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/meta"
 
-	k8sv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,7 +118,7 @@ func DeleteResource(ctx context.Context, obj client.Object) {
 }
 
 func lvmNamespaceCleanup(ctx context.Context) {
-	DeleteResource(ctx, &k8sv1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
+	DeleteResource(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
 }
 
 // afterTestSuiteCleanup is the function called to tear down the test environment.
@@ -171,7 +171,7 @@ func createNamespace(ctx context.Context, namespace string) {
 	// annotation required for workload partitioning
 	annotations["workload.openshift.io/allowed"] = "management"
 
-	ns := &k8sv1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        namespace,
 			Annotations: annotations,
@@ -179,6 +179,12 @@ func createNamespace(ctx context.Context, namespace string) {
 		},
 	}
 	CreateResource(ctx, ns)
+}
+
+func IsSNO(ctx context.Context) bool {
+	nodeList := &corev1.NodeList{}
+	Expect(crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})).To(Succeed())
+	return len(nodeList.Items) == 1
 }
 
 // DeleteResources in concurrent rows with sequential elements in each row

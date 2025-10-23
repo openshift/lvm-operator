@@ -61,8 +61,8 @@ func getNodeEnvironmentFromNodeList(nodeList *corev1.NodeList) ([]NodeDisks, err
 		disks := NodeDisks{
 			Node: node.GetName(),
 			Disks: []Disk{
-				{Size: 10},
-				{Size: 20},
+				{Size: 30},
+				{Size: 30},
 			},
 			AWSNodeInfo: nodeInfo,
 		}
