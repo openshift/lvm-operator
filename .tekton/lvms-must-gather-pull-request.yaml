@@ -48,7 +48,7 @@ spec:
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvms-must-gather-4-20
   timeouts:
-    pipeline: 1h30m0s
+    pipeline: 1h30m1s
   workspaces:
   - name: git-auth
     secret:
