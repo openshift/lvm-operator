@@ -1,0 +1,31 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.20.0
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: 'Jeff Roche <jeroche@redhat.com>'
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-20
+  snapshot: lvm-operator-4-20-24xvq
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be seen.
+
+        This erratum implements the following changes:
+
+        - Changes the default namespace from openshift-storage to openshift-lvm-storage
+        - Attaches a label to PVs containing the name of the node it belongs to
+        - Fixes the lvms-operator-metrics-monitor targets being down with a TLS certificate error
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        fixed:
+          - id: OCPEDGE-1832
+            source: issues.redhat.com
+          - id: OCPEDGE-1783
+            source: issues.redhat.com
+          - id: OCPBUGS-59178
+            source: issues.redhat.com
