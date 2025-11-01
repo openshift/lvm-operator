@@ -64,7 +64,7 @@
           "alm-examples": "[\n  {\n    \"apiVersion\": \"lvm.topolvm.io/v1alpha1\",\n    \"kind\": \"LVMCluster\",\n    \"metadata\": {\n      \"name\": \"my-lvmcluster\"\n    },\n    \"spec\": {\n      \"storage\": {\n        \"deviceClasses\": [\n          {\n            \"default\": true,\n            \"fstype\": \"xfs\",\n            \"name\": \"vg1\",\n            \"thinPoolConfig\": {\n              \"name\": \"thin-pool-1\",\n              \"overprovisionRatio\": 10,\n              \"sizePercent\": 90\n            }\n          }\n        ]\n      }\n    }\n  }\n]",
           "capabilities": "Seamless Upgrades",
           "categories": "Storage",
-          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:1d49ce5985c9ff28101d1bffa95238b7589408f3ddc39f3bae23e92b431f391d",
+          "containerImage": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:927a9116a4a8e36880c343414076dc295672fdcaffc74fd9d3533511b9654398",
           "description": "Logical volume manager storage provides dynamically provisioned local storage for container workloads",
           "features.operators.openshift.io/cnf": "false",
           "features.operators.openshift.io/cni": "false",
@@ -172,7 +172,7 @@
       "name": "lvms-must-gather"
     },
     {
-      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:1d49ce5985c9ff28101d1bffa95238b7589408f3ddc39f3bae23e92b431f391d",
+      "image": "registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:927a9116a4a8e36880c343414076dc295672fdcaffc74fd9d3533511b9654398",
       "name": "lvms-operator"
     },
     {
