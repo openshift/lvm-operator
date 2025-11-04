@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
@@ -98,6 +99,8 @@ func lvmClusterTest() {
 				Paths: []v1alpha1.DevicePath{"/dev/sdg", "/dev/sdh"},
 			}
 
+			time.Sleep(30 * time.Minute)
+
 			By("Creating cluster with multiple devices")
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
@@ -123,6 +126,8 @@ func lvmClusterTest() {
 				Paths:         []v1alpha1.DevicePath{"/dev/sdh"},
 				OptionalPaths: []v1alpha1.DevicePath{"/dev/sdl", "/dev/sdm"},
 			}
+
+			time.Sleep(30 * time.Minute)
 
 			By("Creating cluster with required and optional devices")
 			CreateResource(ctx, cluster)
