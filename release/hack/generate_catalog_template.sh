@@ -1,7 +1,7 @@
 #!/bin/bash
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
-#staging_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
 lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
@@ -74,11 +74,14 @@ for i in "${!all_y_streams[@]}"; do
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"Candidate ${ver}\")")
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
         done
     else
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
     fi
+
+    # Convert any staging references to quay references
+    catalog_template="${catalog_template//${staging_bundle_path}/${quay_bundle_path}}"
 
     catalog_file_location="release/catalog/lvm-operator-catalog-template.yaml"
     echo -e "${catalog_template}" > $catalog_file_location

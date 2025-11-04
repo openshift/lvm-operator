@@ -3,6 +3,19 @@
   "extends": [
     "github>konflux-ci/mintmaker//config/renovate/renovate.json"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "datasourceTemplate": "docker",
+      "managerFilePatterns": [
+        "/.*\\-catalog\\-template\\.yaml$/"
+      ],
+      "matchStrings": [
+        "(?<depName>quay\\.io[\\w\\-\\.\\/]+)(?<currentValue>)?@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "versioningTemplate": "docker"
+    }
+  ],
   "gomod": {
     "enabled": false
   },
