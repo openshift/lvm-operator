@@ -1,13 +1,15 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: test-catalog-build-pipeline
+  name: catalog-patching-build-pipeline
 spec:
   description: |
     This pipeline is ideal for building and verifying [file-based catalogs](https://konflux-ci.dev/docs/end-to-end/building-olm/#building-the-file-based-catalog).
 
     _Uses `buildah` to create a container image. Its build-time tests are limited to verifying the included catalog and do not scan the image.
     This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-fbc-builder?tab=tags)_
+
+    This pipeline has a special step that runs a render-catalog script to patch the catalog built by OPM.
   params:
   - description: Source Repository URL
     name: git-url
