@@ -59,7 +59,7 @@ spec:
   - name: catalog-patch-image
     value: quay.io/konflux-ci/yq@sha256:41aee71bcaa8a759073e00d6acea358fbc4013ad6e28554729451606c0c35591
   pipelineRef:
-    name: test-catalog-build-pipeline
+    name: catalog-patching-build-pipeline
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-catalog-4-21
   workspaces:
