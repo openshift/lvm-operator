@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
@@ -96,10 +95,8 @@ func lvmClusterTest() {
 		It("should remove devices from volume group successfully", func(ctx SpecContext) {
 			// Configure cluster with multiple devices for removal testing
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
-				Paths: []v1alpha1.DevicePath{"/dev/sdg", "/dev/sdh"},
+				Paths: []v1alpha1.DevicePath{"/dev/nvme1n1", "/dev/nvme2n1"},
 			}
-
-			time.Sleep(30 * time.Minute)
 
 			By("Creating cluster with multiple devices")
 			CreateResource(ctx, cluster)
@@ -108,7 +105,7 @@ func lvmClusterTest() {
 			By("Removing one device from the volume group")
 			// Update cluster to remove /dev/sdi
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
-				"/dev/sdg",
+				"/dev/nvme2n1",
 			}
 
 			err := crClient.Update(ctx, cluster)
@@ -123,11 +120,9 @@ func lvmClusterTest() {
 		It("should handle optional device removal", func(ctx SpecContext) {
 			// Configure cluster with both required and optional devices
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
-				Paths:         []v1alpha1.DevicePath{"/dev/sdh"},
+				Paths:         []v1alpha1.DevicePath{"/dev/nvme2n1"},
 				OptionalPaths: []v1alpha1.DevicePath{"/dev/sdl", "/dev/sdm"},
 			}
-
-			time.Sleep(30 * time.Minute)
 
 			By("Creating cluster with required and optional devices")
 			CreateResource(ctx, cluster)
