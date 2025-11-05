@@ -6,4 +6,3 @@ GenerateMinorChannels: true
 Stable:
   Bundles:
     - Image: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:f2270236ca0f96bac3d2f616b349b3b5d44ffa3889fa91838508be3d9b58fe3b # v4.20.0
-    - Image: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle@sha256:d94b7e77071feca02f67a884a3de53c4486b2d29efab31c166fa8046f4aa3533 # v4.21.0

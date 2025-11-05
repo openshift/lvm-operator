@@ -84,6 +84,9 @@ spec:
   - name: catalog-output-path
     type: string
     description: The path for the output catalog file
+  - name: catalog-template-merge-script
+    type: string
+    description: The script to run prior to running the opm command to merge the catalog templates
   - name: catalog-patch-script
     type: string
     description: The script to run after running the opm command to generate the catalog.json
@@ -150,10 +153,35 @@ spec:
     workspaces:
     - name: basic-auth
       workspace: git-auth
+  - name: catalog-template-merge
+    params:
+    - name: ociStorage
+      value: $(params.output-image).script
+    - name: ociArtifactExpiresAfter
+      value: $(params.image-expires-after)
+    - name: SCRIPT_RUNNER_IMAGE
+      value: $(params.catalog-patch-image)
+    - name: SCRIPT
+      value: $(params.catalog-template-merge-script)
+    - name: HERMETIC
+      value: $(params.hermetic)
+    - name: SOURCE_ARTIFACT
+      value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+    runAfter:
+    - clone-repository
+    taskRef:
+      params:
+        - name: name
+          value: run-script-oci-ta
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-run-script-oci-ta:0.1@sha256:834a934f1e631a79aea7f2d001162cf90086e664e648c8ca15b69ad9798571ee
+        - name: kind
+          value: task
+      resolver: bundles
   - name: run-opm-command
     params:
     - name: SOURCE_ARTIFACT
-      value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+      value: $(tasks.catalog-template-merge.results.SCRIPT_ARTIFACT)
     - name: ociStorage
       value: $(params.output-image).opm
     - name: ociArtifactExpiresAfter
@@ -168,7 +196,7 @@ spec:
     - name: FILE_TO_UPDATE_PULLSPEC
       value: $(params.catalog-output-path)
     runAfter:
-    - clone-repository
+    - catalog-template-merge
     taskRef:
       params:
       - name: name
@@ -265,6 +293,7 @@ spec:
       value: "true"
     - name: ADDITIONAL_BASE_IMAGES
       value:
+      - $(tasks.catalog-template-merge.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       - $(tasks.run-catalog-patch-script.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
     runAfter:
     - run-catalog-patch-script

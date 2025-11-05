@@ -49,6 +49,8 @@ spec:
     - release/catalog/lvm-operator-catalog-template.yaml
   - name: catalog-output-path
     value: "release/catalog/lvm-operator-catalog.json"
+  - name: catalog-template-merge-script
+    value: "yq --inplace eval-all '. as $item ireduce ({}; . *+ $item)' ./release/catalog/lvm-operator-catalog-template.yaml ./release/catalog/lvm-operator-catalog-candidate-template.yaml"
   - name: catalog-patch-script
     value: "./release/hack/render-catalog.sh"
   - name: catalog-patch-image

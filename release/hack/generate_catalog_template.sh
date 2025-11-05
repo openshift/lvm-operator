@@ -64,7 +64,18 @@ for i in "${!all_y_streams[@]}"; do
         catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
     done
 
+    # Save the catalog template with the released versions
+    template_file_location="release/catalog/lvm-operator-catalog-template.yaml"
+    echo -e "${catalog_template}" > $template_file_location
+    echo "Catalog template saved to ${template_file_location}"
+
     catalog_versions=($(echo "${candidate_versions}" | yq "[.[] | select(contains(\"${maxVersion}\"))] | join(\" \")"))
+    # Initialize the stable channel array if there are stable versions
+    if (( ${#catalog_versions[@]} )); then
+        catalog_template=$(echo "${catalog_template}" | yq '.Stable.Bundles = []')
+    else
+        SKIP_CANDIDATES="true"
+    fi
 
     # Check for and add any candidates if SKIP_CANDIDATES was not specified
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
@@ -74,16 +85,14 @@ for i in "${!all_y_streams[@]}"; do
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${quay_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
         done
     else
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
     fi
 
-    # Convert any staging references to quay references
-    catalog_template="${catalog_template//${staging_bundle_path}/${quay_bundle_path}}"
-
-    catalog_file_location="release/catalog/lvm-operator-catalog-template.yaml"
-    echo -e "${catalog_template}" > $catalog_file_location
-    echo "Catalog saved to ${catalog_file_location}"
+    # Save the catalog template with the released versions
+    candidate_template_file_location="release/catalog/lvm-operator-catalog-candidate-template.yaml"
+    echo -e "${catalog_template}" > $candidate_template_file_location
+    echo "Candidate catalog template saved to ${candidate_template_file_location}"
 done
