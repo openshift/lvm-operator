@@ -14,7 +14,7 @@ rpm-lock: rhsm-keys
 	--env 'RHSM_ACTIVATION_KEY=$(RHSM_ACTIVATION_KEY)' \
 	--env 'RHSM_ORG=$(RHSM_ORG)' \
 	--workdir /source \
-	registry.redhat.io/rhel9-4-els/rhel:9.4 ./release/hack/generate-rpm-lock.sh $(TARGET)
+	registry.redhat.io/ubi9/ubi:9.6 ./release/hack/generate-rpm-lock.sh $(TARGET)
 
 .PHONY: rhsm-keys
 rhsm-keys:
