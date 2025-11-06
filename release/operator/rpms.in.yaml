@@ -57,14 +57,14 @@ contentOrigin:
 
 packages:
   # list of rpm names to resolve
+  #- glibc
   - util-linux
   - xfsprogs
   - e2fsprogs
-  - glibc
 
-#reinstallPackages: []
-  # list of rpms already provided in the base image, but which should be
-  # reinstalled
+upgradePackages:
+  # list of rpms already provided in the base image, but which should be upgraded
+  - glibc
 
 arches:
   # The list of architectures can be set in the config file. Any `--arch` option set
@@ -80,7 +80,7 @@ context:
   # can be combined with `image` and `containerfile`
   containerfile:
     file: konflux.Dockerfile
-    imagePattern: registry.redhat.io/rhel9-4-els/rhel-minimal
+    imagePattern: registry.redhat.io/ubi9/ubi-minimal
 
 # Tell DNF it may erase already installed packages when resolving the
 # transaction. Defaults to false.
