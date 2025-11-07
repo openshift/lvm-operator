@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
@@ -33,7 +34,9 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -266,6 +269,11 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 		return ctrl.Result{}, err
 	}
 
+	err := r.checkForDeletedDeviceClasses(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to check for deleted device classes, %w", err)
+	}
+
 	msg := "successfully reconciled LVMCluster"
 	logger.Info(msg, "resourceSyncElapsedTime", resourceSyncElapsedTime)
 	r.NormalEvent(ctx, instance, EventReasonResourceReconciliationSuccess, msg)
@@ -332,6 +340,75 @@ func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
 		}
 
 		return fmt.Errorf("failed to get container image for %s in pod %s", constants.LVMOperatorContainerName, podName)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) checkForDeletedDeviceClasses(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("device class deletion for", instance.GetName())
+
+	currentVGs := &lvmv1alpha1.LVMVolumeGroupList{}
+	if err := r.List(ctx, currentVGs, client.InNamespace(r.GetNamespace())); err != nil {
+		return fmt.Errorf("failed to list existing LVMVolumeGroups: %w", err)
+	}
+
+	desiredVgNames := make(map[string]struct{})
+	for _, dc := range instance.Spec.Storage.DeviceClasses {
+		desiredVgNames[dc.Name] = struct{}{}
+	}
+
+	for _, currentVG := range currentVGs.Items {
+		if !metav1.IsControlledBy(&currentVG, instance) {
+			continue
+		}
+
+		if _, ok := desiredVgNames[currentVG.Name]; ok {
+			continue
+		}
+
+		logger.Info("deleting lvm volume group and storage class because it no longer exists in device class list", "name", currentVG.Name)
+
+		// delete SC and VSC first
+		sc := &storagev1.StorageClass{}
+		scName := resource.GetStorageClassName(currentVG.GetName())
+
+		err := r.Get(ctx, types.NamespacedName{Name: scName}, sc)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get storage class, %w", err)
+		}
+
+		if sc.GetDeletionTimestamp().IsZero() {
+			if err := r.Delete(ctx, sc); err != nil {
+				return fmt.Errorf("failed to delete StorageClass %s: %w", scName, err)
+			}
+		}
+
+		if r.SnapshotsEnabled() {
+			vsc := &snapapi.VolumeSnapshotClass{}
+			vscName := resource.GetVolumeSnapshotClassName(currentVG.GetName())
+
+			err := r.Get(ctx, types.NamespacedName{Name: vscName}, vsc)
+			if err != nil && !k8serrors.IsNotFound(err) {
+				return fmt.Errorf("failed to get volume snapshot class: %w", err)
+			}
+
+			if vsc.GetDeletionTimestamp().IsZero() {
+				err := r.Delete(ctx, vsc)
+				if err != nil {
+					return fmt.Errorf("failed to delete VolumeSnapshotClass %s: %w", vscName, err)
+				}
+			}
+		}
+
+		if !currentVG.GetDeletionTimestamp().IsZero() {
+			continue
+		}
+
+		err = r.Delete(ctx, &currentVG)
+		if err != nil {
+			return fmt.Errorf("failed to delete orphaned LVMVolumeGroup %s: %w", currentVG.Name, err)
+		}
 	}
 
 	return nil

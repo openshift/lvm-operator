@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 
 	lvmdCMD "github.com/topolvm/topolvm/cmd/lvmd/app"
 	lvmd "github.com/topolvm/topolvm/pkg/lvmd/types"
@@ -111,6 +112,9 @@ func (c *CachedFileConfig) Load(ctx context.Context) (*Config, error) {
 }
 
 func (c *CachedFileConfig) Save(ctx context.Context, config *Config) error {
+	if reflect.DeepEqual(config, c.Config) {
+		return nil
+	}
 	c.Config = config
 	log.FromContext(ctx).Info("saving lvmd config to cache and store")
 	return c.FileConfig.Save(ctx, config)
