@@ -33,9 +33,6 @@ spec:
     value: "true"
   - name: build-args-file
     value: release/container-build.args
-  - name: build-platforms
-    value:
-    - linux/x86_64
   pipelineRef:
     resolver: git
     params:
@@ -44,7 +41,7 @@ spec:
     - name: revision
       value: main
     - name: pathInRepo
-      value: .tekton/multi-arch-build-pipeline.yaml
+      value: .tekton/single-arch-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-bundle-4-17
   timeouts:
