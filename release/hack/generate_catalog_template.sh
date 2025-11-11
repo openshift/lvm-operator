@@ -1,7 +1,7 @@
 #!/bin/bash
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
-#staging_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
 lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
@@ -64,7 +64,15 @@ for i in "${!all_y_streams[@]}"; do
         catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
     done
 
+    # Save the catalog template with the released versions
+    template_file_location="release/catalog/lvm-operator-catalog-template.yaml"
+    echo -e "${catalog_template}" > $template_file_location
+    echo "Catalog template saved to ${template_file_location}"
+
     catalog_versions=($(echo "${candidate_versions}" | yq "[.[] | select(contains(\"${maxVersion}\"))] | join(\" \")"))
+
+    # Reinitialize the stable channel array
+    catalog_template=$(echo "${catalog_template}" | yq '.Stable.Bundles = []')
 
     # Check for and add any candidates if SKIP_CANDIDATES was not specified
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
@@ -74,13 +82,16 @@ for i in "${!all_y_streams[@]}"; do
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"Candidate ${ver}\")")
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${quay_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
         done
-    else
+    elif ! [ -z "${SKIP_CANDIDATES+x}" ]; then
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
+    else
+        echo "No pre-release content found, skipping pre-release content"
     fi
 
-    catalog_file_location="release/catalog/lvm-operator-catalog-template.yaml"
-    echo -e "${catalog_template}" > $catalog_file_location
-    echo "Catalog saved to ${catalog_file_location}"
+    # Save the catalog template with the released versions
+    candidate_template_file_location="release/catalog/lvm-operator-catalog-candidate-template.yaml"
+    echo -e "${catalog_template}" > $candidate_template_file_location
+    echo "Candidate catalog template saved to ${candidate_template_file_location}"
 done
