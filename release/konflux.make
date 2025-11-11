@@ -34,7 +34,7 @@ catalog-template:
 
 .PHONY: catalog-source
 catalog-source: opm
-	CATALOG_VERSION=$(Y_STREAM) release/hack/generate_catalog.sh $(OPM)
+	$(OPM) alpha render-template semver release/catalog/lvm-operator-catalog-template.yaml > release/catalog/lvm-operator-catalog.json
 
 IMAGE_BUILD_CMD ?= $(shell command -v podman 2>&1 >/dev/null && echo podman || echo docker)
 
