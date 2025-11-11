@@ -26,13 +26,6 @@ ifndef RHSM_ORG
 	$(error environment variable RHSM_ORG is required)
 endif
 
-.PHONY: konflux-update
-konflux-update: konflux-task-manifest-updates
-
-.PHONY: konflux-task-manifest-updates
-konflux-task-manifest-updates:
-	release/hack/update-konflux-task-refs.sh .tekton/single-arch-build-pipeline.yaml .tekton/multi-arch-build-pipeline.yaml .tekton/catalog-build-pipeline.yaml
-
 .PHONY: catalog-template
 catalog-template:
 	TARGET_VERSIONS=$(Y_STREAM) release/hack/generate_catalog_template.sh
@@ -41,7 +34,7 @@ catalog-template:
 
 .PHONY: catalog-source
 catalog-source: opm
-	CATALOG_VERSION=$(Y_STREAM) release/hack/generate_catalog.sh $(OPM)
+	$(OPM) alpha render-template semver release/catalog/lvm-operator-catalog-template.yaml > release/catalog/lvm-operator-catalog.json
 
 IMAGE_BUILD_CMD ?= $(shell command -v podman 2>&1 >/dev/null && echo podman || echo docker)
 
