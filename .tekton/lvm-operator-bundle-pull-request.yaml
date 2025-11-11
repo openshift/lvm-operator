@@ -38,9 +38,6 @@ spec:
     value: release/container-build.args
   - name: skip-additional-tags
     value: "true"
-  - name: build-platforms
-    value:
-    - linux/x86_64
   pipelineRef:
     resolver: git
     params:
@@ -49,7 +46,7 @@ spec:
     - name: revision
       value: main
     - name: pathInRepo
-      value: .tekton/multi-arch-build-pipeline.yaml
+      value: .tekton/single-arch-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-bundle-4-19
   timeouts:
