@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
@@ -92,8 +93,15 @@ func lvmClusterTest() {
 	})
 
 	Describe("Device Removal", Serial, func() {
+		BeforeEach(func() {
+			if !diskInstall {
+				Skip("Device removal tests require --disk-install=true")
+			}
+		})
+
 		It("should remove devices from volume group successfully", func(ctx SpecContext) {
 			// Configure cluster with multiple devices for removal testing
+			time.Sleep(time.Hour)
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
 				Paths: []v1alpha1.DevicePath{"/dev/nvme1n1", "/dev/nvme2n1"},
 			}
@@ -119,6 +127,7 @@ func lvmClusterTest() {
 
 		It("should handle optional device removal", func(ctx SpecContext) {
 			// Configure cluster with both required and optional devices
+			time.Sleep(time.Hour)
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
 				Paths:         []v1alpha1.DevicePath{"/dev/nvme2n1"},
 				OptionalPaths: []v1alpha1.DevicePath{"/dev/sdl", "/dev/sdm"},
