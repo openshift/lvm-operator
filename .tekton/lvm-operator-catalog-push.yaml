@@ -31,7 +31,6 @@ spec:
   - name: build-args
     value:
     - CATALOG_VERSION=v4.14
-    - BASE_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-ose-operator-registry
   - name: hermetic
     value: "true"
   - name: build-platforms
@@ -40,8 +39,29 @@ spec:
     - linux/arm64
     - linux/ppc64le
     - linux/s390x
+  - name: opm_args
+    value:
+    - alpha
+    - render-template
+    - semver
+    - release/catalog/lvm-operator-catalog-template.yaml
+  - name: catalog-output-path
+    value: "release/catalog/lvm-operator-catalog.json"
+  - name: catalog-template-merge-script
+    value: "yq --inplace eval-all '. as $item ireduce ({}; . *+ $item)' ./release/catalog/lvm-operator-catalog-template.yaml ./release/catalog/lvm-operator-catalog-candidate-template.yaml"
+  - name: catalog-patch-script
+    value: "./release/hack/render-catalog.sh"
+  - name: catalog-patch-image
+    value: quay.io/konflux-ci/yq@sha256:41aee71bcaa8a759073e00d6acea358fbc4013ad6e28554729451606c0c35591
   pipelineRef:
-    name: catalog-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/catalog-patching-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-catalog-4-14
   workspaces:
