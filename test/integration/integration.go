@@ -9,18 +9,26 @@ import (
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 	"github.com/spf13/cobra"
 
-	// Import your tests package for side effects (registers tests)
-	_ "github.com/openshift/lvm-operator/v4/test/integration/helloworld"
+	// Import the test packages
+	_ "github.com/openshift/lvm-operator/v4/test/integration/sno"
 )
 
 func main() {
 	registry := e.NewRegistry()
 	ext := e.NewExtension("openshift", "payload", "lvm-operator")
 
-	ext.AddSuite(e.Suite{
-		Name:    "openshift/lvm-operator/test/integration",
-		Parents: []string{},
-	})
+	suites := []e.Suite{
+		{
+			Name: "openshift/lvm-operator/test/integration/single-node",
+			Qualifiers: []string{
+				`labels.exists(l, l=="SNO")`,
+			},
+		},
+	}
+
+	for _, suite := range suites {
+		ext.AddSuite(suite)
+	}
 
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
 	if err != nil {
@@ -30,7 +38,7 @@ func main() {
 	registry.Register(ext)
 
 	root := &cobra.Command{
-		Long: "LVM Test Suite (OTE Based)",
+		Long: "LVM Operator Test Suite (OTE Based)",
 	}
 
 	root.AddCommand(cmd.DefaultExtensionCommands(registry)...)
