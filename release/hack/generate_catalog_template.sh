@@ -70,12 +70,9 @@ for i in "${!all_y_streams[@]}"; do
     echo "Catalog template saved to ${template_file_location}"
 
     catalog_versions=($(echo "${candidate_versions}" | yq "[.[] | select(contains(\"${maxVersion}\"))] | join(\" \")"))
-    # Initialize the stable channel array if there are stable versions
-    if (( ${#catalog_versions[@]} )); then
-        catalog_template=$(echo "${catalog_template}" | yq '.Stable.Bundles = []')
-    else
-        SKIP_CANDIDATES="true"
-    fi
+
+    # Reinitialize the stable channel array
+    catalog_template=$(echo "${catalog_template}" | yq '.Stable.Bundles = []')
 
     # Check for and add any candidates if SKIP_CANDIDATES was not specified
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
@@ -85,10 +82,13 @@ for i in "${!all_y_streams[@]}"; do
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${quay_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
+            # The staging path has to be used here so the nudge is only triggered by images that make it to staging
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
         done
-    else
+    elif ! [ -z "${SKIP_CANDIDATES+x}" ]; then
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
+    else
+        echo "No pre-release content found, skipping pre-release content"
     fi
 
     # Save the catalog template with the released versions
