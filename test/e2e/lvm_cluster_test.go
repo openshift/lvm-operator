@@ -101,9 +101,14 @@ func lvmClusterTest() {
 
 		It("should remove devices from volume group successfully", func(ctx SpecContext) {
 			// Configure cluster with multiple devices for removal testing
-			time.Sleep(time.Hour)
+			devices := []v1alpha1.DevicePath{"/dev/nvme2n1"}
+			if nodeCount == 1 {
+				devices = append(devices, "/dev/nvme1n1")
+			} else {
+				devices = append(devices, "/dev/nvme3n1")
+			}
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
-				Paths: []v1alpha1.DevicePath{"/dev/nvme1n1", "/dev/nvme2n1"},
+				Paths: devices,
 			}
 
 			By("Creating cluster with multiple devices")
@@ -130,7 +135,7 @@ func lvmClusterTest() {
 			time.Sleep(time.Hour)
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
 				Paths:         []v1alpha1.DevicePath{"/dev/nvme2n1"},
-				OptionalPaths: []v1alpha1.DevicePath{"/dev/sdl", "/dev/sdm"},
+				OptionalPaths: []v1alpha1.DevicePath{"/dev/nvme1n1", "/dev/nvme3n1"},
 			}
 
 			By("Creating cluster with required and optional devices")
@@ -138,7 +143,7 @@ func lvmClusterTest() {
 			VerifyLVMSSetup(ctx, cluster)
 
 			By("Removing optional devices")
-			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []v1alpha1.DevicePath{}
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{}
 
 			err := crClient.Update(ctx, cluster)
 			Expect(err).NotTo(HaveOccurred(), "Should allow removal of optional devices")

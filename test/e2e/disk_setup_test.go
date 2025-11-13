@@ -27,11 +27,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var nodeCount = 0
+
 func diskSetup(ctx context.Context) {
 	// get nodes
 	By(fmt.Sprintf("getting all worker nodes by label %s", labelNodeRoleWorker))
 	nodeList := &corev1.NodeList{}
 	Expect(crClient.List(ctx, nodeList, client.HasLabels{labelNodeRoleWorker})).To(Succeed())
+	nodeCount = len(nodeList.Items)
 
 	By("getting AWS region info from the first Node spec")
 	nodeInfo, err := getAWSNodeInfo(nodeList.Items[0])
