@@ -267,11 +267,11 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	if errors.Is(context.Cause(ctx), ErrConfigModified) {
-		opts.SetupLog.Info("restarting controller due to modified configuration")
-		return run(cmd, nil, opts)
+		opts.SetupLog.Info("exiting pod due to modified configuration")
+		os.Exit(0)
 	} else if errors.Is(context.Cause(ctx), icsi.ErrPluginRegistrationFailed) {
-		opts.SetupLog.Error(context.Cause(ctx), "restarting due to failed plugin registration")
-		return run(cmd, nil, opts)
+		opts.SetupLog.Error(context.Cause(ctx), "exiting pod due to failed plugin registration")
+		os.Exit(0)
 	} else if err := ctx.Err(); err != nil {
 		opts.SetupLog.Error(err, "exiting abnormally")
 		os.Exit(1)
