@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
@@ -88,6 +89,69 @@ func lvmClusterTest() {
 			}
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
+		})
+	})
+
+	Describe("Device Removal", Serial, func() {
+		BeforeEach(func() {
+			if !diskInstall {
+				Skip("Device removal tests require --disk-install=true")
+			}
+		})
+
+		It("should remove devices from volume group successfully", func(ctx SpecContext) {
+			// Configure cluster with multiple devices for removal testing
+			devices := []v1alpha1.DevicePath{"/dev/nvme2n1"}
+			if nodeCount == 1 {
+				devices = append(devices, "/dev/nvme1n1")
+			} else {
+				devices = append(devices, "/dev/nvme3n1")
+			}
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
+				Paths: devices,
+			}
+
+			By("Creating cluster with multiple devices")
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Removing one device from the volume group")
+			// Update cluster to remove /dev/sdi
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
+				"/dev/nvme2n1",
+			}
+
+			err := crClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying device removal completed successfully")
+			Eventually(func(ctx SpecContext) bool {
+				return validateDeviceRemovalSuccess(ctx, cluster, 1)
+			}, 5*timeout, interval).WithContext(ctx).Should(BeTrue())
+		})
+
+		It("should handle optional device removal", func(ctx SpecContext) {
+			// Configure cluster with both required and optional devices
+			time.Sleep(time.Hour)
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
+				Paths:         []v1alpha1.DevicePath{"/dev/nvme2n1"},
+				OptionalPaths: []v1alpha1.DevicePath{"/dev/nvme1n1", "/dev/nvme3n1"},
+			}
+
+			By("Creating cluster with required and optional devices")
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Removing optional devices")
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{}
+
+			err := crClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred(), "Should allow removal of optional devices")
+
+			By("Verifying cluster remains Ready with required device only")
+			Eventually(func(ctx SpecContext) bool {
+				return validateClusterReady(ctx, cluster)
+			}, timeout, interval).WithContext(ctx).Should(BeTrue())
 		})
 	})
 }
