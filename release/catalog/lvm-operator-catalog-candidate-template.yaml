@@ -5,4 +5,4 @@ GenerateMajorChannels: false
 GenerateMinorChannels: true
 Stable:
   Bundles:
-    - Image: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle@sha256:82bcaba7f44d28e8529915af868c847107932a6f8cc9d2eaf34796c578c7a5ba # v4.18.4
+    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:82bcaba7f44d28e8529915af868c847107932a6f8cc9d2eaf34796c578c7a5ba # v4.18.4
