@@ -158,7 +158,7 @@ func (r *Reconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create or update LVMVolumeGroupNodeStatus %s", nodeStatus.GetName())
+		return fmt.Errorf("failed to create or update LVMVolumeGroupNodeStatus %s, %w", nodeStatus.GetName(), err)
 	}
 
 	if result != controllerutil.OperationResultNone {

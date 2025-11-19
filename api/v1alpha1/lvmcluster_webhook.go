@@ -174,10 +174,10 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
 	}
 
-	// Validate all the old device classes still exist
-	err = validateDeviceClassesStillExist(oldLVMCluster.Spec.Storage.DeviceClasses, l.Spec.Storage.DeviceClasses)
+	// Validate device class removal follows the business rules
+	err = validateDeviceClassRemoval(oldLVMCluster.Spec.Storage.DeviceClasses, l.Spec.Storage.DeviceClasses)
 	if err != nil {
-		return warnings, fmt.Errorf("invalid: device classes were deleted from the LVMCluster: %w", err)
+		return warnings, fmt.Errorf("device class removal validation failed: %w", err)
 	}
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -265,20 +265,25 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	return warnings, nil
 }
 
-func validateDeviceClassesStillExist(old, new []DeviceClass) error {
-	deviceClassMap := make(map[string]bool)
-
-	for _, deviceClass := range old {
-		deviceClassMap[deviceClass.Name] = true
+// validateDeviceClassRemoval validates that device class removal follows the business rules:
+// 1. Cannot delete the last device class
+// 2. Cannot delete default device class
+func validateDeviceClassRemoval(old, new []DeviceClass) error {
+	if len(new) == 0 {
+		return fmt.Errorf("cannot remove all device classes: at least one device class must remain")
 	}
 
+	newDeviceClassMap := make(map[string]DeviceClass)
 	for _, deviceClass := range new {
-		delete(deviceClassMap, deviceClass.Name)
+		newDeviceClassMap[deviceClass.Name] = deviceClass
 	}
 
-	// if any old device class is removed now
-	if len(deviceClassMap) != 0 {
-		return fmt.Errorf("device classes can not be removed from the LVMCluster once added oldDeviceClasses:%v, newDeviceClasses:%v", old, new)
+	for _, oldDeviceClass := range old {
+		if _, exists := newDeviceClassMap[oldDeviceClass.Name]; !exists {
+			if oldDeviceClass.Default {
+				return fmt.Errorf("cannot delete default device class %s", oldDeviceClass.Name)
+			}
+		}
 	}
 
 	return nil
