@@ -23,6 +23,8 @@ import (
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
+	storagev1 "k8s.io/api/storage/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -88,6 +90,59 @@ func lvmClusterTest() {
 			}
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
+		})
+	})
+
+	Describe("Device Class Deletion", Serial, func() {
+		if !diskInstall {
+			Skip("Disk install is false, skipping")
+		}
+
+		It("should clean up resources when removing an unused device class", func(ctx SpecContext) {
+			By("Setting up LVMCluster with two device classes")
+			cluster.Spec.Storage.DeviceClasses = []v1alpha1.DeviceClass{
+				{
+					Name:    "vg1",
+					Default: true,
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []v1alpha1.DevicePath{"/dev/nvme1n1"},
+					},
+				},
+				{
+					Name:    "vg2",
+					Default: false,
+					DeviceSelector: &v1alpha1.DeviceSelector{
+						Paths: []v1alpha1.DevicePath{"/dev/nvme2n1"},
+					},
+				},
+			}
+
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Verifying both StorageClasses exist")
+			Eventually(func(ctx SpecContext) error {
+				return crClient.Get(ctx, types.NamespacedName{Name: "lvms-vg1"}, &storagev1.StorageClass{})
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+			Eventually(func(ctx SpecContext) error {
+				return crClient.Get(ctx, types.NamespacedName{Name: "lvms-vg2"}, &storagev1.StorageClass{})
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+			By("Removing the second device class")
+			cluster.Spec.Storage.DeviceClasses = cluster.Spec.Storage.DeviceClasses[:1]
+			Expect(crClient.Update(ctx, cluster)).To(Succeed())
+
+			By("Verifying StorageClass for removed device class is deleted")
+			Eventually(func(ctx SpecContext) bool {
+				err := crClient.Get(ctx, types.NamespacedName{Name: "lvms-vg2"}, &storagev1.StorageClass{})
+				return k8serrors.IsNotFound(err)
+			}, timeout, interval).WithContext(ctx).Should(BeTrue())
+
+			By("Verifying remaining StorageClass still exists")
+			Eventually(func(ctx SpecContext) error {
+				return crClient.Get(ctx, types.NamespacedName{Name: "lvms-vg1"}, &storagev1.StorageClass{})
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
 		})
 	})
 }
