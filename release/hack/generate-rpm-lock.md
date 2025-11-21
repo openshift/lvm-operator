@@ -11,9 +11,6 @@ In order to generate the rpms.lock.yaml file you will need the following:
     - [Default] `$XDG_RUNTIME_DIR/containers/auth.json` for podman on linux
     - `~/.docker/config.json` for docker setups
     - Some users set `$REGISTRY_AUTH_FILE` (for podman, skopeo, etc.)
-  - `TARGET` - (optional) this is the component you wish to generate a lockfile for. Possible values are:
-    - `operator`
-    - `must-gather`
 
 The `make rpm-lock` command will start up a container, activate with RHSM and use `rpm-lockfile-prototype` with `rpms.in.yaml` as an input. We are generating for several architectures so it will take a few minutes for the command to finish.
 

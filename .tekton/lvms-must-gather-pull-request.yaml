@@ -34,8 +34,6 @@ spec:
     value: release/container-build.args
   - name: skip-additional-tags
     value: "true"
-  - name: prefetch-input
-    value: '[{"type": "rpm", "path": "release/must-gather"}]'
   pipelineRef:
     name: multi-arch-build-pipeline
   taskRunTemplate:
