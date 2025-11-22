@@ -19,7 +19,7 @@ integration-docker-build:
 
 # Run integration tests locally (binary)
 integration-run: integration-build
-	./$(BINARY) run-suite openshift/lvm-operator/test/integration
+	./$(BINARY) run-suite openshift/lvm-operator/test/integration/single-node
 
 # Run integration tests in Docker container
 integration-docker-run: integration-docker-build
