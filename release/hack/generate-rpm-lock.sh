@@ -21,13 +21,11 @@ pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/ta
 
 cd release
 
-cp /etc/yum.repos.d/redhat.repo ./$target/redhat.repo
-
-# Overwrite the arch listing so that we can do multiarch
-sed -i "s/$(uname -m)/\$basearch/g" ./$target/redhat.repo
+# Get the SSL Keys
+keydir="/etc/pki/entitlement"
+keyfile=$(ls $keydir | grep "\-key")
+export DNF_VAR_SSL_CLIENT_KEY="${keydir}/${keyfile}"
+export DNF_VAR_SSL_CLIENT_CERT="${keydir}/${keyfile//-key}"
 
 # Generate the rpms.lock.yaml file for the operator
-rpm-lockfile-prototype --allowerasing --outfile="${target}/rpms.lock.yaml" ${target}/rpms.in.yaml
-
-# Cleanup the repo file
-rm -rf ./$target/redhat.repo
+rpm-lockfile-prototype --outfile="${target}/rpms.lock.yaml" ${target}/rpms.in.yaml
