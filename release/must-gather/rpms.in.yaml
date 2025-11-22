@@ -17,6 +17,10 @@ packages:
   - procps-ng
   - openshift-clients
 
+upgradePackages:
+  # list of rpms already provided in the base image, but which should be upgraded
+  - glibc
+
 #reinstallPackages: []
   # list of rpms already provided in the base image, but which should be
   # reinstalled
@@ -35,4 +39,4 @@ context:
   # can be combined with `image` and `containerfile`
   containerfile:
     file: must-gather.konflux.Dockerfile
-    imagePattern: registry.redhat.io/rhel9-4-els/rhel
+    imagePattern: registry.redhat.io/ubi9/ubi
