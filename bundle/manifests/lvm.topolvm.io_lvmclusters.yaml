@@ -244,6 +244,7 @@ spec:
                                 the available storage in the thin pool. To prevent
                                 over-provisioning through validation, set this field
                                 to 1.
+                              maximum: 100
                               minimum: 1
                               type: integer
                             sizePercent:
