@@ -82,7 +82,7 @@ for i in "${!all_y_streams[@]}"; do
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${quay_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
         done
     elif ! [ -z "${SKIP_CANDIDATES+x}" ]; then
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
