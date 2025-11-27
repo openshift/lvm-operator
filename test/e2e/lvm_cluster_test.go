@@ -113,13 +113,13 @@ func lvmClusterTest() {
 			VerifyLVMSSetup(ctx, cluster)
 
 			By("Executing pvmove to migrate data from device to be removed")
-			err := executePvmoveOnVGManagerPods(ctx, "/dev/nvme3n1", "/dev/nvme4n1")
+			err := executePvmoveOnVGManagerPods(ctx, "/dev/nvme4n1", "/dev/nvme3n1")
 			Expect(err).NotTo(HaveOccurred(), "pvmove should succeed before device removal")
 
 			By("Removing one device from the volume group")
 			// Update cluster to remove /dev/nvme1n1
 			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
-				"/dev/nvme4n1",
+				"/dev/nvme3n1",
 			}
 
 			err = crClient.Update(ctx, cluster)
