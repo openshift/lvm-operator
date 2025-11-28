@@ -78,12 +78,30 @@ spec:
       workspace: git-auth
     - name: netrc
       workspace: netrc
-  - matrix:
+  - name: generate-labels
+    params:
+      - name: label-templates
+        value:
+            - "release=$ACTUAL_DATE"
+      - name: source-date-epoch
+        value: '$(tasks.clone-repository.results.commit-timestamp)'
+    runAfter:
+      - clone-repository
+    taskRef:
+      params:
+        - name: name
+          value: generate-labels
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-generate-labels:0.1@sha256:0f60c6356f9a58e10e92a8daba470cf5b1686036351d8a24ba16462dffe09a3c
+        - name: kind
+          value: task
+      resolver: bundles
+  - name: build-images
+    matrix:
       params:
       - name: PLATFORM
         value:
         - $(params.build-platforms)
-    name: build-images
     params:
     - name: IMAGE
       value: $(params.output-image)
@@ -112,8 +130,14 @@ spec:
       value: "true"
     - name: BUILDAH_FORMAT
       value: $(params.buildah-format)
+    - name: LABELS
+      value:
+      - $(tasks.generate-labels.results.labels[*])
+      - vendor=Red Hat, Inc.
+      - distribution-scope="public"
     runAfter:
     - prefetch-dependencies
+    - generate-labels
     taskRef:
       params:
       - name: name
@@ -211,12 +235,12 @@ spec:
       operator: in
       values:
       - "false"
-  - matrix:
+  - name: clair-scan
+    matrix:
       params:
       - name: image-platform
         value:
         - $(params.build-platforms)
-    name: clair-scan
     params:
     - name: image-digest
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
