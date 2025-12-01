@@ -73,6 +73,24 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+  - name: generate-labels
+    params:
+      - name: label-templates
+        value:
+            - "release=$SOURCE_DATE_EPOCH"
+      - name: source-date-epoch
+        value: '$(tasks.clone-repository.results.commit-timestamp)'
+    runAfter:
+      - clone-repository
+    taskRef:
+      params:
+        - name: name
+          value: generate-labels
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-generate-labels:0.1@sha256:0f60c6356f9a58e10e92a8daba470cf5b1686036351d8a24ba16462dffe09a3c
+        - name: kind
+          value: task
+      resolver: bundles
   - name: build-container
     params:
     - name: IMAGE
@@ -100,8 +118,12 @@ spec:
       value: $(params.build-args-file)
     - name: BUILDAH_FORMAT
       value: $(params.buildah-format)
+    - name: LABELS
+      value:
+      - $(tasks.generate-labels.results.labels[*])
     runAfter:
-    - clone-repository
+    - generate-labels
+    - prefetch-dependencies
     taskRef:
       params:
       - name: name
