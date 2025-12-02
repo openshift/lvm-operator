@@ -64,10 +64,6 @@ import (
     g "github.com/onsi/ginkgo/v2"
     o "github.com/onsi/gomega"
 
-    // OpenShift test utilities with standard aliases
-    exutil "github.com/openshift/origin/test/extended/util"
-    compat_otp "github.com/openshift/origin/test/extended/util/compat_otp"
-
     // Kubernetes imports
     corev1 "k8s.io/api/core/v1"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,25 +76,27 @@ import (
 **Critical Import Rules:**
 - ALWAYS use `g` as the alias for `github.com/onsi/ginkgo/v2`
 - ALWAYS use `o` as the alias for `github.com/onsi/gomega`
-- ALWAYS use `exutil` as the alias for `github.com/openshift/origin/test/extended/util`
-- ALWAYS use `compat_otp` as the alias for `github.com/openshift/origin/test/extended/util/compat_otp`
 - Use Ginkgo functions with the `g.` prefix (e.g., `g.Describe`, `g.It`, `g.By`)
 - Use Gomega matchers with the `o.` prefix (e.g., `o.Expect`, `o.BeNil`)
+- DO NOT import `github.com/openshift/origin/test/extended/util` - we use TestClient instead
 
 ### Cluster Client Initialization
-**ALWAYS** use `exutil.NewCLI()` for cluster connections:
+**ALWAYS** use `NewTestClient()` for cluster connections:
 
 ```go
 var (
-    oc = exutil.NewCLI("test-namespace-prefix")
+    tc = NewTestClient("test-namespace-prefix")
 )
 ```
 
 - NEVER use `kubernetes.Clientset` directly
 - NEVER use `clientcmd.BuildConfigFromFlags`
-- Use `oc.AdminKubeClient()` to access the Kubernetes clientset
-- Use `oc.AdminConfig()` to access the rest config
-- Example: `oc.AdminKubeClient().CoreV1().Pods(namespace).List(...)`
+- NEVER use `exutil.NewCLI()` - use `NewTestClient()` instead
+- Use `tc.AdminKubeClient()` to access the Kubernetes clientset when needed
+- Use `tc.Config` to access the rest config
+- **Prefer type-safe APIs**: Use `tc.Get()`, `tc.List()`, `tc.Create()` instead of CLI commands
+- Example CLI-style: `tc.Run("get").Args("pods", "-n", namespace).Output()`
+- Example type-safe: `tc.List(tc.Context(), podList, client.InNamespace(namespace))`
 
 ### Repository-Specific Guidelines
 
@@ -148,13 +146,14 @@ The command performs the following steps:
 
 3. **Port Test Code**:
    - Create/update test file in `test/integration/tests/lvms.go`
-   - Migrate utilities to `test/integration/tests/lvms_utils.go`
-   - Convert imports to use standard aliases (g, o, exutil, compat_otp)
+   - Migrate utilities to `test/integration/tests/lvms_utils.go` or other `*_utils.go` files
+   - Convert imports to use standard aliases (g, o) - NO exutil or compat_otp
    - Replace all Ginkgo calls with `g.` prefix (Describe → g.Describe, It → g.It, By → g.By)
    - Replace all Gomega calls with `o.` prefix (Expect → o.Expect, BeNil → o.BeNil)
-   - Replace `clientset` usage with `oc.AdminKubeClient()`
-   - Initialize cluster client using `oc = exutil.NewCLI("namespace-prefix")`
+   - **Replace `oc *exutil.CLI` → `tc *TestClient`** in all function signatures
+   - Initialize cluster client using `tc = NewTestClient("namespace-prefix")`
    - Maintain original test name for traceability
+   - Follow migration guide in `test/integration/MIGRATION.md` for exutil→TestClient conversion
 
 4. **Validate Test Structure**:
    - Ensure no BeforeAll/AfterAll hooks
@@ -203,33 +202,53 @@ When porting from openshift-tests-private, apply these conversions:
 import (
     . "github.com/onsi/ginkgo/v2"
     . "github.com/onsi/gomega"
-    "k8s.io/client-go/kubernetes"
-    "k8s.io/client-go/tools/clientcmd"
+    exutil "github.com/openshift/origin/test/extended/util"
+    compat_otp "github.com/openshift/origin/test/extended/util/compat_otp"
 )
 
 // NEW (lvm-operator integration tests):
 import (
     g "github.com/onsi/ginkgo/v2"
     o "github.com/onsi/gomega"
-    exutil "github.com/openshift/origin/test/extended/util"
-    compat_otp "github.com/openshift/origin/test/extended/util/compat_otp"
+    // No exutil or compat_otp - we use TestClient
 )
 ```
 
 **Client Initialization Conversions:**
 ```go
-// OLD:
+// OLD (openshift-tests-private):
+var oc = exutil.NewCLI("test-prefix")
+// or
 var oc = compat_otp.NewCLI("test-prefix")
 
-// NEW:
-var oc = exutil.NewCLI("test-prefix")
-// Then use: oc.AdminKubeClient().CoreV1()...
+// NEW (lvm-operator):
+var tc = NewTestClient("test-prefix")
 ```
 
+**Function Parameter Conversions:**
+```go
+// OLD:
+func someFunction(oc *exutil.CLI) {
+    output, _ := oc.Run("get").Args("pods").Output()
+}
+
+// NEW:
+func someFunction(tc *TestClient) {
+    output, _ := tc.Run("get").Args("pods").Output()
+}
+```
+
+**Migration Resources:**
+- See `test/integration/MIGRATION.md` for detailed migration guide
+- See `test/integration/MIGRATION_COMPARISON.md` for real examples
+- TestClient provides both CLI-style commands AND type-safe API access
+- Prefer type-safe APIs (`tc.Get()`, `tc.List()`) over CLI commands when possible
+
 **Additional Notes:**
-- Check for existing helper functions in `test/integration/tests/lvms_utils.go` before porting
-- Some openshift-tests-private helpers may not be needed with compat_otp utilities
-- Replace direct REST client usage with `oc.AdminConfig()` when needed
+- Check for existing helper functions in `test/integration/tests/*_utils.go` before porting
+- TestClient wraps controller-runtime client for type-safe operations
+- For operations without API equivalents (like `oc debug node`), use CLI commands
+- All utility functions have been ported - see `common_utils.go`, `pod_utils.go`, `deployment_utils.go`, etc.
 
 ### Maintaining Traceability
 - Keep original test name unchanged
@@ -257,11 +276,53 @@ var oc = exutil.NewCLI("test-prefix")
 
 After successful porting:
 - Test case exists in `test/integration/tests/lvms.go`
-- All imports use standard aliases (g, o, exutil, compat_otp)
-- Cluster client uses `oc = exutil.NewCLI()` pattern
-- All clientset references replaced with `oc.AdminKubeClient()`
+- All imports use standard aliases (g, o) - NO exutil or compat_otp imports
+- Cluster client uses `tc = NewTestClient()` pattern
+- All function parameters changed from `oc *exutil.CLI` to `tc *TestClient`
 - All Ginkgo/Gomega calls use appropriate prefixes (g., o.)
 - Test appears in `integration-test list` output
 - Test runs successfully (if cluster available)
 - Test shows no flakiness over multiple runs
 - Code follows Ginkgo best practices for this repository
+- Migration follows patterns documented in `test/integration/MIGRATION.md`
+
+## TestClient Migration
+
+The lvm-operator integration tests use a lightweight `TestClient` instead of `exutil.CLI`:
+
+### Why TestClient?
+- **Smaller dependencies**: No massive openshift/origin module (saves ~850MB)
+- **Type-safe APIs**: Direct access to Kubernetes APIs via controller-runtime
+- **Better integration**: Same client library as operator code
+- **Dual interface**: Supports both CLI-style commands AND type-safe operations
+
+### Migration Strategy
+When porting tests from openshift-tests-private:
+
+**Step 1: Replace Client (Required)**
+```go
+// OLD:
+var oc = exutil.NewCLI("test-name")
+func myFunc(oc *exutil.CLI) { ... }
+
+// NEW:
+var tc = NewTestClient("test-name")
+func myFunc(tc *TestClient) { ... }
+```
+
+**Step 2: Use Type-Safe APIs (Recommended)**
+```go
+// CLI style (works but not recommended):
+output, _ := tc.Run("get").Args("lvmcluster", name, "-o", "json").Output()
+state := gjson.Get(output, "status.state").String()
+
+// Type-safe (preferred):
+cluster, _ := tc.GetLVMCluster(name, namespace)
+state := string(cluster.Status.State)
+```
+
+### Available Resources
+- `test/integration/MIGRATION.md` - Complete migration guide
+- `test/integration/MIGRATION_COMPARISON.md` - Real code examples
+- `test/integration/tests/testclient.go` - TestClient implementation
+- `test/integration/tests/*_utils.go` - Ported utility functions
