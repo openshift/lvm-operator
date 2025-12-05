@@ -1,4 +1,5 @@
-FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9:v4.18 as operator-sdk
+FROM quay.io/konflux-ci/operator-sdk-builder@sha256:e08de236089a3756535b5be1abacc3f465b1f5771efd8a40c7a2dae4febd67d7 as operator-sdk
+
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.24 as builder
 
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:b89f61ea697d32ea2fafb26ac77becbff7a1211cb4e194cf7bb7a11e95224676
@@ -20,7 +21,7 @@ RUN mkdir bin && \
     go install -mod=readonly sigs.k8s.io/controller-tools/cmd/controller-gen && \
     go install -mod=readonly sigs.k8s.io/kustomize/kustomize/v5
 
-COPY --from=operator-sdk /usr/local/bin/operator-sdk ./bin/operator-sdk
+COPY --from=operator-sdk /usr/bin/operator-sdk ./bin/operator-sdk
 
 RUN CI_VERSION=${OPERATOR_VERSION} IMG=${IMG} LVM_MUST_GATHER=${LVM_MUST_GATHER} ./release/hack/render_templates.sh
 
