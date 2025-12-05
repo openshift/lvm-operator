@@ -6,6 +6,7 @@ resources:
 - openshift-lvm-storage-operatorgroup.yaml
 - lvms-operator-subscription.yaml
 - lvms-catalogsource.yaml
+- ../networkpolicy
 
 # image configurations
 configurations:
