@@ -61,6 +61,7 @@ func validateLVMCluster(ctx context.Context, cluster *v1alpha1.LVMCluster) bool 
 			return err
 		}
 		if currentCluster.Status.State == v1alpha1.LVMStatusReady {
+			GinkgoLogr.V(0).Info("Current LVM cluster devices are", "devices", currentCluster.Status.DeviceClassStatuses)
 			return nil
 		}
 		return fmt.Errorf("cluster is not ready: %v", currentCluster.Status)
@@ -368,4 +369,40 @@ func GenericGetItemsFromList(list client.ObjectList) ([]client.Object, error) {
 	}
 
 	return result, nil
+}
+
+func validateDeviceRemovalSuccess(ctx context.Context, cluster *v1alpha1.LVMCluster, expectedDeviceCount int) bool {
+	vgStatus := getVGStatusForCluster(ctx, cluster)
+	return len(vgStatus.Devices) == expectedDeviceCount && vgStatus.Status == v1alpha1.VGStatusReady
+}
+
+func validateClusterReady(ctx context.Context, cluster *v1alpha1.LVMCluster) bool {
+	vgStatus := getVGStatusForCluster(ctx, cluster)
+	return vgStatus.Status == v1alpha1.VGStatusReady
+}
+
+func getVGStatusForCluster(ctx context.Context, cluster *v1alpha1.LVMCluster) v1alpha1.VGStatus {
+	currentCluster := &v1alpha1.LVMCluster{}
+	err := crClient.Get(ctx, client.ObjectKeyFromObject(cluster), currentCluster)
+	if err != nil {
+		return v1alpha1.VGStatus{}
+	}
+
+	if len(currentCluster.Status.DeviceClassStatuses) == 0 {
+		return v1alpha1.VGStatus{}
+	}
+
+	// Find the first device class (usually "vg1")
+	for _, deviceClassStatus := range currentCluster.Status.DeviceClassStatuses {
+		if len(deviceClassStatus.NodeStatus) > 0 {
+			// Return status from the first node with VG status
+			for _, nodeStatus := range deviceClassStatus.NodeStatus {
+				if nodeStatus.Name == lvmVolumeGroupName {
+					return nodeStatus.VGStatus
+				}
+			}
+		}
+	}
+
+	return v1alpha1.VGStatus{}
 }
