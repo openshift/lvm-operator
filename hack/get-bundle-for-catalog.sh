@@ -277,6 +277,152 @@ extract_bundle_from_catalog() {
     echo "$bundle_info"
 }
 
+find_bundle_snapshot() {
+    local bundle_image="$1"
+    local bundle_version="$2"
+    local catalog_snapshot="$3"
+
+    debug "Finding bundle snapshot for image: $bundle_image (version: $bundle_version)"
+
+    # Extract the SHA digest from the bundle image
+    # Format: registry.redhat.io/lvms4/lvms-operator-bundle@sha256:abc123...
+    local bundle_sha
+    bundle_sha=$(echo "$bundle_image" | sed -n 's/.*@sha256:\(.*\)/\1/p')
+
+    if [ -z "$bundle_sha" ]; then
+        debug "No SHA256 digest found in bundle image reference"
+        return 1
+    fi
+
+    debug "Looking for bundle snapshot with SHA: $bundle_sha"
+
+    # Use the provided version to filter snapshots
+    # Format: 4.20.0 -> extract 4.20
+    local version_hint=""
+    if [ -n "$bundle_version" ]; then
+        version_hint=$(echo "$bundle_version" | sed -n 's/^\([0-9]\+\.[0-9]\+\).*/\1/p')
+        debug "Using version hint from bundle: $version_hint"
+    fi
+
+    # Get catalog snapshot creation time if provided (for sorting by age)
+    local catalog_time=""
+    if [ -n "$catalog_snapshot" ]; then
+        catalog_time=$(oc ka get snapshot "$catalog_snapshot" -n "${NAMESPACE}" -o json 2>/dev/null | \
+            jq -r '.items[0].metadata.creationTimestamp // empty')
+        if [ -n "$catalog_time" ]; then
+            debug "Catalog snapshot created at: $catalog_time"
+        fi
+    fi
+
+    # Search for snapshots that contain this bundle SHA
+    # The snapshot will have format: lvm-operator-4-YY-XXXXX (without "catalog")
+    # The image reference in the snapshot will be quay.io but with same SHA
+    # We need to search across different component labels since the bundle might be in different component snapshots
+    local snapshot_name=""
+
+    # Try searching with application label filter if we have a version hint
+    # The bundle snapshots have format: lvm-operator-4-YY-XXXXX
+    # and belong to application: lvm-operator-4-YY
+    #
+    # Strategy:
+    # 1. First check if there's a Release object that references a snapshot with this SHA
+    # 2. Otherwise, fall back to timestamp sorting
+    if [ -n "$version_hint" ]; then
+        local y_stream="${version_hint##*.}"
+        local app_label="lvm-operator-4-${y_stream}"
+
+        debug "Trying application label: $app_label"
+
+        # First, try to find a Release object that references a snapshot with this bundle SHA
+        # Release objects are the authoritative source for what was actually released
+        # Strategy: Get all snapshots with matching SHA, then check which are in Releases
+        local bundle_component="lvm-operator-bundle-4-${y_stream}"
+        debug "Checking for Release objects with component: $bundle_component"
+
+        # Get all snapshot names that have this SHA
+        local matching_snapshots
+        matching_snapshots=$(oc ka get snapshots -n "${NAMESPACE}" \
+            -l "appstudio.openshift.io/application=${app_label}" \
+            -o json 2>/dev/null | \
+            jq -r --arg sha "$bundle_sha" --arg prefix "lvm-operator-4-${y_stream}-" '
+                .items[] |
+                select(.metadata.name | startswith($prefix)) |
+                select(.spec.components[]? | .containerImage | contains($sha)) |
+                .metadata.name
+            ')
+
+        # Check if any of these snapshots are referenced by a Release
+        if [ -n "$matching_snapshots" ]; then
+            debug "Found $(echo "$matching_snapshots" | wc -l) snapshots with matching SHA, checking Releases"
+            snapshot_name=$(oc ka get releases -n "${NAMESPACE}" \
+                -l "appstudio.openshift.io/component=${bundle_component}" \
+                -o json 2>/dev/null | \
+                jq -r --arg snapshots "$(echo "$matching_snapshots" | tr '\n' '|' | sed 's/|$//')" '
+                    .items[] |
+                    select(.spec.snapshot != null) |
+                    select(.spec.snapshot | test($snapshots)) |
+                    .spec.snapshot
+                ' | head -1)
+
+            if [ -n "$snapshot_name" ]; then
+                debug "Found bundle snapshot via Release: $snapshot_name"
+            fi
+        fi
+
+        # If not found via Release, use timestamp sorting
+        if [ -z "$snapshot_name" ]; then
+            if [ -n "$catalog_time" ]; then
+                debug "No Release found, searching for bundle snapshot created before catalog"
+                snapshot_name=$(oc ka get snapshots -n "${NAMESPACE}" \
+                    -l "appstudio.openshift.io/application=${app_label}" \
+                    -o json 2>/dev/null | \
+                    jq -r --arg sha "$bundle_sha" \
+                        --arg prefix "lvm-operator-4-${y_stream}-" \
+                        --arg catalog_time "$catalog_time" '
+                        .items[] |
+                        select(.metadata.name | startswith($prefix)) |
+                        select(.spec.components[]? | .containerImage | contains($sha)) |
+                        select(.metadata.creationTimestamp <= $catalog_time) |
+                        {name: .metadata.name, time: .metadata.creationTimestamp}
+                    ' | jq -s 'sort_by(.time) | reverse | .[0].name // empty' | tr -d '"')
+            else
+                snapshot_name=$(oc ka get snapshots -n "${NAMESPACE}" \
+                    -l "appstudio.openshift.io/application=${app_label}" \
+                    -o json 2>/dev/null | \
+                    jq -r --arg sha "$bundle_sha" --arg prefix "lvm-operator-4-${y_stream}-" '
+                        .items[] |
+                        select(.metadata.name | startswith($prefix)) |
+                        select(.spec.components[]? | .containerImage | contains($sha)) |
+                        {name: .metadata.name, time: .metadata.creationTimestamp}
+                    ' | jq -s 'sort_by(.time) | reverse | .[0].name // empty' | tr -d '"')
+            fi
+        else
+            debug "Found bundle snapshot via Release object"
+        fi
+    fi
+
+    # Fallback to unfiltered search if still not found
+    if [ -z "$snapshot_name" ]; then
+        debug "Trying unfiltered search (may be slower)"
+        snapshot_name=$(oc ka get snapshots -n "${NAMESPACE}" -o json 2>/dev/null | \
+            jq -r --arg sha "$bundle_sha" '
+                .items[] |
+                select(.metadata.name | startswith("lvm-operator-4-")) |
+                select(.metadata.name | contains("catalog") | not) |
+                select(.spec.components[]? | .containerImage | contains($sha)) |
+                {name: .metadata.name, time: .metadata.creationTimestamp}
+            ' | jq -s 'sort_by(.time) | reverse | .[0].name // empty' | tr -d '"')
+    fi
+
+    if [ -n "$snapshot_name" ] && [ "$snapshot_name" != "null" ]; then
+        debug "Found bundle snapshot: $snapshot_name"
+        echo "$snapshot_name"
+    else
+        debug "No bundle snapshot found for SHA: $bundle_sha"
+        return 1
+    fi
+}
+
 # ============================================================================
 # OUTPUT FUNCTIONS
 # ============================================================================
@@ -290,6 +436,7 @@ output_text() {
     local bundle_name
     local bundle_package
     local bundle_version
+    local bundle_snapshot
 
     catalog_image=$(echo "$output_info" | jq -r '.catalog_image')
     catalog_snapshot=$(echo "$output_info" | jq -r '.catalog_snapshot')
@@ -297,6 +444,7 @@ output_text() {
     bundle_name=$(echo "$output_info" | jq -r '.name')
     bundle_package=$(echo "$output_info" | jq -r '.package')
     bundle_version=$(echo "$output_info" | jq -r '.version')
+    bundle_snapshot=$(echo "$output_info" | jq -r '.bundle_snapshot')
 
     info "Catalog Information:"
     if [ -n "$catalog_snapshot" ] && [ "$catalog_snapshot" != "null" ]; then
@@ -308,6 +456,9 @@ output_text() {
     info "  Package: $bundle_package"
     info "  Version: $bundle_version"
     info "  Name: $bundle_name"
+    if [ -n "$bundle_snapshot" ] && [ "$bundle_snapshot" != "null" ]; then
+        info "  Snapshot: $bundle_snapshot"
+    fi
     info "  Image: $bundle_image"
 }
 
@@ -366,9 +517,14 @@ parse_arguments() {
                 exit 1
                 ;;
             *)
-                # Positional argument - catalog image
+                # Positional argument - could be catalog image or environment shorthand
                 if [ -z "$CATALOG_IMAGE" ]; then
-                    CATALOG_IMAGE="$1"
+                    # Check if this is an environment name (staging/production)
+                    if [ "$1" = "staging" ] || [ "$1" = "production" ]; then
+                        ENVIRONMENT="$1"
+                    else
+                        CATALOG_IMAGE="$1"
+                    fi
                 else
                     error "Unexpected argument: $1"
                     usage
@@ -385,13 +541,15 @@ parse_arguments() {
     [ -n "$SNAPSHOT_NAME" ] && input_count=$((input_count + 1))
     [ -n "$VERSION" ] && input_count=$((input_count + 1))
 
-    if [ $input_count -eq 0 ]; then
-        error "Must provide either CATALOG_IMAGE, --snapshot, or --version"
+    # Special case: if only environment is provided, we'll process all versions
+    if [ $input_count -eq 0 ] && [ -n "$ENVIRONMENT" ]; then
+        debug "Environment-only mode: will process all versions"
+        # This is valid - we'll handle it in main
+    elif [ $input_count -eq 0 ]; then
+        error "Must provide either CATALOG_IMAGE, --snapshot, --version, or --env"
         usage
         exit 1
-    fi
-
-    if [ $input_count -gt 1 ]; then
+    elif [ $input_count -gt 1 ]; then
         error "Cannot specify multiple input methods (catalog image, snapshot, or version)"
         usage
         exit 1
@@ -419,12 +577,115 @@ parse_arguments() {
 # MAIN LOGIC
 # ============================================================================
 
+process_single_catalog() {
+    local catalog_image="$1"
+    local snapshot_name="$2"
+
+    debug "Using catalog image: $catalog_image"
+
+    # Extract bundle information
+    local bundle_info
+    bundle_info=$(extract_bundle_from_catalog "$catalog_image")
+
+    if [ -z "$bundle_info" ]; then
+        error "Failed to extract bundle information"
+        return 1
+    fi
+
+    # Find the bundle snapshot
+    local bundle_image
+    local bundle_version
+    bundle_image=$(echo "$bundle_info" | jq -r '.image')
+    bundle_version=$(echo "$bundle_info" | jq -r '.version')
+
+    local bundle_snapshot=""
+    if [ -n "$bundle_image" ]; then
+        bundle_snapshot=$(find_bundle_snapshot "$bundle_image" "$bundle_version" "$snapshot_name") || bundle_snapshot=""
+    fi
+
+    # Add catalog metadata and bundle snapshot to bundle info
+    local output_info
+    output_info=$(echo "$bundle_info" | jq -c \
+        --arg catalog "$catalog_image" \
+        --arg catalog_snap "$snapshot_name" \
+        --arg bundle_snap "$bundle_snapshot" \
+        '. + {catalog_image: $catalog, catalog_snapshot: $catalog_snap, bundle_snapshot: $bundle_snap}')
+
+    echo "$output_info"
+}
+
 main() {
     parse_arguments "$@"
     check_dependencies
     check_auth
     setup_kubearchive
 
+    # Check if we're in all-versions mode (only environment provided)
+    if [ -z "$CATALOG_IMAGE" ] && [ -z "$SNAPSHOT_NAME" ] && [ -z "$VERSION" ] && [ -n "$ENVIRONMENT" ]; then
+        debug "Processing all versions for environment: $ENVIRONMENT"
+
+        # Known LVMS versions
+        local versions=("4.17" "4.18" "4.19" "4.20" "4.21")
+        local all_results=()
+
+        for ver in "${versions[@]}"; do
+            debug "Processing version $ver"
+
+            # Get latest catalog snapshot for this version
+            local snapshot_name
+            snapshot_name=$(get_latest_catalog_snapshot "$ver" "$ENVIRONMENT" 2>/dev/null) || continue
+
+            if [ -z "$snapshot_name" ]; then
+                debug "No catalog snapshot found for version $ver, skipping"
+                continue
+            fi
+
+            # Get catalog image from snapshot
+            local catalog_image
+            catalog_image=$(get_catalog_from_snapshot "$snapshot_name" 2>/dev/null) || continue
+
+            if [ -z "$catalog_image" ]; then
+                debug "Failed to get catalog image for version $ver, skipping"
+                continue
+            fi
+
+            # Process this catalog
+            local result
+            result=$(process_single_catalog "$catalog_image" "$snapshot_name")
+
+            if [ -n "$result" ]; then
+                all_results+=("$result")
+            fi
+        done
+
+        # Output all results
+        if [ ${#all_results[@]} -eq 0 ]; then
+            error "No catalogs found for environment: $ENVIRONMENT"
+            exit 1
+        fi
+
+        case "$OUTPUT_FORMAT" in
+            text)
+                for result in "${all_results[@]}"; do
+                    output_text "$result"
+                    echo ""  # Blank line between versions
+                done
+                ;;
+            json)
+                # Combine into JSON array
+                printf '%s\n' "${all_results[@]}" | jq -s '.'
+                ;;
+            yaml)
+                for result in "${all_results[@]}"; do
+                    output_yaml "$result"
+                    echo "---"  # YAML document separator
+                done
+                ;;
+        esac
+        return 0
+    fi
+
+    # Single catalog mode
     # Determine the catalog image to use
     local catalog_image="$CATALOG_IMAGE"
     local snapshot_name=""
@@ -444,23 +705,14 @@ main() {
         exit 1
     fi
 
-    debug "Using catalog image: $catalog_image"
+    # Process single catalog
+    local output_info
+    output_info=$(process_single_catalog "$catalog_image" "$snapshot_name")
 
-    # Extract bundle information
-    local bundle_info
-    bundle_info=$(extract_bundle_from_catalog "$catalog_image")
-
-    if [ -z "$bundle_info" ]; then
-        error "Failed to extract bundle information"
+    if [ -z "$output_info" ]; then
+        error "Failed to process catalog"
         exit 1
     fi
-
-    # Add catalog metadata to bundle info
-    local output_info
-    output_info=$(echo "$bundle_info" | jq -c \
-        --arg catalog "$catalog_image" \
-        --arg snapshot "$snapshot_name" \
-        '. + {catalog_image: $catalog, catalog_snapshot: $snapshot}')
 
     # Output in requested format
     case "$OUTPUT_FORMAT" in

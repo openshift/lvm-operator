@@ -16,30 +16,35 @@ Query catalog images (directly or via snapshots) to extract bundle version infor
 This is a Claude Code slash command. To use it, type one of the following in your Claude Code chat:
 
 ```bash
+# Get ALL versions for an environment (simplest usage)
+/lvms:konflux:get-bundle-for-catalog staging
+/lvms:konflux:get-bundle-for-catalog production
+
+# Get ALL versions with JSON output
+/lvms:konflux:get-bundle-for-catalog --env staging --format json
+
 # Get bundle from specific catalog image
 /lvms:konflux:get-bundle-for-catalog quay.io/redhat-user-workloads/org/catalog@sha256:abc123
 
 # Get bundle from snapshot name
 /lvms:konflux:get-bundle-for-catalog --snapshot lvm-operator-catalog-4-18-t2sc5
 
-# Get latest staging bundle for a version
+# Get latest staging bundle for a specific version
 /lvms:konflux:get-bundle-for-catalog --version 4.18 --env staging
 
-# Get latest production bundle for a version
+# Get latest production bundle for a specific version
 /lvms:konflux:get-bundle-for-catalog --version 4.18 --env production
-
-# Get bundle in JSON format
-/lvms:konflux:get-bundle-for-catalog --version 4.18 --format json
 ```
 
 ## Input Options
 You must provide ONE of:
+- Environment name: `staging` or `production` (positional argument) - queries ALL versions
 - Direct catalog image reference (positional argument)
 - `--snapshot NAME` - Catalog snapshot name
 - `--version VER` - Get latest catalog for this version (e.g., 4.18)
+- `--env ENV` - Filter by environment: `staging` or `production`
 
 Optional flags:
-- `--env ENV` - Filter by environment: `staging` or `production` (use with --version)
 - `--format FORMAT` - Output format: `text`, `json`, or `yaml` (default: text)
 - `--namespace NS` - Override namespace (default: logical-volume-manag-tenant)
 - `--debug` - Enable debug output
@@ -51,11 +56,16 @@ Optional flags:
 - **no filter**: Latest snapshot with AutoReleased status
 
 ## Output
-Displays bundle information including:
+Displays catalog and bundle information including:
+- Catalog snapshot name
+- Catalog image reference
 - Package name
 - Bundle version (e.g., 4.18.4)
 - Bundle name
+- **Bundle snapshot name** (e.g., lvm-operator-4-20-24xvq)
 - Bundle image reference
+
+When querying all versions for an environment, displays information for each version (4.17, 4.18, 4.19, 4.20, 4.21).
 
 ## Technical Details
 The script:
@@ -64,6 +74,8 @@ The script:
 3. Extracts catalog image from snapshot spec
 4. Downloads catalog `/configs/` directory using `oc image extract`
 5. Parses OLM bundle metadata and selects latest semantic version
+6. **Finds bundle snapshot by checking Release objects** for authoritative mapping
+7. Falls back to timestamp-based matching if no Release found
 
 ## Implementation
 Execute the bash script located at `hack/get-bundle-for-catalog.sh` with the user's arguments.
