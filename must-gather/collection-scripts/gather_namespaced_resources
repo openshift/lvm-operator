@@ -27,7 +27,7 @@ fi
 #   lvm-operator-for-everyone
 #   openshift-storage
 #   ~~~
-# This will return an array of namespaces   
+# This will return an array of namespaces
 mapfile -t INSTALL_NAMESPACE < <(oc get csv --all-namespaces | grep lvms-operator | cut -f1 -d " ")
 
 
@@ -88,7 +88,7 @@ done
 # Create the dir for oc_output
 for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
     mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/"
-done 
+done
 
 # Run the Collection of OC get commands
 for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
