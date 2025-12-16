@@ -1,0 +1,21 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.17.7
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: 'Jeff Roche <jeroche@redhat.com>'
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-17
+  snapshot: lvm-operator-4-17-7q7tb
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be seen.
+
+        This erratum implements the following changes:
+
+        - General base image version bumps
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
