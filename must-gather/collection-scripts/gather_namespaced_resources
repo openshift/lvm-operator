@@ -74,7 +74,7 @@ oc_yamls+=("installplan")
 echo "collecting dump of namespace" | tee -a "${BASE_COLLECTION_PATH}"/gather-debug.log
 
 for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
-  oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect ns/"$NAMESPACE" ${log_collection_args} >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
+    oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect ns/"$NAMESPACE" ${log_collection_args} >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
 done
 
 echo "collecting dump of clusterresourceversion" | tee -a "${BASE_COLLECTION_PATH}"/gather-debug.log
@@ -87,7 +87,7 @@ done
 
 # Create the dir for oc_output
 for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
-  mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/"
+    mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/"
 done 
 
 # Run the Collection of OC get commands
@@ -111,7 +111,7 @@ for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
 done
 
 for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
-   { oc get lvmclusters -n ${NAMESPACE} -o yaml; } >"$BASE_COLLECTION_PATH/namespaces/${NAMESPACE}/oc_output/lvmcluster.yaml" 2>&1
+    { oc get lvmclusters -n ${NAMESPACE} -o yaml; } >"$BASE_COLLECTION_PATH/namespaces/${NAMESPACE}/oc_output/lvmcluster.yaml" 2>&1
 done
 
 # Create the dir for data from all namespaces
