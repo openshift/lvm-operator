@@ -378,7 +378,7 @@ func (r *Reconciler) checkForDeletedDeviceClasses(ctx context.Context, instance 
 			return fmt.Errorf("failed to get storage class, %w", err)
 		}
 
-		if sc.GetDeletionTimestamp().IsZero() {
+		if sc.GetDeletionTimestamp().IsZero() && err == nil {
 			if err := r.Delete(ctx, sc); err != nil {
 				return fmt.Errorf("failed to delete StorageClass %s: %w", scName, err)
 			}
@@ -393,7 +393,7 @@ func (r *Reconciler) checkForDeletedDeviceClasses(ctx context.Context, instance 
 				return fmt.Errorf("failed to get volume snapshot class: %w", err)
 			}
 
-			if vsc.GetDeletionTimestamp().IsZero() {
+			if vsc.GetDeletionTimestamp().IsZero() && err == nil {
 				err := r.Delete(ctx, vsc)
 				if err != nil {
 					return fmt.Errorf("failed to delete VolumeSnapshotClass %s: %w", vscName, err)
