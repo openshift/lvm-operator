@@ -2,7 +2,7 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-catalog-4-17-7q7tb
+  name: lvm-operator-catalog-4-17-7
   namespace: logical-volume-manag-tenant
   labels:
     release.appstudio.openshift.io/author: "Jeff Roche <jeroche@redhat.com>"
