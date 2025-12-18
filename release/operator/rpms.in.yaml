@@ -1,8 +1,59 @@
 contentOrigin:
-  # Define at least one source of packages, but you can have as many as you want.
-  repofiles:
-     - ./redhat.repo
+  # DNF Repos needed for installing the packages
+  repos:
+    - repoid: rhel-9-for-$basearch-baseos-rpms
+      name: Red Hat Enterprise Linux 9 for $basearch - BaseOS (RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/baseos/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      sslverifystatus: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
 
+    - repoid: rhel-9-for-$basearch-appstream-source-rpms
+      name: Red Hat Enterprise Linux 9 for $basearch - AppStream (Source RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/appstream/source/SRPMS
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      sslverifystatus: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "0"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhel-9-for-$basearch-appstream-rpms
+      name: Red Hat Enterprise Linux 9 for $basearch - AppStream (RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/appstream/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhel-9-for-$basearch-baseos-source-rpms
+      name: Red Hat Enterprise Linux 9 for $basearch - BaseOS (Source RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/baseos/source/SRPMS
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "0"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
 packages:
   # list of rpm names to resolve
   - util-linux
@@ -29,3 +80,7 @@ context:
   containerfile:
     file: konflux.Dockerfile
     imagePattern: registry.redhat.io/rhel9-2-els/rhel
+
+# Tell DNF it may erase already installed packages when resolving the
+# transaction. Defaults to false.
+allowerasing: true

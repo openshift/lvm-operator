@@ -1,13 +1,8 @@
-FROM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2
+FROM registry.redhat.io/openshift4/ose-must-gather-rhel9:v4.16@sha256:bf8d9f0c2c92ebe5d0767eb8ccd3580a88ebf6fc21fa0a03c509c1e7bacacf9d
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
 ARG LVMS_TAGS
-
-RUN microdnf update -y && \
-    microdnf install -y --nodocs --setopt=install_weak_deps=0 tar rsync findutils gzip iproute tcpdump pciutils util-linux nftables procps-ng openshift-clients && \
-    microdnf clean all && \
-    rm -rf /var/cache/*
 
 # Copy all collection scripts to /usr/bin
 COPY must-gather/collection-scripts /usr/bin/
@@ -26,6 +21,7 @@ LABEL io.k8s.description="LVM Storage data gathering image"
 LABEL io.openshift.tags="lvms"
 LABEL upstream-vcs-ref="${CI_LVM_OPERATOR_UPSTREAM_COMMIT}"
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
+LABEL cpe="cpe:/a:redhat:lvms:${LVMS_TAGS#v}::el9"
 
 USER 65532:65532
 
