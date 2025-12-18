@@ -4,8 +4,6 @@ kind: Release
 metadata:
   name: lvm-operator-catalog-4-17-7
   namespace: logical-volume-manag-tenant
-  labels:
-    release.appstudio.openshift.io/author: "Jeff Roche <jeroche@redhat.com>"
 spec:
   releasePlan: lvm-operator-catalog-production-releaseplan-4-17
   snapshot: lvm-operator-catalog-4-17-cf289
