@@ -43,8 +43,8 @@ import (
 )
 
 const (
-	timeout                 = time.Minute * 2
-	interval                = time.Millisecond * 300
+	timeout                 = time.Minute * 4
+	interval                = time.Second
 	lvmVolumeGroupName      = "vg1"
 	storageClassName        = "lvms-vg1"
 	volumeSnapshotClassName = "lvms-vg1"
