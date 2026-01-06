@@ -100,7 +100,10 @@ type CachedFileConfig struct {
 
 func (c *CachedFileConfig) Load(ctx context.Context) (*Config, error) {
 	if c.Config != nil {
-		return c.Config, nil
+		// Return a deep copy to prevent callers from modifying the cached config.
+		// This ensures Save() can correctly detect changes by comparing
+		// the modified config against the original cached version.
+		return DeepCopyConfig(c.Config), nil
 	}
 	log.FromContext(ctx).Info("lvmd config not found in cache, loading from store")
 	conf, err := c.FileConfig.Load(ctx)
@@ -108,7 +111,7 @@ func (c *CachedFileConfig) Load(ctx context.Context) (*Config, error) {
 		return nil, err
 	}
 	c.Config = conf
-	return conf, nil
+	return DeepCopyConfig(conf), nil
 }
 
 func (c *CachedFileConfig) Save(ctx context.Context, config *Config) error {
