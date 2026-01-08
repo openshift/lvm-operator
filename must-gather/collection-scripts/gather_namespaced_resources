@@ -104,7 +104,7 @@ done
 for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
     for command_desc in "${commands_desc[@]}"; do
     echo "collecting oc describe command ${command_desc}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
-    COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${ns}/oc_output/${command_desc// /_}
+    COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/${command_desc// /_}
     # shellcheck disable=SC2086
     { oc describe ${command_desc} -n ${NAMESPACE}; } >>"${COMMAND_OUTPUT_FILE}"
     done
