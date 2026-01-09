@@ -113,8 +113,8 @@ func pvcTestThickProvisioning() {
 		cluster = GetDefaultTestLVMClusterTemplate()
 
 		// set ThinPoolConfig to nil
-		for _, dc := range cluster.Spec.Storage.DeviceClasses {
-			dc.ThinPoolConfig = nil
+		for i := range cluster.Spec.Storage.DeviceClasses {
+			cluster.Spec.Storage.DeviceClasses[i].ThinPoolConfig = nil
 		}
 
 		CreateResource(ctx, cluster)
@@ -207,6 +207,9 @@ func pvcTestsForMode(options pvcTestOptions) {
 	})
 
 	It("Cloning", func(ctx SpecContext) {
+		if !options.snapshot {
+			Skip("Skipping cloning tests because snapshots are disabled")
+		}
 		CreateResource(ctx, clonePVC)
 		CreateResource(ctx, clonePod)
 
