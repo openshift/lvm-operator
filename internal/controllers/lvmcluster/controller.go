@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -31,7 +30,6 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/resource"
-	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager"
 	topolvmv1 "github.com/topolvm/topolvm/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -173,16 +171,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// The resource was deleted
 	if !lvmCluster.DeletionTimestamp.IsZero() {
-		// check for stale vgmanager finalizer in case if node deleted but vg still exist
+
+		// Get cluster nodes for deletion checks
 		nodes, err := r.clusterNodes(ctx)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get unhealthy nodes: %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to get cluster nodes: %w", err)
 		}
 
-		err = r.checkStaleNodeFinalizers(ctx, nodes)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to check for deleted nodes: %w", err)
-		}
 		// Check for existing LogicalVolumes
 		lvsExist, err := r.logicalVolumesExist(ctx, nodes)
 		if err != nil {
@@ -437,37 +432,6 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, nodes map[string]s
 	}
 
 	return false, nil
-}
-
-func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, nodes map[string]struct{}) error {
-	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
-	err := r.List(ctx, volumeGroups, &client.ListOptions{Namespace: r.Namespace})
-	if k8serrors.IsNotFound(err) {
-		return nil
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to list volume groups: %w", err)
-	}
-
-	for _, vg := range volumeGroups.Items {
-		for _, finalizer := range vg.Finalizers {
-			if !strings.HasPrefix(finalizer, vgmanager.NodeCleanupFinalizer) {
-				continue
-			}
-
-			nodeName := strings.TrimPrefix(finalizer, vgmanager.NodeCleanupFinalizer+"/")
-			if _, ok := nodes[nodeName]; !ok {
-				controllerutil.RemoveFinalizer(&vg, finalizer)
-				err = r.Update(ctx, &vg)
-				if err != nil {
-					return fmt.Errorf("failed to delete finalizer from volumegroup %s, error: %w", vg.Name, err)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
