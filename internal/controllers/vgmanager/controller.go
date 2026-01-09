@@ -678,7 +678,25 @@ func (r *Reconciler) deleteRemovedDevices(
 	devicesToRemove := make([]string, 0)
 
 	for _, pv := range currentVG.PVs {
-		if !slices.Contains(userProvidedMappings, pv.PvName) {
+		// Check if the PV matches any user-provided path
+		// We need to handle symlinks: the PV might be stored as /dev/mapper/encrypted
+		// while the user path resolves to /dev/dm-0, or vice versa
+		pvMatched := false
+
+		// First, try direct match with PV name as-is
+		if slices.Contains(userProvidedMappings, pv.PvName) {
+			pvMatched = true
+		}
+
+		// If no direct match, try resolving the PV name and compare
+		if !pvMatched {
+			resolvedPvName, err := resolver.Resolve(pv.PvName)
+			if err == nil && slices.Contains(userProvidedMappings, resolvedPvName) {
+				pvMatched = true
+			}
+		}
+
+		if !pvMatched {
 			devicesToRemove = append(devicesToRemove, pv.PvName)
 		}
 	}
