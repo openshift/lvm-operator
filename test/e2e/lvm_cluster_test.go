@@ -72,8 +72,8 @@ func lvmClusterTest() {
 	Describe("Storage Class", Serial, func() {
 		It("should become ready without a default storageclass", func(ctx SpecContext) {
 			// set default to false
-			for _, dc := range cluster.Spec.Storage.DeviceClasses {
-				dc.Default = false
+			for i := range cluster.Spec.Storage.DeviceClasses {
+				cluster.Spec.Storage.DeviceClasses[i].Default = false
 			}
 
 			CreateResource(ctx, cluster)
@@ -83,8 +83,8 @@ func lvmClusterTest() {
 
 	Describe("Thick Provisioning", Serial, func() {
 		It("should become ready if ThinPoolConfig is empty (thick provisioning)", func(ctx SpecContext) {
-			for _, dc := range cluster.Spec.Storage.DeviceClasses {
-				dc.ThinPoolConfig = nil
+			for i := range cluster.Spec.Storage.DeviceClasses {
+				cluster.Spec.Storage.DeviceClasses[i].ThinPoolConfig = nil
 			}
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
