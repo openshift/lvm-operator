@@ -13,6 +13,7 @@ import (
 
 // registrationServer is a sample plugin to work with plugin watcher
 type registrationServer struct {
+	registerapi.UnimplementedRegistrationServer
 	driverName string
 	endpoint   string
 	version    []string

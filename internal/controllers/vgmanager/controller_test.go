@@ -657,7 +657,18 @@ func testEvents(ctx context.Context) {
 	gvk, _ := apiutil.GVKForObject(nodeStatus, scheme.Scheme)
 	nodeStatus.SetGroupVersionKind(gvk)
 
-	clnt := fake.NewClientBuilder().WithObjects(vg, nodeStatus).WithScheme(scheme.Scheme).Build()
+	clnt := fake.NewClientBuilder().WithObjects(vg, nodeStatus).WithScheme(scheme.Scheme).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			err := client.Get(ctx, key, obj, opts...)
+			if err == nil {
+				// Set GVK after Get since fake client clears TypeMeta (controller-runtime v0.22+ behavior)
+				if gvk, gvkErr := apiutil.GVKForObject(obj, scheme.Scheme); gvkErr == nil {
+					obj.GetObjectKind().SetGroupVersionKind(gvk)
+				}
+			}
+			return err
+		},
+	}).Build()
 	r := &Reconciler{Client: clnt, Scheme: scheme.Scheme, EventRecorder: fakeRecorder, NodeName: nodeStatus.GetName()}
 
 	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
