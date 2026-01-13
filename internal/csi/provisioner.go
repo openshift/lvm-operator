@@ -76,10 +76,11 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		p.options.Metrics,
 		connection.OnConnectionLoss(onLostConnection),
 		connection.WithTimeout(p.options.CSIOperationTimeout))
-	defer grpcClient.Close() //nolint:errcheck,staticcheck
 	if err != nil {
 		return err
 	}
+	defer grpcClient.Close() //nolint:errcheck,staticcheck
+
 	pluginCapabilities, controllerCapabilities, err := provisionctrl.GetDriverCapabilities(grpcClient, p.options.CSIOperationTimeout)
 	if err != nil {
 		return err
