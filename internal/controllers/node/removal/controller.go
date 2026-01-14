@@ -33,6 +33,7 @@ func NewReconciler(client client.Client, namespace string) *Reconciler {
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroupnodestatuses/finalizers,verbs=update
+//+kubebuilder:rbac:groups=lvm.topolvm.io,resources=lvmvolumegroups,verbs=get;list;update;patch
 
 // Reconcile takes care of watching a LVMVolumeGroupNodeStatus, and reacting to a node removal request by deleting
 // the unwanted LVMVolumeGroupNodeStatus that was associated with the node.
@@ -62,6 +63,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer from LVMVolumeGroupNodeStatus: %w", err)
 			}
 		}
+
+		if err := r.removeWipeAnnotationsForNode(ctx, nodeStatus.GetName()); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to remove wipe annotations for Node %s: %w", nodeStatus.GetName(), err)
+		}
+
 		return ctrl.Result{}, nil
 	}
 
@@ -112,4 +118,34 @@ func removeDeleteProtectionFinalizer(status *lvmv1alpha1.LVMVolumeGroupNodeStatu
 		}
 	}
 	return false
+}
+
+// removeWipeAnnotationsForNode removes wipe annotations for the given node from all LVMVolumeGroup objects.
+func (r *Reconciler) removeWipeAnnotationsForNode(ctx context.Context, nodeName string) error {
+	logger := log.FromContext(ctx)
+	annotationKey := constants.DevicesWipedAnnotationPrefix + nodeName
+
+	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
+	if err := r.List(ctx, volumeGroups, client.InNamespace(r.Namespace)); err != nil {
+		return fmt.Errorf("failed to list LVMVolumeGroups: %w", err)
+	}
+
+	for i := range volumeGroups.Items {
+		vg := &volumeGroups.Items[i]
+		if vg.Annotations == nil {
+			continue
+		}
+
+		if _, exists := vg.Annotations[annotationKey]; !exists {
+			continue
+		}
+
+		logger.Info("removing wipe annotation from LVMVolumeGroup", "lvmVolumeGroup", vg.Name, "node", nodeName)
+		delete(vg.Annotations, annotationKey)
+		if err := r.Update(ctx, vg); err != nil {
+			return fmt.Errorf("failed to update LVMVolumeGroup %s: %w", vg.Name, err)
+		}
+	}
+
+	return nil
 }
