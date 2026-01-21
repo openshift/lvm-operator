@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -118,6 +119,38 @@ var (
 	ChunkSizeMaximum = resource.MustParse("1Gi")
 )
 
+// StorageClassOptions configures the StorageClass created for this device class.
+// All fields are optional with sensible defaults matching current LVMS behavior.
+// Changes to these options will trigger recreation of the StorageClass.
+// +optional
+type StorageClassOptions struct {
+	// ReclaimPolicy specifies what happens to volumes when PVCs are deleted.
+	// Valid values: "Delete" (default), "Retain"
+	// +optional
+	// +kubebuilder:validation:Enum=Delete;Retain
+	// +kubebuilder:default=Delete
+	ReclaimPolicy *corev1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty"`
+
+	// VolumeBindingMode controls when volume binding and provisioning occurs.
+	// Valid values: "Immediate", "WaitForFirstConsumer" (default)
+	// WaitForFirstConsumer enables topology-aware scheduling.
+	// +optional
+	// +kubebuilder:validation:Enum=Immediate;WaitForFirstConsumer
+	// +kubebuilder:default=WaitForFirstConsumer
+	VolumeBindingMode *storagev1.VolumeBindingMode `json:"volumeBindingMode,omitempty"`
+
+	// AdditionalParameters adds custom parameters to the StorageClass.
+	// Parameters conflicting with LVMS-owned keys (topolvm.io/device-class,
+	// csi.storage.k8s.io/fstype) are ignored with a warning.
+	// +optional
+	AdditionalParameters map[string]string `json:"additionalParameters,omitempty"`
+
+	// AdditionalLabels adds custom labels to the StorageClass.
+	// Labels conflicting with LVMS-managed labels are ignored with a warning.
+	// +optional
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+}
+
 type DeviceFilesystemType string
 
 const (
@@ -155,6 +188,10 @@ type DeviceClass struct {
 	// +kubebuilder:default=xfs
 	// +optional
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
+
+	// StorageClassOptions configures the StorageClass created for this device class.
+	// +optional
+	StorageClassOptions *StorageClassOptions `json:"storageClassOptions,omitempty"`
 
 	// DeviceDiscoveryPolicy specifies the policy for discovering devices for this device class.
 	// Static means the volume group is created with devices found at install time; new devices are ignored.

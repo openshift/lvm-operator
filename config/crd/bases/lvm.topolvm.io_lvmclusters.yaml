@@ -195,6 +195,45 @@ spec:
                           - nodeSelectorTerms
                           type: object
                           x-kubernetes-map-type: atomic
+                        storageClassOptions:
+                          description: StorageClassOptions configures the StorageClass
+                            created for this device class.
+                          properties:
+                            additionalLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                AdditionalLabels adds custom labels to the StorageClass.
+                                Labels conflicting with LVMS-managed labels are ignored with a warning.
+                              type: object
+                            additionalParameters:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                AdditionalParameters adds custom parameters to the StorageClass.
+                                Parameters conflicting with LVMS-owned keys (topolvm.io/device-class,
+                                csi.storage.k8s.io/fstype) are ignored with a warning.
+                              type: object
+                            reclaimPolicy:
+                              default: Delete
+                              description: |-
+                                ReclaimPolicy specifies what happens to volumes when PVCs are deleted.
+                                Valid values: "Delete" (default), "Retain"
+                              enum:
+                              - Delete
+                              - Retain
+                              type: string
+                            volumeBindingMode:
+                              default: WaitForFirstConsumer
+                              description: |-
+                                VolumeBindingMode controls when volume binding and provisioning occurs.
+                                Valid values: "Immediate", "WaitForFirstConsumer" (default)
+                                WaitForFirstConsumer enables topology-aware scheduling.
+                              enum:
+                              - Immediate
+                              - WaitForFirstConsumer
+                              type: string
+                          type: object
                         thinPoolConfig:
                           description: ThinPoolConfig contains the configuration to
                             create a thin pool in the LVM volume group. If you exclude

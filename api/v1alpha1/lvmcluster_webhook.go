@@ -24,9 +24,11 @@ import (
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -133,6 +135,12 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 	}
 	warnings = append(warnings, metadataWarnings...)
 
+	storageClassWarnings, err := v.verifyStorageClassOptions(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, storageClassWarnings...)
+
 	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
 	warnings = append(warnings, discoveryPolicyWarnings...)
 
@@ -172,6 +180,12 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	if err != nil {
 		return warnings, err
 	}
+
+	storageClassWarnings, err := v.verifyStorageClassOptions(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, storageClassWarnings...)
 
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
@@ -330,7 +344,6 @@ func (v *lvmClusterValidator) verifyDeviceClass(l *LVMCluster) (admission.Warnin
 }
 
 func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.Warnings, error) {
-
 	var deviceClassesWithoutPaths []string
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
@@ -391,7 +404,6 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 }
 
 func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
-
 	// make sure no device overlap with another VGs
 	// use map to find the duplicate entries for paths
 	/*
@@ -469,7 +481,6 @@ func (v *lvmClusterValidator) getPathsOfDeviceClass(l *LVMCluster, deviceClassNa
 }
 
 func (v *lvmClusterValidator) getNodeSelectorOfDeviceClass(l *LVMCluster, deviceClassName string) (*corev1.NodeSelector, error) {
-
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
 			if deviceClass.NodeSelector != nil {
@@ -483,7 +494,6 @@ func (v *lvmClusterValidator) getNodeSelectorOfDeviceClass(l *LVMCluster, device
 }
 
 func (v *lvmClusterValidator) getThinPoolsConfigOfDeviceClass(l *LVMCluster, deviceClassName string) (*ThinPoolConfig, error) {
-
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.Name == deviceClassName {
 			if deviceClass.ThinPoolConfig != nil {
@@ -550,6 +560,42 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 			}
 		}
 	}
+	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
+	warnings := admission.Warnings{}
+
+	// LVMS-owned parameters that cannot be overridden
+	lvmsOwnedParameters := map[string]bool{
+		constants.DeviceClassKey:    true, // "topolvm.io/device-class"
+		"csi.storage.k8s.io/fstype": true,
+	}
+
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.StorageClassOptions == nil {
+			continue
+		}
+
+		// Warn about parameter conflicts
+		for key := range deviceClass.StorageClassOptions.AdditionalParameters {
+			if lvmsOwnedParameters[key] {
+				warnings = append(warnings, fmt.Sprintf(
+					"additionalParameter %q in device class %q conflicts with LVMS-owned parameter and will be ignored",
+					key, deviceClass.Name))
+			}
+		}
+
+		// Validate label key format
+		for key := range deviceClass.StorageClassOptions.AdditionalLabels {
+			if errs := validation.IsQualifiedName(key); len(errs) > 0 {
+				return warnings, fmt.Errorf(
+					"invalid label key %q in device class %q: %s",
+					key, deviceClass.Name, strings.Join(errs, "; "))
+			}
+		}
+	}
+
 	return warnings, nil
 }
 
