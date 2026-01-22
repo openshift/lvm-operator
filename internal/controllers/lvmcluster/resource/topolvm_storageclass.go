@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -77,35 +77,63 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 			return fmt.Errorf("%s failed to get StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
 
-		// Immutable diff? Then delete+recreate (requeue-driven).
+		// Immutable diff? Then delete+recreate (watch-driven).
 		if s.needsRecreation(existing, desired) {
-			// Delete existing
+			// Delete existing - watch event will trigger next reconcile to create
 			if err := r.Delete(ctx, existing); err != nil {
 				return fmt.Errorf("%s failed to delete StorageClass %s: %w", s.GetName(), desired.Name, err)
 			}
-
-			// Requeue to wait for deletion completion (next reconcile will create)
-			return fmt.Errorf("waiting for StorageClass %s deletion to complete before recreate", desired.Name)
+			logger.V(2).Info("StorageClass deleted for recreation", "name", desired.Name)
+			continue
 		}
 
-		// Update metadata (labels/annotations) if needed
-		result, err := cutil.CreateOrUpdate(ctx, r, existing, func() error {
-			labels.SetManagedLabels(r.Scheme(), existing, cluster)
-			s.applyAdditionalLabels(existing, cluster, desired.Name)
-			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("%s failed to update StorageClass %s: %w", s.GetName(), existing.Name, err)
-		}
-		if result != cutil.OperationResultNone {
-			logger.V(2).Info("StorageClass metadata updated", "operation", result)
+		// Update metadata (labels/annotations) only if changed
+		if err := s.patchStorageClassMetadataIfNeeded(r, ctx, existing, cluster, desired.Name); err != nil {
+			return fmt.Errorf("%s failed to patch StorageClass %s metadata: %w", s.GetName(), existing.Name, err)
 		}
 	}
 
 	return nil
 }
 
+// patchStorageClassMetadataIfNeeded patches StorageClass metadata only if it differs
+func (s topolvmStorageClass) patchStorageClassMetadataIfNeeded(
+	r Reconciler,
+	ctx context.Context,
+	existing *storagev1.StorageClass,
+	cluster *lvmv1alpha1.LVMCluster,
+	scName string,
+) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName(), "storageClass", existing.Name)
+
+	base := existing.DeepCopy()
+	tmp := existing.DeepCopy()
+
+	// Mutate ONLY metadata on temp object (leaves spec untouched)
+	labels.SetManagedLabels(r.Scheme(), tmp, cluster)
+	s.applyAdditionalLabels(tmp, cluster, scName)
+
+	// If nothing changed → do nothing (zero API calls)
+	if reflect.DeepEqual(base.Labels, tmp.Labels) &&
+		reflect.DeepEqual(base.Annotations, tmp.Annotations) {
+		return nil
+	}
+
+	// Apply only the metadata changes to existing
+	existing.Labels = tmp.Labels
+	existing.Annotations = tmp.Annotations
+
+	if err := r.Patch(ctx, existing, client.MergeFrom(base)); err != nil {
+		return err
+	}
+
+	logger.V(2).Info("StorageClass metadata patched")
+	return nil
+}
+
 func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
+
 	// construct name of storage class based on CR spec deviceClass field and
 	// delete the corresponding storage class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
@@ -120,14 +148,15 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 		}
 
 		if !sc.GetDeletionTimestamp().IsZero() {
-			return fmt.Errorf("the StorageClass %s is still present, waiting for deletion", scName)
+			// Already being deleted - watch event will trigger next reconcile
+			logger.V(2).Info("StorageClass deletion in progress", "name", scName)
+			continue
 		}
 
 		if err := r.Delete(ctx, sc); err != nil {
 			return fmt.Errorf("failed to delete StorageClass %s: %w", scName, err)
 		}
-		// Don't claim success - requeue until actually gone
-		return fmt.Errorf("waiting for StorageClass %s deletion to complete", scName)
+		logger.V(2).Info("StorageClass deleted", "name", scName)
 	}
 	return nil
 }
