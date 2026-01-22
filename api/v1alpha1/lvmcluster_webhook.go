@@ -582,12 +582,17 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 			}
 		}
 
-		// Validate label key format
-		for key := range deviceClass.StorageClassOptions.AdditionalLabels {
+		// Validate label key and value format
+		for key, value := range deviceClass.StorageClassOptions.AdditionalLabels {
 			if errs := validation.IsQualifiedName(key); len(errs) > 0 {
 				return warnings, fmt.Errorf(
 					"invalid label key %q in device class %q: %s",
 					key, deviceClass.Name, strings.Join(errs, "; "))
+			}
+			if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+				return warnings, fmt.Errorf(
+					"invalid label value %q for key %q in device class %q: %s",
+					value, key, deviceClass.Name, strings.Join(errs, "; "))
 			}
 		}
 	}

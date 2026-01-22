@@ -243,18 +243,46 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 
 // needsRecreation checks if immutable StorageClass fields changed
 func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.StorageClass) bool {
-	// Check reclaimPolicy
-	if !reflect.DeepEqual(existing.ReclaimPolicy, desired.ReclaimPolicy) {
+	// Normalize ReclaimPolicy (semantic default: Delete)
+	existingRP := corev1.PersistentVolumeReclaimDelete
+	desiredRP := corev1.PersistentVolumeReclaimDelete
+
+	if existing.ReclaimPolicy != nil {
+		existingRP = *existing.ReclaimPolicy
+	}
+	if desired.ReclaimPolicy != nil {
+		desiredRP = *desired.ReclaimPolicy
+	}
+	if existingRP != desiredRP {
 		return true
 	}
 
-	// Check volumeBindingMode
-	if !reflect.DeepEqual(existing.VolumeBindingMode, desired.VolumeBindingMode) {
+	// Normalize VolumeBindingMode (semantic default: WaitForFirstConsumer)
+	existingVBM := storagev1.VolumeBindingWaitForFirstConsumer
+	desiredVBM := storagev1.VolumeBindingWaitForFirstConsumer
+
+	if existing.VolumeBindingMode != nil {
+		existingVBM = *existing.VolumeBindingMode
+	}
+	if desired.VolumeBindingMode != nil {
+		desiredVBM = *desired.VolumeBindingMode
+	}
+	if existingVBM != desiredVBM {
 		return true
 	}
 
-	// Check parameters (immutable map)
-	if !reflect.DeepEqual(existing.Parameters, desired.Parameters) {
+	// Normalize Parameters (nil == empty map)
+	existingParams := existing.Parameters
+	desiredParams := desired.Parameters
+
+	if existingParams == nil {
+		existingParams = map[string]string{}
+	}
+	if desiredParams == nil {
+		desiredParams = map[string]string{}
+	}
+
+	if !reflect.DeepEqual(existingParams, desiredParams) {
 		return true
 	}
 
