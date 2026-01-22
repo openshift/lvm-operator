@@ -117,6 +117,35 @@ func DeleteResource(ctx context.Context, obj client.Object) {
 	}, timeout, interval).WithContext(ctx).Should(Satisfy(k8serrors.IsNotFound))
 }
 
+// waitForStorageCleanup waits for all LVMVolumeGroup and LVMVolumeGroupNodeStatus resources to be deleted.
+// This ensures that the actual storage cleanup (VG/thin-pool deletion) is complete, not just the CR deletion.
+func waitForStorageCleanup(ctx context.Context) {
+	GinkgoHelper()
+	By("Waiting for LVMVolumeGroup resources to be deleted")
+	Eventually(func(ctx context.Context) error {
+		vgList := &v1alpha1.LVMVolumeGroupList{}
+		if err := crClient.List(ctx, vgList, client.InNamespace(installNamespace)); err != nil {
+			return fmt.Errorf("failed to list LVMVolumeGroups: %w", err)
+		}
+		if len(vgList.Items) > 0 {
+			return fmt.Errorf("still waiting for %d LVMVolumeGroup(s) to be deleted", len(vgList.Items))
+		}
+		return nil
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+	By("Waiting for LVMVolumeGroupNodeStatus resources to be deleted")
+	Eventually(func(ctx context.Context) error {
+		nodeStatusList := &v1alpha1.LVMVolumeGroupNodeStatusList{}
+		if err := crClient.List(ctx, nodeStatusList, client.InNamespace(installNamespace)); err != nil {
+			return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
+		}
+		if len(nodeStatusList.Items) > 0 {
+			return fmt.Errorf("still waiting for %d LVMVolumeGroupNodeStatus(s) to be deleted", len(nodeStatusList.Items))
+		}
+		return nil
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
+}
+
 func lvmNamespaceCleanup(ctx context.Context) {
 	DeleteResource(ctx, &k8sv1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
 }

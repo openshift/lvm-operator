@@ -40,6 +40,8 @@ func lvmClusterTest() {
 			return
 		}
 		DeleteResource(ctx, cluster)
+		// Wait for actual storage cleanup (VG/thin-pool deletion), not just CR deletion
+		waitForStorageCleanup(ctx)
 		validateCSINodeInfo(ctx, cluster, false)
 	})
 
