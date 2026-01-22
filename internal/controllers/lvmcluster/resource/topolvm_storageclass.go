@@ -37,6 +37,15 @@ const (
 	scName = "topolvm-storageclass"
 )
 
+// ErrStorageClassDeletionPending indicates a StorageClass is still deleting and recreation should be retried
+type ErrStorageClassDeletionPending struct {
+	Name string
+}
+
+func (e *ErrStorageClassDeletionPending) Error() string {
+	return fmt.Sprintf("StorageClass %s deletion still in progress, will retry recreation", e.Name)
+}
+
 func TopoLVMStorageClass() Manager {
 	return &topolvmStorageClass{}
 }
@@ -80,17 +89,44 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 				"name", desired.Name,
 				"reason", "StorageClass spec fields are immutable in Kubernetes")
 
-			// Delete existing
-			if err := r.Delete(ctx, existing); err != nil {
-				return fmt.Errorf("%s failed to delete StorageClass %s: %w", s.GetName(), desired.Name, err)
+			// Initiate deletion if not already deleting
+			if existing.DeletionTimestamp.IsZero() {
+				if err := r.Delete(ctx, existing); err != nil && !errors.IsNotFound(err) {
+					return fmt.Errorf("%s failed to delete StorageClass %s: %w", s.GetName(), desired.Name, err)
+				}
+				logger.V(2).Info("StorageClass deletion initiated", "name", desired.Name)
 			}
 
-			// Create new
-			labels.SetManagedLabels(r.Scheme(), desired, cluster)
-			if err := r.Create(ctx, desired); err != nil {
-				return fmt.Errorf("%s failed to recreate StorageClass %s: %w", s.GetName(), desired.Name, err)
+			// Verify deletion completed before recreating
+			checkDeleted := &storagev1.StorageClass{}
+			err := r.Get(ctx, types.NamespacedName{Name: desired.Name}, checkDeleted)
+			switch {
+			case err == nil:
+				// Still exists (deletion in progress or just initiated)
+				logger.V(2).Info("StorageClass deletion in progress, waiting before recreate",
+					"name", desired.Name,
+					"deleting", !checkDeleted.DeletionTimestamp.IsZero())
+				// Return error to trigger requeue by controller
+				return &ErrStorageClassDeletionPending{Name: desired.Name}
+
+			case errors.IsNotFound(err):
+				// Deletion complete, safe to create new StorageClass
+				labels.SetManagedLabels(r.Scheme(), desired, cluster)
+				if err := r.Create(ctx, desired); err != nil {
+					if errors.IsAlreadyExists(err) {
+						// Race condition: another reconcile created it or API server inconsistency
+						logger.V(2).Info("StorageClass already exists after deletion, will retry",
+							"name", desired.Name)
+						return &ErrStorageClassDeletionPending{Name: desired.Name}
+					}
+					return fmt.Errorf("%s failed to recreate StorageClass %s: %w", s.GetName(), desired.Name, err)
+				}
+				logger.Info("StorageClass recreated", "name", desired.Name)
+
+			default:
+				// Unexpected error verifying deletion
+				return fmt.Errorf("%s failed to verify deletion of StorageClass %s: %w", s.GetName(), desired.Name, err)
 			}
-			logger.Info("StorageClass recreated", "name", desired.Name)
 		} else {
 			// Only update metadata (labels/annotations)
 			result, err := cutil.CreateOrUpdate(ctx, r, existing, func() error {
@@ -243,6 +279,22 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 
 // needsRecreation checks if immutable StorageClass fields changed
 func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.StorageClass) bool {
+	logger := log.Log.WithName("topolvm-storageclass")
+
+	// Log comparison inputs for debugging
+	logger.Info("DEBUG: Comparing StorageClass for recreation check",
+		"name", existing.Name,
+		"existingRP", existing.ReclaimPolicy,
+		"existingRPnil", existing.ReclaimPolicy == nil,
+		"desiredRP", desired.ReclaimPolicy,
+		"desiredRPnil", desired.ReclaimPolicy == nil,
+		"existingVBM", existing.VolumeBindingMode,
+		"existingVBMnil", existing.VolumeBindingMode == nil,
+		"desiredVBM", desired.VolumeBindingMode,
+		"desiredVBMnil", desired.VolumeBindingMode == nil,
+		"existingParams", existing.Parameters,
+		"desiredParams", desired.Parameters)
+
 	// Normalize ReclaimPolicy (semantic default: Delete)
 	existingRP := corev1.PersistentVolumeReclaimDelete
 	desiredRP := corev1.PersistentVolumeReclaimDelete
@@ -254,6 +306,10 @@ func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.Storag
 		desiredRP = *desired.ReclaimPolicy
 	}
 	if existingRP != desiredRP {
+		logger.Info("DEBUG: ReclaimPolicy diff detected - recreation required",
+			"name", existing.Name,
+			"existingNormalized", existingRP,
+			"desiredNormalized", desiredRP)
 		return true
 	}
 
@@ -268,6 +324,10 @@ func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.Storag
 		desiredVBM = *desired.VolumeBindingMode
 	}
 	if existingVBM != desiredVBM {
+		logger.Info("DEBUG: VolumeBindingMode diff detected - recreation required",
+			"name", existing.Name,
+			"existingNormalized", existingVBM,
+			"desiredNormalized", desiredVBM)
 		return true
 	}
 
@@ -283,9 +343,15 @@ func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.Storag
 	}
 
 	if !reflect.DeepEqual(existingParams, desiredParams) {
+		logger.Info("DEBUG: Parameters diff detected - recreation required",
+			"name", existing.Name,
+			"existingNormalized", existingParams,
+			"desiredNormalized", desiredParams)
 		return true
 	}
 
+	logger.V(2).Info("DEBUG: No recreation needed - specs match",
+		"name", existing.Name)
 	return false
 }
 
