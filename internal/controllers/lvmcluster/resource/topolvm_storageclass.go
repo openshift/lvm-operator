@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -63,11 +62,8 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 
 		if err != nil {
 			if errors.IsNotFound(err) {
-				// Create new StorageClass
 				labels.SetManagedLabels(r.Scheme(), desired, cluster)
-				// Apply additional labels onto desired (metadata only)
 				s.applyAdditionalLabels(desired, cluster, desired.Name)
-
 				if err := r.Create(ctx, desired); err != nil {
 					return fmt.Errorf("%s failed to create StorageClass %s: %w", s.GetName(), desired.Name, err)
 				}
@@ -77,9 +73,7 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 			return fmt.Errorf("%s failed to get StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
 
-		// Immutable diff? Then delete+recreate (watch-driven).
 		if s.needsRecreation(existing, desired) {
-			// Delete existing - watch event will trigger next reconcile to create
 			if err := r.Delete(ctx, existing); err != nil {
 				return fmt.Errorf("%s failed to delete StorageClass %s: %w", s.GetName(), desired.Name, err)
 			}
@@ -87,47 +81,13 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 			continue
 		}
 
-		// Update metadata (labels/annotations) only if changed
-		if err := s.patchStorageClassMetadataIfNeeded(r, ctx, existing, cluster, desired.Name); err != nil {
-			return fmt.Errorf("%s failed to patch StorageClass %s metadata: %w", s.GetName(), existing.Name, err)
+		labels.SetManagedLabels(r.Scheme(), existing, cluster)
+		s.applyAdditionalLabels(existing, cluster, desired.Name)
+		if err := r.Update(ctx, existing); err != nil {
+			return fmt.Errorf("%s failed to update StorageClass %s: %w", s.GetName(), existing.Name, err)
 		}
 	}
 
-	return nil
-}
-
-// patchStorageClassMetadataIfNeeded patches StorageClass metadata only if it differs
-func (s topolvmStorageClass) patchStorageClassMetadataIfNeeded(
-	r Reconciler,
-	ctx context.Context,
-	existing *storagev1.StorageClass,
-	cluster *lvmv1alpha1.LVMCluster,
-	scName string,
-) error {
-	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName(), "storageClass", existing.Name)
-
-	base := existing.DeepCopy()
-	tmp := existing.DeepCopy()
-
-	// Mutate ONLY metadata on temp object (leaves spec untouched)
-	labels.SetManagedLabels(r.Scheme(), tmp, cluster)
-	s.applyAdditionalLabels(tmp, cluster, scName)
-
-	// If nothing changed → do nothing (zero API calls)
-	if reflect.DeepEqual(base.Labels, tmp.Labels) &&
-		reflect.DeepEqual(base.Annotations, tmp.Annotations) {
-		return nil
-	}
-
-	// Apply only the metadata changes to existing
-	existing.Labels = tmp.Labels
-	existing.Annotations = tmp.Annotations
-
-	if err := r.Patch(ctx, existing, client.MergeFrom(base)); err != nil {
-		return err
-	}
-
-	logger.V(2).Info("StorageClass metadata patched")
 	return nil
 }
 
@@ -169,7 +129,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
 
-	// Mark the lvms storage class, associated with the default device class, as default if no other default storage class exists on the cluster
 	scList := &storagev1.StorageClassList{}
 	err := r.List(ctx, scList)
 
@@ -189,7 +148,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
 
-		// Apply defaults for StorageClass fields
 		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
 		var reclaimPolicy *corev1.PersistentVolumeReclaimPolicy
 		parameters := map[string]string{
@@ -198,19 +156,15 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		}
 		additionalLabels := map[string]string{}
 
-		// Apply StorageClassOptions if provided
 		if opts := deviceClass.StorageClassOptions; opts != nil {
-			// VolumeBindingMode
 			if opts.VolumeBindingMode != nil {
 				volumeBindingMode = *opts.VolumeBindingMode
 			}
 
-			// ReclaimPolicy
 			if opts.ReclaimPolicy != nil {
 				reclaimPolicy = opts.ReclaimPolicy
 			}
 
-			// AdditionalParameters (skip LVMS-owned keys)
 			lvmsOwnedParams := map[string]bool{
 				constants.DeviceClassKey:    true,
 				"csi.storage.k8s.io/fstype": true,
@@ -224,7 +178,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 				}
 			}
 
-			// AdditionalLabels (applied below)
 			if opts.AdditionalLabels != nil {
 				additionalLabels = opts.AdditionalLabels
 			}
@@ -244,7 +197,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			Parameters:           parameters,
 		}
 
-		// Apply additional labels
 		if len(additionalLabels) > 0 {
 			if storageClass.Labels == nil {
 				storageClass.Labels = make(map[string]string)
@@ -254,7 +206,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			}
 		}
 
-		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
 			storageClass.Annotations[defaultSCAnnotation] = "true"
 			defaultStorageClassName = scName
@@ -264,12 +215,9 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 	return sc
 }
 
-// needsRecreation checks if immutable StorageClass fields changed
 func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.StorageClass) bool {
-	// Normalize ReclaimPolicy (semantic default: Delete)
 	existingRP := corev1.PersistentVolumeReclaimDelete
 	desiredRP := corev1.PersistentVolumeReclaimDelete
-
 	if existing.ReclaimPolicy != nil {
 		existingRP = *existing.ReclaimPolicy
 	}
@@ -280,10 +228,8 @@ func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.Storag
 		return true
 	}
 
-	// Normalize VolumeBindingMode (semantic default: WaitForFirstConsumer)
 	existingVBM := storagev1.VolumeBindingWaitForFirstConsumer
 	desiredVBM := storagev1.VolumeBindingWaitForFirstConsumer
-
 	if existing.VolumeBindingMode != nil {
 		existingVBM = *existing.VolumeBindingMode
 	}
@@ -294,27 +240,18 @@ func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.Storag
 		return true
 	}
 
-	// Normalize Parameters (nil == empty map)
 	existingParams := existing.Parameters
 	desiredParams := desired.Parameters
-
 	if existingParams == nil {
 		existingParams = map[string]string{}
 	}
 	if desiredParams == nil {
 		desiredParams = map[string]string{}
 	}
-
-	if !reflect.DeepEqual(existingParams, desiredParams) {
-		return true
-	}
-
-	return false
+	return !reflect.DeepEqual(existingParams, desiredParams)
 }
 
-// applyAdditionalLabels merges additional labels from StorageClassOptions
 func (s topolvmStorageClass) applyAdditionalLabels(sc *storagev1.StorageClass, cluster *lvmv1alpha1.LVMCluster, scName string) {
-	// Find the device class for this StorageClass
 	var deviceClass *lvmv1alpha1.DeviceClass
 	for i, dc := range cluster.Spec.Storage.DeviceClasses {
 		if GetStorageClassName(dc.Name) == scName {
@@ -331,7 +268,6 @@ func (s topolvmStorageClass) applyAdditionalLabels(sc *storagev1.StorageClass, c
 		sc.Labels = make(map[string]string)
 	}
 
-	// LVMS-managed labels (cannot be overridden)
 	lvmsManagedLabels := map[string]bool{
 		constants.AppKubernetesPartOfLabel:    true,
 		constants.AppKubernetesNameLabel:      true,
@@ -339,7 +275,6 @@ func (s topolvmStorageClass) applyAdditionalLabels(sc *storagev1.StorageClass, c
 		constants.AppKubernetesComponentLabel: true,
 	}
 
-	// Merge additional labels without overwriting LVMS-managed
 	for key, value := range deviceClass.StorageClassOptions.AdditionalLabels {
 		if !lvmsManagedLabels[key] {
 			sc.Labels[key] = value

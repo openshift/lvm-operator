@@ -39,14 +39,10 @@ func lvmClusterTest() {
 			By("Test failed, but cleaning up cluster to prevent cascade failures")
 			skipSuiteCleanup.Store(true)
 		}
-
-		// Best-effort delete (ignore errors if already deleted)
 		DeleteResource(ctx, cluster)
-
-		// Wait for actual storage cleanup (VG/thin-pool deletion), not just CR deletion
+		// Wait for actual storage cleanup, not just CR deletion
 		waitForStorageCleanup(ctx)
 
-		// Validate CSI driver unregistered
 		validateCSINodeInfo(ctx, cluster, false)
 	})
 
