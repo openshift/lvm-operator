@@ -59,7 +59,6 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 	for _, desired := range desiredStorageClasses {
 		existing := &storagev1.StorageClass{}
 		err := r.Get(ctx, types.NamespacedName{Name: desired.Name}, existing)
-
 		if err != nil {
 			if errors.IsNotFound(err) {
 				labels.SetManagedLabels(r.Scheme(), desired, cluster)
@@ -98,7 +97,7 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 	// delete the corresponding storage class
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
-
+		logger := logger.WithValues("StorageClass", scName)
 		sc := &storagev1.StorageClass{}
 		if err := r.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
 			if errors.IsNotFound(err) {
@@ -128,7 +127,7 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 	allowVolumeExpansion := true
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
-
+	// Mark the lvms storage class, associated with the default device class, as default if no other default storage class exists on the cluster
 	scList := &storagev1.StorageClassList{}
 	err := r.List(ctx, scList)
 
@@ -205,7 +204,7 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 				storageClass.Labels[key] = value
 			}
 		}
-
+		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
 			storageClass.Annotations[defaultSCAnnotation] = "true"
 			defaultStorageClassName = scName
