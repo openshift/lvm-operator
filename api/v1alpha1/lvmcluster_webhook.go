@@ -27,7 +27,10 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -145,7 +148,7 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime.Object) (admission.Warnings, error) {
+func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
 	l := new.(*LVMCluster)
 
 	lvmclusterlog.Info("validate update", "name", l.Name)
@@ -187,6 +190,11 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
+	}
+
+	err = v.verifyImmutableStorageClassFields(ctx, oldLVMCluster, l)
+	if err != nil {
+		return warnings, err
 	}
 
 	// Validate device class removal follows the business rules
@@ -562,10 +570,16 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
 	warnings := admission.Warnings{}
 
-	// LVMS-owned parameters that cannot be overridden
 	lvmsOwnedParameters := map[string]bool{
-		constants.DeviceClassKey:    true, // "topolvm.io/device-class"
+		constants.DeviceClassKey:    true,
 		"csi.storage.k8s.io/fstype": true,
+	}
+
+	lvmsManagedLabels := map[string]bool{
+		constants.AppKubernetesPartOfLabel:    true,
+		constants.AppKubernetesNameLabel:      true,
+		constants.AppKubernetesManagedByLabel: true,
+		constants.AppKubernetesComponentLabel: true,
 	}
 
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
@@ -573,7 +587,6 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 			continue
 		}
 
-		// Warn about parameter conflicts
 		for key := range deviceClass.StorageClassOptions.AdditionalParameters {
 			if lvmsOwnedParameters[key] {
 				warnings = append(warnings, fmt.Sprintf(
@@ -582,7 +595,14 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 			}
 		}
 
-		// Validate label key and value format
+		for key := range deviceClass.StorageClassOptions.AdditionalLabels {
+			if lvmsManagedLabels[key] {
+				warnings = append(warnings, fmt.Sprintf(
+					"additionalLabel %q in device class %q conflicts with LVMS-managed label and will be ignored",
+					key, deviceClass.Name))
+			}
+		}
+
 		for key, value := range deviceClass.StorageClassOptions.AdditionalLabels {
 			if errs := validation.IsQualifiedName(key); len(errs) > 0 {
 				return warnings, fmt.Errorf(
@@ -598,4 +618,89 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 	}
 
 	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Context, oldCluster, newCluster *LVMCluster) error {
+	for _, newDC := range newCluster.Spec.Storage.DeviceClasses {
+		var oldDC *DeviceClass
+		for i := range oldCluster.Spec.Storage.DeviceClasses {
+			if oldCluster.Spec.Storage.DeviceClasses[i].Name == newDC.Name {
+				oldDC = &oldCluster.Spec.Storage.DeviceClasses[i]
+				break
+			}
+		}
+
+		if oldDC == nil {
+			continue
+		}
+
+		scName := constants.StorageClassPrefix + newDC.Name
+		sc := &storagev1.StorageClass{}
+		err := v.Get(ctx, types.NamespacedName{Name: scName}, sc)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				continue
+			}
+			return fmt.Errorf("failed to get StorageClass %s: %w", scName, err)
+		}
+
+		// FilesystemType affects StorageClass parameters (csi.storage.k8s.io/fstype)
+		if oldDC.FilesystemType != newDC.FilesystemType {
+			return fmt.Errorf(
+				"filesystemType cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
+				newDC.Name, oldDC.FilesystemType, newDC.FilesystemType)
+		}
+
+		oldOpts := oldDC.StorageClassOptions
+		newOpts := newDC.StorageClassOptions
+
+		if oldOpts == nil && newOpts == nil {
+			continue
+		}
+
+		if oldOpts != nil && newOpts != nil {
+			if oldOpts.ReclaimPolicy != nil && newOpts.ReclaimPolicy != nil {
+				if *oldOpts.ReclaimPolicy != *newOpts.ReclaimPolicy {
+					return fmt.Errorf(
+						"reclaimPolicy cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
+						newDC.Name, *oldOpts.ReclaimPolicy, *newOpts.ReclaimPolicy)
+				}
+			} else if (oldOpts.ReclaimPolicy == nil) != (newOpts.ReclaimPolicy == nil) {
+				return fmt.Errorf(
+					"reclaimPolicy cannot be changed for device class %q after StorageClass creation",
+					newDC.Name)
+			}
+
+			if oldOpts.VolumeBindingMode != nil && newOpts.VolumeBindingMode != nil {
+				if *oldOpts.VolumeBindingMode != *newOpts.VolumeBindingMode {
+					return fmt.Errorf(
+						"volumeBindingMode cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
+						newDC.Name, *oldOpts.VolumeBindingMode, *newOpts.VolumeBindingMode)
+				}
+			} else if (oldOpts.VolumeBindingMode == nil) != (newOpts.VolumeBindingMode == nil) {
+				return fmt.Errorf(
+					"volumeBindingMode cannot be changed for device class %q after StorageClass creation",
+					newDC.Name)
+			}
+
+			// AdditionalParameters are immutable (StorageClass parameters cannot be changed after creation)
+			oldParams := oldOpts.AdditionalParameters
+			newParams := newOpts.AdditionalParameters
+			if !reflect.DeepEqual(oldParams, newParams) {
+				return fmt.Errorf(
+					"additionalParameters cannot be changed for device class %q after StorageClass creation (StorageClass parameters are immutable in Kubernetes)",
+					newDC.Name)
+			}
+		}
+
+		// Also reject if additionalParameters is added or removed after SC exists
+		if (oldOpts == nil && newOpts != nil && len(newOpts.AdditionalParameters) > 0) ||
+			(oldOpts != nil && len(oldOpts.AdditionalParameters) > 0 && newOpts == nil) {
+			return fmt.Errorf(
+				"additionalParameters cannot be changed for device class %q after StorageClass creation",
+				newDC.Name)
+		}
+	}
+
+	return nil
 }

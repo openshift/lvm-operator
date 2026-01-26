@@ -19,7 +19,9 @@ package resource
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"maps"
+	"sort"
+	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -57,33 +60,38 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 	desiredStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
 
 	for _, desired := range desiredStorageClasses {
-		existing := &storagev1.StorageClass{}
-		err := r.Get(ctx, types.NamespacedName{Name: desired.Name}, existing)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				labels.SetManagedLabels(r.Scheme(), desired, cluster)
-				s.applyAdditionalLabels(desired, cluster, desired.Name)
-				if err := r.Create(ctx, desired); err != nil {
-					return fmt.Errorf("%s failed to create StorageClass %s: %w", s.GetName(), desired.Name, err)
+		sc := &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: desired.Name,
+			},
+		}
+
+		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
+			labels.SetManagedLabels(r.Scheme(), sc, cluster)
+			s.applyAdditionalLabels(sc, cluster, desired.Name)
+
+			if sc.CreationTimestamp.IsZero() {
+				sc.Provisioner = desired.Provisioner
+				sc.VolumeBindingMode = desired.VolumeBindingMode
+				sc.ReclaimPolicy = desired.ReclaimPolicy
+				sc.AllowVolumeExpansion = desired.AllowVolumeExpansion
+				if sc.Annotations == nil {
+					sc.Annotations = make(map[string]string)
 				}
-				logger.V(2).Info("StorageClass created", "name", desired.Name)
-				continue
+				sc.Annotations["description"] = "Provides RWO and RWOP Filesystem & Block volumes"
+				// Deep copy to avoid map aliasing
+				sc.Parameters = make(map[string]string, len(desired.Parameters))
+				maps.Copy(sc.Parameters, desired.Parameters)
 			}
-			return fmt.Errorf("%s failed to get StorageClass %s: %w", s.GetName(), desired.Name, err)
+
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("%s failed to reconcile StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
 
-		if s.needsRecreation(existing, desired) {
-			if err := r.Delete(ctx, existing); err != nil {
-				return fmt.Errorf("%s failed to delete StorageClass %s: %w", s.GetName(), desired.Name, err)
-			}
-			logger.V(2).Info("StorageClass deleted for recreation", "name", desired.Name)
-			continue
-		}
-
-		labels.SetManagedLabels(r.Scheme(), existing, cluster)
-		s.applyAdditionalLabels(existing, cluster, desired.Name)
-		if err := r.Update(ctx, existing); err != nil {
-			return fmt.Errorf("%s failed to update StorageClass %s: %w", s.GetName(), existing.Name, err)
+		if result != cutil.OperationResultNone {
+			logger.V(2).Info("StorageClass reconciled", "operation", result, "name", sc.Name)
 		}
 	}
 
@@ -200,9 +208,7 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			if storageClass.Labels == nil {
 				storageClass.Labels = make(map[string]string)
 			}
-			for key, value := range additionalLabels {
-				storageClass.Labels[key] = value
-			}
+			maps.Copy(storageClass.Labels, additionalLabels)
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
@@ -214,69 +220,58 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 	return sc
 }
 
-func (s topolvmStorageClass) needsRecreation(existing, desired *storagev1.StorageClass) bool {
-	existingRP := corev1.PersistentVolumeReclaimDelete
-	desiredRP := corev1.PersistentVolumeReclaimDelete
-	if existing.ReclaimPolicy != nil {
-		existingRP = *existing.ReclaimPolicy
+func (s topolvmStorageClass) applyAdditionalLabels(
+	sc *storagev1.StorageClass,
+	cluster *lvmv1alpha1.LVMCluster,
+	scName string,
+) {
+	dc := FindDeviceClassBySCName(cluster, scName)
+
+	if sc.Labels == nil {
+		sc.Labels = map[string]string{}
 	}
-	if desired.ReclaimPolicy != nil {
-		desiredRP = *desired.ReclaimPolicy
-	}
-	if existingRP != desiredRP {
-		return true
+	if sc.Annotations == nil {
+		sc.Annotations = map[string]string{}
 	}
 
-	existingVBM := storagev1.VolumeBindingWaitForFirstConsumer
-	desiredVBM := storagev1.VolumeBindingWaitForFirstConsumer
-	if existing.VolumeBindingMode != nil {
-		existingVBM = *existing.VolumeBindingMode
-	}
-	if desired.VolumeBindingMode != nil {
-		desiredVBM = *desired.VolumeBindingMode
-	}
-	if existingVBM != desiredVBM {
-		return true
+	// keys LVMS owns/sets; user must not override
+	lvmsManaged := map[string]struct{}{
+		constants.AppKubernetesPartOfLabel:    {},
+		constants.AppKubernetesNameLabel:      {},
+		constants.AppKubernetesManagedByLabel: {},
+		constants.AppKubernetesComponentLabel: {},
 	}
 
-	existingParams := existing.Parameters
-	desiredParams := desired.Parameters
-	if existingParams == nil {
-		existingParams = map[string]string{}
-	}
-	if desiredParams == nil {
-		desiredParams = map[string]string{}
-	}
-	return !reflect.DeepEqual(existingParams, desiredParams)
-}
+	// previously-managed keys (for pruning)
+	prev := strings.FieldsFunc(sc.Annotations[constants.ManagedAdditionalLabelsAnnotation], func(r rune) bool { return r == ',' })
 
-func (s topolvmStorageClass) applyAdditionalLabels(sc *storagev1.StorageClass, cluster *lvmv1alpha1.LVMCluster, scName string) {
-	var deviceClass *lvmv1alpha1.DeviceClass
-	for i, dc := range cluster.Spec.Storage.DeviceClasses {
-		if GetStorageClassName(dc.Name) == scName {
-			deviceClass = &cluster.Spec.Storage.DeviceClasses[i]
-			break
+	desired := map[string]struct{}{}
+	if dc != nil && dc.StorageClassOptions != nil && dc.StorageClassOptions.AdditionalLabels != nil {
+		for k, v := range dc.StorageClassOptions.AdditionalLabels {
+			if _, owned := lvmsManaged[k]; owned {
+				continue
+			}
+			sc.Labels[k] = v
+			desired[k] = struct{}{}
 		}
 	}
 
-	if deviceClass == nil || deviceClass.StorageClassOptions == nil {
+	// prune keys we previously managed but no longer desired
+	for _, k := range prev {
+		if _, ok := desired[k]; !ok {
+			delete(sc.Labels, k)
+		}
+	}
+
+	if len(desired) == 0 {
+		delete(sc.Annotations, constants.ManagedAdditionalLabelsAnnotation)
 		return
 	}
 
-	if sc.Labels == nil {
-		sc.Labels = make(map[string]string)
+	keys := make([]string, 0, len(desired))
+	for k := range desired {
+		keys = append(keys, k)
 	}
-
-	lvmsManagedLabels := map[string]bool{
-		constants.AppKubernetesPartOfLabel:    true,
-		constants.AppKubernetesNameLabel:      true,
-		constants.AppKubernetesManagedByLabel: true,
-		constants.AppKubernetesComponentLabel: true,
-	}
-
-	for key, value := range deviceClass.StorageClassOptions.AdditionalLabels {
-		if !lvmsManagedLabels[key] {
-			sc.Labels[key] = value
-		}
-	}
+	sort.Strings(keys)
+	sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] = strings.Join(keys, ",")
 }
