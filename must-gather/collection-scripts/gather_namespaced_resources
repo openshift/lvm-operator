@@ -11,15 +11,23 @@ if [ "${BASE_COLLECTION_PATH}" = "" ]; then
     BASE_COLLECTION_PATH=$(pwd)
 fi
 
-# Use a global variable for namespace
-INSTALL_NAMESPACE=openshift-lvm-storage
-
-# Add general resources to list if necessary
-
-# Resource List
-resources=()
-# collect lvmcluster resources
-#resources+=(lvmclusters)
+# There might be cases where the operator might be installed in a different namespace
+# The INSTALL_NAMESPACE parameter does not account for old installations when it was running
+# on project "openshift-storage" by default.
+# This causes the must-gather to not collect data properly
+# INSTALL_NAMESPACE=openshift-lvm-storage
+# There might be different ways to sort the namespace installation namespace
+#
+#   We filter based on the CSV object for "lvms-operator"
+#   oc get csv -A | grep lvms-operator | cut -f1 -d " "
+#   Give a list of project where the operator is detected, example output:
+#   ~~~
+#   $ oc get csv -A | grep lvms-operator | cut -f1 -d " "
+#   lvm-operator-for-everyone
+#   openshift-storage
+#   ~~~
+# This will return an array of namespaces
+mapfile -t INSTALL_NAMESPACE < <(oc get csv --all-namespaces | grep lvms-operator | cut -f1 -d " ")
 
 # collection path for OC commands
 mkdir -p "${BASE_COLLECTION_PATH}/oc_output/"
@@ -55,42 +63,50 @@ oc_yamls+=("csv")
 oc_yamls+=("installplan")
 
 echo "collecting dump of namespace" | tee -a "${BASE_COLLECTION_PATH}"/gather-debug.log
-oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect ns/"${INSTALL_NAMESPACE}" ${log_collection_args} >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
+
+for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
+    oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect ns/"$NAMESPACE" ${log_collection_args} >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
+done
+
 echo "collecting dump of clusterresourceversion" | tee -a "${BASE_COLLECTION_PATH}"/gather-debug.log
-for oc_yaml in "${oc_yamls[@]}"; do
-    # shellcheck disable=SC2129
-    oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect "${oc_yaml}" -n "${INSTALL_NAMESPACE}" ${log_collection_args} >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
+for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
+    for oc_yaml in "${oc_yamls[@]}"; do
+        # shellcheck disable=SC2129
+        oc adm --dest-dir="${BASE_COLLECTION_PATH}" inspect "${oc_yaml}" -n "$NAMESPACE" ${log_collection_args} >>"${BASE_COLLECTION_PATH}"/gather-debug.log 2>&1
+    done
 done
 
 # Create the dir for oc_output
-mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${INSTALL_NAMESPACE}/oc_output/"
+for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
+    mkdir -p "${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/"
+done
 
 # Run the Collection of OC get commands
-for command_get in "${commands_get[@]}"; do
-    echo "collecting oc command ${command_get}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
-    COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${INSTALL_NAMESPACE}/oc_output/${command_get// /_}
-    # shellcheck disable=SC2086
-    { oc get ${command_get} -n ${INSTALL_NAMESPACE}; } >>"${COMMAND_OUTPUT_FILE}"
+for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
+    for command_get in "${commands_get[@]}"; do
+        echo "collecting oc command ${command_get}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
+        COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/${command_get// /_}
+        # shellcheck disable=SC2086
+        { oc get ${command_get} -n ${NAMESPACE}; } >>"${COMMAND_OUTPUT_FILE}"
+    done
 done
 
 # Run the Collection of OC desc commands
-for command_desc in "${commands_desc[@]}"; do
+for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
+    for command_desc in "${commands_desc[@]}"; do
     echo "collecting oc describe command ${command_desc}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
-    COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${INSTALL_NAMESPACE}/oc_output/${command_desc// /_}
+    COMMAND_OUTPUT_FILE=${BASE_COLLECTION_PATH}/namespaces/${NAMESPACE}/oc_output/${command_desc// /_}
     # shellcheck disable=SC2086
-    { oc describe ${command_desc} -n ${INSTALL_NAMESPACE}; } >>"${COMMAND_OUTPUT_FILE}"
+    { oc describe ${command_desc} -n ${NAMESPACE}; } >>"${COMMAND_OUTPUT_FILE}"
+    done
 done
 
-{ oc get lvmclusters -n ${INSTALL_NAMESPACE} -o yaml; } >"$BASE_COLLECTION_PATH/namespaces/${INSTALL_NAMESPACE}/oc_output/lvmcluster.yaml" 2>&1
+for NAMESPACE in "${INSTALL_NAMESPACE[@]}"; do
+    { oc get lvmclusters -n ${NAMESPACE} -o yaml; } >"$BASE_COLLECTION_PATH/namespaces/${NAMESPACE}/oc_output/lvmcluster.yaml" 2>&1
+done
 
 # Create the dir for data from all namespaces
 mkdir -p "${BASE_COLLECTION_PATH}/namespaces/all/"
-
-# Run the Collection of Resources using must-gather
-for resource in "${resources[@]}"; do
-    echo "collecting dump of ${resource}" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
-    { oc adm --dest-dir="${BASE_COLLECTION_PATH}/namespaces/all/" inspect "${resource}" --all-namespaces ${log_collection_args}; } >>"${BASE_COLLECTION_PATH}/gather-debug.log" 2>&1
-done
 
 # For pvc of all namespaces
 echo "collecting dump of oc get pvc all namespaces" | tee -a "${BASE_COLLECTION_PATH}/gather-debug.log"
