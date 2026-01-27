@@ -44,10 +44,7 @@
         "digest"
       ],
       "platformAutomerge": true,
-      "commitMessagePrefix": "NO-JIRA:",
-      "schedule": [
-        "at any time"
-      ]
+      "commitMessagePrefix": "NO-JIRA:"
     },
     {
       "matchUpdateTypes": [
@@ -80,9 +77,6 @@
       "release/**"
     ],
     "platformAutomerge": true,
-    "commitMessagePrefix": "NO-JIRA:",
-    "schedule": [
-      "at any time"
-    ]
+    "commitMessagePrefix": "NO-JIRA:"
   }
 }
