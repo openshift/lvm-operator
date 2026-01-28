@@ -24,9 +24,14 @@ import (
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -132,11 +137,18 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 	warnings = append(warnings, metadataWarnings...)
+
+	storageClassWarnings, err := v.verifyStorageClassOptions(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, storageClassWarnings...)
+
 	return warnings, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime.Object) (admission.Warnings, error) {
+func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
 	l := new.(*LVMCluster)
 
 	lvmclusterlog.Info("validate update", "name", l.Name)
@@ -169,9 +181,20 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		return warnings, err
 	}
 
+	storageClassWarnings, err := v.verifyStorageClassOptions(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, storageClassWarnings...)
+
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
+	}
+
+	err = v.verifyImmutableStorageClassFields(ctx, oldLVMCluster, l)
+	if err != nil {
+		return warnings, err
 	}
 
 	// Validate device class removal follows the business rules
@@ -542,4 +565,123 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 		}
 	}
 	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
+	warnings := admission.Warnings{}
+
+	lvmsOwnedParameters := map[string]bool{
+		constants.DeviceClassKey:    true,
+		"csi.storage.k8s.io/fstype": true,
+	}
+
+	lvmsManagedLabels := map[string]bool{
+		constants.AppKubernetesPartOfLabel:    true,
+		constants.AppKubernetesNameLabel:      true,
+		constants.AppKubernetesManagedByLabel: true,
+		constants.AppKubernetesComponentLabel: true,
+	}
+
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.StorageClassOptions == nil {
+			continue
+		}
+
+		for key := range deviceClass.StorageClassOptions.AdditionalParameters {
+			if lvmsOwnedParameters[key] {
+				warnings = append(warnings, fmt.Sprintf(
+					"additionalParameter %q in device class %q conflicts with LVMS-owned parameter and will be ignored",
+					key, deviceClass.Name))
+			}
+		}
+
+		for key := range deviceClass.StorageClassOptions.AdditionalLabels {
+			if lvmsManagedLabels[key] {
+				warnings = append(warnings, fmt.Sprintf(
+					"additionalLabel %q in device class %q conflicts with LVMS-managed label and will be ignored",
+					key, deviceClass.Name))
+			}
+		}
+
+		for key, value := range deviceClass.StorageClassOptions.AdditionalLabels {
+			if errs := validation.IsQualifiedName(key); len(errs) > 0 {
+				return warnings, fmt.Errorf(
+					"invalid label key %q in device class %q: %s",
+					key, deviceClass.Name, strings.Join(errs, "; "))
+			}
+			if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+				return warnings, fmt.Errorf(
+					"invalid label value %q for key %q in device class %q: %s",
+					value, key, deviceClass.Name, strings.Join(errs, "; "))
+			}
+		}
+	}
+
+	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Context, oldCluster, newCluster *LVMCluster) error {
+	for _, newDC := range newCluster.Spec.Storage.DeviceClasses {
+		var oldDC *DeviceClass
+		for i := range oldCluster.Spec.Storage.DeviceClasses {
+			if oldCluster.Spec.Storage.DeviceClasses[i].Name == newDC.Name {
+				oldDC = &oldCluster.Spec.Storage.DeviceClasses[i]
+				break
+			}
+		}
+
+		if oldDC == nil {
+			continue
+		}
+
+		scName := constants.StorageClassPrefix + newDC.Name
+		sc := &storagev1.StorageClass{}
+		err := v.Get(ctx, types.NamespacedName{Name: scName}, sc)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				continue
+			}
+			return fmt.Errorf("failed to get StorageClass %s: %w", scName, err)
+		}
+
+		// FilesystemType affects StorageClass parameters (csi.storage.k8s.io/fstype)
+		if oldDC.FilesystemType != newDC.FilesystemType {
+			return fmt.Errorf(
+				"filesystemType cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
+				newDC.Name, oldDC.FilesystemType, newDC.FilesystemType)
+		}
+
+		// StorageClassOptions are immutable after SC creation, except additionalLabels.
+		// We allow additionalLabels updates because they are metadata-only and safely reconcilable.
+		oldOpts := oldDC.StorageClassOptions
+		newOpts := newDC.StorageClassOptions
+
+		var oldImm, newImm StorageClassOptions
+		if oldOpts != nil {
+			oldImm = *oldOpts
+		}
+		if newOpts != nil {
+			newImm = *newOpts
+		}
+
+		// Ignore labels in immutability enforcement
+		oldImm.AdditionalLabels = nil
+		newImm.AdditionalLabels = nil
+
+		// Normalize nil vs empty maps to avoid false diffs
+		if len(oldImm.AdditionalParameters) == 0 {
+			oldImm.AdditionalParameters = nil
+		}
+		if len(newImm.AdditionalParameters) == 0 {
+			newImm.AdditionalParameters = nil
+		}
+
+		if !reflect.DeepEqual(oldImm, newImm) {
+			return fmt.Errorf(
+				"storageClassOptions (except additionalLabels) cannot be changed for device class %q after StorageClass creation",
+				newDC.Name)
+		}
+	}
+
+	return nil
 }

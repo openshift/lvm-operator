@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -115,6 +116,57 @@ func DeleteResource(ctx context.Context, obj client.Object) {
 	Eventually(func(ctx context.Context) error {
 		return crClient.Get(ctx, client.ObjectKeyFromObject(obj), obj)
 	}, timeout, interval).WithContext(ctx).Should(Satisfy(k8serrors.IsNotFound))
+}
+
+// waitForStorageCleanup waits for all LVMVolumeGroup and LVMVolumeGroupNodeStatus resources to be deleted.
+// This ensures that the actual storage cleanup (VG/thin-pool deletion) is complete, not just the CR deletion.
+func waitForStorageCleanup(ctx context.Context) {
+	GinkgoHelper()
+	By("Waiting for LVMVolumeGroup resources to be deleted")
+	Eventually(func(ctx context.Context) error {
+		vgList := &v1alpha1.LVMVolumeGroupList{}
+		// List all (no namespace filter) to be robust
+		if err := crClient.List(ctx, vgList); err != nil {
+			return fmt.Errorf("failed to list LVMVolumeGroups: %w", err)
+		}
+		// Filter in-memory for our namespace
+		remaining := 0
+		for _, vg := range vgList.Items {
+			if vg.Namespace == installNamespace {
+				remaining++
+			}
+		}
+		if remaining > 0 {
+			return fmt.Errorf("still waiting for %d LVMVolumeGroup(s) in namespace %s to be deleted", remaining, installNamespace)
+		}
+		return nil
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+	By("Waiting for LVMVolumeGroupNodeStatus resources to be deleted")
+	Eventually(func(ctx context.Context) error {
+		nodeStatusList := &v1alpha1.LVMVolumeGroupNodeStatusList{}
+		// List all (no namespace filter) to be robust
+		if err := crClient.List(ctx, nodeStatusList); err != nil {
+			return fmt.Errorf("failed to list LVMVolumeGroupNodeStatus: %w", err)
+		}
+		// Filter in-memory for our namespace
+		remaining := 0
+		for _, ns := range nodeStatusList.Items {
+			if ns.Namespace == installNamespace {
+				remaining++
+			}
+		}
+		if remaining > 0 {
+			return fmt.Errorf("still waiting for %d LVMVolumeGroupNodeStatus(s) in namespace %s to be deleted", remaining, installNamespace)
+		}
+		return nil
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+	// Additional settling time for LVM metadata to flush to disk
+	// Even after CR deletion, LVM commands (vgremove/lvremove) may still be flushing metadata
+	// HyperShift remote control plane + slower I/O can make this window larger
+	By("Waiting for LVM metadata to settle on disk")
+	time.Sleep(5 * time.Second)
 }
 
 func lvmNamespaceCleanup(ctx context.Context) {
