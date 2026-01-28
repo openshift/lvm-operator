@@ -651,11 +651,34 @@ func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Cont
 				newDC.Name, oldDC.FilesystemType, newDC.FilesystemType)
 		}
 
-		// StorageClassOptions are immutable after SC creation
-		// DeepEqual handles nil transitions and field changes automatically
-		if !reflect.DeepEqual(oldDC.StorageClassOptions, newDC.StorageClassOptions) {
+		// StorageClassOptions are immutable after SC creation, except additionalLabels.
+		// We allow additionalLabels updates because they are metadata-only and safely reconcilable.
+		oldOpts := oldDC.StorageClassOptions
+		newOpts := newDC.StorageClassOptions
+
+		var oldImm, newImm StorageClassOptions
+		if oldOpts != nil {
+			oldImm = *oldOpts
+		}
+		if newOpts != nil {
+			newImm = *newOpts
+		}
+
+		// Ignore labels in immutability enforcement
+		oldImm.AdditionalLabels = nil
+		newImm.AdditionalLabels = nil
+
+		// Normalize nil vs empty maps to avoid false diffs
+		if len(oldImm.AdditionalParameters) == 0 {
+			oldImm.AdditionalParameters = nil
+		}
+		if len(newImm.AdditionalParameters) == 0 {
+			newImm.AdditionalParameters = nil
+		}
+
+		if !reflect.DeepEqual(oldImm, newImm) {
 			return fmt.Errorf(
-				"storageClassOptions cannot be changed for device class %q after StorageClass creation",
+				"storageClassOptions (except additionalLabels) cannot be changed for device class %q after StorageClass creation",
 				newDC.Name)
 		}
 	}
