@@ -651,53 +651,11 @@ func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Cont
 				newDC.Name, oldDC.FilesystemType, newDC.FilesystemType)
 		}
 
-		oldOpts := oldDC.StorageClassOptions
-		newOpts := newDC.StorageClassOptions
-
-		if oldOpts == nil && newOpts == nil {
-			continue
-		}
-
-		if oldOpts != nil && newOpts != nil {
-			if oldOpts.ReclaimPolicy != nil && newOpts.ReclaimPolicy != nil {
-				if *oldOpts.ReclaimPolicy != *newOpts.ReclaimPolicy {
-					return fmt.Errorf(
-						"reclaimPolicy cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
-						newDC.Name, *oldOpts.ReclaimPolicy, *newOpts.ReclaimPolicy)
-				}
-			} else if (oldOpts.ReclaimPolicy == nil) != (newOpts.ReclaimPolicy == nil) {
-				return fmt.Errorf(
-					"reclaimPolicy cannot be changed for device class %q after StorageClass creation",
-					newDC.Name)
-			}
-
-			if oldOpts.VolumeBindingMode != nil && newOpts.VolumeBindingMode != nil {
-				if *oldOpts.VolumeBindingMode != *newOpts.VolumeBindingMode {
-					return fmt.Errorf(
-						"volumeBindingMode cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
-						newDC.Name, *oldOpts.VolumeBindingMode, *newOpts.VolumeBindingMode)
-				}
-			} else if (oldOpts.VolumeBindingMode == nil) != (newOpts.VolumeBindingMode == nil) {
-				return fmt.Errorf(
-					"volumeBindingMode cannot be changed for device class %q after StorageClass creation",
-					newDC.Name)
-			}
-
-			// AdditionalParameters are immutable (StorageClass parameters cannot be changed after creation)
-			oldParams := oldOpts.AdditionalParameters
-			newParams := newOpts.AdditionalParameters
-			if !reflect.DeepEqual(oldParams, newParams) {
-				return fmt.Errorf(
-					"additionalParameters cannot be changed for device class %q after StorageClass creation (StorageClass parameters are immutable in Kubernetes)",
-					newDC.Name)
-			}
-		}
-
-		// Also reject if additionalParameters is added or removed after SC exists
-		if (oldOpts == nil && newOpts != nil && len(newOpts.AdditionalParameters) > 0) ||
-			(oldOpts != nil && len(oldOpts.AdditionalParameters) > 0 && newOpts == nil) {
+		// StorageClassOptions are immutable after SC creation
+		// DeepEqual handles nil transitions and field changes automatically
+		if !reflect.DeepEqual(oldDC.StorageClassOptions, newDC.StorageClassOptions) {
 			return fmt.Errorf(
-				"additionalParameters cannot be changed for device class %q after StorageClass creation",
+				"storageClassOptions cannot be changed for device class %q after StorageClass creation",
 				newDC.Name)
 		}
 	}

@@ -60,17 +60,15 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 	desiredStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
 
 	for _, desired := range desiredStorageClasses {
-		sc := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: desired.Name,
-			},
-		}
+		sc := &storagev1.StorageClass{}
+		sc.Name = desired.Name
 
 		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
 			labels.SetManagedLabels(r.Scheme(), sc, cluster)
-			s.applyAdditionalLabels(sc, cluster, desired.Name)
+			s.applyAdditionalLabels(sc, cluster, sc.Name)
 
-			if sc.CreationTimestamp.IsZero() {
+			// Only set immutable spec fields on creation (ResourceVersion is empty for new objects)
+			if sc.ResourceVersion == "" {
 				sc.Provisioner = desired.Provisioner
 				sc.VolumeBindingMode = desired.VolumeBindingMode
 				sc.ReclaimPolicy = desired.ReclaimPolicy
@@ -123,7 +121,7 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 		if err := r.Delete(ctx, sc); err != nil {
 			return fmt.Errorf("failed to delete StorageClass %s: %w", scName, err)
 		}
-		logger.V(2).Info("StorageClass deleted", "name", scName)
+		logger.V(2).Info("StorageClass deletion initiated", "name", scName)
 	}
 	return nil
 }
@@ -156,7 +154,8 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		scName := GetStorageClassName(deviceClass.Name)
 
 		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
-		var reclaimPolicy *corev1.PersistentVolumeReclaimPolicy
+		deletePolicy := corev1.PersistentVolumeReclaimDelete
+		reclaimPolicy := &deletePolicy
 		parameters := map[string]string{
 			constants.DeviceClassKey:    deviceClass.Name,
 			"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),

@@ -121,8 +121,6 @@ var (
 
 // StorageClassOptions configures the StorageClass created for this device class.
 // All fields are optional with sensible defaults matching current LVMS behavior.
-// Changes to these options will trigger recreation of the StorageClass.
-// +optional
 type StorageClassOptions struct {
 	// ReclaimPolicy specifies what happens to volumes when PVCs are deleted.
 	// Valid values: "Delete" (default), "Retain"
