@@ -226,13 +226,6 @@ func (s topolvmStorageClass) applyAdditionalLabels(
 ) {
 	dc := FindDeviceClassBySCName(cluster, scName)
 
-	if sc.Labels == nil {
-		sc.Labels = map[string]string{}
-	}
-	if sc.Annotations == nil {
-		sc.Annotations = map[string]string{}
-	}
-
 	// keys LVMS owns/sets; user must not override
 	lvmsManaged := map[string]struct{}{
 		constants.AppKubernetesPartOfLabel:    {},
@@ -241,11 +234,18 @@ func (s topolvmStorageClass) applyAdditionalLabels(
 		constants.AppKubernetesComponentLabel: {},
 	}
 
-	// previously-managed keys (for pruning)
-	prev := strings.FieldsFunc(sc.Annotations[constants.ManagedAdditionalLabelsAnnotation], func(r rune) bool { return r == ',' })
+	// previously-managed keys (for pruning) - only read if annotations exist
+	var prev []string
+	if sc.Annotations != nil {
+		prev = strings.FieldsFunc(sc.Annotations[constants.ManagedAdditionalLabelsAnnotation], func(r rune) bool { return r == ',' })
+	}
 
 	desired := map[string]struct{}{}
 	if dc != nil && dc.StorageClassOptions != nil && dc.StorageClassOptions.AdditionalLabels != nil {
+		// Initialize Labels map only when we have labels to add
+		if sc.Labels == nil {
+			sc.Labels = map[string]string{}
+		}
 		for k, v := range dc.StorageClassOptions.AdditionalLabels {
 			if _, owned := lvmsManaged[k]; owned {
 				continue
@@ -263,14 +263,25 @@ func (s topolvmStorageClass) applyAdditionalLabels(
 	}
 
 	if len(desired) == 0 {
-		delete(sc.Annotations, constants.ManagedAdditionalLabelsAnnotation)
+		// Clean up tracking annotation if no labels are managed
+		if sc.Annotations != nil {
+			delete(sc.Annotations, constants.ManagedAdditionalLabelsAnnotation)
+		}
 		return
 	}
 
+	// Only update annotation if the value actually changed (avoid reconcile churn)
 	keys := make([]string, 0, len(desired))
 	for k := range desired {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] = strings.Join(keys, ",")
+	newValue := strings.Join(keys, ",")
+
+	if sc.Annotations == nil || sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] != newValue {
+		if sc.Annotations == nil {
+			sc.Annotations = map[string]string{}
+		}
+		sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] = newValue
+	}
 }
