@@ -55,6 +55,11 @@ func (s topolvmStorageClass) GetName() string {
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;create;delete;watch;list;update;patch
 
 func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
+	// During deletion, do not touch StorageClasses (prevents reconcile churn during finalizer cleanup)
+	if !cluster.GetDeletionTimestamp().IsZero() {
+		return nil
+	}
+
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
 	desiredStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
