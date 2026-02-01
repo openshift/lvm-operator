@@ -46,8 +46,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type EventReasonInfo string
-type EventReasonError string
+type (
+	EventReasonInfo  string
+	EventReasonError string
+)
 
 const (
 	EventReasonErrorDeletionPending                  EventReasonError = "DeletionPending"
@@ -157,7 +159,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("failed to list LVMCluster instances: %w", err)
 	}
 	if size := len(lvmClusterList.Items); size > 1 {
-		return ctrl.Result{}, fmt.Errorf("there should be a single LVMCluster but multiple were found, %d clusters found", size)
+		return ctrl.Result{}, fmt.Errorf(
+			"there should be a single LVMCluster but multiple were found, %d clusters found",
+			size,
+		)
 	}
 
 	// get lvmcluster
@@ -173,6 +178,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// The resource was deleted
 	if !lvmCluster.DeletionTimestamp.IsZero() {
+
 		// check for stale vgmanager finalizer in case if node deleted but vg still exist
 		nodes, err := r.clusterNodes(ctx)
 		if err != nil {
@@ -183,24 +189,38 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check for deleted nodes: %w", err)
 		}
-		// Check for existing LogicalVolumes
-		lvsExist, err := r.logicalVolumesExist(ctx, nodes)
-		if err != nil {
-			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
-		}
-		if lvsExist {
-			waitForLVRemoval := time.Second * 10
-			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion", waitForLVRemoval)
-			r.WarningEvent(ctx, lvmCluster, EventReasonErrorDeletionPending, err)
-			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{RequeueAfter: waitForLVRemoval}, nil
+
+		// Clean up stale LogicalVolume finalizers
+		if _, err := r.logicalVolumesExist(ctx, nodes); err != nil {
+			return ctrl.Result{}, fmt.Errorf(
+				"failed to cleanup stale LogicalVolume finalizers: %w",
+				err,
+			)
 		}
 
-		logger.Info("processing LVMCluster deletion")
+		// Check for active PVCs
+		pvcExist, err := r.activePVCsExistForClusterStorageClasses(ctx, lvmCluster)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check for active PVCs: %w", err)
+		}
+		if pvcExist {
+			waitForPVCRemoval := time.Second * 10
+			err := fmt.Errorf(
+				"found PVCs provisioned by LVMS, waiting %s for their deletion",
+				waitForPVCRemoval,
+			)
+			r.WarningEvent(ctx, lvmCluster, EventReasonErrorDeletionPending, err)
+			return ctrl.Result{RequeueAfter: waitForPVCRemoval}, nil
+		}
+
+		logger.Info(
+			"processing LVMCluster deletion; orphaned PVs from reclaimPolicy=Retain will be deleted",
+		)
 		if err := r.processDelete(ctx, lvmCluster); err != nil {
-			// check in backing off intervals if there are still PVCs present or the LogicalVolumes are removed
-			return ctrl.Result{}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
+			return ctrl.Result{}, fmt.Errorf(
+				"failed to process LVMCluster deletion: %w",
+				err,
+			)
 		}
 		return reconcile.Result{}, nil
 	}
@@ -319,7 +339,6 @@ func (r *Reconciler) updateLVMClusterStatus(ctx context.Context, instance *lvmv1
 
 // getRunningPodImage gets the operator image and set it in reconciler struct
 func (r *Reconciler) setRunningPodImage(ctx context.Context) error {
-
 	if r.ImageName == "" {
 		// 'NAME' and 'NAMESPACE' are set in env of lvm-operator when running as a container
 		podName := os.Getenv(podNameEnv)
@@ -414,6 +433,115 @@ func (r *Reconciler) checkForDeletedDeviceClasses(ctx context.Context, instance 
 	return nil
 }
 
+// activePVCsExistForClusterStorageClasses checks if any active PVCs exist using LVMS StorageClasses.
+// Note: Lists all PVCs cluster-wide (LVMS already has cluster-scoped list permissions).
+func (r *Reconciler) activePVCsExistForClusterStorageClasses(
+	ctx context.Context,
+	cluster *lvmv1alpha1.LVMCluster,
+) (bool, error) {
+	// Build set of LVMS StorageClass names
+	scNames := make(map[string]struct{})
+	for _, dc := range cluster.Spec.Storage.DeviceClasses {
+		scNames[resource.GetStorageClassName(dc.Name)] = struct{}{}
+	}
+
+	// Check for active PVCs
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := r.List(ctx, pvcList); err != nil {
+		return false, fmt.Errorf("failed to list PVCs: %w", err)
+	}
+
+	for _, pvc := range pvcList.Items {
+		if !pvc.DeletionTimestamp.IsZero() {
+			// PVC is already being deleted, don't block on it
+			continue
+		}
+		if pvc.Spec.StorageClassName == nil {
+			continue
+		}
+		if _, ok := scNames[*pvc.Spec.StorageClassName]; ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// deleteRetainPVs deletes orphaned PVs with reclaimPolicy=Retain.
+// This is called during LVMCluster deletion to clean up Retain PVs that persist after PVC deletion.
+// activePVCsExistForClusterStorageClasses() must have returned false before calling this.
+func (r *Reconciler) deleteRetainPVs(ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
+	logger := log.FromContext(ctx)
+
+	scNames := make(map[string]struct{})
+	for _, dc := range cluster.Spec.Storage.DeviceClasses {
+		scNames[resource.GetStorageClassName(dc.Name)] = struct{}{}
+	}
+
+	// Delete PVs using LVMS StorageClasses
+	pvList := &corev1.PersistentVolumeList{}
+	if err := r.List(ctx, pvList); err != nil {
+		return fmt.Errorf("failed to list PVs: %w", err)
+	}
+
+	deletedPVs := 0
+	for _, pv := range pvList.Items {
+		if pv.Spec.StorageClassName == "" {
+			continue
+		}
+		if _, ok := scNames[pv.Spec.StorageClassName]; ok {
+			// Only delete PVs with reclaimPolicy=Retain
+			if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
+				continue
+			}
+
+			// Check if PV is bound to an active PVC (safety check, should not happen due to contract)
+			if pv.Status.Phase == corev1.VolumeBound && pv.Spec.ClaimRef != nil {
+				pvcKey := types.NamespacedName{
+					Namespace: pv.Spec.ClaimRef.Namespace,
+					Name:      pv.Spec.ClaimRef.Name,
+				}
+				pvc := &corev1.PersistentVolumeClaim{}
+				if err := r.Get(ctx, pvcKey, pvc); err == nil {
+					// PVC exists - should not happen, safety gate failed
+					logger.Info("WARNING: found Bound PV with active PVC during deletion, skipping",
+						"pv", pv.Name, "pvc", pvcKey)
+					continue
+				}
+			}
+
+			// Delete the PV
+			if err := r.Delete(ctx, &pv); err != nil && !k8serrors.IsNotFound(err) {
+				logger.Info("failed to delete PV, continuing", "pv", pv.Name, "error", err)
+			} else {
+				deletedPVs++
+				logger.V(1).Info("requested deletion of orphaned Retain PV", "pv", pv.Name, "storageClass", pv.Spec.StorageClassName)
+			}
+		}
+	}
+
+	// Delete LogicalVolumes
+	lvList := &topolvmv1.LogicalVolumeList{}
+	if err := r.List(ctx, lvList); err != nil {
+		return fmt.Errorf("failed to list LogicalVolumes: %w", err)
+	}
+
+	deletedLVs := 0
+	for _, lv := range lvList.Items {
+		if err := r.Delete(ctx, &lv); err != nil && !k8serrors.IsNotFound(err) {
+			logger.Info("failed to delete LogicalVolume, continuing", "lv", lv.Name, "error", err)
+		} else {
+			deletedLVs++
+			logger.V(1).Info("requested deletion of LogicalVolume", "lv", lv.Name, "node", lv.Spec.NodeName)
+		}
+	}
+
+	logger.Info("requested deletion of orphaned Retain PVs and LogicalVolumes (best effort, not waiting for completion)",
+		"retainPVs", deletedPVs, "lvs", deletedLVs)
+
+	return nil
+}
+
 func (r *Reconciler) logicalVolumesExist(ctx context.Context, nodes map[string]struct{}) (bool, error) {
 	logicalVolumeList := &topolvmv1.LogicalVolumeList{}
 	if err := r.List(ctx, logicalVolumeList); err != nil {
@@ -488,6 +616,12 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 
 		if r.SnapshotsEnabled() {
 			resourceDeletionList = append(resourceDeletionList, resource.TopoLVMVolumeSnapshotClass())
+		}
+		// Delete orphaned PVs from reclaimPolicy=Retain before cleaning up resources.
+		if err := r.deleteRetainPVs(ctx, instance); err != nil {
+			err := fmt.Errorf("failed to delete orphaned Retain PVs: %w", err)
+			r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
+			return err
 		}
 
 		for _, unit := range resourceDeletionList {
