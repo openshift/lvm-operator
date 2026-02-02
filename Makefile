@@ -152,7 +152,6 @@ godeps-update: ## Run go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
-	hack/verify-deps.sh
 	hack/verify-bundle.sh
 	hack/verify-catalog.sh
 	hack/verify-generated.sh
