@@ -13,6 +13,13 @@ spec:
             emptyDir: { }
         steps:
         - image: registry.redhat.io/openshift4/ose-cli:latest
+          computeResources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
           env:
           - name: URL
             valueFrom:
