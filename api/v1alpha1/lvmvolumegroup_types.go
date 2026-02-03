@@ -40,6 +40,11 @@ type LVMVolumeGroupSpec struct {
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`
+
+	// DeviceDiscoveryPolicy specifies how devices are discovered for this volume group.
+	// +kubebuilder:validation:Enum=Static;Dynamic
+	// +optional
+	DeviceDiscoveryPolicy DeviceDiscoveryPolicySpec `json:"deviceDiscoveryPolicy,omitempty"`
 }
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup

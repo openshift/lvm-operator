@@ -73,6 +73,10 @@ var _ = Describe("vgmanager controller", func() {
 				Spec: lvmv1alpha1.LVMVolumeGroupSpec{},
 			})
 		})
+		Context("static device discovery policy", func() {
+			It("should skip device discovery when VG exists in static mode", testStaticModeSkipsDiscoveryWhenVGExists)
+			It("should run device discovery when VG does not exist in static mode", testStaticModeRunsDiscoveryWhenVGDoesNotExist)
+		})
 		Context("edge cases during reconciliation", func() {
 			Context("failure in LVM or LSBLK", func() {
 				It("reconcile failure because of external errors", testReconcileFailure)
@@ -883,6 +887,7 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering listblockdevices failure", func() {
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(nil, fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
@@ -890,10 +895,10 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering wipefs failure", func() {
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "ext4"},
 		}, nil)
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
@@ -906,8 +911,8 @@ func testReconcileFailure(ctx context.Context) {
 		blockDevices := []lsblk.BlockDevice{
 			{Name: "/dev/xxx", KName: "/dev/xxx", FSType: "ext4"},
 		}
-		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(blockDevices, nil)
 		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(blockDevices, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 		Expect(instances.client.Get(ctx, client.ObjectKey{
@@ -932,11 +937,11 @@ func testReconcileFailure(ctx context.Context) {
 	Expect(instances.client.Update(ctx, vg)).To(Succeed())
 
 	By("triggering failure because vg is not found even though there are no devices to be added", func() {
+		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
 			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
 		}, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
-		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
 				IsUsableLoopDev: false,
@@ -951,13 +956,13 @@ func testReconcileFailure(ctx context.Context) {
 	})
 
 	By("triggering failure because vg is found but thin-pool validation failed", func() {
-		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
-			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
-		}, nil)
 		vgs := []lvm.VolumeGroup{
 			{Name: "vg1", VgSize: "1073741824"},
 		}
 		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(vgs, nil)
+		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return([]lsblk.BlockDevice{
+			{Name: "/dev/sda", KName: "/dev/sda", FSType: "xfs", PartLabel: "reserved"},
+		}, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
 		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{
 			"/dev/sda": {
@@ -1016,4 +1021,141 @@ func calculateExpectedChunkSize(chunkSize *resource.Quantity) int64 {
 		return lvmv1alpha1.ChunkSizeDefault.Value()
 	}
 	return chunkSize.Value()
+}
+
+func testStaticModeSkipsDiscoveryWhenVGExists(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	By("setting up test instances")
+	instances := setupInstances()
+
+	// Set up symlink resolver
+	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
+
+	vg := &lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vg-static",
+			Namespace: instances.namespace.GetName(),
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+			NodeSelector:          instances.nodeSelector.DeepCopy(),
+			DeviceSelector:        &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sda"}},
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
+		},
+	}
+
+	By("creating the LVMVolumeGroup with static discovery policy")
+	Expect(instances.client.Create(ctx, vg)).To(Succeed())
+
+	By("creating the LVMVolumeGroupNodeStatus")
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(instances.node.GetName())
+	nodeStatus.SetNamespace(instances.namespace.GetName())
+	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+
+	By("triggering the first Reconciliation to add finalizer")
+	_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+
+	By("setting up mocks for static mode with existing VG")
+	existingVG := lvm.VolumeGroup{
+		Name:   vg.GetName(),
+		VgSize: "1073741824",
+		PVs:    []lvm.PhysicalVolume{{PvName: "/dev/sda", VgName: vg.GetName()}},
+	}
+
+	// In static mode with existing VG, we should only list VGs but NOT list block devices
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+	// No call to ListBlockDevices expected because we skip device discovery
+
+	By("triggering the second Reconciliation - should skip device discovery because VG exists")
+	result, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+	// Static mode with existing VG should not requeue
+	Expect(result.RequeueAfter).To(BeZero())
+
+	By("verifying the VGStatus is set to ready with Preconfigured policy")
+	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
+	Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
+	found := false
+	for _, status := range nodeStatus.Spec.LVMVGStatus {
+		if status.Name == vg.GetName() {
+			found = true
+			Expect(status.Status).To(Equal(lvmv1alpha1.VGStatusReady))
+			Expect(status.DeviceDiscoveryPolicy).To(Equal(lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured))
+			break
+		}
+	}
+	Expect(found).To(BeTrue(), "VGStatus should be found for the volume group")
+}
+
+func testStaticModeRunsDiscoveryWhenVGDoesNotExist(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	By("setting up test instances")
+	instances := setupInstances()
+
+	// Set up symlink resolver
+	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
+
+	device := getKNameFromDevice(filepath.Join(GinkgoT().TempDir(), "mock-static"))
+	By("creating the mock device file")
+	_, err := os.Create(device.Unresolved())
+	Expect(err).To(Succeed())
+
+	blockDevice := createMockedBlockDevice(device.Unresolved())
+
+	vg := &lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vg-static-new",
+			Namespace: instances.namespace.GetName(),
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+			NodeSelector:          instances.nodeSelector.DeepCopy(),
+			DeviceSelector:        &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{device}},
+			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
+		},
+	}
+
+	By("creating the LVMVolumeGroup with static discovery policy")
+	Expect(instances.client.Create(ctx, vg)).To(Succeed())
+
+	By("creating the LVMVolumeGroupNodeStatus")
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(instances.node.GetName())
+	nodeStatus.SetNamespace(instances.namespace.GetName())
+	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+
+	By("triggering the first Reconciliation to add finalizer")
+	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+
+	By("setting up mocks for static mode with NO existing VG - should run device discovery")
+	// VG does not exist, so we need to run discovery
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return(nil, nil).Once()
+	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+	instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
+	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
+		blockDevice.KName: {IsUsableLoopDev: false},
+	}, nil).Once()
+
+	By("triggering the second Reconciliation - should run device discovery because VG does not exist")
+	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+
+	By("verifying the VGStatus is set to progressing")
+	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
+	Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
+	found := false
+	for _, status := range nodeStatus.Spec.LVMVGStatus {
+		if status.Name == vg.GetName() {
+			found = true
+			Expect(status.Status).To(Equal(lvmv1alpha1.VGStatusProgressing))
+			Expect(status.DeviceDiscoveryPolicy).To(Equal(lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured))
+			break
+		}
+	}
+	Expect(found).To(BeTrue(), "VGStatus should be found for the volume group")
 }

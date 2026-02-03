@@ -43,6 +43,13 @@ spec:
                 description: Default is a flag to indicate whether the device-class
                   is the default
                 type: boolean
+              deviceDiscoveryPolicy:
+                description: DeviceDiscoveryPolicy specifies how devices are discovered
+                  for this volume group.
+                enum:
+                - Static
+                - Dynamic
+                type: string
               deviceSelector:
                 description: DeviceSelector is a set of rules that should match for
                   a device to be included in this TopoLVMCluster

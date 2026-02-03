@@ -54,6 +54,15 @@ spec:
                             class is the default. You can configure only a single
                             default device class.
                           type: boolean
+                        deviceDiscoveryPolicy:
+                          description: |-
+                            DeviceDiscoveryPolicy specifies how devices are discovered for this device class.
+                            Static: VG is created with devices discovered at install time. Discovery is then disabled.
+                            Dynamic: Devices are continuously discovered and added (default).
+                          enum:
+                          - Static
+                          - Dynamic
+                          type: string
                         deviceSelector:
                           description: DeviceSelector contains the configuration to
                             specify paths to the devices that you want to add to the

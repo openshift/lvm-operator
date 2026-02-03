@@ -132,6 +132,10 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 	warnings = append(warnings, metadataWarnings...)
+
+	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
+	warnings = append(warnings, discoveryPolicyWarnings...)
+
 	return warnings, nil
 }
 
@@ -542,4 +546,22 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 		}
 	}
 	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admission.Warnings {
+	warnings := admission.Warnings{}
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		// Warn if using Dynamic mode without DeviceSelector (runtime discovery not recommended for production)
+		if (deviceClass.DeviceDiscoveryPolicy == DeviceDiscoveryPolicySpecDynamic ||
+			deviceClass.DeviceDiscoveryPolicy == "") &&
+			deviceClass.DeviceSelector == nil {
+			warnings = append(warnings, fmt.Sprintf(
+				"deviceClass %q uses Dynamic discovery without DeviceSelector - "+
+					"new devices will be automatically added to the volume group. "+
+					"This is not recommended for production. "+
+					"Consider using Static discovery policy to lock the VG after initial creation.",
+				deviceClass.Name))
+		}
+	}
+	return warnings
 }
