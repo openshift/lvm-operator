@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "release-4.21" &&
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" &&
       (".tekton/lvm-operator-catalog-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-push.yaml".pathChanged() ||
       ".tekton/images-mirror-set.yaml".pathChanged() ||
@@ -61,14 +61,7 @@ spec:
   - name: catalog-patch-image
     value: quay.io/konflux-ci/yq@sha256:41aee71bcaa8a759073e00d6acea358fbc4013ad6e28554729451606c0c35591
   pipelineRef:
-    resolver: git
-    params:
-    - name: url
-      value: https://github.com/openshift/lvm-operator.git
-    - name: revision
-      value: main
-    - name: pathInRepo
-      value: .tekton/catalog-patching-build-pipeline.yaml
+    name: catalog-patching-build-pipeline
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-catalog-4-21
   workspaces:
