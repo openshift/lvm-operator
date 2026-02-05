@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 
@@ -28,9 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -620,6 +619,47 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 	return warnings, nil
 }
 
+// immutableSCFields represents the immutable fields of a StorageClass for comparison purposes.
+// This uses value types (not pointers) to enable simple DeepEqual comparison.
+type immutableSCFields struct {
+	VolumeBindingMode    storagev1.VolumeBindingMode
+	ReclaimPolicy        corev1.PersistentVolumeReclaimPolicy
+	AdditionalParameters map[string]string
+	FilesystemType       DeviceFilesystemType
+}
+
+// effectiveImmutable extracts the effective immutable StorageClass configuration from a DeviceClass.
+// It applies defaults for fields that are nil, enabling comparison of "what will actually be created"
+// rather than "what was explicitly set".
+func effectiveImmutable(dc *DeviceClass) immutableSCFields {
+	out := immutableSCFields{
+		VolumeBindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
+		ReclaimPolicy:        corev1.PersistentVolumeReclaimDelete,
+		AdditionalParameters: nil,
+		FilesystemType:       dc.FilesystemType,
+	}
+
+	if dc.StorageClassOptions == nil {
+		return out
+	}
+
+	if dc.StorageClassOptions.VolumeBindingMode != nil {
+		out.VolumeBindingMode = *dc.StorageClassOptions.VolumeBindingMode
+	}
+	if dc.StorageClassOptions.ReclaimPolicy != nil {
+		out.ReclaimPolicy = *dc.StorageClassOptions.ReclaimPolicy
+	}
+	if len(dc.StorageClassOptions.AdditionalParameters) > 0 {
+		out.AdditionalParameters = maps.Clone(dc.StorageClassOptions.AdditionalParameters)
+	}
+	// Normalize empty map to nil for consistent comparison
+	if len(out.AdditionalParameters) == 0 {
+		out.AdditionalParameters = nil
+	}
+
+	return out
+}
+
 func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Context, oldCluster, newCluster *LVMCluster) error {
 	for _, newDC := range newCluster.Spec.Storage.DeviceClasses {
 		var oldDC *DeviceClass
@@ -630,55 +670,21 @@ func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Cont
 			}
 		}
 
+		// New device class - no immutability constraints
 		if oldDC == nil {
 			continue
 		}
 
-		scName := constants.StorageClassPrefix + newDC.Name
-		sc := &storagev1.StorageClass{}
-		err := v.Get(ctx, types.NamespacedName{Name: scName}, sc)
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				continue
-			}
-			return fmt.Errorf("failed to get StorageClass %s: %w", scName, err)
-		}
+		// Compare effective immutable fields (with defaults applied)
+		// This catches cases where StorageClassOptions is removed (nil → defaults)
+		oldEffective := effectiveImmutable(oldDC)
+		newEffective := effectiveImmutable(&newDC)
 
-		// FilesystemType affects StorageClass parameters (csi.storage.k8s.io/fstype)
-		if oldDC.FilesystemType != newDC.FilesystemType {
+		if !reflect.DeepEqual(oldEffective, newEffective) {
 			return fmt.Errorf(
-				"filesystemType cannot be changed for device class %q after StorageClass creation (old: %s, new: %s)",
-				newDC.Name, oldDC.FilesystemType, newDC.FilesystemType)
-		}
-
-		// StorageClassOptions are immutable after SC creation, except additionalLabels.
-		// We allow additionalLabels updates because they are metadata-only and safely reconcilable.
-		oldOpts := oldDC.StorageClassOptions
-		newOpts := newDC.StorageClassOptions
-
-		var oldImm, newImm StorageClassOptions
-		if oldOpts != nil {
-			oldImm = *oldOpts
-		}
-		if newOpts != nil {
-			newImm = *newOpts
-		}
-
-		// Ignore labels in immutability enforcement
-		oldImm.AdditionalLabels = nil
-		newImm.AdditionalLabels = nil
-
-		// Normalize nil vs empty maps to avoid false diffs
-		if len(oldImm.AdditionalParameters) == 0 {
-			oldImm.AdditionalParameters = nil
-		}
-		if len(newImm.AdditionalParameters) == 0 {
-			newImm.AdditionalParameters = nil
-		}
-
-		if !reflect.DeepEqual(oldImm, newImm) {
-			return fmt.Errorf(
-				"storageClassOptions (except additionalLabels) cannot be changed for device class %q after StorageClass creation",
+				"storageClass configuration cannot be changed for device class %q after creation "+
+					"(volumeBindingMode, reclaimPolicy, fstype, and additionalParameters are immutable; "+
+					"only additionalLabels can be updated)",
 				newDC.Name)
 		}
 	}

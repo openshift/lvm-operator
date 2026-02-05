@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -55,11 +56,6 @@ func (s topolvmStorageClass) GetName() string {
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;create;delete;watch;list;update;patch
 
 func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
-	// During deletion, do not touch StorageClasses (prevents reconcile churn during finalizer cleanup)
-	if !cluster.GetDeletionTimestamp().IsZero() {
-		return nil
-	}
-
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
 	desiredStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
@@ -78,10 +74,6 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 				sc.VolumeBindingMode = desired.VolumeBindingMode
 				sc.ReclaimPolicy = desired.ReclaimPolicy
 				sc.AllowVolumeExpansion = desired.AllowVolumeExpansion
-				if sc.Annotations == nil {
-					sc.Annotations = make(map[string]string)
-				}
-				sc.Annotations["description"] = "Provides RWO and RWOP Filesystem & Block volumes"
 				// Deep copy to avoid map aliasing
 				sc.Parameters = make(map[string]string, len(desired.Parameters))
 				maps.Copy(sc.Parameters, desired.Parameters)
@@ -159,8 +151,7 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		scName := GetStorageClassName(deviceClass.Name)
 
 		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
-		deletePolicy := corev1.PersistentVolumeReclaimDelete
-		reclaimPolicy := &deletePolicy
+		reclaimPolicy := ptr.To(corev1.PersistentVolumeReclaimDelete)
 		parameters := map[string]string{
 			constants.DeviceClassKey:    deviceClass.Name,
 			"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
@@ -197,9 +188,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: scName,
-				Annotations: map[string]string{
-					"description": "Provides RWO and RWOP Filesystem & Block volumes",
-				},
 			},
 			Provisioner:          constants.TopolvmCSIDriverName,
 			VolumeBindingMode:    &volumeBindingMode,
@@ -216,6 +204,9 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
+			if storageClass.Annotations == nil {
+				storageClass.Annotations = make(map[string]string)
+			}
 			storageClass.Annotations[defaultSCAnnotation] = "true"
 			defaultStorageClassName = scName
 		}

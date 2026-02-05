@@ -467,79 +467,85 @@ func (r *Reconciler) activePVCsExistForClusterStorageClasses(
 	return false, nil
 }
 
-// deleteRetainPVs deletes orphaned PVs with reclaimPolicy=Retain.
-// This is called during LVMCluster deletion to clean up Retain PVs that persist after PVC deletion.
-// activePVCsExistForClusterStorageClasses() must have returned false before calling this.
-func (r *Reconciler) deleteRetainPVs(ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
+// reconcileRetainVolumeCleanupOnDelete deletes LogicalVolumes for Retain deviceClasses during LVMCluster deletion.
+// Deletes LVs by deviceClass to avoid dependency on PVs still existing.
+// Waits bounded for LV finalizers to clear before proceeding with TopoLVM component deletion.
+func (r *Reconciler) reconcileRetainVolumeCleanupOnDelete(ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx)
 
-	scNames := make(map[string]struct{})
+	// Build set of deviceClasses with reclaimPolicy=Retain
+	retainDCs := map[string]struct{}{}
 	for _, dc := range cluster.Spec.Storage.DeviceClasses {
-		scNames[resource.GetStorageClassName(dc.Name)] = struct{}{}
-	}
-
-	// Delete PVs using LVMS StorageClasses
-	pvList := &corev1.PersistentVolumeList{}
-	if err := r.List(ctx, pvList); err != nil {
-		return fmt.Errorf("failed to list PVs: %w", err)
-	}
-
-	deletedPVs := 0
-	for _, pv := range pvList.Items {
-		if pv.Spec.StorageClassName == "" {
-			continue
-		}
-		if _, ok := scNames[pv.Spec.StorageClassName]; ok {
-			// Only delete PVs with reclaimPolicy=Retain
-			if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
-				continue
-			}
-
-			// Check if PV is bound to an active PVC (safety check, should not happen due to contract)
-			if pv.Status.Phase == corev1.VolumeBound && pv.Spec.ClaimRef != nil {
-				pvcKey := types.NamespacedName{
-					Namespace: pv.Spec.ClaimRef.Namespace,
-					Name:      pv.Spec.ClaimRef.Name,
-				}
-				pvc := &corev1.PersistentVolumeClaim{}
-				if err := r.Get(ctx, pvcKey, pvc); err == nil {
-					// PVC exists - should not happen, safety gate failed
-					logger.Info("WARNING: found Bound PV with active PVC during deletion, skipping",
-						"pv", pv.Name, "pvc", pvcKey)
-					continue
-				}
-			}
-
-			// Delete the PV
-			if err := r.Delete(ctx, &pv); err != nil && !k8serrors.IsNotFound(err) {
-				logger.Info("failed to delete PV, continuing", "pv", pv.Name, "error", err)
-			} else {
-				deletedPVs++
-				logger.V(1).Info("requested deletion of orphaned Retain PV", "pv", pv.Name, "storageClass", pv.Spec.StorageClassName)
-			}
+		if dc.StorageClassOptions != nil &&
+			dc.StorageClassOptions.ReclaimPolicy != nil &&
+			*dc.StorageClassOptions.ReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+			retainDCs[dc.Name] = struct{}{}
 		}
 	}
+	if len(retainDCs) == 0 {
+		return nil
+	}
 
-	// Delete LogicalVolumes
+	matches := func(lv *topolvmv1.LogicalVolume) bool {
+		if _, ok := retainDCs[lv.Spec.DeviceClass]; !ok {
+			return false
+		}
+		if v, ok := lv.Labels["app.kubernetes.io/created-by"]; ok && v != "topolvm-controller" {
+			return false
+		}
+		return true
+	}
+
+	// Delete matching LVs
 	lvList := &topolvmv1.LogicalVolumeList{}
 	if err := r.List(ctx, lvList); err != nil {
 		return fmt.Errorf("failed to list LogicalVolumes: %w", err)
 	}
 
-	deletedLVs := 0
-	for _, lv := range lvList.Items {
-		if err := r.Delete(ctx, &lv); err != nil && !k8serrors.IsNotFound(err) {
+	for i := range lvList.Items {
+		lv := &lvList.Items[i]
+		if !matches(lv) || !lv.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if err := r.Delete(ctx, lv); err != nil && !k8serrors.IsNotFound(err) {
 			logger.Info("failed to delete LogicalVolume, continuing", "lv", lv.Name, "error", err)
-		} else {
-			deletedLVs++
-			logger.V(1).Info("requested deletion of LogicalVolume", "lv", lv.Name, "node", lv.Spec.NodeName)
 		}
 	}
 
-	logger.Info("requested deletion of orphaned Retain PVs and LogicalVolumes (best effort, not waiting for completion)",
-		"retainPVs", deletedPVs, "lvs", deletedLVs)
+	// Wait bounded for matching LVs to disappear
+	const (
+		pollInterval = 2 * time.Second
+		waitTimeout  = 90 * time.Second
+	)
+	deadline := time.Now().Add(waitTimeout)
+	lastRemaining := -1
 
-	return nil
+	for time.Now().Before(deadline) {
+		cur := &topolvmv1.LogicalVolumeList{}
+		if err := r.List(ctx, cur); err != nil {
+			logger.Info("failed to list LogicalVolumes while waiting; retrying", "error", err)
+			time.Sleep(pollInterval)
+			continue
+		}
+
+		remaining := 0
+		for i := range cur.Items {
+			if matches(&cur.Items[i]) {
+				remaining++
+			}
+		}
+		lastRemaining = remaining
+
+		if remaining == 0 {
+			logger.Info("retain cleanup: all matching LogicalVolumes removed")
+			return nil
+		}
+
+		logger.V(1).Info("retain cleanup: waiting for LogicalVolumes to be removed", "remaining", remaining)
+		time.Sleep(pollInterval)
+	}
+
+	return fmt.Errorf("timed out waiting for %d LogicalVolumes to be deleted after %v", lastRemaining, waitTimeout)
 }
 
 func (r *Reconciler) logicalVolumesExist(ctx context.Context, nodes map[string]struct{}) (bool, error) {
@@ -617,11 +623,14 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 		if r.SnapshotsEnabled() {
 			resourceDeletionList = append(resourceDeletionList, resource.TopoLVMVolumeSnapshotClass())
 		}
-		// Delete orphaned PVs from reclaimPolicy=Retain before cleaning up resources.
-		if err := r.deleteRetainPVs(ctx, instance); err != nil {
-			err := fmt.Errorf("failed to delete orphaned Retain PVs: %w", err)
-			r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
-			return err
+
+		// Retain PVs can leave TopoLVM LogicalVolumes orphaned and block deletion.
+		if r.hasAnyRetainDeviceClass(instance) {
+			if err := r.reconcileRetainVolumeCleanupOnDelete(ctx, instance); err != nil {
+				err := fmt.Errorf("failed to delete LogicalVolumes: %w", err)
+				r.WarningEvent(ctx, instance, EventReasonErrorDeletionPending, err)
+				return err
+			}
 		}
 
 		for _, unit := range resourceDeletionList {
@@ -640,6 +649,18 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 	}
 
 	return nil
+}
+
+// hasAnyRetainDeviceClass checks if any device class in the cluster uses reclaimPolicy=Retain.
+func (r *Reconciler) hasAnyRetainDeviceClass(cluster *lvmv1alpha1.LVMCluster) bool {
+	for _, dc := range cluster.Spec.Storage.DeviceClasses {
+		if dc.StorageClassOptions != nil &&
+			dc.StorageClassOptions.ReclaimPolicy != nil &&
+			*dc.StorageClassOptions.ReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Reconciler) clusterNodes(ctx context.Context) (map[string]struct{}, error) {
