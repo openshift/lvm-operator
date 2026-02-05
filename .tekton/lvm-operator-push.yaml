@@ -14,10 +14,10 @@ metadata:
       || "api/***".pathChanged() || "release/container-build.args".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: lvm-operator-4-21
-    appstudio.openshift.io/component: lvm-operator-4-21
+    appstudio.openshift.io/application: lvm-operator-4-22
+    appstudio.openshift.io/component: lvm-operator-4-22
     pipelines.appstudio.openshift.io/type: build
-  name: lvm-operator-4-21-on-push
+  name: lvm-operator-4-22-on-push
   namespace: logical-volume-manag-tenant
 spec:
   params:
@@ -36,7 +36,7 @@ spec:
   pipelineRef:
     name: multi-arch-build-pipeline
   taskRunTemplate:
-    serviceAccountName: build-pipeline-lvm-operator-4-21
+    serviceAccountName: build-pipeline-lvm-operator-4-22
   timeouts:
     pipeline: 1h30m0s
   workspaces:
