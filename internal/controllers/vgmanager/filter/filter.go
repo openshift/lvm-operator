@@ -46,6 +46,7 @@ const (
 	noChildren                    = "noChildren"
 	usableDeviceType              = "usableDeviceType"
 	partOfDeviceSelector          = "partOfDeviceSelector"
+	staticDiscoveryPolicy         = "staticDiscoveryPolicy"
 )
 
 var (
@@ -67,6 +68,7 @@ type Options struct {
 	VG  *lvmv1alpha1.LVMVolumeGroup
 	BDI lsblk.BlockDeviceInfos
 	PVs []lvm.PhysicalVolume
+	VGs []lvm.VolumeGroup
 }
 
 type FilterSetup func(context.Context, *Options) Filters
@@ -83,6 +85,24 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 func DefaultFilters(ctx context.Context, opts *Options) Filters {
 	logger := log.FromContext(ctx)
 	return Filters{
+		staticDiscoveryPolicy: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
+			// DeviceDiscoveryPolicy is only relevant when no explicit device paths are configured.
+			// When a DeviceSelector is present, devices are preconfigured and the policy is ignored.
+			if opts.VG.Spec.DeviceSelector != nil {
+				return nil
+			}
+
+			// In static discovery mode, if VG already exists, no new devices should be discovered
+			if opts.VG.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicySpecStatic {
+				for _, vg := range opts.VGs {
+					if vg.Name == opts.VG.Name {
+						return fmt.Errorf("static discovery policy: VG %s already exists, device discovery disabled", opts.VG.Name)
+					}
+				}
+			}
+			return nil
+		},
+
 		partOfDeviceSelector: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
 			if opts.VG.Spec.DeviceSelector == nil {
 				// if no device selector is set, its automatically a valid candidate

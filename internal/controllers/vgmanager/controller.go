@@ -160,17 +160,6 @@ func (r *Reconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
 	}
 
-	// In Static mode with existing VG, skip device discovery
-	if isStaticMode(volumeGroup) {
-		existingVG := findVGByName(vgs, volumeGroup.Name)
-		if existingVG != nil {
-			logger.Info("static discovery mode: VG exists, skipping device discovery")
-			return r.handleStaticModeExistingVG(ctx, volumeGroup, existingVG, vgs)
-		}
-		// VG doesn't exist yet - continue with normal discovery to create it
-		logger.Info("static discovery mode: VG does not exist yet, running initial device discovery")
-	}
-
 	blockDevices, err := r.ListBlockDevices(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
@@ -199,6 +188,7 @@ func (r *Reconciler) reconcile(
 		BDI: bdi,
 		PVs: pvs,
 		VG:  volumeGroup,
+		VGs: vgs,
 	}))
 
 	if volumeGroup.Spec.DeviceSelector != nil {
@@ -339,66 +329,22 @@ func (r *Reconciler) reconcile(
 }
 
 func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup) ctrl.Result {
-	if volumeGroup.Spec.DeviceSelector == nil {
-		return reconcileAgain
+	// When explicit device paths are configured, DeviceDiscoveryPolicy is ignored
+	// and no requeue is needed since devices are fixed
+	if volumeGroup.Spec.DeviceSelector != nil {
+		return ctrl.Result{}
 	}
-	return ctrl.Result{}
+
+	// Without explicit paths, Static mode doesn't need requeue
+	if volumeGroup.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicySpecStatic {
+		return ctrl.Result{}
+	}
+
+	// Dynamic mode (or empty for backward compat) without explicit paths needs requeue
+	return reconcileAgain
 }
 
-// isStaticMode returns true if the volume group is configured with Static device discovery policy.
-func isStaticMode(volumeGroup *lvmv1alpha1.LVMVolumeGroup) bool {
-	return volumeGroup.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicySpecStatic
-}
 
-// findVGByName finds a volume group by name from the list of volume groups.
-func findVGByName(vgs []lvm.VolumeGroup, name string) *lvm.VolumeGroup {
-	for i := range vgs {
-		if vgs[i].Name == name {
-			return &vgs[i]
-		}
-	}
-	return nil
-}
-
-// handleStaticModeExistingVG handles reconciliation when in Static mode with an existing VG.
-// It skips device discovery and only validates the existing state.
-func (r *Reconciler) handleStaticModeExistingVG(
-	ctx context.Context,
-	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
-	existingVG *lvm.VolumeGroup,
-	vgs []lvm.VolumeGroup,
-) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
-	// Validate thin pool if configured
-	if volumeGroup.Spec.ThinPoolConfig != nil {
-		if err := r.validateLVs(ctx, volumeGroup); err != nil {
-			err := fmt.Errorf("error while validating logical volumes in existing volume group: %w", err)
-			r.WarningEvent(ctx, volumeGroup, EventReasonErrorInconsistentLVs, err)
-			if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
-				logger.Error(statusErr, "failed to set status to failed")
-			}
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Apply lvmd config
-	if err := r.applyLVMDConfig(ctx, volumeGroup, vgs, FilteredBlockDevices{}); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Set ready status
-	if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
-	} else if updated {
-		msg := "volume group is ready (static discovery mode)"
-		logger.Info(msg)
-		r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
-	}
-
-	// No requeue needed in static mode - VG is stable
-	return ctrl.Result{}, nil
-}
 
 func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)

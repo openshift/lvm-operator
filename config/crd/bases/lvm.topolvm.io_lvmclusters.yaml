@@ -57,8 +57,10 @@ spec:
                         deviceDiscoveryPolicy:
                           description: |-
                             DeviceDiscoveryPolicy specifies how devices are discovered for this device class.
+                            This field is only relevant when no explicit device paths are configured in the DeviceSelector.
+                            When explicit device paths are configured, this field is ignored and devices are always preconfigured.
                             Static: VG is created with devices discovered at install time. Discovery is then disabled.
-                            Dynamic: Devices are continuously discovered and added (default).
+                            Dynamic: Devices are continuously discovered and added (default when no paths are configured).
                           enum:
                           - Static
                           - Dynamic

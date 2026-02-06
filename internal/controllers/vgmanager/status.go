@@ -81,23 +81,17 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
-	// Determine status DeviceDiscoveryPolicy based on spec
-	switch vg.Spec.DeviceDiscoveryPolicy {
-	case lvmv1alpha1.DeviceDiscoveryPolicySpecStatic:
-		// Static mode is always Preconfigured as devices are locked after initial discovery
+	// Determine status DeviceDiscoveryPolicy based on spec.
+	// When explicit device paths are configured, DeviceDiscoveryPolicy is ignored
+	// and devices are always preconfigured.
+	if vg.Spec.DeviceSelector != nil {
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
-	case lvmv1alpha1.DeviceDiscoveryPolicySpecDynamic:
-		// Dynamic mode: if DeviceSelector is nil, it's RuntimeDynamic; otherwise Preconfigured
-		if vg.Spec.DeviceSelector == nil {
-			status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
-		} else {
+	} else {
+		switch vg.Spec.DeviceDiscoveryPolicy {
+		case lvmv1alpha1.DeviceDiscoveryPolicySpecStatic:
 			status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
-		}
-	default: // empty = Dynamic for backward compatibility
-		if vg.Spec.DeviceSelector == nil {
+		default: // Dynamic or empty (backward compat)
 			status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
-		} else {
-			status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
 		}
 	}
 

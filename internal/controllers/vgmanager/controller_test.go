@@ -1033,6 +1033,8 @@ func testStaticModeSkipsDiscoveryWhenVGExists(ctx context.Context) {
 	// Set up symlink resolver
 	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
 
+	// Static mode is only relevant when no explicit device paths are configured.
+	// When explicit paths are set, DeviceDiscoveryPolicy is ignored.
 	vg := &lvmv1alpha1.LVMVolumeGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vg-static",
@@ -1040,12 +1042,11 @@ func testStaticModeSkipsDiscoveryWhenVGExists(ctx context.Context) {
 		},
 		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
 			NodeSelector:          instances.nodeSelector.DeepCopy(),
-			DeviceSelector:        &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sda"}},
 			DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
 		},
 	}
 
-	By("creating the LVMVolumeGroup with static discovery policy")
+	By("creating the LVMVolumeGroup with static discovery policy and no explicit paths")
 	Expect(instances.client.Create(ctx, vg)).To(Succeed())
 
 	By("creating the LVMVolumeGroupNodeStatus")
@@ -1065,11 +1066,17 @@ func testStaticModeSkipsDiscoveryWhenVGExists(ctx context.Context) {
 		PVs:    []lvm.PhysicalVolume{{PvName: "/dev/sda", VgName: vg.GetName()}},
 	}
 
-	// In static mode with existing VG, we should only list VGs but NOT list block devices
+	// In static mode without explicit paths, the static filter blocks all devices when VG exists
 	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
-	// No call to ListBlockDevices expected because we skip device discovery
+	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{
+		{Name: "/dev/sda", KName: "/dev/sda", Type: "disk"},
+	}, nil).Once()
+	instances.LVM.EXPECT().ListPVs(ctx, "").Return([]lvm.PhysicalVolume{{PvName: "/dev/sda", VgName: vg.GetName()}}, nil).Once()
+	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
+		"/dev/sda": {IsUsableLoopDev: true},
+	}, nil).Once()
 
-	By("triggering the second Reconciliation - should skip device discovery because VG exists")
+	By("triggering the second Reconciliation - static filter should block devices because VG exists")
 	result, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred())
 	// Static mode with existing VG should not requeue

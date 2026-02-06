@@ -44,8 +44,10 @@ spec:
                   is the default
                 type: boolean
               deviceDiscoveryPolicy:
-                description: DeviceDiscoveryPolicy specifies how devices are discovered
-                  for this volume group.
+                description: |-
+                  DeviceDiscoveryPolicy specifies how devices are discovered for this volume group.
+                  This field is only relevant when no explicit device paths are configured in the DeviceSelector.
+                  When explicit device paths are configured, this field is ignored and devices are always preconfigured.
                 enum:
                 - Static
                 - Dynamic

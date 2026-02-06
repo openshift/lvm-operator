@@ -243,3 +243,76 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 		})
 	}
 }
+
+func TestStaticDiscoveryPolicy(t *testing.T) {
+	testcases := []struct {
+		label           string
+		device          lsblk.BlockDevice
+		discoveryPolicy lvmv1alpha1.DeviceDiscoveryPolicySpec
+		existingVGs     []lvm.VolumeGroup
+		vgName          string
+		deviceSelector  *lvmv1alpha1.DeviceSelector
+		assertErr       assert.ErrorAssertionFunc
+	}{
+		{
+			label:           "static policy with existing VG - should filter device",
+			device:          lsblk.BlockDevice{KName: "dev1"},
+			discoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
+			existingVGs:     []lvm.VolumeGroup{{Name: "test-vg"}},
+			vgName:          "test-vg",
+			assertErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorContains(t, err, "static discovery policy: VG test-vg already exists, device discovery disabled")
+			},
+		},
+		{
+			label:           "static policy with non-existing VG - should allow device",
+			device:          lsblk.BlockDevice{KName: "dev1"},
+			discoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
+			existingVGs:     []lvm.VolumeGroup{{Name: "other-vg"}},
+			vgName:          "test-vg",
+			assertErr:       assert.NoError,
+		},
+		{
+			label:           "dynamic policy with existing VG - should allow device",
+			device:          lsblk.BlockDevice{KName: "dev1"},
+			discoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecDynamic,
+			existingVGs:     []lvm.VolumeGroup{{Name: "test-vg"}},
+			vgName:          "test-vg",
+			assertErr:       assert.NoError,
+		},
+		{
+			label:           "static policy with empty VG list - should allow device",
+			device:          lsblk.BlockDevice{KName: "dev1"},
+			discoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
+			existingVGs:     []lvm.VolumeGroup{},
+			vgName:          "test-vg",
+			assertErr:       assert.NoError,
+		},
+		{
+			label:           "static policy with existing VG and DeviceSelector - should allow device (policy ignored)",
+			device:          lsblk.BlockDevice{KName: "dev1"},
+			discoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicySpecStatic,
+			existingVGs:     []lvm.VolumeGroup{{Name: "test-vg"}},
+			vgName:          "test-vg",
+			deviceSelector:  &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sda"}},
+			assertErr:       assert.NoError,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.label, func(t *testing.T) {
+			vg := &lvmv1alpha1.LVMVolumeGroup{}
+			vg.SetName(tc.vgName)
+			vg.Spec.DeviceDiscoveryPolicy = tc.discoveryPolicy
+			vg.Spec.DeviceSelector = tc.deviceSelector
+
+			opts := &Options{
+				VG:  vg,
+				VGs: tc.existingVGs,
+			}
+
+			err := DefaultFilters(context.Background(), opts)[staticDiscoveryPolicy](tc.device, symlinkResolver.NewWithDefaultResolver())
+			tc.assertErr(t, err, fmt.Sprintf("staticDiscoveryPolicy(%v)", tc.device))
+		})
+	}
+}

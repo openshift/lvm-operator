@@ -42,6 +42,8 @@ type LVMVolumeGroupSpec struct {
 	Default bool `json:"default,omitempty"`
 
 	// DeviceDiscoveryPolicy specifies how devices are discovered for this volume group.
+	// This field is only relevant when no explicit device paths are configured in the DeviceSelector.
+	// When explicit device paths are configured, this field is ignored and devices are always preconfigured.
 	// +kubebuilder:validation:Enum=Static;Dynamic
 	// +optional
 	DeviceDiscoveryPolicy DeviceDiscoveryPolicySpec `json:"deviceDiscoveryPolicy,omitempty"`
