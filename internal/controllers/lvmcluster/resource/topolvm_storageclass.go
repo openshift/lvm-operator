@@ -19,14 +19,19 @@ package resource
 import (
 	"context"
 	"fmt"
+	"maps"
+	"sort"
+	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -53,21 +58,38 @@ func (s topolvmStorageClass) GetName() string {
 func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
-	// one storage class for every deviceClass based on CR is created
-	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
-	for _, sc := range topolvmStorageClasses {
-		// we anticipate no edits to storage class
+	desiredStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
+
+	for _, desired := range desiredStorageClasses {
+		sc := &storagev1.StorageClass{}
+		sc.Name = desired.Name
+
 		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
 			labels.SetManagedLabels(r.Scheme(), sc, cluster)
+			s.applyAdditionalLabels(sc, cluster, sc.Name)
+
+			// Only set immutable spec fields on creation (ResourceVersion is empty for new objects)
+			if sc.ResourceVersion == "" {
+				sc.Provisioner = desired.Provisioner
+				sc.VolumeBindingMode = desired.VolumeBindingMode
+				sc.ReclaimPolicy = desired.ReclaimPolicy
+				sc.AllowVolumeExpansion = desired.AllowVolumeExpansion
+				// Deep copy to avoid map aliasing
+				sc.Parameters = make(map[string]string, len(desired.Parameters))
+				maps.Copy(sc.Parameters, desired.Parameters)
+			}
+
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("%s failed to reconcile: %w", s.GetName(), err)
+			return fmt.Errorf("%s failed to reconcile StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
+
 		if result != cutil.OperationResultNone {
-			logger.V(2).Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
+			logger.V(2).Info("StorageClass reconciled", "operation", result, "name", sc.Name)
 		}
 	}
+
 	return nil
 }
 
@@ -79,7 +101,6 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
 		logger := logger.WithValues("StorageClass", scName)
-
 		sc := &storagev1.StorageClass{}
 		if err := r.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
 			if errors.IsNotFound(err) {
@@ -89,13 +110,15 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 		}
 
 		if !sc.GetDeletionTimestamp().IsZero() {
-			return fmt.Errorf("the StorageClass %s is still present, waiting for deletion", scName)
+			// Already being deleted - watch event will trigger next reconcile
+			logger.V(2).Info("StorageClass deletion in progress", "name", scName)
+			continue
 		}
 
 		if err := r.Delete(ctx, sc); err != nil {
 			return fmt.Errorf("failed to delete StorageClass %s: %w", scName, err)
 		}
-		logger.Info("initiated StorageClass deletion")
+		logger.V(2).Info("StorageClass deletion initiated", "name", scName)
 	}
 	return nil
 }
@@ -105,10 +128,8 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 
 	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
 	allowVolumeExpansion := true
-	volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
-
 	// Mark the lvms storage class, associated with the default device class, as default if no other default storage class exists on the cluster
 	scList := &storagev1.StorageClassList{}
 	err := r.List(ctx, scList)
@@ -129,27 +150,134 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
 
+		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
+		reclaimPolicy := ptr.To(corev1.PersistentVolumeReclaimDelete)
+		parameters := map[string]string{
+			constants.DeviceClassKey:    deviceClass.Name,
+			"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
+		}
+		additionalLabels := map[string]string{}
+
+		if opts := deviceClass.StorageClassOptions; opts != nil {
+			if opts.VolumeBindingMode != nil {
+				volumeBindingMode = *opts.VolumeBindingMode
+			}
+
+			if opts.ReclaimPolicy != nil {
+				reclaimPolicy = opts.ReclaimPolicy
+			}
+
+			lvmsOwnedParams := map[string]bool{
+				constants.DeviceClassKey:    true,
+				"csi.storage.k8s.io/fstype": true,
+			}
+			for key, value := range opts.AdditionalParameters {
+				if !lvmsOwnedParams[key] {
+					parameters[key] = value
+				} else {
+					logger.V(1).Info("Skipping conflicting additionalParameter",
+						"key", key, "deviceClass", deviceClass.Name)
+				}
+			}
+
+			if opts.AdditionalLabels != nil {
+				additionalLabels = opts.AdditionalLabels
+			}
+		}
+
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: scName,
-				Annotations: map[string]string{
-					"description": "Provides RWO and RWOP Filesystem & Block volumes",
-				},
 			},
 			Provisioner:          constants.TopolvmCSIDriverName,
 			VolumeBindingMode:    &volumeBindingMode,
+			ReclaimPolicy:        reclaimPolicy,
 			AllowVolumeExpansion: &allowVolumeExpansion,
-			Parameters: map[string]string{
-				constants.DeviceClassKey:    deviceClass.Name,
-				"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
-			},
+			Parameters:           parameters,
+		}
+
+		if len(additionalLabels) > 0 {
+			if storageClass.Labels == nil {
+				storageClass.Labels = make(map[string]string)
+			}
+			maps.Copy(storageClass.Labels, additionalLabels)
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
+			if storageClass.Annotations == nil {
+				storageClass.Annotations = make(map[string]string)
+			}
 			storageClass.Annotations[defaultSCAnnotation] = "true"
 			defaultStorageClassName = scName
 		}
 		sc = append(sc, storageClass)
 	}
 	return sc
+}
+
+func (s topolvmStorageClass) applyAdditionalLabels(
+	sc *storagev1.StorageClass,
+	cluster *lvmv1alpha1.LVMCluster,
+	scName string,
+) {
+	dc := FindDeviceClassBySCName(cluster, scName)
+
+	// keys LVMS owns/sets; user must not override
+	lvmsManaged := map[string]struct{}{
+		constants.AppKubernetesPartOfLabel:    {},
+		constants.AppKubernetesNameLabel:      {},
+		constants.AppKubernetesManagedByLabel: {},
+		constants.AppKubernetesComponentLabel: {},
+	}
+
+	// previously-managed keys (for pruning) - only read if annotations exist
+	var prev []string
+	if sc.Annotations != nil {
+		prev = strings.FieldsFunc(sc.Annotations[constants.ManagedAdditionalLabelsAnnotation], func(r rune) bool { return r == ',' })
+	}
+
+	desired := map[string]struct{}{}
+	if dc != nil && dc.StorageClassOptions != nil && dc.StorageClassOptions.AdditionalLabels != nil {
+		// Initialize Labels map only when we have labels to add
+		if sc.Labels == nil {
+			sc.Labels = map[string]string{}
+		}
+		for k, v := range dc.StorageClassOptions.AdditionalLabels {
+			if _, owned := lvmsManaged[k]; owned {
+				continue
+			}
+			sc.Labels[k] = v
+			desired[k] = struct{}{}
+		}
+	}
+
+	// prune keys we previously managed but no longer desired
+	for _, k := range prev {
+		if _, ok := desired[k]; !ok {
+			delete(sc.Labels, k)
+		}
+	}
+
+	if len(desired) == 0 {
+		// Clean up tracking annotation if no labels are managed
+		if sc.Annotations != nil {
+			delete(sc.Annotations, constants.ManagedAdditionalLabelsAnnotation)
+		}
+		return
+	}
+
+	// Only update annotation if the value actually changed (avoid reconcile churn)
+	keys := make([]string, 0, len(desired))
+	for k := range desired {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	newValue := strings.Join(keys, ",")
+
+	if sc.Annotations == nil || sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] != newValue {
+		if sc.Annotations == nil {
+			sc.Annotations = map[string]string{}
+		}
+		sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] = newValue
+	}
 }

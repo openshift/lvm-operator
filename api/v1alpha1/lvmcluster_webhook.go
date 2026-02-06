@@ -20,13 +20,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -132,11 +136,18 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 	warnings = append(warnings, metadataWarnings...)
+
+	storageClassWarnings, err := v.verifyStorageClassOptions(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, storageClassWarnings...)
+
 	return warnings, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime.Object) (admission.Warnings, error) {
+func (v *lvmClusterValidator) ValidateUpdate(ctx context.Context, old, new runtime.Object) (admission.Warnings, error) {
 	l := new.(*LVMCluster)
 
 	lvmclusterlog.Info("validate update", "name", l.Name)
@@ -169,9 +180,20 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		return warnings, err
 	}
 
+	storageClassWarnings, err := v.verifyStorageClassOptions(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, storageClassWarnings...)
+
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
+	}
+
+	err = v.verifyImmutableStorageClassFields(ctx, oldLVMCluster, l)
+	if err != nil {
+		return warnings, err
 	}
 
 	// Validate device class removal follows the business rules
@@ -542,4 +564,130 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 		}
 	}
 	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
+	warnings := admission.Warnings{}
+
+	lvmsOwnedParameters := map[string]bool{
+		constants.DeviceClassKey:    true,
+		"csi.storage.k8s.io/fstype": true,
+	}
+
+	lvmsManagedLabels := map[string]bool{
+		constants.AppKubernetesPartOfLabel:    true,
+		constants.AppKubernetesNameLabel:      true,
+		constants.AppKubernetesManagedByLabel: true,
+		constants.AppKubernetesComponentLabel: true,
+	}
+
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.StorageClassOptions == nil {
+			continue
+		}
+
+		for key := range deviceClass.StorageClassOptions.AdditionalParameters {
+			if lvmsOwnedParameters[key] {
+				warnings = append(warnings, fmt.Sprintf(
+					"additionalParameter %q in device class %q conflicts with LVMS-owned parameter and will be ignored",
+					key, deviceClass.Name))
+			}
+		}
+
+		for key := range deviceClass.StorageClassOptions.AdditionalLabels {
+			if lvmsManagedLabels[key] {
+				warnings = append(warnings, fmt.Sprintf(
+					"additionalLabel %q in device class %q conflicts with LVMS-managed label and will be ignored",
+					key, deviceClass.Name))
+			}
+		}
+
+		for key, value := range deviceClass.StorageClassOptions.AdditionalLabels {
+			if errs := validation.IsQualifiedName(key); len(errs) > 0 {
+				return warnings, fmt.Errorf(
+					"invalid label key %q in device class %q: %s",
+					key, deviceClass.Name, strings.Join(errs, "; "))
+			}
+			if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+				return warnings, fmt.Errorf(
+					"invalid label value %q for key %q in device class %q: %s",
+					value, key, deviceClass.Name, strings.Join(errs, "; "))
+			}
+		}
+	}
+
+	return warnings, nil
+}
+
+// immutableSCFields represents the immutable fields of a StorageClass for comparison purposes.
+// This uses value types (not pointers) to enable simple DeepEqual comparison.
+type immutableSCFields struct {
+	VolumeBindingMode    storagev1.VolumeBindingMode
+	ReclaimPolicy        corev1.PersistentVolumeReclaimPolicy
+	AdditionalParameters map[string]string
+	FilesystemType       DeviceFilesystemType
+}
+
+// effectiveImmutable extracts the effective immutable StorageClass configuration from a DeviceClass.
+// It applies defaults for fields that are nil, enabling comparison of "what will actually be created"
+// rather than "what was explicitly set".
+func effectiveImmutable(dc *DeviceClass) immutableSCFields {
+	out := immutableSCFields{
+		VolumeBindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
+		ReclaimPolicy:        corev1.PersistentVolumeReclaimDelete,
+		AdditionalParameters: nil,
+		FilesystemType:       dc.FilesystemType,
+	}
+
+	if dc.StorageClassOptions == nil {
+		return out
+	}
+
+	if dc.StorageClassOptions.VolumeBindingMode != nil {
+		out.VolumeBindingMode = *dc.StorageClassOptions.VolumeBindingMode
+	}
+	if dc.StorageClassOptions.ReclaimPolicy != nil {
+		out.ReclaimPolicy = *dc.StorageClassOptions.ReclaimPolicy
+	}
+	if len(dc.StorageClassOptions.AdditionalParameters) > 0 {
+		out.AdditionalParameters = maps.Clone(dc.StorageClassOptions.AdditionalParameters)
+	}
+	// Normalize empty map to nil for consistent comparison
+	if len(out.AdditionalParameters) == 0 {
+		out.AdditionalParameters = nil
+	}
+
+	return out
+}
+
+func (v *lvmClusterValidator) verifyImmutableStorageClassFields(ctx context.Context, oldCluster, newCluster *LVMCluster) error {
+	for _, newDC := range newCluster.Spec.Storage.DeviceClasses {
+		var oldDC *DeviceClass
+		for i := range oldCluster.Spec.Storage.DeviceClasses {
+			if oldCluster.Spec.Storage.DeviceClasses[i].Name == newDC.Name {
+				oldDC = &oldCluster.Spec.Storage.DeviceClasses[i]
+				break
+			}
+		}
+
+		// New device class - no immutability constraints
+		if oldDC == nil {
+			continue
+		}
+
+		// Compare effective immutable fields (with defaults applied)
+		// This catches cases where StorageClassOptions is removed (nil → defaults)
+		oldEffective := effectiveImmutable(oldDC)
+		newEffective := effectiveImmutable(&newDC)
+
+		if !reflect.DeepEqual(oldEffective, newEffective) {
+			return fmt.Errorf(
+				"storageClass configuration cannot be changed for device class %q after creation "+
+					"(volumeBindingMode, reclaimPolicy, fstype, and additionalParameters are immutable; "+
+					"only additionalLabels can be updated)",
+				newDC.Name)
+		}
+	}
+
+	return nil
 }
