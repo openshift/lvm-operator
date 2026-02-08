@@ -60,6 +60,7 @@ var (
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
+	ErrDeviceDiscoveryPolicyIgnoredWithExplicitPaths         = errors.New("deviceDiscoveryPolicy is ignored when explicit device paths are configured")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -132,6 +133,13 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 	warnings = append(warnings, metadataWarnings...)
+
+	discoveryPolicyWarnings, err := v.verifyDeviceDiscoveryPolicy(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, discoveryPolicyWarnings...)
+
 	return warnings, nil
 }
 
@@ -168,6 +176,12 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	if err != nil {
 		return warnings, err
 	}
+
+	discoveryPolicyWarnings, err := v.verifyDeviceDiscoveryPolicy(l)
+	if err != nil {
+		return warnings, err
+	}
+	warnings = append(warnings, discoveryPolicyWarnings...)
 
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
@@ -539,6 +553,25 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 			if dc.ThinPoolConfig.MetadataSize.Cmp(ThinPoolMetadataSizeMaximum) > 0 {
 				return warnings, fmt.Errorf("metadata size must be less than or equal to %s", ThinPoolMetadataSizeMaximum.String())
 			}
+		}
+	}
+	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) (admission.Warnings, error) {
+	warnings := admission.Warnings{}
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		// If DeviceSelector is nil, skip all DeviceDiscoveryPolicy checks
+		if deviceClass.DeviceSelector == nil {
+			continue
+		}
+
+		// Check if explicit device paths are specified
+		hasExplicitPaths := len(deviceClass.DeviceSelector.Paths) > 0 || len(deviceClass.DeviceSelector.OptionalPaths) > 0
+
+		// If explicit device paths are provided, DeviceDiscoveryPolicy is ignored — warn the user
+		if hasExplicitPaths && deviceClass.DeviceDiscoveryPolicy != "" {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", deviceClass.Name, ErrDeviceDiscoveryPolicyIgnoredWithExplicitPaths))
 		}
 	}
 	return warnings, nil

@@ -125,6 +125,18 @@ const (
 	FilesystemTypeXFS  DeviceFilesystemType = "xfs"
 )
 
+// DeviceDiscoveryPolicySpec specifies how devices are discovered and added to the volume group.
+type DeviceDiscoveryPolicySpec string
+
+const (
+	// DeviceDiscoveryPolicySpecStatic locks the volume group to devices discovered at creation time.
+	// Discovery is then disabled and new devices will not be automatically added.
+	// This is the default behavior.
+	DeviceDiscoveryPolicySpecStatic DeviceDiscoveryPolicySpec = "Static"
+	// DeviceDiscoveryPolicySpecDynamic continuously discovers devices and adds eligible ones to the volume group.
+	DeviceDiscoveryPolicySpecDynamic DeviceDiscoveryPolicySpec = "Dynamic"
+)
+
 type DeviceClass struct {
 	// Name specifies a name for the device class
 	// +kubebuilder:validation:MaxLength=245
@@ -155,6 +167,15 @@ type DeviceClass struct {
 	// +kubebuilder:default=xfs
 	// +optional
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
+
+	// DeviceDiscoveryPolicy specifies how devices are discovered for this device class.
+	// This field is only relevant when no explicit device paths are configured in the DeviceSelector.
+	// When explicit device paths are configured, this field is ignored and devices are always preconfigured.
+	// Static: VG is created with devices discovered at install time. Discovery is then disabled.
+	// Dynamic: Devices are continuously discovered and added (default when no paths are configured).
+	// +kubebuilder:validation:Enum=Static;Dynamic
+	// +optional
+	DeviceDiscoveryPolicy DeviceDiscoveryPolicySpec `json:"deviceDiscoveryPolicy,omitempty"`
 }
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned

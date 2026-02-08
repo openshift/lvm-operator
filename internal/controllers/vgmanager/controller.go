@@ -155,14 +155,14 @@ func (r *Reconciler) reconcile(
 		}
 	}
 
-	blockDevices, err := r.ListBlockDevices(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
-	}
-
 	vgs, err := r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+	}
+
+	blockDevices, err := r.ListBlockDevices(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list block devices: %w", err)
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
@@ -188,6 +188,7 @@ func (r *Reconciler) reconcile(
 		BDI: bdi,
 		PVs: pvs,
 		VG:  volumeGroup,
+		VGs: vgs,
 	}))
 
 	if volumeGroup.Spec.DeviceSelector != nil {
@@ -328,11 +329,22 @@ func (r *Reconciler) reconcile(
 }
 
 func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup) ctrl.Result {
-	if volumeGroup.Spec.DeviceSelector == nil {
-		return reconcileAgain
+	// When explicit device paths are configured, DeviceDiscoveryPolicy is ignored
+	// and no requeue is needed since devices are fixed
+	if volumeGroup.Spec.DeviceSelector != nil {
+		return ctrl.Result{}
 	}
-	return ctrl.Result{}
+
+	// Without explicit paths, Static mode doesn't need requeue
+	if volumeGroup.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicySpecStatic {
+		return ctrl.Result{}
+	}
+
+	// Dynamic mode (or empty for backward compat) without explicit paths needs requeue
+	return reconcileAgain
 }
+
+
 
 func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
