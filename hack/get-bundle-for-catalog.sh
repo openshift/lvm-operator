@@ -125,11 +125,6 @@ check_dependencies() {
         missing+=("jq")
     fi
 
-    # Check if oc ka plugin is available
-    if ! oc ka --help >/dev/null 2>&1; then
-        missing+=("oc-ka-plugin")
-    fi
-
     if [ ${#missing[@]} -gt 0 ]; then
         error "Missing required tools: ${missing[*]}"
         info ""
@@ -138,9 +133,6 @@ check_dependencies() {
             case "$tool" in
                 oc)
                     info "  oc: https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html"
-                    ;;
-                oc-ka-plugin)
-                    info "  oc ka plugin: Install the KubeArchive oc plugin"
                     ;;
                 jq)
                     info "  jq: https://stedolan.github.io/jq/download/"
@@ -165,12 +157,6 @@ check_auth() {
     debug "Authentication verified: $(oc whoami)"
 }
 
-setup_kubearchive() {
-    # Set KubeArchive host for oc ka plugin
-    export KUBECTL_PLUGIN_KA_HOST="https://kubearchive-api-server-product-kubearchive.apps.$(oc whoami --show-console | sed -E 's/.*\.apps\.//')"
-    debug "KubeArchive host configured: ${KUBECTL_PLUGIN_KA_HOST}"
-}
-
 # ============================================================================
 # QUERY FUNCTIONS
 # ============================================================================
@@ -178,12 +164,12 @@ setup_kubearchive() {
 get_catalog_from_snapshot() {
     local snapshot="$1"
 
-    debug "Getting catalog image from snapshot: $snapshot (using oc ka for archived + active)"
+    debug "Getting catalog image from snapshot: $snapshot (only active)"
 
     local catalog_image
-    catalog_image=$(oc ka get snapshot "$snapshot" -n "${NAMESPACE}" \
+    catalog_image=$(oc get snapshot "$snapshot" -n "${NAMESPACE}" \
         -o json 2>/dev/null | \
-        jq -r '.items[0].spec.components[] | select(.name | contains("catalog")) | .containerImage' | \
+        jq -r '.spec.components[] | select(.name | contains("catalog")) | .containerImage' | \
         head -1)
 
     if [ -z "$catalog_image" ]; then
@@ -198,7 +184,7 @@ get_latest_catalog_snapshot() {
     local version="$1"
     local env="$2"
 
-    debug "Getting latest catalog snapshot for version=$version, env=${env:-any} (using oc ka releases with label filtering)"
+    debug "Getting latest catalog snapshot for version=$version, env=${env:-any} (using oc releases with label filtering)"
 
     local y_stream="${version##*.}"
     local component_label="lvm-operator-catalog-4-${y_stream}"
@@ -218,7 +204,7 @@ get_latest_catalog_snapshot() {
     # This is the authoritative source - Release objects track what's actually been released
     # Filter by component label for better performance
     local snapshot
-    snapshot=$(oc ka get releases -n "${NAMESPACE}" \
+    snapshot=$(oc get releases -n "${NAMESPACE}" \
         -l "appstudio.openshift.io/component=${component_label}" \
         -o json 2>/dev/null | \
         jq -r --arg plan "$release_plan_pattern" \
@@ -307,8 +293,8 @@ find_bundle_snapshot() {
     # Get catalog snapshot creation time if provided (for sorting by age)
     local catalog_time=""
     if [ -n "$catalog_snapshot" ]; then
-        catalog_time=$(oc ka get snapshot "$catalog_snapshot" -n "${NAMESPACE}" -o json 2>/dev/null | \
-            jq -r '.items[0].metadata.creationTimestamp // empty')
+        catalog_time=$(oc get snapshot "$catalog_snapshot" -n "${NAMESPACE}" -o json 2>/dev/null | \
+            jq -r '.metadata.creationTimestamp // empty')
         if [ -n "$catalog_time" ]; then
             debug "Catalog snapshot created at: $catalog_time"
         fi
@@ -341,7 +327,7 @@ find_bundle_snapshot() {
 
         # Get all snapshot names that have this SHA
         local matching_snapshots
-        matching_snapshots=$(oc ka get snapshots -n "${NAMESPACE}" \
+        matching_snapshots=$(oc get snapshots -n "${NAMESPACE}" \
             -l "appstudio.openshift.io/application=${app_label}" \
             -o json 2>/dev/null | \
             jq -r --arg sha "$bundle_sha" --arg prefix "lvm-operator-4-${y_stream}-" '
@@ -354,7 +340,7 @@ find_bundle_snapshot() {
         # Check if any of these snapshots are referenced by a Release
         if [ -n "$matching_snapshots" ]; then
             debug "Found $(echo "$matching_snapshots" | wc -l) snapshots with matching SHA, checking Releases"
-            snapshot_name=$(oc ka get releases -n "${NAMESPACE}" \
+            snapshot_name=$(oc get releases -n "${NAMESPACE}" \
                 -l "appstudio.openshift.io/component=${bundle_component}" \
                 -o json 2>/dev/null | \
                 jq -r --arg snapshots "$(echo "$matching_snapshots" | tr '\n' '|' | sed 's/|$//')" '
@@ -373,7 +359,7 @@ find_bundle_snapshot() {
         if [ -z "$snapshot_name" ]; then
             if [ -n "$catalog_time" ]; then
                 debug "No Release found, searching for bundle snapshot created before catalog"
-                snapshot_name=$(oc ka get snapshots -n "${NAMESPACE}" \
+                snapshot_name=$(oc get snapshots -n "${NAMESPACE}" \
                     -l "appstudio.openshift.io/application=${app_label}" \
                     -o json 2>/dev/null | \
                     jq -r --arg sha "$bundle_sha" \
@@ -386,7 +372,7 @@ find_bundle_snapshot() {
                         {name: .metadata.name, time: .metadata.creationTimestamp}
                     ' | jq -s 'sort_by(.time) | reverse | .[0].name // empty' | tr -d '"')
             else
-                snapshot_name=$(oc ka get snapshots -n "${NAMESPACE}" \
+                snapshot_name=$(oc get snapshots -n "${NAMESPACE}" \
                     -l "appstudio.openshift.io/application=${app_label}" \
                     -o json 2>/dev/null | \
                     jq -r --arg sha "$bundle_sha" --arg prefix "lvm-operator-4-${y_stream}-" '
@@ -404,7 +390,7 @@ find_bundle_snapshot() {
     # Fallback to unfiltered search if still not found
     if [ -z "$snapshot_name" ]; then
         debug "Trying unfiltered search (may be slower)"
-        snapshot_name=$(oc ka get snapshots -n "${NAMESPACE}" -o json 2>/dev/null | \
+        snapshot_name=$(oc get snapshots -n "${NAMESPACE}" -o json 2>/dev/null | \
             jq -r --arg sha "$bundle_sha" '
                 .items[] |
                 select(.metadata.name | startswith("lvm-operator-4-")) |
@@ -618,7 +604,6 @@ main() {
     parse_arguments "$@"
     check_dependencies
     check_auth
-    setup_kubearchive
 
     # Check if we're in all-versions mode (only environment provided)
     if [ -z "$CATALOG_IMAGE" ] && [ -z "$SNAPSHOT_NAME" ] && [ -z "$VERSION" ] && [ -n "$ENVIRONMENT" ]; then
