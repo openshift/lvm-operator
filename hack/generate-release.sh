@@ -70,7 +70,7 @@ spec:
     data:
         releaseNotes:
             description: |
-                After a successful LVMS upgrade, the latest lvms-operator SHA image should be seen.
+                After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
 
                 This erratum implements the following changes:
 
