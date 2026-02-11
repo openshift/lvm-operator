@@ -1,0 +1,34 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.21.0
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-21
+  snapshot: lvm-operator-4-21-20260204-215026-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
+
+        This erratum implements the following changes:
+
+        - Changes base image to UBI Minimal for improved security posture
+        - Allows removal of device classes on day2 operations
+        - Allows removal of devices on day2 operations
+        - Fixes VG-Manager lock contention issue that could cause disk space exhaustion
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        fixed:
+          - id: OCPEDGE-2221
+            source: issues.redhat.com
+          - id: OCPEDGE-2133
+            source: issues.redhat.com
+          - id: OCPEDGE-2108
+            source: issues.redhat.com
+          - id: OCPBUGS-63398
+            source: issues.redhat.com
