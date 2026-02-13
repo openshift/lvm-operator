@@ -132,6 +132,10 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 		return warnings, err
 	}
 	warnings = append(warnings, metadataWarnings...)
+
+	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
+	warnings = append(warnings, discoveryPolicyWarnings...)
+
 	return warnings, nil
 }
 
@@ -262,6 +266,9 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		}
 	}
 
+	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicyUpdate(oldLVMCluster, l)
+	warnings = append(warnings, discoveryPolicyWarnings...)
+
 	return warnings, nil
 }
 
@@ -340,7 +347,12 @@ func (v *lvmClusterValidator) verifyPathsAreNotEmpty(l *LVMCluster) (admission.W
 	if len(l.Spec.Storage.DeviceClasses) > 1 && len(deviceClassesWithoutPaths) > 0 {
 		return nil, fmt.Errorf("%w. Please specify device path(s) under deviceSelector.paths for %s deviceClass(es)", ErrEmptyPathsWithMultipleDeviceClasses, strings.Join(deviceClassesWithoutPaths, `,`))
 	} else if len(l.Spec.Storage.DeviceClasses) == 1 && len(deviceClassesWithoutPaths) == 1 {
-		return admission.Warnings{fmt.Sprintf("no device path(s) under deviceSelector.paths was specified for the %s deviceClass, LVMS will actively monitor and dynamically utilize any supported unused devices. This is not recommended for production environments. Please refer to the limitations outlined in the product documentation for further details.", deviceClassesWithoutPaths[0])}, nil
+		return admission.Warnings{fmt.Sprintf(
+			"no device path(s) under deviceSelector.paths was specified for the %s deviceClass, "+
+				"device discovery will be based on the deviceDiscoveryPolicy (defaults to Static). "+
+				"This is not recommended for production environments. "+
+				"Please refer to the limitations outlined in the product documentation for further details.",
+			deviceClassesWithoutPaths[0])}, nil
 	}
 
 	return nil, nil
@@ -542,4 +554,41 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 		}
 	}
 	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admission.Warnings {
+	var warnings admission.Warnings
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.DeviceDiscoveryPolicy == nil && deviceClass.DeviceSelector == nil {
+			warnings = append(warnings, fmt.Sprintf(
+				"deviceDiscoveryPolicy is not set for device class %q; new volume groups will default to Static mode "+
+					"(devices discovered at creation time only). Set deviceDiscoveryPolicy explicitly to avoid ambiguity.",
+				deviceClass.Name))
+		}
+	}
+	return warnings
+}
+
+func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicyUpdate(old, new *LVMCluster) admission.Warnings {
+	var warnings admission.Warnings
+	oldPolicies := make(map[string]*DeviceDiscoveryPolicy)
+	for _, dc := range old.Spec.Storage.DeviceClasses {
+		oldPolicies[dc.Name] = dc.DeviceDiscoveryPolicy
+	}
+
+	for _, dc := range new.Spec.Storage.DeviceClasses {
+		oldPolicy, exists := oldPolicies[dc.Name]
+		if !exists {
+			continue
+		}
+		oldIsDynamic := oldPolicy != nil && *oldPolicy == DeviceDiscoveryPolicyDynamic
+		newIsStatic := dc.DeviceDiscoveryPolicy == nil || *dc.DeviceDiscoveryPolicy == DeviceDiscoveryPolicyStatic
+		if oldIsDynamic && newIsStatic {
+			warnings = append(warnings, fmt.Sprintf(
+				"device class %q is switching from Dynamic to Static device discovery. "+
+					"The current device configuration will be locked and no new devices will be added automatically.",
+				dc.Name))
+		}
+	}
+	return warnings
 }

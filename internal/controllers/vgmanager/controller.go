@@ -200,6 +200,36 @@ func (r *Reconciler) reconcile(
 		}
 	}
 
+	// Determine if VG already exists in LVM
+	vgExists := false
+	for _, vg := range vgs {
+		if volumeGroup.Name == vg.Name {
+			vgExists = true
+			break
+		}
+	}
+	// When explicit device paths are configured via DeviceSelector, the discovery policy
+	// is not applicable — we always honor user-specified paths regardless of the policy.
+	hasExplicitPaths := volumeGroup.Spec.DeviceSelector != nil &&
+		(len(volumeGroup.Spec.DeviceSelector.Paths) > 0 || len(volumeGroup.Spec.DeviceSelector.OptionalPaths) > 0)
+
+	effectivePolicy := ptr.Deref(volumeGroup.Spec.DeviceDiscoveryPolicy, lvmv1alpha1.DeviceDiscoveryPolicyStatic)
+
+	// In static mode, if the VG already exists, exclude any newly discovered devices.
+	// This only applies when no explicit device paths are configured.
+	if !hasExplicitPaths && effectivePolicy == lvmv1alpha1.DeviceDiscoveryPolicyStatic && vgExists && len(devices.Available) > 0 {
+		logger.Info("static device discovery policy: excluding newly discovered devices", "count", len(devices.Available))
+		for _, dev := range devices.Available {
+			devices.Excluded = append(devices.Excluded, FilteredBlockDevice{
+				BlockDevice: dev,
+				FilterErrors: []error{
+					fmt.Errorf("%s was not part of %s at creation (static device discovery enabled)", dev.KName, volumeGroup.Name),
+				},
+			})
+		}
+		devices.Available = nil
+	}
+
 	// If there are no available devices, that could mean either
 	// - There is no available devices to attach to the volume group
 	// - All the available devices are already attached
@@ -264,7 +294,7 @@ func (r *Reconciler) reconcile(
 			r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
 		}
 
-		return r.determineFinishedRequeue(volumeGroup), nil
+		return r.determineFinishedRequeue(volumeGroup, effectivePolicy), nil
 	} else {
 		if updated, err := r.setVolumeGroupProgressingStatus(ctx, volumeGroup, vgs, devices); err != nil {
 			logger.Error(err, "failed to set status to progressing")
@@ -324,11 +354,23 @@ func (r *Reconciler) reconcile(
 		r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
 	}
 
-	return reconcileAgain, nil
+	return r.determineFinishedRequeue(volumeGroup, effectivePolicy), nil
 }
 
-func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup) ctrl.Result {
-	if volumeGroup.Spec.DeviceSelector == nil {
+func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup, effectivePolicy lvmv1alpha1.DeviceDiscoveryPolicy) ctrl.Result {
+	hasExplicitPaths := volumeGroup.Spec.DeviceSelector != nil &&
+		(len(volumeGroup.Spec.DeviceSelector.Paths) > 0 || len(volumeGroup.Spec.DeviceSelector.OptionalPaths) > 0)
+
+	// With explicit paths, no periodic requeue is needed — the paths define
+	// the exact set of devices. Changes to paths trigger reconciliation via
+	// the LVMVolumeGroup watch.
+	if hasExplicitPaths {
+		return ctrl.Result{}
+	}
+
+	// Without explicit paths, requeue only in Dynamic mode to continuously
+	// discover new devices. Static mode locks the device set after creation.
+	if effectivePolicy == lvmv1alpha1.DeviceDiscoveryPolicyDynamic {
 		return reconcileAgain
 	}
 	return ctrl.Result{}

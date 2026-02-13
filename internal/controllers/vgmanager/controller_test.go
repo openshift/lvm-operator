@@ -91,6 +91,11 @@ var _ = Describe("vgmanager controller", func() {
 	Context("lvmd config reconciler", func() {
 		It("should update lvmd config on overprovision ratio change", testLVMDConfigChange)
 	})
+	Context("device discovery policy", func() {
+		It("should exclude new devices in static mode when VG exists", testStaticModeExcludesNewDevices)
+		It("should add new devices in dynamic mode when VG exists", testDynamicModeAddsNewDevices)
+		It("should ignore static policy when explicit device paths are configured", testStaticModeIgnoredWithExplicitPaths)
+	})
 })
 
 func init() {
@@ -1009,6 +1014,206 @@ func testLVMDConfigChange(ctx context.Context) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 	Expect(cfg.DeviceClasses[0].ThinPoolConfig.OverprovisionRatio).To(Equal(float64(1)))
+}
+
+func testStaticModeExcludesNewDevices(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	instances := setupInstances()
+	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
+
+	staticPolicy := lvmv1alpha1.DeviceDiscoveryPolicyStatic
+	vg := &lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vg1",
+			Namespace: instances.namespace.GetName(),
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+			NodeSelector:          instances.nodeSelector.DeepCopy(),
+			DeviceDiscoveryPolicy: &staticPolicy,
+		},
+	}
+
+	By("creating the LVMVolumeGroup and LVMVolumeGroupNodeStatus")
+	Expect(instances.client.Create(ctx, vg)).To(Succeed())
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(instances.node.GetName())
+	nodeStatus.SetNamespace(instances.namespace.GetName())
+	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+
+	By("first reconcile adds finalizer")
+	_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+
+	device := "/dev/sda"
+	blockDevice := createMockedBlockDevice(device)
+
+	By("setting up mocks: VG already exists, new device available")
+	existingVG := lvm.VolumeGroup{
+		Name: "vg1",
+		PVs:  []lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}},
+	}
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+	instances.LVM.EXPECT().ListPVs(ctx, "").Return([]lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}}, nil).Once()
+	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
+		device: {IsUsableLoopDev: false},
+	}, nil).Once()
+
+	By("reconciling - the device should be excluded, not added")
+	res, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(res.Requeue).To(BeFalse(), "static mode should not requeue")
+
+	By("verifying the VG status shows excluded device with static reason")
+	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
+	Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
+	found := false
+	for _, status := range nodeStatus.Spec.LVMVGStatus {
+		if status.Name == "vg1" {
+			found = true
+			Expect(status.Status).To(Equal(lvmv1alpha1.VGStatusReady))
+			excludedFound := false
+			for _, excluded := range status.Excluded {
+				if excluded.Name == "mock0" {
+					excludedFound = true
+					Expect(excluded.Reasons).To(ContainElement(ContainSubstring("static device discovery enabled")))
+				}
+			}
+			Expect(excludedFound).To(BeTrue(), "device should be in excluded list with static reason")
+		}
+	}
+	Expect(found).To(BeTrue(), "VG status should exist")
+}
+
+func testDynamicModeAddsNewDevices(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	instances := setupInstances()
+	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
+
+	dynamicPolicy := lvmv1alpha1.DeviceDiscoveryPolicyDynamic
+	vg := &lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vg1",
+			Namespace: instances.namespace.GetName(),
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+			NodeSelector:          instances.nodeSelector.DeepCopy(),
+			DeviceDiscoveryPolicy: &dynamicPolicy,
+		},
+	}
+
+	By("creating the LVMVolumeGroup and LVMVolumeGroupNodeStatus")
+	Expect(instances.client.Create(ctx, vg)).To(Succeed())
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(instances.node.GetName())
+	nodeStatus.SetNamespace(instances.namespace.GetName())
+	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+
+	By("first reconcile adds finalizer")
+	_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+
+	device := "/dev/sda"
+	blockDevice := createMockedBlockDevice(device)
+
+	By("setting up mocks: VG already exists, new device available")
+	existingVG := lvm.VolumeGroup{
+		Name: "vg1",
+		PVs:  []lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}},
+	}
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+	instances.LVM.EXPECT().ListPVs(ctx, "").Return([]lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}}, nil).Once()
+	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
+		device: {IsUsableLoopDev: false},
+	}, nil).Once()
+
+	By("reconciling - in dynamic mode, the device should be picked up (progressing status set)")
+	res, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(res.Requeue).To(BeTrue(), "dynamic mode should requeue after progressing")
+
+	By("verifying the VG status is progressing (new devices discovered)")
+	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
+	Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
+	found := false
+	for _, status := range nodeStatus.Spec.LVMVGStatus {
+		if status.Name == "vg1" {
+			found = true
+			Expect(status.Status).To(Equal(lvmv1alpha1.VGStatusProgressing))
+		}
+	}
+	Expect(found).To(BeTrue(), "VG status should exist and be progressing")
+}
+
+func testStaticModeIgnoredWithExplicitPaths(ctx context.Context) {
+	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
+
+	instances := setupInstances()
+	instances.Reconciler.SymlinkResolveFn = func(path string) (string, error) { return path, nil }
+
+	staticPolicy := lvmv1alpha1.DeviceDiscoveryPolicyStatic
+	vg := &lvmv1alpha1.LVMVolumeGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vg1",
+			Namespace: instances.namespace.GetName(),
+		},
+		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+			NodeSelector:          instances.nodeSelector.DeepCopy(),
+			DeviceDiscoveryPolicy: &staticPolicy,
+			DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				Paths: []lvmv1alpha1.DevicePath{"/dev/sda"},
+			},
+		},
+	}
+
+	By("creating the LVMVolumeGroup and LVMVolumeGroupNodeStatus")
+	Expect(instances.client.Create(ctx, vg)).To(Succeed())
+	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
+	nodeStatus.SetName(instances.node.GetName())
+	nodeStatus.SetNamespace(instances.namespace.GetName())
+	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed())
+
+	By("first reconcile adds finalizer")
+	_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+
+	device := "/dev/sda"
+	blockDevice := createMockedBlockDevice(device)
+
+	By("setting up mocks: VG already exists, device from Paths is available")
+	existingVG := lvm.VolumeGroup{
+		Name: "vg1",
+		PVs:  []lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}},
+	}
+	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+	instances.LVM.EXPECT().ListPVs(ctx, "").Return([]lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}}, nil).Once()
+	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
+	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(lsblk.BlockDeviceInfos{
+		device: {IsUsableLoopDev: false},
+	}, nil).Once()
+
+	By("reconciling - despite static policy, explicit paths should be honored (progressing status set)")
+	res, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(res.Requeue).To(BeTrue(), "should requeue after progressing")
+
+	By("verifying the VG status is progressing (device from Paths is being added)")
+	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
+	Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
+	found := false
+	for _, status := range nodeStatus.Spec.LVMVGStatus {
+		if status.Name == "vg1" {
+			found = true
+			Expect(status.Status).To(Equal(lvmv1alpha1.VGStatusProgressing))
+		}
+	}
+	Expect(found).To(BeTrue(), "VG status should exist and be progressing")
 }
 
 func calculateExpectedChunkSize(chunkSize *resource.Quantity) int64 {
