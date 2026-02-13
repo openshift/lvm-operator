@@ -40,6 +40,14 @@ type LVMVolumeGroupSpec struct {
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
 	Default bool `json:"default,omitempty"`
+
+	// DeviceDiscoveryPolicy specifies the policy for discovering devices for this volume group.
+	// Static means the volume group is created with devices found at install time; new devices are ignored.
+	// Dynamic means devices are continuously discovered and added to the volume group.
+	// When not set, new volume groups default to Static and existing volume groups default to Dynamic for backward compatibility.
+	// +kubebuilder:validation:Enum=Static;Dynamic
+	// +optional
+	DeviceDiscoveryPolicy *DeviceDiscoveryPolicySpec `json:"deviceDiscoveryPolicy,omitempty"`
 }
 
 // LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
