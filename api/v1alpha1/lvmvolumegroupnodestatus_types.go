@@ -25,10 +25,22 @@ import (
 type DeviceDiscoveryPolicy string
 
 const (
-	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
+	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through explicit DeviceSelector paths.
+	// When paths are specified, the device discovery policy from the spec is ignored.
 	DeviceDiscoveryPolicyPreconfigured DeviceDiscoveryPolicy = "Preconfigured"
-	// DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
+	// DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are discovered and added to the VG dynamically
+	// if they are present at runtime. No DeviceSelector paths are configured and the discovery policy is Dynamic.
 	DeviceDiscoveryPolicyRuntimeDynamic DeviceDiscoveryPolicy = "RuntimeDynamic"
+	// DeviceDiscoveryPolicyRuntimeStatic indicates the VG is created with devices discovered at install time;
+	// later-discovered devices are ignored. No DeviceSelector paths are configured and the discovery policy is Static.
+	DeviceDiscoveryPolicyRuntimeStatic DeviceDiscoveryPolicy = "RuntimeStatic"
+
+	// DeviceDiscoveryPolicyStatic is the spec-level value for static device discovery.
+	// The VG is created with devices found at install time; new devices are ignored.
+	DeviceDiscoveryPolicyStatic DeviceDiscoveryPolicy = "Static"
+	// DeviceDiscoveryPolicyDynamic is the spec-level value for dynamic device discovery.
+	// Devices are continuously discovered and added to the VG.
+	DeviceDiscoveryPolicyDynamic DeviceDiscoveryPolicy = "Dynamic"
 )
 
 // LVMVolumeGroupNodeStatusSpec defines the desired state of LVMVolumeGroupNodeStatus
@@ -62,13 +74,12 @@ type VGStatus struct {
 	// Excluded contains the per node status of applied device exclusions that were picked up via selector,
 	// but were not used for other reasons.
 	Excluded []ExcludedDevice `json:"excluded,omitempty"`
-	// DeviceDiscoveryPolicy is a field to indicate whether the devices are discovered
-	// at runtime or preconfigured through a DeviceSelector
-	// Setting this to DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
-	// Setting this to DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
-	// By default, the value is set to RuntimeDynamic.
-	// +kubebuilder:validation:Enum=Preconfigured;RuntimeDynamic
-	// +kubebuilder:default=RuntimeDynamic
+	// DeviceDiscoveryPolicy is a field to indicate the effective device discovery policy for this volume group.
+	// Preconfigured indicates explicit DeviceSelector paths are configured and the discovery policy is not applicable.
+	// RuntimeDynamic indicates devices are discovered and added dynamically at runtime (no explicit paths, Dynamic policy).
+	// RuntimeStatic indicates devices were discovered at install time and new devices are ignored (no explicit paths, Static policy).
+	// +kubebuilder:validation:Enum=Preconfigured;RuntimeDynamic;RuntimeStatic
+	// +kubebuilder:default=RuntimeStatic
 	// +kubebuilder:validation:Required
 	DeviceDiscoveryPolicy DeviceDiscoveryPolicy `json:"deviceDiscoveryPolicy,omitempty"`
 }

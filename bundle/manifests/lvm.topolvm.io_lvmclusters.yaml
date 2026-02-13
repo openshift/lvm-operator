@@ -58,6 +58,16 @@ spec:
                             class is the default. You can configure only a single
                             default device class.
                           type: boolean
+                        deviceDiscoveryPolicy:
+                          description: |-
+                            DeviceDiscoveryPolicy specifies the policy for discovering devices for this device class.
+                            Static means the volume group is created with devices found at install time; new devices are ignored.
+                            Dynamic means devices are continuously discovered and added to the volume group.
+                            When not set, new volume groups default to Static and existing volume groups default to Dynamic for backward compatibility.
+                          enum:
+                          - Static
+                          - Dynamic
+                          type: string
                         deviceSelector:
                           description: DeviceSelector contains the configuration to
                             specify paths to the devices that you want to add to the
@@ -380,16 +390,16 @@ spec:
                           deviceclass on the node
                         properties:
                           deviceDiscoveryPolicy:
-                            default: RuntimeDynamic
+                            default: RuntimeStatic
                             description: |-
-                              DeviceDiscoveryPolicy is a field to indicate whether the devices are discovered
-                              at runtime or preconfigured through a DeviceSelector
-                              Setting this to DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through a DeviceSelector.
-                              Setting this to DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are added to the VG dynamically if they are present at runtime.
-                              By default, the value is set to RuntimeDynamic.
+                              DeviceDiscoveryPolicy is a field to indicate the effective device discovery policy for this volume group.
+                              Preconfigured indicates explicit DeviceSelector paths are configured and the discovery policy is not applicable.
+                              RuntimeDynamic indicates devices are discovered and added dynamically at runtime (no explicit paths, Dynamic policy).
+                              RuntimeStatic indicates devices were discovered at install time and new devices are ignored (no explicit paths, Static policy).
                             enum:
                             - Preconfigured
                             - RuntimeDynamic
+                            - RuntimeStatic
                             type: string
                           devices:
                             description: Devices is the list of devices used by the
