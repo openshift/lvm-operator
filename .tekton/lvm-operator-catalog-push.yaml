@@ -13,10 +13,10 @@ metadata:
       "release/catalog/***".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: lvm-operator-catalog-4-21
-    appstudio.openshift.io/component: lvm-operator-catalog-4-21
+    appstudio.openshift.io/application: lvm-operator-catalog-4-22
+    appstudio.openshift.io/component: lvm-operator-catalog-4-22
     pipelines.appstudio.openshift.io/type: build
-  name: lvm-operator-catalog-4-21-on-push
+  name: lvm-operator-catalog-4-22-on-push
   namespace: logical-volume-manag-tenant
 spec:
   params:
@@ -25,13 +25,14 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.21-{{revision}}
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.22-{{revision}}
   - name: dockerfile
     value: release/catalog/catalog.konflux.Dockerfile
   - name: build-args
     value:
-    - CATALOG_VERSION=v4.21
+    - CATALOG_VERSION=v4.22
     - BASE_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-ose-operator-registry-rhel9
+    - BASE_IMAGE_TAG=v4.21
   - name: hermetic
     value: "true"
   - name: build-platforms
@@ -58,7 +59,7 @@ spec:
   pipelineRef:
     name: catalog-patching-build-pipeline
   taskRunTemplate:
-    serviceAccountName: build-pipeline-lvm-operator-catalog-4-21
+    serviceAccountName: build-pipeline-lvm-operator-catalog-4-22
   workspaces:
   - name: git-auth
     secret:
