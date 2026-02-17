@@ -11,7 +11,7 @@ metadata:
       (".tekton/lvm-operator-catalog-pull-request.yaml".pathChanged() ||
       ".tekton/lvm-operator-catalog-push.yaml".pathChanged() ||
       ".tekton/images-mirror-set.yaml".pathChanged() ||
-      "release/catalog/***".pathChanged())
+      "release/catalog/**".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator-catalog-4-16
