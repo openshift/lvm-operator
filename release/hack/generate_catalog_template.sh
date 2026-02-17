@@ -1,9 +1,8 @@
 #!/bin/bash
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
-quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
-staging_bundle_path="${quay_bundle_path}"
-#staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
+#quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
 lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
 all_y_streams=($(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
