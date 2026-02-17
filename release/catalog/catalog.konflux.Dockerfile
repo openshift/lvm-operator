@@ -1,7 +1,8 @@
 ARG CATALOG_VERSION
+ARG BASE_IMAGE_TAG
 ARG BASE_IMAGE=registry.redhat.io/openshift4/ose-operator-registry-rhel9
 # Global args to be used to build the final base image url
-FROM ${BASE_IMAGE}:${CATALOG_VERSION}
+FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG}
 ARG CATALOG_VERSION
 
 COPY release/catalog/lvm-operator-catalog.json /configs/lvms-operator/catalog.json
