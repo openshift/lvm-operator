@@ -11,6 +11,7 @@ import (
 
 	// Import the test packages
 	_ "github.com/openshift/lvm-operator/v4/test/integration/sno"
+	_ "github.com/openshift/lvm-operator/v4/test/integration/tests"
 )
 
 func main() {
