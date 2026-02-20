@@ -2,6 +2,10 @@
 
 catalog_file="release/catalog/lvm-operator-catalog.json"
 
+# OCPBUGS-76865: Override the default channel to force 4.16 instead of 4.18
+echo "Setting default channel to stable-4.16"
+yq eval-all --inplace -o=json 'select(document_index == 0).defaultChannel = "stable-4.16"' ${catalog_file}
+
 catalog_content=$(cat ${catalog_file})
 
 # Channel name patching to match legacy format (no v)
