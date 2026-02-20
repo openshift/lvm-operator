@@ -34,12 +34,15 @@ func lvmClusterTest() {
 		cluster = GetDefaultTestLVMClusterTemplate()
 	})
 	AfterEach(func(ctx SpecContext) {
+		// Always cleanup, even on failure (prevents "duplicate LVMCluster" cascade failures)
 		if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
-			By("Test failed, skipping cluster cleanup")
+			By("Test failed, but cleaning up cluster to prevent cascade failures")
 			skipSuiteCleanup.Store(true)
-			return
 		}
 		DeleteResource(ctx, cluster)
+		// Wait for actual storage cleanup, not just CR deletion
+		waitForStorageCleanup(ctx)
+
 		validateCSINodeInfo(ctx, cluster, false)
 	})
 
