@@ -23,6 +23,7 @@
     "enabled": false
   },
   "commitBody": "Signed-off-by: {{{gitAuthor}}}",
+  "commitMessagePrefix": "NO-JIRA:",
   "packageRules": [
     {
       "addLabels": [
@@ -43,8 +44,7 @@
       "matchUpdateTypes": [
         "digest"
       ],
-      "platformAutomerge": true,
-      "commitMessagePrefix": "NO-JIRA:"
+      "platformAutomerge": true
     },
     {
       "matchUpdateTypes": [
@@ -76,7 +76,24 @@
       ".tekton/**",
       "release/**"
     ],
-    "platformAutomerge": true,
-    "commitMessagePrefix": "NO-JIRA:"
+    "platformAutomerge": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "recreateWhen": "auto",
+    "rebaseWhen": "behind-base-branch",
+    "rebaseStalePrs": true,
+    "branchTopic": "lock-file-maintenance",
+    "schedule": [
+      "before 5am"
+    ],
+    "automerge": true,
+    "automergeType": "pr",
+    "automergeStrategy": "rebase",
+    "addLabels": [
+      "approved",
+      "lgtm"
+    ],
+    "platformAutomerge": true
   }
 }

@@ -2,7 +2,7 @@
 //        1. Installing LVMS operator
 //        2. Adding blank disk/device to worker node to be consumed by LVMCluster
 //        3. Create resources like OperatorGroup, Subscription, etc. to configure LVMS operator
-//        4. Create LVMCLuster resource with single volumeGroup named as 'vg1', mutliple VGs could be added in future
+//        4. Create LVMCLuster resource with single volumeGroup named as 'vg1', multiple VGs could be added in future
 //      Also, these tests are utilizing preset lvms storageClass="lvms-vg1", volumeSnapshotClassName="lvms-vg1"
 
 package tests
@@ -1215,101 +1215,101 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 	})
 
-// original author: rdeore@redhat.com
-g.It("Author:rdeore-Critical-61998-[LVMS] [Block] [Snapshot] should restore volume larger than disk size with snapshot dataSource successfully and the volume could be read and written [Serial]", g.Label("SNO"), func() {
-	volumeGroup := "vg1"
-	thinPoolName := "thin-pool-1"
-	storageClassName := "lvms-" + volumeGroup
-	volumeSnapshotClassName := "lvms-" + volumeGroup
+	// original author: rdeore@redhat.com
+	g.It("Author:rdeore-Critical-61998-[LVMS] [Block] [Snapshot] should restore volume larger than disk size with snapshot dataSource successfully and the volume could be read and written [Serial]", g.Label("SNO"), func() {
+		volumeGroup := "vg1"
+		thinPoolName := "thin-pool-1"
+		storageClassName := "lvms-" + volumeGroup
+		volumeSnapshotClassName := "lvms-" + volumeGroup
 
-	g.By("#. Get thin pool size")
-	thinPoolSize := getThinPoolSizeByVolumeGroup(tc, volumeGroup, thinPoolName)
+		g.By("#. Get thin pool size")
+		thinPoolSize := getThinPoolSizeByVolumeGroup(tc, volumeGroup, thinPoolName)
 
-	g.By("#. Create a PVC with Block volumeMode and capacity bigger than disk size")
-	pvcCapacity := fmt.Sprintf("%dGi", int64(thinPoolSize)+getRandomNum(2, 10))
-	volumeMode := corev1.PersistentVolumeBlock
-	pvcOri := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pvc-ori-61998",
-			Namespace: testNamespace,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse(pvcCapacity),
-				},
+		g.By("#. Create a PVC with Block volumeMode and capacity bigger than disk size")
+		pvcCapacity := fmt.Sprintf("%dGi", int64(thinPoolSize)+getRandomNum(2, 10))
+		volumeMode := corev1.PersistentVolumeBlock
+		pvcOri := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pvc-ori-61998",
+				Namespace: testNamespace,
 			},
-			StorageClassName: &storageClassName,
-			VolumeMode:       &volumeMode,
-		},
-	}
-	_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
-	o.Expect(err).NotTo(o.HaveOccurred())
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(pvcCapacity),
+					},
+				},
+				StorageClassName: &storageClassName,
+				VolumeMode:       &volumeMode,
+			},
+		}
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		o.Expect(err).NotTo(o.HaveOccurred())
 
-	g.By("#. Create pod with the created pvc (using volumeDevices for block mode)")
-	podOri := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod-ori-61998",
-			Namespace: testNamespace,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "test-container",
-					Image:   "registry.redhat.io/rhel8/support-tools:latest",
-					Command: []string{"/bin/sh", "-c", "sleep 3600"},
-					VolumeDevices: []corev1.VolumeDevice{
-						{
-							Name:       "test-volume",
-							DevicePath: "/dev/dblock",
+		g.By("#. Create pod with the created pvc (using volumeDevices for block mode)")
+		podOri := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-ori-61998",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:    "test-container",
+						Image:   "registry.redhat.io/rhel8/support-tools:latest",
+						Command: []string{"/bin/sh", "-c", "sleep 3600"},
+						VolumeDevices: []corev1.VolumeDevice{
+							{
+								Name:       "test-volume",
+								DevicePath: "/dev/dblock",
+							},
+						},
+					},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "test-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "test-pvc-ori-61998",
+							},
 						},
 					},
 				},
 			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "test-volume",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "test-pvc-ori-61998",
-						},
-					},
-				},
-			},
-		},
-	}
-	_, err = tc.Clientset.CoreV1().Pods(testNamespace).Create(context.TODO(), podOri, metav1.CreateOptions{})
-	o.Expect(err).NotTo(o.HaveOccurred())
-
-	g.By("#. Wait for PVC to be bound")
-	o.Eventually(func() corev1.PersistentVolumeClaimPhase {
-		pvc, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Get(context.TODO(), "test-pvc-ori-61998", metav1.GetOptions{})
-		if err != nil {
-			return corev1.ClaimPending
 		}
-		return pvc.Status.Phase
-	}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.ClaimBound))
+		_, err = tc.Clientset.CoreV1().Pods(testNamespace).Create(context.TODO(), podOri, metav1.CreateOptions{})
+		o.Expect(err).NotTo(o.HaveOccurred())
 
-	g.By("#. Wait for pod to be running")
-	o.Eventually(func() corev1.PodPhase {
-		pod, err := tc.Clientset.CoreV1().Pods(testNamespace).Get(context.TODO(), "test-pod-ori-61998", metav1.GetOptions{})
-		if err != nil {
-			return corev1.PodPending
-		}
-		return pod.Status.Phase
-	}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.PodRunning))
+		g.By("#. Wait for PVC to be bound")
+		o.Eventually(func() corev1.PersistentVolumeClaimPhase {
+			pvc, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Get(context.TODO(), "test-pvc-ori-61998", metav1.GetOptions{})
+			if err != nil {
+				return corev1.ClaimPending
+			}
+			return pvc.Status.Phase
+		}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.ClaimBound))
 
-	g.By("#. Check volume size is bigger than disk size")
-	checkVolumeBiggerThanDisk(tc, "test-pvc-ori-61998", testNamespace, thinPoolSize)
+		g.By("#. Wait for pod to be running")
+		o.Eventually(func() corev1.PodPhase {
+			pod, err := tc.Clientset.CoreV1().Pods(testNamespace).Get(context.TODO(), "test-pod-ori-61998", metav1.GetOptions{})
+			if err != nil {
+				return corev1.PodPending
+			}
+			return pod.Status.Phase
+		}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.PodRunning))
 
-	g.By("#. Sync data to disk")
-	syncCmd := "sync"
-	execCommandInPod(tc, testNamespace, "test-pod-ori-61998", "test-container", syncCmd)
+		g.By("#. Check volume size is bigger than disk size")
+		checkVolumeBiggerThanDisk(tc, "test-pvc-ori-61998", testNamespace, thinPoolSize)
 
-	g.By("#. Create volumesnapshot using oc")
-	snapshotName := "test-snapshot-61998"
-	snapshotYAML := fmt.Sprintf(`apiVersion: snapshot.storage.k8s.io/v1
+		g.By("#. Sync data to disk")
+		syncCmd := "sync"
+		execCommandInPod(tc, testNamespace, "test-pod-ori-61998", "test-container", syncCmd)
+
+		g.By("#. Create volumesnapshot using oc")
+		snapshotName := "test-snapshot-61998"
+		snapshotYAML := fmt.Sprintf(`apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   name: %s
@@ -1320,99 +1320,99 @@ spec:
     persistentVolumeClaimName: test-pvc-ori-61998
 `, snapshotName, testNamespace, volumeSnapshotClassName)
 
-	cmd := exec.Command("oc", "apply", "-f", "-")
-	cmd.Stdin = strings.NewReader(snapshotYAML)
-	output, err := cmd.CombinedOutput()
-	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Failed to create snapshot: %s", string(output)))
+		cmd := exec.Command("oc", "apply", "-f", "-")
+		cmd.Stdin = strings.NewReader(snapshotYAML)
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Failed to create snapshot: %s", string(output)))
 
-	g.By("#. Wait for volumesnapshot to be ready")
-	o.Eventually(func() string {
-		cmd := exec.Command("oc", "get", "volumesnapshot", snapshotName, "-n", testNamespace, "-o=jsonpath={.status.readyToUse}")
-		output, _ := cmd.CombinedOutput()
-		return strings.TrimSpace(string(output))
-	}, 3*time.Minute, 5*time.Second).Should(o.Equal("true"))
+		g.By("#. Wait for volumesnapshot to be ready")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "volumesnapshot", snapshotName, "-n", testNamespace, "-o=jsonpath={.status.readyToUse}")
+			output, _ := cmd.CombinedOutput()
+			return strings.TrimSpace(string(output))
+		}, 3*time.Minute, 5*time.Second).Should(o.Equal("true"))
 
-	g.By("#. Create a restored pvc with snapshot dataSource")
-	pvcRestore := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pvc-restore-61998",
-			Namespace: testNamespace,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse(pvcCapacity),
+		g.By("#. Create a restored pvc with snapshot dataSource")
+		pvcRestore := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pvc-restore-61998",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(pvcCapacity),
+					},
+				},
+				StorageClassName: &storageClassName,
+				VolumeMode:       &volumeMode,
+				DataSource: &corev1.TypedLocalObjectReference{
+					APIGroup: &[]string{"snapshot.storage.k8s.io"}[0],
+					Kind:     "VolumeSnapshot",
+					Name:     snapshotName,
 				},
 			},
-			StorageClassName: &storageClassName,
-			VolumeMode:       &volumeMode,
-			DataSource: &corev1.TypedLocalObjectReference{
-				APIGroup: &[]string{"snapshot.storage.k8s.io"}[0],
-				Kind:     "VolumeSnapshot",
-				Name:     snapshotName,
-			},
-		},
-	}
-	_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Create(context.TODO(), pvcRestore, metav1.CreateOptions{})
-	o.Expect(err).NotTo(o.HaveOccurred())
+		}
+		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Create(context.TODO(), pvcRestore, metav1.CreateOptions{})
+		o.Expect(err).NotTo(o.HaveOccurred())
 
-	g.By("#. Create pod with the restored pvc")
-	podRestore := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod-restore-61998",
-			Namespace: testNamespace,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "test-container",
-					Image:   "registry.redhat.io/rhel8/support-tools:latest",
-					Command: []string{"/bin/sh", "-c", "sleep 3600"},
-					VolumeDevices: []corev1.VolumeDevice{
-						{
-							Name:       "test-volume",
-							DevicePath: "/dev/dblock",
+		g.By("#. Create pod with the restored pvc")
+		podRestore := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-restore-61998",
+				Namespace: testNamespace,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:    "test-container",
+						Image:   "registry.redhat.io/rhel8/support-tools:latest",
+						Command: []string{"/bin/sh", "-c", "sleep 3600"},
+						VolumeDevices: []corev1.VolumeDevice{
+							{
+								Name:       "test-volume",
+								DevicePath: "/dev/dblock",
+							},
+						},
+					},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "test-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "test-pvc-restore-61998",
+							},
 						},
 					},
 				},
 			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "test-volume",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "test-pvc-restore-61998",
-						},
-					},
-				},
-			},
-		},
-	}
-	_, err = tc.Clientset.CoreV1().Pods(testNamespace).Create(context.TODO(), podRestore, metav1.CreateOptions{})
-	o.Expect(err).NotTo(o.HaveOccurred())
-
-	g.By("#. Wait for restored PVC to be bound")
-	o.Eventually(func() corev1.PersistentVolumeClaimPhase {
-		pvc, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Get(context.TODO(), "test-pvc-restore-61998", metav1.GetOptions{})
-		if err != nil {
-			return corev1.ClaimPending
 		}
-		return pvc.Status.Phase
-	}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.ClaimBound))
+		_, err = tc.Clientset.CoreV1().Pods(testNamespace).Create(context.TODO(), podRestore, metav1.CreateOptions{})
+		o.Expect(err).NotTo(o.HaveOccurred())
 
-	g.By("#. Wait for restored pod to be running")
-	o.Eventually(func() corev1.PodPhase {
-		pod, err := tc.Clientset.CoreV1().Pods(testNamespace).Get(context.TODO(), "test-pod-restore-61998", metav1.GetOptions{})
-		if err != nil {
-			return corev1.PodPending
-		}
-		return pod.Status.Phase
-	}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.PodRunning))
+		g.By("#. Wait for restored PVC to be bound")
+		o.Eventually(func() corev1.PersistentVolumeClaimPhase {
+			pvc, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Get(context.TODO(), "test-pvc-restore-61998", metav1.GetOptions{})
+			if err != nil {
+				return corev1.ClaimPending
+			}
+			return pvc.Status.Phase
+		}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.ClaimBound))
 
-	g.By("#. Check restored volume size is bigger than disk size")
-	checkVolumeBiggerThanDisk(tc, "test-pvc-restore-61998", testNamespace, thinPoolSize)
-})
+		g.By("#. Wait for restored pod to be running")
+		o.Eventually(func() corev1.PodPhase {
+			pod, err := tc.Clientset.CoreV1().Pods(testNamespace).Get(context.TODO(), "test-pod-restore-61998", metav1.GetOptions{})
+			if err != nil {
+				return corev1.PodPending
+			}
+			return pod.Status.Phase
+		}, 3*time.Minute, 5*time.Second).Should(o.Equal(corev1.PodRunning))
+
+		g.By("#. Check restored volume size is bigger than disk size")
+		checkVolumeBiggerThanDisk(tc, "test-pvc-restore-61998", testNamespace, thinPoolSize)
+	})
 })
 
 // checkLvmsOperatorInstalled verifies that LVMS operator is installed on the cluster
