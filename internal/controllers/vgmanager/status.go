@@ -81,10 +81,13 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
-	if vg.Spec.DeviceSelector == nil {
+	if hasExplicitDevicePaths(vg) {
+		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
+	} else if vg.Spec.DeviceDiscoveryPolicy == nil || *vg.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicyDynamic {
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
 	} else {
-		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
+		// Default is RuntimeStatic
+		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeStatic
 	}
 
 	// Get LVMVolumeGroupNodeStatus and set the relevant VGStatus

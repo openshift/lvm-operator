@@ -155,6 +155,14 @@ type DeviceClass struct {
 	// +kubebuilder:default=xfs
 	// +optional
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
+
+	// DeviceDiscoveryPolicy specifies the policy for discovering devices for this device class.
+	// Static means the volume group is created with devices found at install time; new devices are ignored.
+	// Dynamic means devices are continuously discovered and added to the volume group.
+	// When not set, new volume groups default to Static and existing volume groups default to Dynamic for backward compatibility.
+	// +kubebuilder:validation:Enum=Static;Dynamic
+	// +optional
+	DeviceDiscoveryPolicy *DeviceDiscoveryPolicySpec `json:"deviceDiscoveryPolicy,omitempty"`
 }
 
 // DeviceSelector specifies the list of criteria that have to match before a device is assigned
