@@ -82,7 +82,6 @@
     "enabled": true,
     "recreateWhen": "auto",
     "rebaseWhen": "behind-base-branch",
-    "rebaseStalePrs": true,
     "branchTopic": "lock-file-maintenance",
     "schedule": [
       "before 5am"
