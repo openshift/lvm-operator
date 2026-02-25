@@ -763,4 +763,34 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	It("static device discovery policy is accepted on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		staticPolicy := DeviceDiscoveryPolicyStatic
+		resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy = &staticPolicy
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("dynamic device discovery policy is accepted on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		dynamicPolicy := DeviceDiscoveryPolicyDynamic
+		resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy = &dynamicPolicy
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("switching between discovery policy modes is accepted on update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		dynamicPolicy := DeviceDiscoveryPolicyDynamic
+		resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy = &dynamicPolicy
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		staticPolicy := DeviceDiscoveryPolicyStatic
+		updated.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy = &staticPolicy
+		Expect(k8sClient.Update(ctx, updated)).To(Succeed())
+
+		Expect(k8sClient.Delete(ctx, updated)).To(Succeed())
+	})
+
 })
