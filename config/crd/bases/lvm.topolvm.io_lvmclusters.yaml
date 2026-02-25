@@ -195,6 +195,43 @@ spec:
                           - nodeSelectorTerms
                           type: object
                           x-kubernetes-map-type: atomic
+                        storageClassOptions:
+                          description: StorageClassOptions allows customization of
+                            the StorageClass created for this device class.
+                          properties:
+                            additionalLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                AdditionalLabels sets additional labels on the StorageClass.
+                                This is the only StorageClassOptions field that can be changed after creation.
+                              type: object
+                            additionalParameters:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                AdditionalParameters sets additional parameters on the StorageClass.
+                                LVMS-owned keys (topolvm.io/device-class, csi.storage.k8s.io/fstype) cannot be overridden.
+                                This field is immutable after creation.
+                              type: object
+                            reclaimPolicy:
+                              description: |-
+                                ReclaimPolicy sets the reclaim policy for PVs provisioned by this device class.
+                                When set to Retain, PVs and their underlying logical volumes are preserved when PVCs are deleted.
+                                Defaults to Delete if not specified.
+                              enum:
+                              - Delete
+                              - Retain
+                              type: string
+                            volumeBindingMode:
+                              description: |-
+                                VolumeBindingMode sets the binding mode for PVs provisioned by this device class.
+                                Defaults to WaitForFirstConsumer if not specified.
+                              enum:
+                              - WaitForFirstConsumer
+                              - Immediate
+                              type: string
+                          type: object
                         thinPoolConfig:
                           description: ThinPoolConfig contains the configuration to
                             create a thin pool in the LVM volume group. If you exclude

@@ -44,6 +44,10 @@ const (
 	// DevicesWipedAnnotationPrefix is an annotation prefix that marks when a device has been wiped on a certain node
 	DevicesWipedAnnotationPrefix = "wiped.devices.lvms.openshift.io/"
 
+	// ManagedAdditionalLabelsAnnotation tracks which StorageClass labels are managed by LVMS via additionalLabels,
+	// enabling proper pruning when labels are removed from the LVMCluster CR.
+	ManagedAdditionalLabelsAnnotation = "lvms.topolvm.io/managed-additional-labels"
+
 	// labels and values
 
 	// AppKubernetesPartOfLabel is the Kubernetes recommended part-of label

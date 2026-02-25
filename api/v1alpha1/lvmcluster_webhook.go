@@ -26,7 +26,9 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -60,6 +62,10 @@ var (
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
+	ErrReclaimPolicyCannotBeChanged                          = errors.New("StorageClassOptions.ReclaimPolicy cannot be changed after creation")
+	ErrVolumeBindingModeCannotBeChanged                      = errors.New("StorageClassOptions.VolumeBindingMode cannot be changed after creation")
+	ErrAdditionalParametersCannotBeChanged                   = errors.New("StorageClassOptions.AdditionalParameters cannot be changed after creation")
+	ErrFsTypeCannotBeChanged                                 = errors.New("FilesystemType cannot be changed after creation")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -136,6 +142,12 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
 	warnings = append(warnings, discoveryPolicyWarnings...)
 
+	scOptionWarnings, err := v.verifyStorageClassOptions(l)
+	warnings = append(warnings, scOptionWarnings...)
+	if err != nil {
+		return warnings, err
+	}
+
 	return warnings, nil
 }
 
@@ -176,6 +188,16 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
+	}
+
+	if err := v.verifyImmutableStorageClassFields(oldLVMCluster, l); err != nil {
+		return warnings, err
+	}
+
+	scOptionWarnings, err := v.verifyStorageClassOptions(l)
+	warnings = append(warnings, scOptionWarnings...)
+	if err != nil {
+		return warnings, err
 	}
 
 	// Validate device class removal follows the business rules
@@ -567,4 +589,94 @@ func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admissi
 		}
 	}
 	return warnings
+}
+
+// lvmsOwnedParameterKeys are StorageClass parameter keys managed by LVMS that cannot be overridden.
+var lvmsOwnedParameterKeys = map[string]struct{}{
+	"topolvm.io/device-class":   {},
+	"csi.storage.k8s.io/fstype": {},
+}
+
+func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
+	var warnings admission.Warnings
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.StorageClassOptions == nil {
+			continue
+		}
+		for key := range dc.StorageClassOptions.AdditionalParameters {
+			if _, owned := lvmsOwnedParameterKeys[key]; owned {
+				warnings = append(warnings, fmt.Sprintf(
+					"device class %q: additionalParameters key %q is managed by LVMS and will be ignored",
+					dc.Name, key))
+			}
+		}
+		for key, val := range dc.StorageClassOptions.AdditionalLabels {
+			if errs := k8svalidation.IsQualifiedName(key); len(errs) > 0 {
+				return warnings, fmt.Errorf("device class %q: additionalLabels key %q is invalid: %s",
+					dc.Name, key, strings.Join(errs, "; "))
+			}
+			if errs := k8svalidation.IsValidLabelValue(val); len(errs) > 0 {
+				return warnings, fmt.Errorf("device class %q: additionalLabels value %q for key %q is invalid: %s",
+					dc.Name, val, key, strings.Join(errs, "; "))
+			}
+		}
+	}
+	return warnings, nil
+}
+
+// effectiveImmutable returns the effective values of immutable StorageClass fields with defaults applied.
+type immutableSCFields struct {
+	ReclaimPolicy        corev1.PersistentVolumeReclaimPolicy
+	VolumeBindingMode    storagev1.VolumeBindingMode
+	AdditionalParameters map[string]string
+	FsType               DeviceFilesystemType
+}
+
+func effectiveImmutable(dc DeviceClass) immutableSCFields {
+	f := immutableSCFields{
+		ReclaimPolicy:     corev1.PersistentVolumeReclaimDelete,
+		VolumeBindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+		FsType:            dc.FilesystemType,
+	}
+	if dc.StorageClassOptions != nil {
+		if dc.StorageClassOptions.ReclaimPolicy != nil {
+			f.ReclaimPolicy = *dc.StorageClassOptions.ReclaimPolicy
+		}
+		if dc.StorageClassOptions.VolumeBindingMode != nil {
+			f.VolumeBindingMode = *dc.StorageClassOptions.VolumeBindingMode
+		}
+		f.AdditionalParameters = dc.StorageClassOptions.AdditionalParameters
+	}
+	return f
+}
+
+func (v *lvmClusterValidator) verifyImmutableStorageClassFields(old, new *LVMCluster) error {
+	oldDCs := make(map[string]DeviceClass)
+	for _, dc := range old.Spec.Storage.DeviceClasses {
+		oldDCs[dc.Name] = dc
+	}
+
+	for _, newDC := range new.Spec.Storage.DeviceClasses {
+		oldDC, exists := oldDCs[newDC.Name]
+		if !exists {
+			continue
+		}
+
+		oldFields := effectiveImmutable(oldDC)
+		newFields := effectiveImmutable(newDC)
+
+		if oldFields.ReclaimPolicy != newFields.ReclaimPolicy {
+			return fmt.Errorf("device class %q: %w", newDC.Name, ErrReclaimPolicyCannotBeChanged)
+		}
+		if oldFields.VolumeBindingMode != newFields.VolumeBindingMode {
+			return fmt.Errorf("device class %q: %w", newDC.Name, ErrVolumeBindingModeCannotBeChanged)
+		}
+		if !reflect.DeepEqual(oldFields.AdditionalParameters, newFields.AdditionalParameters) {
+			return fmt.Errorf("device class %q: %w", newDC.Name, ErrAdditionalParametersCannotBeChanged)
+		}
+		if oldFields.FsType != newFields.FsType {
+			return fmt.Errorf("device class %q: %w", newDC.Name, ErrFsTypeCannotBeChanged)
+		}
+	}
+	return nil
 }

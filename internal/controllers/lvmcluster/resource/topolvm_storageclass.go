@@ -19,10 +19,13 @@ package resource
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,17 +58,33 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 
 	// one storage class for every deviceClass based on CR is created
 	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
-	for _, sc := range topolvmStorageClasses {
-		// we anticipate no edits to storage class
-		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
-			labels.SetManagedLabels(r.Scheme(), sc, cluster)
+	for i, desired := range topolvmStorageClasses {
+		existing := &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{Name: desired.Name},
+		}
+
+		result, err := cutil.CreateOrUpdate(ctx, r, existing, func() error {
+			labels.SetManagedLabels(r.Scheme(), existing, cluster)
+
+			if existing.ResourceVersion == "" {
+				// First creation: set all fields including immutable ones
+				existing.Provisioner = desired.Provisioner
+				existing.VolumeBindingMode = desired.VolumeBindingMode
+				existing.ReclaimPolicy = desired.ReclaimPolicy
+				existing.AllowVolumeExpansion = desired.AllowVolumeExpansion
+				existing.Parameters = desired.Parameters
+				existing.Annotations = desired.Annotations
+			}
+
+			// Labels (including additionalLabels) can always be updated
+			applyAdditionalLabels(existing, cluster.Spec.Storage.DeviceClasses[i])
 			return nil
 		})
 		if err != nil {
 			return fmt.Errorf("%s failed to reconcile: %w", s.GetName(), err)
 		}
 		if result != cutil.OperationResultNone {
-			logger.V(2).Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
+			logger.V(2).Info("StorageClass applied to cluster", "operation", result, "name", desired.Name)
 		}
 	}
 	return nil
@@ -105,7 +124,6 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 
 	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
 	allowVolumeExpansion := true
-	volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
 
@@ -125,9 +143,39 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			}
 		}
 	}
+
 	var sc []*storagev1.StorageClass
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
+
+		// Defaults
+		reclaimPolicy := corev1.PersistentVolumeReclaimDelete
+		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
+
+		// Apply StorageClassOptions overrides
+		if opts := deviceClass.StorageClassOptions; opts != nil {
+			if opts.ReclaimPolicy != nil {
+				reclaimPolicy = *opts.ReclaimPolicy
+			}
+			if opts.VolumeBindingMode != nil {
+				volumeBindingMode = *opts.VolumeBindingMode
+			}
+		}
+
+		parameters := map[string]string{
+			constants.DeviceClassKey:    deviceClass.Name,
+			"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
+		}
+
+		// Merge additional parameters, skipping LVMS-owned keys
+		if deviceClass.StorageClassOptions != nil {
+			for k, v := range deviceClass.StorageClassOptions.AdditionalParameters {
+				if k == constants.DeviceClassKey || k == "csi.storage.k8s.io/fstype" {
+					continue
+				}
+				parameters[k] = v
+			}
+		}
 
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
@@ -137,12 +185,10 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 				},
 			},
 			Provisioner:          constants.TopolvmCSIDriverName,
+			ReclaimPolicy:        &reclaimPolicy,
 			VolumeBindingMode:    &volumeBindingMode,
 			AllowVolumeExpansion: &allowVolumeExpansion,
-			Parameters: map[string]string{
-				constants.DeviceClassKey:    deviceClass.Name,
-				"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
-			},
+			Parameters:           parameters,
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
@@ -152,4 +198,50 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		sc = append(sc, storageClass)
 	}
 	return sc
+}
+
+// applyAdditionalLabels applies additionalLabels from the DeviceClass to the StorageClass,
+// and prunes any labels that were previously managed but have been removed from the CR.
+func applyAdditionalLabels(sc *storagev1.StorageClass, dc lvmv1alpha1.DeviceClass) {
+	if sc.Labels == nil {
+		sc.Labels = make(map[string]string)
+	}
+	if sc.Annotations == nil {
+		sc.Annotations = make(map[string]string)
+	}
+
+	// Read previously managed label keys from annotation
+	var previousKeys []string
+	if raw, ok := sc.Annotations[constants.ManagedAdditionalLabelsAnnotation]; ok && raw != "" {
+		previousKeys = strings.Split(raw, ",")
+	}
+
+	// Remove previously managed labels that are no longer in additionalLabels
+	var currentAdditional map[string]string
+	if dc.StorageClassOptions != nil {
+		currentAdditional = dc.StorageClassOptions.AdditionalLabels
+	}
+	for _, key := range previousKeys {
+		if _, stillPresent := currentAdditional[key]; !stillPresent {
+			delete(sc.Labels, key)
+		}
+	}
+
+	// Apply current additionalLabels, skipping operator-owned label keys
+	var managedKeys []string
+	for k, v := range currentAdditional {
+		if strings.HasPrefix(k, labels.OwnedByPrefix) || strings.HasPrefix(k, "app.kubernetes.io/") {
+			continue
+		}
+		sc.Labels[k] = v
+		managedKeys = append(managedKeys, k)
+	}
+
+	// Update tracking annotation
+	if len(managedKeys) > 0 {
+		sort.Strings(managedKeys)
+		sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] = strings.Join(managedKeys, ",")
+	} else {
+		delete(sc.Annotations, constants.ManagedAdditionalLabelsAnnotation)
+	}
 }
