@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,6 +49,11 @@ func (in *DeviceClass) DeepCopyInto(out *DeviceClass) {
 		in, out := &in.StorageClassOptions, &out.StorageClassOptions
 		*out = new(StorageClassOptions)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.DeviceDiscoveryPolicy != nil {
+		in, out := &in.DeviceDiscoveryPolicy, &out.DeviceDiscoveryPolicy
+		*out = new(DeviceDiscoveryPolicySpec)
+		**out = **in
 	}
 }
 
