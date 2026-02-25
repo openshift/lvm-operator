@@ -18,6 +18,7 @@ package lvmcluster
 
 import (
 	"context"
+	"fmt"
 
 	snapapiv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
@@ -43,6 +44,30 @@ import (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Index PVCs and PVs by spec.storageClassName so deletion checks can filter by SC.
+	err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1.PersistentVolumeClaim{},
+		"spec.storageClassName", func(obj client.Object) []string {
+			pvc := obj.(*v1.PersistentVolumeClaim)
+			if pvc.Spec.StorageClassName == nil {
+				return nil
+			}
+			return []string{*pvc.Spec.StorageClassName}
+		})
+	if err != nil {
+		return fmt.Errorf("failed to index PVCs by storageClassName: %w", err)
+	}
+	err = mgr.GetFieldIndexer().IndexField(context.Background(), &v1.PersistentVolume{},
+		"spec.storageClassName", func(obj client.Object) []string {
+			pv := obj.(*v1.PersistentVolume)
+			if pv.Spec.StorageClassName == "" {
+				return nil
+			}
+			return []string{pv.Spec.StorageClassName}
+		})
+	if err != nil {
+		return fmt.Errorf("failed to index PVs by storageClassName: %w", err)
+	}
+
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMCluster{}).
 		Owns(&appsv1.DaemonSet{}).
