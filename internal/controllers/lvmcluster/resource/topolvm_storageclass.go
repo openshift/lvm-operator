@@ -39,6 +39,16 @@ const (
 	scName = "topolvm-storageclass"
 )
 
+// reservedStorageClassLabelKeys are standard app.kubernetes.io label keys that are operator-reserved
+// and cannot be set or overridden via additionalLabels. This prevents users from spoofing
+// ownership/identity labels on cluster-scoped StorageClass resources.
+var reservedStorageClassLabelKeys = map[string]struct{}{
+	constants.AppKubernetesManagedByLabel: {},
+	constants.AppKubernetesPartOfLabel:    {},
+	constants.AppKubernetesNameLabel:      {},
+	constants.AppKubernetesComponentLabel: {},
+}
+
 func TopoLVMStorageClass() Manager {
 	return &topolvmStorageClass{}
 }
@@ -65,7 +75,7 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 
 		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
 			labels.SetManagedLabels(r.Scheme(), sc, cluster)
-			applyAdditionalLabels(sc, cluster, sc.Name)
+			applyAdditionalLabels(ctx, sc, cluster, sc.Name)
 
 			// Only set immutable spec fields on creation (ResourceVersion is empty for new objects)
 			if sc.ResourceVersion == "" {
@@ -207,7 +217,8 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 
 // applyAdditionalLabels applies additionalLabels from the matching DeviceClass to the StorageClass,
 // and prunes any labels that were previously managed but have been removed from the CR.
-func applyAdditionalLabels(sc *storagev1.StorageClass, cluster *lvmv1alpha1.LVMCluster, scName string) {
+func applyAdditionalLabels(ctx context.Context, sc *storagev1.StorageClass, cluster *lvmv1alpha1.LVMCluster, scName string) {
+	logger := log.FromContext(ctx)
 	if sc.Labels == nil {
 		sc.Labels = make(map[string]string)
 	}
@@ -232,17 +243,29 @@ func applyAdditionalLabels(sc *storagev1.StorageClass, cluster *lvmv1alpha1.LVMC
 		currentAdditional = dc.StorageClassOptions.AdditionalLabels
 	}
 
-	// Remove previously managed labels that are no longer in additionalLabels
+	// Remove previously managed labels that are no longer in additionalLabels,
+	// but never prune operator-reserved keys even if a prior version tracked them.
 	for _, key := range previousKeys {
+		if strings.HasPrefix(key, labels.OwnedByPrefix) {
+			continue
+		}
+		if _, reserved := reservedStorageClassLabelKeys[key]; reserved {
+			continue
+		}
 		if _, stillPresent := currentAdditional[key]; !stillPresent {
 			delete(sc.Labels, key)
 		}
 	}
 
-	// Apply current additionalLabels, skipping operator-owned label keys
+	// Apply current additionalLabels, skipping operator-reserved label keys
 	managedKeys := make([]string, 0, len(currentAdditional))
 	for k, v := range currentAdditional {
 		if strings.HasPrefix(k, labels.OwnedByPrefix) {
+			logger.V(2).Info("additionalLabels key is reserved and will be ignored", "key", k, "storageClass", scName)
+			continue
+		}
+		if _, reserved := reservedStorageClassLabelKeys[k]; reserved {
+			logger.V(2).Info("additionalLabels key is reserved and will be ignored", "key", k, "storageClass", scName)
 			continue
 		}
 		sc.Labels[k] = v
