@@ -138,7 +138,7 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
 	warnings = append(warnings, discoveryPolicyWarnings...)
 
-	scOptionWarnings, err := v.verifyStorageClassOptions(l)
+	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
 	warnings = append(warnings, scOptionWarnings...)
 	if err != nil {
 		return warnings, err
@@ -186,7 +186,7 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
 	}
 
-	scOptionWarnings, err := v.verifyStorageClassOptions(l)
+	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
 	warnings = append(warnings, scOptionWarnings...)
 	if err != nil {
 		return warnings, err
@@ -583,13 +583,20 @@ func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admissi
 	return warnings
 }
 
-// lvmsOwnedParameterKeys are StorageClass parameter keys managed by LVMS that cannot be overridden.
+// lvmsOwnedParameterKeys are StorageClass parameter keys managed by LVMS that cannot be set via additionalParameters.
 var lvmsOwnedParameterKeys = map[string]struct{}{
 	constants.DeviceClassKey: {},
 	constants.FsTypeKey:      {},
 }
 
-func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
+// ownedByLabelPrefix matches labels set by the operator to track StorageClass ownership.
+const ownedByLabelPrefix = "owned-by.topolvm.io"
+
+// validateAdditionalParamsAndLabels rejects LVMS-owned parameter keys and operator-reserved
+// label keys at admission. It also validates label key/value format via
+// IsQualifiedName/IsValidLabelValue which cannot be expressed as CEL rules.
+// The controller retains equivalent skip logic as defense-in-depth against admission bypass.
+func (v *lvmClusterValidator) validateAdditionalParamsAndLabels(l *LVMCluster) (admission.Warnings, error) {
 	var warnings admission.Warnings
 	for _, dc := range l.Spec.Storage.DeviceClasses {
 		if dc.StorageClassOptions == nil {
@@ -600,9 +607,8 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 				return warnings, fmt.Errorf("device class %q: additionalParameters must not contain empty keys", dc.Name)
 			}
 			if _, owned := lvmsOwnedParameterKeys[key]; owned {
-				warnings = append(warnings, fmt.Sprintf(
-					"device class %q: additionalParameters key %q is managed by LVMS and will be ignored",
-					dc.Name, key))
+				return warnings, fmt.Errorf("device class %q: additionalParameters key %q is managed by LVMS and cannot be set",
+					dc.Name, key)
 			}
 		}
 		for key, val := range dc.StorageClassOptions.AdditionalLabels {
@@ -615,9 +621,12 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 					dc.Name, val, key, strings.Join(errs, "; "))
 			}
 			if _, reserved := constants.ReservedStorageClassLabelKeys[key]; reserved {
-				warnings = append(warnings, fmt.Sprintf(
-					"device class %q: additionalLabels key %q is reserved and will be ignored",
-					dc.Name, key))
+				return warnings, fmt.Errorf("device class %q: additionalLabels key %q is operator-reserved and cannot be set",
+					dc.Name, key)
+			}
+			if strings.HasPrefix(key, ownedByLabelPrefix) {
+				return warnings, fmt.Errorf("device class %q: additionalLabels key %q is operator-reserved and cannot be set",
+					dc.Name, key)
 			}
 		}
 	}
