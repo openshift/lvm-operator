@@ -97,10 +97,10 @@ func (t *PodRunner) ExecWithOptions(ctx context.Context, options ExecOptions) (s
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
 }
 
-func (t *PodRunner) ExecCommand(ctx context.Context, pod, container string, command []string) (string, string, error) {
+func (t *PodRunner) ExecCommand(ctx context.Context, pod, container, namespace string, command []string) (string, string, error) {
 	return t.ExecWithOptions(ctx, ExecOptions{
 		Command:            command,
-		Namespace:          testNamespace,
+		Namespace:          namespace,
 		PodName:            pod,
 		ContainerName:      container,
 		Stdin:              nil,
@@ -111,8 +111,8 @@ func (t *PodRunner) ExecCommand(ctx context.Context, pod, container string, comm
 }
 
 // ExecShellCommand executes the command in container through a shell.
-func (t *PodRunner) ExecShellCommand(ctx context.Context, pod, container string, command string) (string, string, error) {
-	stdout, stderr, err := t.ExecCommand(ctx, pod, container, []string{"sh", "-c", command})
+func (t *PodRunner) ExecShellCommand(ctx context.Context, pod, container string, namespace string, command string) (string, string, error) {
+	stdout, stderr, err := t.ExecCommand(ctx, pod, container, namespace, []string{"sh", "-c", command})
 	if err != nil {
 		return stdout, stderr, fmt.Errorf("failed to execute shell command in pod %v, container %v: %v",
 			pod, container, err)
@@ -125,7 +125,7 @@ func (t *PodRunner) ExecCommandInFirstPodContainer(ctx context.Context, pod *k8s
 	if len(pod.Spec.Containers) < 1 {
 		return "", "", fmt.Errorf("found %v containers, but expected at least 1", pod.Spec.Containers)
 	}
-	return t.ExecShellCommand(ctx, pod.Name, pod.Spec.Containers[0].Name, cmd)
+	return t.ExecShellCommand(ctx, pod.Name, pod.Spec.Containers[0].Name, pod.Namespace, cmd)
 }
 
 // WriteDataInPod writes the data to pod.
