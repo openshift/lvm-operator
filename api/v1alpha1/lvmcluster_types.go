@@ -131,7 +131,8 @@ type DeviceClass struct {
 	// +kubebuilder:validation:MaxLength=245
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-	Name string `json:"name,omitempty"`
+	// +required
+	Name string `json:"name"`
 
 	// DeviceSelector contains the configuration to specify paths to the devices that you want to add to the LVM volume group, and force wipe the selected devices.
 	// +optional
@@ -152,9 +153,10 @@ type DeviceClass struct {
 	// FilesystemType sets the default filesystem type for persistent volumes created from this device class.
 	// This determines the filesystem used when provisioning PVCs with volumeMode: Filesystem.
 	// Select either `ext4` or `xfs`. This does not filter devices during discovery.
-	// +kubebuilder:validation:Enum=xfs;ext4;""
+	// +kubebuilder:validation:Enum=xfs;ext4
 	// +kubebuilder:default=xfs
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="fstype is immutable"
 	FilesystemType DeviceFilesystemType `json:"fstype,omitempty"`
 
 	// DeviceDiscoveryPolicy specifies the policy for discovering devices for this device class.
@@ -174,26 +176,32 @@ type DeviceClass struct {
 type StorageClassOptions struct {
 	// ReclaimPolicy sets the reclaim policy for PVs provisioned by this device class.
 	// When set to Retain, PVs and their underlying logical volumes are preserved when PVCs are deleted.
-	// Defaults to Delete if not specified.
 	// +optional
+	// +kubebuilder:default=Delete
 	// +kubebuilder:validation:Enum=Delete;Retain
+	// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="reclaimPolicy is immutable once set"
 	ReclaimPolicy *corev1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty"`
 
 	// VolumeBindingMode sets the binding mode for PVs provisioned by this device class.
-	// Defaults to WaitForFirstConsumer if not specified.
 	// +optional
+	// +kubebuilder:default=WaitForFirstConsumer
 	// +kubebuilder:validation:Enum=WaitForFirstConsumer;Immediate
+	// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="volumeBindingMode is immutable once set"
 	VolumeBindingMode *storagev1.VolumeBindingMode `json:"volumeBindingMode,omitempty"`
 
 	// AdditionalParameters sets additional parameters on the StorageClass.
 	// LVMS-owned keys (topolvm.io/device-class, csi.storage.k8s.io/fstype) cannot be overridden.
 	// This field is immutable after creation.
 	// +optional
+	// +kubebuilder:default={}
+	// +kubebuilder:validation:MaxProperties=16
+	// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="additionalParameters is immutable once set"
 	AdditionalParameters map[string]string `json:"additionalParameters,omitempty"`
 
 	// AdditionalLabels sets additional labels on the StorageClass.
 	// This is the only StorageClassOptions field that can be changed after creation.
 	// +optional
+	// +kubebuilder:validation:MaxProperties=16
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 }
 
@@ -279,6 +287,8 @@ type DeviceClassStatus struct {
 type Storage struct {
 	// DeviceClasses contains the configuration to assign the local storage devices to the LVM volume groups that you can use to provision persistent volume claims (PVCs).
 	// +Optional
+	// +listType=map
+	// +listMapKey=name
 	DeviceClasses []DeviceClass `json:"deviceClasses,omitempty"`
 }
 

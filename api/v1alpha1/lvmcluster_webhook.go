@@ -27,7 +27,6 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -63,10 +62,6 @@ var (
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
-	ErrReclaimPolicyCannotBeChanged                          = errors.New("StorageClassOptions.ReclaimPolicy cannot be changed after creation")
-	ErrVolumeBindingModeCannotBeChanged                      = errors.New("StorageClassOptions.VolumeBindingMode cannot be changed after creation")
-	ErrAdditionalParametersCannotBeChanged                   = errors.New("StorageClassOptions.AdditionalParameters cannot be changed after creation")
-	ErrFsTypeCannotBeChanged                                 = errors.New("FilesystemType cannot be changed after creation")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -189,10 +184,6 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
-	}
-
-	if err := v.verifyImmutableStorageClassFields(oldLVMCluster, l); err != nil {
-		return warnings, err
 	}
 
 	scOptionWarnings, err := v.verifyStorageClassOptions(l)
@@ -606,7 +597,7 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 		}
 		for key := range dc.StorageClassOptions.AdditionalParameters {
 			if key == "" {
-				return warnings, fmt.Errorf("device class %q: additionalParameters contains an empty key", dc.Name)
+				return warnings, fmt.Errorf("device class %q: additionalParameters must not contain empty keys", dc.Name)
 			}
 			if _, owned := lvmsOwnedParameterKeys[key]; owned {
 				warnings = append(warnings, fmt.Sprintf(
@@ -631,77 +622,4 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 		}
 	}
 	return warnings, nil
-}
-
-// effectiveImmutable returns the effective values of immutable StorageClass fields with defaults applied.
-type immutableSCFields struct {
-	ReclaimPolicy        corev1.PersistentVolumeReclaimPolicy
-	VolumeBindingMode    storagev1.VolumeBindingMode
-	AdditionalParameters map[string]string
-	FsType               DeviceFilesystemType
-}
-
-// sanitizeAdditionalParams returns a copy of the map with LVMS-owned keys stripped,
-// matching the "will be ignored" warning semantics from verifyStorageClassOptions.
-func sanitizeAdditionalParams(m map[string]string) map[string]string {
-	out := make(map[string]string, len(m))
-	for k, v := range m {
-		if _, owned := lvmsOwnedParameterKeys[k]; owned {
-			continue
-		}
-		out[k] = v
-	}
-	return out
-}
-
-func effectiveImmutable(dc DeviceClass) immutableSCFields {
-	f := immutableSCFields{
-		ReclaimPolicy:        corev1.PersistentVolumeReclaimDelete,
-		VolumeBindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
-		AdditionalParameters: map[string]string{},
-		FsType:               dc.FilesystemType,
-	}
-	if dc.StorageClassOptions != nil {
-		if dc.StorageClassOptions.ReclaimPolicy != nil {
-			f.ReclaimPolicy = *dc.StorageClassOptions.ReclaimPolicy
-		}
-		if dc.StorageClassOptions.VolumeBindingMode != nil {
-			f.VolumeBindingMode = *dc.StorageClassOptions.VolumeBindingMode
-		}
-		if dc.StorageClassOptions.AdditionalParameters != nil {
-			f.AdditionalParameters = sanitizeAdditionalParams(dc.StorageClassOptions.AdditionalParameters)
-		}
-	}
-	return f
-}
-
-func (v *lvmClusterValidator) verifyImmutableStorageClassFields(old, new *LVMCluster) error {
-	oldDCs := make(map[string]DeviceClass)
-	for _, dc := range old.Spec.Storage.DeviceClasses {
-		oldDCs[dc.Name] = dc
-	}
-
-	for _, newDC := range new.Spec.Storage.DeviceClasses {
-		oldDC, exists := oldDCs[newDC.Name]
-		if !exists {
-			continue
-		}
-
-		oldFields := effectiveImmutable(oldDC)
-		newFields := effectiveImmutable(newDC)
-
-		if oldFields.ReclaimPolicy != newFields.ReclaimPolicy {
-			return fmt.Errorf("device class %q: %w", newDC.Name, ErrReclaimPolicyCannotBeChanged)
-		}
-		if oldFields.VolumeBindingMode != newFields.VolumeBindingMode {
-			return fmt.Errorf("device class %q: %w", newDC.Name, ErrVolumeBindingModeCannotBeChanged)
-		}
-		if !reflect.DeepEqual(oldFields.AdditionalParameters, newFields.AdditionalParameters) {
-			return fmt.Errorf("device class %q: %w", newDC.Name, ErrAdditionalParametersCannotBeChanged)
-		}
-		if oldFields.FsType != newFields.FsType {
-			return fmt.Errorf("device class %q: %w", newDC.Name, ErrFsTypeCannotBeChanged)
-		}
-	}
-	return nil
 }

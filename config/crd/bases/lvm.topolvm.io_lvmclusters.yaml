@@ -96,8 +96,10 @@ spec:
                           enum:
                           - xfs
                           - ext4
-                          - ""
                           type: string
+                          x-kubernetes-validations:
+                          - message: fstype is immutable
+                            rule: oldSelf == self
                         name:
                           description: Name specifies a name for the device class
                           maxLength: 245
@@ -205,32 +207,44 @@ spec:
                               description: |-
                                 AdditionalLabels sets additional labels on the StorageClass.
                                 This is the only StorageClassOptions field that can be changed after creation.
+                              maxProperties: 16
                               type: object
                             additionalParameters:
                               additionalProperties:
                                 type: string
+                              default: {}
                               description: |-
                                 AdditionalParameters sets additional parameters on the StorageClass.
                                 LVMS-owned keys (topolvm.io/device-class, csi.storage.k8s.io/fstype) cannot be overridden.
                                 This field is immutable after creation.
+                              maxProperties: 16
                               type: object
+                              x-kubernetes-validations:
+                              - message: additionalParameters is immutable once set
+                                rule: oldSelf == self
                             reclaimPolicy:
+                              default: Delete
                               description: |-
                                 ReclaimPolicy sets the reclaim policy for PVs provisioned by this device class.
                                 When set to Retain, PVs and their underlying logical volumes are preserved when PVCs are deleted.
-                                Defaults to Delete if not specified.
                               enum:
                               - Delete
                               - Retain
                               type: string
+                              x-kubernetes-validations:
+                              - message: reclaimPolicy is immutable once set
+                                rule: oldSelf == self
                             volumeBindingMode:
-                              description: |-
-                                VolumeBindingMode sets the binding mode for PVs provisioned by this device class.
-                                Defaults to WaitForFirstConsumer if not specified.
+                              default: WaitForFirstConsumer
+                              description: VolumeBindingMode sets the binding mode
+                                for PVs provisioned by this device class.
                               enum:
                               - WaitForFirstConsumer
                               - Immediate
                               type: string
+                              x-kubernetes-validations:
+                              - message: volumeBindingMode is immutable once set
+                                rule: oldSelf == self
                           type: object
                         thinPoolConfig:
                           description: ThinPoolConfig contains the configuration to
@@ -303,8 +317,13 @@ spec:
                           - name
                           - overprovisionRatio
                           type: object
+                      required:
+                      - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 type: object
               tolerations:
                 description: Tolerations to apply to nodes to act on
