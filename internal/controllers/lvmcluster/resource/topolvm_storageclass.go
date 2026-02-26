@@ -39,16 +39,6 @@ const (
 	scName = "topolvm-storageclass"
 )
 
-// reservedStorageClassLabelKeys are standard app.kubernetes.io label keys that are operator-reserved
-// and cannot be set or overridden via additionalLabels. This prevents users from spoofing
-// ownership/identity labels on cluster-scoped StorageClass resources.
-var reservedStorageClassLabelKeys = map[string]struct{}{
-	constants.AppKubernetesManagedByLabel: {},
-	constants.AppKubernetesPartOfLabel:    {},
-	constants.AppKubernetesNameLabel:      {},
-	constants.AppKubernetesComponentLabel: {},
-}
-
 func TopoLVMStorageClass() Manager {
 	return &topolvmStorageClass{}
 }
@@ -229,13 +219,18 @@ func applyAdditionalLabels(ctx context.Context, sc *storagev1.StorageClass, clus
 	dc := FindDeviceClassBySCName(scName, cluster.Spec.Storage.DeviceClasses)
 	if dc == nil {
 		// Fail-safe: don't prune/apply if we can't map SC -> DeviceClass
+		logger.V(1).Info("cannot map StorageClass to DeviceClass, skipping additionalLabels reconciliation", "storageClass", scName)
 		return
 	}
 
-	// Read previously managed label keys from annotation
+	// Read previously managed label keys from annotation, trimming whitespace defensively
 	var previousKeys []string
 	if raw, ok := sc.Annotations[constants.ManagedAdditionalLabelsAnnotation]; ok && raw != "" {
-		previousKeys = strings.Split(raw, ",")
+		for _, k := range strings.Split(raw, ",") {
+			if trimmed := strings.TrimSpace(k); trimmed != "" {
+				previousKeys = append(previousKeys, trimmed)
+			}
+		}
 	}
 
 	currentAdditional := map[string]string{}
@@ -249,7 +244,7 @@ func applyAdditionalLabels(ctx context.Context, sc *storagev1.StorageClass, clus
 		if strings.HasPrefix(key, labels.OwnedByPrefix) {
 			continue
 		}
-		if _, reserved := reservedStorageClassLabelKeys[key]; reserved {
+		if _, reserved := constants.ReservedStorageClassLabelKeys[key]; reserved {
 			continue
 		}
 		if _, stillPresent := currentAdditional[key]; !stillPresent {
@@ -264,12 +259,12 @@ func applyAdditionalLabels(ctx context.Context, sc *storagev1.StorageClass, clus
 			logger.V(2).Info("additionalLabels key is reserved and will be ignored", "key", k, "storageClass", scName)
 			continue
 		}
-		if _, reserved := reservedStorageClassLabelKeys[k]; reserved {
+		if _, reserved := constants.ReservedStorageClassLabelKeys[k]; reserved {
 			logger.V(2).Info("additionalLabels key is reserved and will be ignored", "key", k, "storageClass", scName)
 			continue
 		}
 		sc.Labels[k] = v
-		managedKeys = append(managedKeys, k)
+		managedKeys = append(managedKeys, strings.TrimSpace(k))
 	}
 
 	// Update tracking annotation

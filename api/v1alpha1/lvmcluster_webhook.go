@@ -605,6 +605,9 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 			continue
 		}
 		for key := range dc.StorageClassOptions.AdditionalParameters {
+			if key == "" {
+				return warnings, fmt.Errorf("device class %q: additionalParameters contains an empty key", dc.Name)
+			}
 			if _, owned := lvmsOwnedParameterKeys[key]; owned {
 				warnings = append(warnings, fmt.Sprintf(
 					"device class %q: additionalParameters key %q is managed by LVMS and will be ignored",
@@ -619,6 +622,11 @@ func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admissio
 			if errs := k8svalidation.IsValidLabelValue(val); len(errs) > 0 {
 				return warnings, fmt.Errorf("device class %q: additionalLabels value %q for key %q is invalid: %s",
 					dc.Name, val, key, strings.Join(errs, "; "))
+			}
+			if _, reserved := constants.ReservedStorageClassLabelKeys[key]; reserved {
+				warnings = append(warnings, fmt.Sprintf(
+					"device class %q: additionalLabels key %q is reserved and will be ignored",
+					dc.Name, key))
 			}
 		}
 	}
