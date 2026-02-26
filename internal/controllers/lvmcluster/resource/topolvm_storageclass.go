@@ -168,14 +168,14 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		}
 
 		parameters := map[string]string{
-			constants.DeviceClassKey:    deviceClass.Name,
-			"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
+			constants.DeviceClassKey: deviceClass.Name,
+			constants.FsTypeKey:      string(deviceClass.FilesystemType),
 		}
 
 		// Merge additional parameters, skipping LVMS-owned keys
 		if deviceClass.StorageClassOptions != nil {
 			for k, v := range deviceClass.StorageClassOptions.AdditionalParameters {
-				if k == constants.DeviceClassKey || k == "csi.storage.k8s.io/fstype" {
+				if k == constants.DeviceClassKey || k == constants.FsTypeKey {
 					continue
 				}
 				parameters[k] = v

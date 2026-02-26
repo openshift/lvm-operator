@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -593,8 +594,8 @@ func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admissi
 
 // lvmsOwnedParameterKeys are StorageClass parameter keys managed by LVMS that cannot be overridden.
 var lvmsOwnedParameterKeys = map[string]struct{}{
-	"topolvm.io/device-class":   {},
-	"csi.storage.k8s.io/fstype": {},
+	constants.DeviceClassKey: {},
+	constants.FsTypeKey:      {},
 }
 
 func (v *lvmClusterValidator) verifyStorageClassOptions(l *LVMCluster) (admission.Warnings, error) {
@@ -632,11 +633,25 @@ type immutableSCFields struct {
 	FsType               DeviceFilesystemType
 }
 
+// sanitizeAdditionalParams returns a copy of the map with LVMS-owned keys stripped,
+// matching the "will be ignored" warning semantics from verifyStorageClassOptions.
+func sanitizeAdditionalParams(m map[string]string) map[string]string {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		if _, owned := lvmsOwnedParameterKeys[k]; owned {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
 func effectiveImmutable(dc DeviceClass) immutableSCFields {
 	f := immutableSCFields{
-		ReclaimPolicy:     corev1.PersistentVolumeReclaimDelete,
-		VolumeBindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
-		FsType:            dc.FilesystemType,
+		ReclaimPolicy:        corev1.PersistentVolumeReclaimDelete,
+		VolumeBindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
+		AdditionalParameters: map[string]string{},
+		FsType:               dc.FilesystemType,
 	}
 	if dc.StorageClassOptions != nil {
 		if dc.StorageClassOptions.ReclaimPolicy != nil {
@@ -645,7 +660,9 @@ func effectiveImmutable(dc DeviceClass) immutableSCFields {
 		if dc.StorageClassOptions.VolumeBindingMode != nil {
 			f.VolumeBindingMode = *dc.StorageClassOptions.VolumeBindingMode
 		}
-		f.AdditionalParameters = dc.StorageClassOptions.AdditionalParameters
+		if dc.StorageClassOptions.AdditionalParameters != nil {
+			f.AdditionalParameters = sanitizeAdditionalParams(dc.StorageClassOptions.AdditionalParameters)
+		}
 	}
 	return f
 }

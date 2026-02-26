@@ -30,6 +30,7 @@ const (
 
 	DefaultCSISocket              = "/run/topolvm/csi-topolvm.sock"
 	DeviceClassKey                = "topolvm.io/device-class"
+	FsTypeKey                     = "csi.storage.k8s.io/fstype"
 	DefaultPluginRegistrationPath = "/registration"
 
 	// name of the lvm-operator container
