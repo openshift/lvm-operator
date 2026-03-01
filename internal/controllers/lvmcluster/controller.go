@@ -183,18 +183,33 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to check for deleted nodes: %w", err)
 		}
-		// Check for existing LogicalVolumes
-		lvsExist, err := r.logicalVolumesExist(ctx, nodes)
-		if err != nil {
-			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{}, fmt.Errorf("failed to check if LogicalVolumes exist: %w", err)
+
+		// Clean up stale LogicalVolume finalizers (side effect only, return value discarded)
+		if _, err := r.logicalVolumesExist(ctx, nodes); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check LogicalVolumes: %w", err)
 		}
-		if lvsExist {
-			waitForLVRemoval := time.Second * 10
-			err := fmt.Errorf("found PVCs provisioned by topolvm, waiting %s for their deletion", waitForLVRemoval)
+
+		// Gate 1: Block deletion if active PVCs still reference LVMS StorageClasses
+		waitForDeletion := 10 * time.Second
+		pvcsExist, err := r.activePVCsExistForClusterStorageClasses(ctx, lvmCluster)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check for active PVCs: %w", err)
+		}
+		if pvcsExist {
+			err := fmt.Errorf("found PVCs provisioned by LVMS, waiting %s for their deletion", waitForDeletion)
 			r.WarningEvent(ctx, lvmCluster, EventReasonErrorDeletionPending, err)
-			// check every 10 seconds if there are still PVCs present
-			return ctrl.Result{RequeueAfter: waitForLVRemoval}, nil
+			return ctrl.Result{RequeueAfter: waitForDeletion}, nil
+		}
+
+		// Gate 2: Block deletion if Retain-policy PVs still exist
+		retainPVsExist, err := r.retainPVsExistForCluster(ctx, lvmCluster)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check for Retain PVs: %w", err)
+		}
+		if retainPVsExist {
+			err := fmt.Errorf("found PVs with Retain policy from LVMS, waiting %s for manual cleanup", waitForDeletion)
+			r.WarningEvent(ctx, lvmCluster, EventReasonErrorDeletionPending, err)
+			return ctrl.Result{RequeueAfter: waitForDeletion}, nil
 		}
 
 		logger.Info("processing LVMCluster deletion")
@@ -439,6 +454,58 @@ func (r *Reconciler) logicalVolumesExist(ctx context.Context, nodes map[string]s
 	return false, nil
 }
 
+// activePVCsExistForClusterStorageClasses checks if any PVCs reference StorageClasses created by LVMS for this cluster.
+func (r *Reconciler) activePVCsExistForClusterStorageClasses(ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) (bool, error) {
+	scNames := make(map[string]struct{})
+	for _, dc := range lvmCluster.Spec.Storage.DeviceClasses {
+		scNames[resource.GetStorageClassName(dc.Name)] = struct{}{}
+	}
+
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := r.List(ctx, pvcList); err != nil {
+		return false, fmt.Errorf("failed to list PVCs: %w", err)
+	}
+
+	for _, pvc := range pvcList.Items {
+		if pvc.Spec.StorageClassName == nil {
+			continue
+		}
+		if _, ok := scNames[*pvc.Spec.StorageClassName]; ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// retainPVsExistForCluster checks if any PVs provisioned by Retain-policy LVMS StorageClasses still exist.
+func (r *Reconciler) retainPVsExistForCluster(ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) (bool, error) {
+	retainSCNames := make(map[string]struct{})
+	for _, dc := range lvmCluster.Spec.Storage.DeviceClasses {
+		if dc.StorageClassOptions != nil && dc.StorageClassOptions.ReclaimPolicy != nil &&
+			*dc.StorageClassOptions.ReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+			retainSCNames[resource.GetStorageClassName(dc.Name)] = struct{}{}
+		}
+	}
+	if len(retainSCNames) == 0 {
+		return false, nil
+	}
+
+	pvList := &corev1.PersistentVolumeList{}
+	if err := r.List(ctx, pvList); err != nil {
+		return false, fmt.Errorf("failed to list PVs: %w", err)
+	}
+
+	for _, pv := range pvList.Items {
+		if pv.Spec.StorageClassName == "" {
+			continue
+		}
+		if _, ok := retainSCNames[pv.Spec.StorageClassName]; ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, nodes map[string]struct{}) error {
 	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
 	err := r.List(ctx, volumeGroups, &client.ListOptions{Namespace: r.Namespace})
@@ -473,9 +540,9 @@ func (r *Reconciler) checkStaleNodeFinalizers(ctx context.Context, nodes map[str
 func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LVMCluster) error {
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		resourceDeletionList := []resource.Manager{
-			resource.TopoLVMStorageClass(),
 			resource.LVMVGs(),
 			resource.LVMVGNodeStatus(),
+			resource.TopoLVMStorageClass(),
 			resource.CSIDriver(),
 			resource.VGManager(r.ClusterType),
 			resource.CSINode(),

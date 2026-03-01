@@ -19,20 +19,26 @@ package resource
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	scName = "topolvm-storageclass"
+
+	labelFieldOwner     = "lvms-labels"
+	defaultSCAnnotation = "storageclass.kubernetes.io/is-default-class"
 )
 
 func TopoLVMStorageClass() Manager {
@@ -53,19 +59,68 @@ func (s topolvmStorageClass) GetName() string {
 func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
-	// one storage class for every deviceClass based on CR is created
-	topolvmStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
-	for _, sc := range topolvmStorageClasses {
-		// we anticipate no edits to storage class
+	desiredStorageClasses := s.getTopolvmStorageClasses(r, ctx, cluster)
+
+	for _, desired := range desiredStorageClasses {
+		sc := &storagev1.StorageClass{}
+		sc.Name = desired.Name
+
+		// CreateOrUpdate handles immutable spec fields on creation only.
 		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
-			labels.SetManagedLabels(r.Scheme(), sc, cluster)
+			if sc.ResourceVersion == "" {
+				sc.Provisioner = desired.Provisioner
+				sc.VolumeBindingMode = desired.VolumeBindingMode
+				sc.ReclaimPolicy = desired.ReclaimPolicy
+				sc.AllowVolumeExpansion = desired.AllowVolumeExpansion
+				sc.Parameters = make(map[string]string, len(desired.Parameters))
+				maps.Copy(sc.Parameters, desired.Parameters)
+			}
+
+			// Default annotation is mutable — reconcile every time.
+			if sc.Annotations == nil {
+				sc.Annotations = make(map[string]string)
+			}
+			if desired.Annotations[defaultSCAnnotation] == "true" {
+				sc.Annotations[defaultSCAnnotation] = "true"
+			} else {
+				delete(sc.Annotations, defaultSCAnnotation)
+			}
+
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("%s failed to reconcile: %w", s.GetName(), err)
+			return fmt.Errorf("%s failed to reconcile StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
 		if result != cutil.OperationResultNone {
-			logger.V(2).Info("StorageClass applied to cluster", "operation", result, "name", sc.Name)
+			logger.V(2).Info("StorageClass reconciled", "operation", result, "name", sc.Name)
+		}
+
+		// SSA patch for labels — the field manager handles ownership and pruning automatically.
+		// Provisioner is required by the StorageClass schema even in partial SSA objects.
+		labelPatch := &storagev1.StorageClass{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "storage.k8s.io/v1",
+				Kind:       "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   desired.Name,
+				Labels: desired.Labels,
+			},
+			Provisioner: desired.Provisioner,
+		}
+		if err := r.Patch(ctx, labelPatch,
+			client.Apply,
+			client.FieldOwner(labelFieldOwner),
+			client.ForceOwnership,
+		); err != nil {
+			if apierrors.IsConflict(err) {
+				logger.Info("StorageClass label ownership conflict detected",
+					"storageClass", desired.Name, "fieldOwner", labelFieldOwner, "error", err)
+				return fmt.Errorf("StorageClass %q label conflict: field manager %q could not set one or more StorageClass label keys "+
+					"because another field manager owns them. Remove the conflicting label key(s) from the StorageClass "+
+					"or stop managing them outside LVMS (e.g. via GitOps/kubectl): %w", desired.Name, labelFieldOwner, err)
+			}
+			return fmt.Errorf("%s failed to apply labels for StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
 	}
 	return nil
@@ -82,7 +137,7 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 
 		sc := &storagev1.StorageClass{}
 		if err := r.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				continue
 			}
 			return err
@@ -103,9 +158,7 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
-	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
 	allowVolumeExpansion := true
-	volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
 
@@ -125,9 +178,33 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			}
 		}
 	}
+
 	var sc []*storagev1.StorageClass
 	for _, deviceClass := range lvmCluster.Spec.Storage.DeviceClasses {
 		scName := GetStorageClassName(deviceClass.Name)
+
+		// Defaults
+		reclaimPolicy := corev1.PersistentVolumeReclaimDelete
+		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
+
+		// Apply StorageClassOptions overrides
+		if opts := deviceClass.StorageClassOptions; opts != nil {
+			if opts.ReclaimPolicy != nil {
+				reclaimPolicy = *opts.ReclaimPolicy
+			}
+			if opts.VolumeBindingMode != nil {
+				volumeBindingMode = *opts.VolumeBindingMode
+			}
+		}
+
+		parameters := map[string]string{
+			constants.DeviceClassKey: deviceClass.Name,
+			constants.FsTypeKey:      string(deviceClass.FilesystemType),
+		}
+
+		if deviceClass.StorageClassOptions != nil {
+			maps.Copy(parameters, deviceClass.StorageClassOptions.AdditionalParameters)
+		}
 
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
@@ -137,18 +214,23 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 				},
 			},
 			Provisioner:          constants.TopolvmCSIDriverName,
+			ReclaimPolicy:        &reclaimPolicy,
 			VolumeBindingMode:    &volumeBindingMode,
 			AllowVolumeExpansion: &allowVolumeExpansion,
-			Parameters: map[string]string{
-				constants.DeviceClassKey:    deviceClass.Name,
-				"csi.storage.k8s.io/fstype": string(deviceClass.FilesystemType),
-			},
+			Parameters:           parameters,
 		}
 		// reconcile will pick up any existing LVMO storage classes as well
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
 			storageClass.Annotations[defaultSCAnnotation] = "true"
 			defaultStorageClassName = scName
 		}
+
+		storageClass.Labels = make(map[string]string)
+		labels.SetManagedLabels(r.Scheme(), storageClass, lvmCluster)
+		if deviceClass.StorageClassOptions != nil {
+			maps.Copy(storageClass.Labels, deviceClass.StorageClassOptions.AdditionalLabels)
+		}
+
 		sc = append(sc, storageClass)
 	}
 	return sc

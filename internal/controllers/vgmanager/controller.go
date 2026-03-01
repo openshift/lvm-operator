@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/filter"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -75,6 +77,7 @@ const EventReasonLVMDConfigUpdated EventReasonInfo = "LVMDConfigUpdated"
 const EventReasonLVMDConfigDeleted EventReasonInfo = "LVMDConfigDeleted"
 const EventReasonVolumeGroupReady EventReasonInfo = "VolumeGroupReady"
 const EventReasonDeviceRemoved EventReasonInfo = "DeviceRemoved"
+const EventReasonErrorManualCleanupRequired EventReasonError = "ManualCleanupRequired"
 
 var (
 	reconcileAgain = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
@@ -469,6 +472,21 @@ func (r *Reconciler) updateLVMDConfigAfterReconcile(
 	return nil
 }
 
+// isRetainPolicy checks the StorageClass associated with a volume group to determine
+// if it uses the Retain reclaim policy. Defaults to true (Retain) on error for safety.
+func (r *Reconciler) isRetainPolicy(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) (bool, error) {
+	scName := constants.StorageClassPrefix + volumeGroup.Name
+	sc := &storagev1.StorageClass{}
+	if err := r.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
+		// Default to Retain on error for safety
+		return true, fmt.Errorf("failed to get StorageClass %s, defaulting to Retain: %w", scName, err)
+	}
+	if sc.ReclaimPolicy != nil && *sc.ReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup) error {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 	logger.Info("deleting")
@@ -508,6 +526,35 @@ func (r *Reconciler) processDelete(ctx context.Context, volumeGroup *lvmv1alpha1
 			vgExistsInLVM = true
 			existingVG = vg
 			break
+		}
+	}
+
+	// Check retain policy before performing disk cleanup
+	if vgExistsInLVM {
+		retain, err := r.isRetainPolicy(ctx, volumeGroup)
+		if err != nil {
+			logger.Error(err, "failed to determine reclaim policy, defaulting to Retain behavior")
+		}
+
+		if retain {
+			lvs, err := r.ListLVsByName(ctx, volumeGroup.Name)
+			if err != nil {
+				return fmt.Errorf("failed to list LVs in volume group %s: %w", volumeGroup.Name, err)
+			}
+			// Filter out the LVMS-managed thin pool — it is not user data
+			var userLVs []string
+			for _, lv := range lvs {
+				if volumeGroup.Spec.ThinPoolConfig != nil && lv == volumeGroup.Spec.ThinPoolConfig.Name {
+					continue
+				}
+				userLVs = append(userLVs, lv)
+			}
+			if len(userLVs) > 0 {
+				err := fmt.Errorf("volume group %s has retained logical volumes %v; manual cleanup required before deletion can proceed", volumeGroup.Name, userLVs)
+				r.WarningEvent(ctx, volumeGroup, EventReasonErrorManualCleanupRequired, err)
+				return err
+			}
+			// VG is empty (only thin pool or nothing) — proceed with courtesy cleanup
 		}
 	}
 

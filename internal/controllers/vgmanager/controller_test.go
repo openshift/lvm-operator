@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -114,6 +115,9 @@ func init() {
 		panic(err)
 	}
 	if err := configv1.Install(scheme.Scheme); err != nil {
+		panic(err)
+	}
+	if err := storagev1.AddToScheme(scheme.Scheme); err != nil {
 		panic(err)
 	}
 }
@@ -488,6 +492,15 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	})
 
 	By("triggering the delete of the VolumeGroup", func() {
+		// Create a StorageClass with Delete policy so isRetainPolicy returns false
+		deletePolicy := corev1.PersistentVolumeReclaimDelete
+		sc := &storagev1.StorageClass{
+			ObjectMeta:    metav1.ObjectMeta{Name: "lvms-" + vg.Name},
+			Provisioner:   "topolvm.io",
+			ReclaimPolicy: &deletePolicy,
+		}
+		Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
 		Expect(instances.client.Delete(ctx, vg)).To(Succeed())
 		Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(vg), vg)).To(Succeed())
 		Expect(vg.Finalizers).ToNot(BeEmpty())

@@ -24,9 +24,11 @@ import (
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -136,6 +138,12 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
 	warnings = append(warnings, discoveryPolicyWarnings...)
 
+	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
+	warnings = append(warnings, scOptionWarnings...)
+	if err != nil {
+		return warnings, err
+	}
+
 	return warnings, nil
 }
 
@@ -176,6 +184,12 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	oldLVMCluster, ok := old.(*LVMCluster)
 	if !ok {
 		return warnings, fmt.Errorf("failed to parse LVMCluster")
+	}
+
+	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
+	warnings = append(warnings, scOptionWarnings...)
+	if err != nil {
+		return warnings, err
 	}
 
 	// Validate device class removal follows the business rules
@@ -567,4 +581,54 @@ func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admissi
 		}
 	}
 	return warnings
+}
+
+// lvmsOwnedParameterKeys are StorageClass parameter keys managed by LVMS that cannot be set via additionalParameters.
+var lvmsOwnedParameterKeys = map[string]struct{}{
+	constants.DeviceClassKey: {},
+	constants.FsTypeKey:      {},
+}
+
+// ownedByLabelPrefix matches labels set by the operator to track StorageClass ownership.
+const ownedByLabelPrefix = "owned-by.topolvm.io"
+
+// validateAdditionalParamsAndLabels rejects LVMS-owned parameter keys and operator-reserved
+// label keys at admission. It also validates label key/value format via
+// IsQualifiedName/IsValidLabelValue which cannot be expressed as CEL rules.
+// The controller retains equivalent skip logic as defense-in-depth against admission bypass.
+func (v *lvmClusterValidator) validateAdditionalParamsAndLabels(l *LVMCluster) (admission.Warnings, error) {
+	var warnings admission.Warnings
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.StorageClassOptions == nil {
+			continue
+		}
+		for key := range dc.StorageClassOptions.AdditionalParameters {
+			if key == "" {
+				return warnings, fmt.Errorf("device class %q: additionalParameters must not contain empty keys", dc.Name)
+			}
+			if _, owned := lvmsOwnedParameterKeys[key]; owned {
+				return warnings, fmt.Errorf("device class %q: additionalParameters key %q is managed by LVMS and cannot be set",
+					dc.Name, key)
+			}
+		}
+		for key, val := range dc.StorageClassOptions.AdditionalLabels {
+			if errs := k8svalidation.IsQualifiedName(key); len(errs) > 0 {
+				return warnings, fmt.Errorf("device class %q: additionalLabels key %q is invalid: %s",
+					dc.Name, key, strings.Join(errs, "; "))
+			}
+			if errs := k8svalidation.IsValidLabelValue(val); len(errs) > 0 {
+				return warnings, fmt.Errorf("device class %q: additionalLabels value %q for key %q is invalid: %s",
+					dc.Name, val, key, strings.Join(errs, "; "))
+			}
+			if _, reserved := constants.ReservedStorageClassLabelKeys[key]; reserved {
+				return warnings, fmt.Errorf("device class %q: additionalLabels key %q is operator-reserved and cannot be set",
+					dc.Name, key)
+			}
+			if strings.HasPrefix(key, ownedByLabelPrefix) {
+				return warnings, fmt.Errorf("device class %q: additionalLabels key %q is operator-reserved and cannot be set",
+					dc.Name, key)
+			}
+		}
+	}
+	return warnings, nil
 }
