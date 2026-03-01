@@ -18,9 +18,7 @@ package resource
 
 import (
 	"fmt"
-	"strings"
 
-	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,17 +43,6 @@ func GetStorageClassName(deviceName string) string {
 
 func GetVolumeSnapshotClassName(deviceName string) string {
 	return constants.VolumeSnapshotClassPrefix + deviceName
-}
-
-// FindDeviceClassBySCName finds the DeviceClass that corresponds to a given StorageClass name.
-func FindDeviceClassBySCName(scName string, deviceClasses []lvmv1alpha1.DeviceClass) *lvmv1alpha1.DeviceClass {
-	dcName := strings.TrimPrefix(scName, constants.StorageClassPrefix)
-	for i := range deviceClasses {
-		if deviceClasses[i].Name == dcName {
-			return &deviceClasses[i]
-		}
-	}
-	return nil
 }
 
 func VerifyDaemonSetReadiness(ds *appsv1.DaemonSet) error {

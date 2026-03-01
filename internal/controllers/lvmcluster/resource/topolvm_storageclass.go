@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"sort"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -28,15 +27,19 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	scName = "topolvm-storageclass"
+
+	labelFieldOwner     = "lvms-labels"
+	defaultSCAnnotation = "storageclass.kubernetes.io/is-default-class"
 )
 
 func TopoLVMStorageClass() Manager {
@@ -63,11 +66,8 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 		sc := &storagev1.StorageClass{}
 		sc.Name = desired.Name
 
+		// CreateOrUpdate handles immutable spec fields on creation only.
 		result, err := cutil.CreateOrUpdate(ctx, r, sc, func() error {
-			labels.SetManagedLabels(r.Scheme(), sc, cluster)
-			applyAdditionalLabels(ctx, sc, cluster, sc.Name)
-
-			// Only set immutable spec fields on creation (ResourceVersion is empty for new objects)
 			if sc.ResourceVersion == "" {
 				sc.Provisioner = desired.Provisioner
 				sc.VolumeBindingMode = desired.VolumeBindingMode
@@ -75,12 +75,16 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 				sc.AllowVolumeExpansion = desired.AllowVolumeExpansion
 				sc.Parameters = make(map[string]string, len(desired.Parameters))
 				maps.Copy(sc.Parameters, desired.Parameters)
-				for k, v := range desired.Annotations {
-					if sc.Annotations == nil {
-						sc.Annotations = make(map[string]string)
-					}
-					sc.Annotations[k] = v
-				}
+			}
+
+			// Default annotation is mutable — reconcile every time.
+			if sc.Annotations == nil {
+				sc.Annotations = make(map[string]string)
+			}
+			if desired.Annotations[defaultSCAnnotation] == "true" {
+				sc.Annotations[defaultSCAnnotation] = "true"
+			} else {
+				delete(sc.Annotations, defaultSCAnnotation)
 			}
 
 			return nil
@@ -90,6 +94,34 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 		}
 		if result != cutil.OperationResultNone {
 			logger.V(2).Info("StorageClass reconciled", "operation", result, "name", sc.Name)
+		}
+
+		// SSA patch for labels — the field manager handles ownership and pruning automatically.
+		// Provisioner is required by the StorageClass schema even in partial SSA objects.
+		labelPatch := &storagev1.StorageClass{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "storage.k8s.io/v1",
+				Kind:       "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   desired.Name,
+				Labels: desired.Labels,
+			},
+			Provisioner: desired.Provisioner,
+		}
+		if err := r.Patch(ctx, labelPatch,
+			client.Apply,
+			client.FieldOwner(labelFieldOwner),
+			client.ForceOwnership,
+		); err != nil {
+			if apierrors.IsConflict(err) {
+				logger.Info("StorageClass label ownership conflict detected",
+					"storageClass", desired.Name, "fieldOwner", labelFieldOwner, "error", err)
+				return fmt.Errorf("StorageClass %q label conflict: field manager %q could not set one or more StorageClass label keys "+
+					"because another field manager owns them. Remove the conflicting label key(s) from the StorageClass "+
+					"or stop managing them outside LVMS (e.g. via GitOps/kubectl): %w", desired.Name, labelFieldOwner, err)
+			}
+			return fmt.Errorf("%s failed to apply labels for StorageClass %s: %w", s.GetName(), desired.Name, err)
 		}
 	}
 	return nil
@@ -106,7 +138,7 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 
 		sc := &storagev1.StorageClass{}
 		if err := r.Get(ctx, types.NamespacedName{Name: scName}, sc); err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				continue
 			}
 			return err
@@ -127,7 +159,6 @@ func (s topolvmStorageClass) EnsureDeleted(r Reconciler, ctx context.Context, lv
 func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.Context, lvmCluster *lvmv1alpha1.LVMCluster) []*storagev1.StorageClass {
 	logger := log.FromContext(ctx).WithValues("resourceManager", s.GetName())
 
-	const defaultSCAnnotation string = "storageclass.kubernetes.io/is-default-class"
 	allowVolumeExpansion := true
 	defaultStorageClassName := ""
 	setDefaultStorageClass := true
@@ -200,78 +231,22 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			storageClass.Annotations[defaultSCAnnotation] = "true"
 			defaultStorageClassName = scName
 		}
+
+		storageClass.Labels = make(map[string]string)
+		labels.SetManagedLabels(r.Scheme(), storageClass, lvmCluster)
+		if deviceClass.StorageClassOptions != nil {
+			for k, v := range deviceClass.StorageClassOptions.AdditionalLabels {
+				if strings.HasPrefix(k, labels.OwnedByPrefix) {
+					continue
+				}
+				if _, reserved := constants.ReservedStorageClassLabelKeys[k]; reserved {
+					continue
+				}
+				storageClass.Labels[k] = v
+			}
+		}
+
 		sc = append(sc, storageClass)
 	}
 	return sc
-}
-
-// applyAdditionalLabels applies additionalLabels from the matching DeviceClass to the StorageClass,
-// and prunes any labels that were previously managed but have been removed from the CR.
-func applyAdditionalLabels(ctx context.Context, sc *storagev1.StorageClass, cluster *lvmv1alpha1.LVMCluster, scName string) {
-	logger := log.FromContext(ctx)
-	if sc.Labels == nil {
-		sc.Labels = make(map[string]string)
-	}
-	if sc.Annotations == nil {
-		sc.Annotations = make(map[string]string)
-	}
-
-	dc := FindDeviceClassBySCName(scName, cluster.Spec.Storage.DeviceClasses)
-	if dc == nil {
-		// Fail-safe: don't prune/apply if we can't map SC -> DeviceClass
-		logger.V(1).Info("cannot map StorageClass to DeviceClass, skipping additionalLabels reconciliation", "storageClass", scName)
-		return
-	}
-
-	// Read previously managed label keys from annotation, trimming whitespace defensively
-	var previousKeys []string
-	if raw, ok := sc.Annotations[constants.ManagedAdditionalLabelsAnnotation]; ok && raw != "" {
-		for _, k := range strings.Split(raw, ",") {
-			if trimmed := strings.TrimSpace(k); trimmed != "" {
-				previousKeys = append(previousKeys, trimmed)
-			}
-		}
-	}
-
-	currentAdditional := map[string]string{}
-	if dc.StorageClassOptions != nil && dc.StorageClassOptions.AdditionalLabels != nil {
-		currentAdditional = dc.StorageClassOptions.AdditionalLabels
-	}
-
-	// Remove previously managed labels that are no longer in additionalLabels,
-	// but never prune operator-reserved keys even if a prior version tracked them.
-	for _, key := range previousKeys {
-		if strings.HasPrefix(key, labels.OwnedByPrefix) {
-			continue
-		}
-		if _, reserved := constants.ReservedStorageClassLabelKeys[key]; reserved {
-			continue
-		}
-		if _, stillPresent := currentAdditional[key]; !stillPresent {
-			delete(sc.Labels, key)
-		}
-	}
-
-	// Apply current additionalLabels, skipping operator-reserved label keys
-	managedKeys := make([]string, 0, len(currentAdditional))
-	for k, v := range currentAdditional {
-		if strings.HasPrefix(k, labels.OwnedByPrefix) {
-			logger.V(2).Info("additionalLabels key is reserved and will be ignored", "key", k, "storageClass", scName)
-			continue
-		}
-		if _, reserved := constants.ReservedStorageClassLabelKeys[k]; reserved {
-			logger.V(2).Info("additionalLabels key is reserved and will be ignored", "key", k, "storageClass", scName)
-			continue
-		}
-		sc.Labels[k] = v
-		managedKeys = append(managedKeys, strings.TrimSpace(k))
-	}
-
-	// Update tracking annotation
-	if len(managedKeys) > 0 {
-		sort.Strings(managedKeys)
-		sc.Annotations[constants.ManagedAdditionalLabelsAnnotation] = strings.Join(managedKeys, ",")
-	} else {
-		delete(sc.Annotations, constants.ManagedAdditionalLabelsAnnotation)
-	}
 }
