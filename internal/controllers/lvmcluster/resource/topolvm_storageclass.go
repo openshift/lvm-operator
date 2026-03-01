@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
@@ -203,14 +202,8 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 			constants.FsTypeKey:      string(deviceClass.FilesystemType),
 		}
 
-		// Merge additional parameters, skipping LVMS-owned keys
 		if deviceClass.StorageClassOptions != nil {
-			for k, v := range deviceClass.StorageClassOptions.AdditionalParameters {
-				if k == constants.DeviceClassKey || k == constants.FsTypeKey {
-					continue
-				}
-				parameters[k] = v
-			}
+			maps.Copy(parameters, deviceClass.StorageClassOptions.AdditionalParameters)
 		}
 
 		storageClass := &storagev1.StorageClass{
@@ -235,15 +228,7 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		storageClass.Labels = make(map[string]string)
 		labels.SetManagedLabels(r.Scheme(), storageClass, lvmCluster)
 		if deviceClass.StorageClassOptions != nil {
-			for k, v := range deviceClass.StorageClassOptions.AdditionalLabels {
-				if strings.HasPrefix(k, labels.OwnedByPrefix) {
-					continue
-				}
-				if _, reserved := constants.ReservedStorageClassLabelKeys[k]; reserved {
-					continue
-				}
-				storageClass.Labels[k] = v
-			}
+			maps.Copy(storageClass.Labels, deviceClass.StorageClassOptions.AdditionalLabels)
 		}
 
 		sc = append(sc, storageClass)
