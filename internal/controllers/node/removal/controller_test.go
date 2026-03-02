@@ -6,6 +6,7 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/node/removal"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -182,4 +183,78 @@ func TestNodeRemovalController_Reconcile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodeRemovalController_CleansUpVolumeGroupsOnNodeDeletion(t *testing.T) {
+	const (
+		namespace     = "test"
+		nodeName      = "test-node"
+		otherNodeName = "other-node"
+	)
+	nodeFinalizer := vgmanager.NodeCleanupFinalizer + "/" + nodeName
+	otherNodeFinalizer := vgmanager.NodeCleanupFinalizer + "/" + otherNodeName
+	nodeWipeAnnotation := "wiped.devices.lvms.openshift.io/" + nodeName
+	otherNodeWipeAnnotation := "wiped.devices.lvms.openshift.io/" + otherNodeName
+
+	req := controllerruntime.Request{NamespacedName: types.NamespacedName{
+		Name:      nodeName,
+		Namespace: namespace,
+	}}
+
+	objs := []client.Object{
+		&lvmv1alpha1.LVMVolumeGroupNodeStatus{
+			ObjectMeta: metav1.ObjectMeta{Name: nodeName, Namespace: namespace},
+		},
+		// VG with both the deleted node's finalizer/annotation and another node's
+		&lvmv1alpha1.LVMVolumeGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "vg-both-nodes",
+				Namespace:  namespace,
+				Finalizers: []string{nodeFinalizer, otherNodeFinalizer},
+				Annotations: map[string]string{
+					nodeWipeAnnotation:      "true",
+					otherNodeWipeAnnotation: "true",
+				},
+			},
+		},
+		// VG with only the other node's finalizer — should not be modified
+		&lvmv1alpha1.LVMVolumeGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "vg-other-node-only",
+				Namespace:  namespace,
+				Finalizers: []string{otherNodeFinalizer},
+			},
+		},
+	}
+
+	newScheme := runtime.NewScheme()
+	assert.NoError(t, lvmv1alpha1.AddToScheme(newScheme))
+	assert.NoError(t, v1.AddToScheme(newScheme))
+
+	clnt := fake.NewClientBuilder().
+		WithObjects(objs...).
+		WithScheme(newScheme).
+		WithIndex(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, "metadata.name", func(object client.Object) []string {
+			return []string{object.GetName()}
+		}).
+		Build()
+
+	r := removal.NewReconciler(clnt, namespace)
+	_, err := r.Reconcile(context.Background(), req)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// VG that had both nodes' data: only the deleted node's finalizer and annotation should be gone
+	vgBoth := &lvmv1alpha1.LVMVolumeGroup{}
+	assert.NoError(t, clnt.Get(ctx, types.NamespacedName{Name: "vg-both-nodes", Namespace: namespace}, vgBoth))
+	assert.NotContains(t, vgBoth.Finalizers, nodeFinalizer)
+	assert.Contains(t, vgBoth.Finalizers, otherNodeFinalizer)
+	assert.NotContains(t, vgBoth.Annotations, nodeWipeAnnotation)
+	assert.Contains(t, vgBoth.Annotations, otherNodeWipeAnnotation)
+
+	// VG unrelated to the deleted node: should be untouched
+	vgOther := &lvmv1alpha1.LVMVolumeGroup{}
+	assert.NoError(t, clnt.Get(ctx, types.NamespacedName{Name: "vg-other-node-only", Namespace: namespace}, vgOther))
+	assert.Contains(t, vgOther.Finalizers, otherNodeFinalizer)
 }
