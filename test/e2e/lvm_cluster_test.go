@@ -35,10 +35,10 @@ func lvmClusterTest() {
 	})
 	AfterEach(func(ctx SpecContext) {
 		if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
-			By("Test failed, skipping cluster cleanup")
 			skipSuiteCleanup.Store(true)
-			return
 		}
+		// Always delete the cluster to prevent stale resources from
+		// causing "duplicate LVMClusters" rejections in subsequent tests.
 		DeleteResource(ctx, cluster)
 		validateCSINodeInfo(ctx, cluster, false)
 	})

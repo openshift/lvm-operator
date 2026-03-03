@@ -99,6 +99,214 @@ var _ = Describe("vgmanager controller", func() {
 		It("should ignore static policy when explicit device paths are configured", testStaticModeIgnoredWithExplicitPaths)
 		It("should default to dynamic mode when policy is nil (upgrade scenario)", testNilPolicyDefaultsToDynamic)
 	})
+	Context("isRetainPolicy", func() {
+		It("should return false for StorageClass with Delete policy", func(ctx SpecContext) {
+			instances := setupInstances()
+			deletePolicy := corev1.PersistentVolumeReclaimDelete
+			sc := &storagev1.StorageClass{
+				ObjectMeta:    metav1.ObjectMeta{Name: "lvms-vg1"},
+				Provisioner:   "topolvm.io",
+				ReclaimPolicy: &deletePolicy,
+			}
+			Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1"},
+			}
+			retain, err := instances.Reconciler.isRetainPolicy(ctx, vg)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(retain).To(BeFalse())
+		})
+		It("should return true for StorageClass with Retain policy", func(ctx SpecContext) {
+			instances := setupInstances()
+			retainPolicy := corev1.PersistentVolumeReclaimRetain
+			sc := &storagev1.StorageClass{
+				ObjectMeta:    metav1.ObjectMeta{Name: "lvms-vg1"},
+				Provisioner:   "topolvm.io",
+				ReclaimPolicy: &retainPolicy,
+			}
+			Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1"},
+			}
+			retain, err := instances.Reconciler.isRetainPolicy(ctx, vg)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(retain).To(BeTrue())
+		})
+		It("should return false when StorageClass not found", func(ctx SpecContext) {
+			instances := setupInstances()
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg-nonexistent"},
+			}
+			retain, err := instances.Reconciler.isRetainPolicy(ctx, vg)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(retain).To(BeFalse())
+		})
+		It("should return true with error when Get fails", func(ctx SpecContext) {
+			errClient := interceptor.NewClient(
+				fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(),
+				interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*storagev1.StorageClass); ok {
+							return fmt.Errorf("injected get error")
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				},
+			)
+			r := &Reconciler{
+				Client: errClient,
+				Scheme: scheme.Scheme,
+			}
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1"},
+			}
+			retain, err := r.isRetainPolicy(ctx, vg)
+			Expect(err).To(HaveOccurred())
+			Expect(retain).To(BeTrue(), "should default to Retain on error for safety")
+		})
+		It("should return false when ReclaimPolicy is nil", func(ctx SpecContext) {
+			instances := setupInstances()
+			sc := &storagev1.StorageClass{
+				ObjectMeta:  metav1.ObjectMeta{Name: "lvms-vg1"},
+				Provisioner: "topolvm.io",
+				// ReclaimPolicy intentionally nil
+			}
+			Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "vg1"},
+			}
+			retain, err := instances.Reconciler.isRetainPolicy(ctx, vg)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(retain).To(BeFalse())
+		})
+	})
+	Context("processDelete retain policy behavior", func() {
+		It("should block deletion when Retain SC and user LVs exist", func(ctx SpecContext) {
+			logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+			logCtx := log.IntoContext(ctx, logger)
+
+			instances := setupInstances()
+
+			// Create a StorageClass with Retain policy
+			retainPolicy := corev1.PersistentVolumeReclaimRetain
+			sc := &storagev1.StorageClass{
+				ObjectMeta:    metav1.ObjectMeta{Name: "lvms-vg1"},
+				Provisioner:   "topolvm.io",
+				ReclaimPolicy: &retainPolicy,
+			}
+			Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vg1",
+					Namespace: instances.namespace.Name,
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+						Name:               "thin-pool-1",
+						SizePercent:        90,
+						OverprovisionRatio: 10,
+					},
+				},
+			}
+			Expect(instances.client.Create(ctx, vg)).To(Succeed())
+
+			// Mock: VG exists in LVM
+			existingVG := lvm.VolumeGroup{Name: "vg1"}
+			instances.LVM.EXPECT().ListVGs(mock.Anything, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+			// Mock: LVs exist (including thin pool and user LV)
+			instances.LVM.EXPECT().ListLVsByName(mock.Anything, "vg1").Return([]string{"thin-pool-1", "user-data-lv"}, nil).Once()
+
+			err := instances.Reconciler.processDelete(logCtx, vg)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("manual cleanup required"))
+			Expect(err.Error()).To(ContainSubstring("user-data-lv"))
+		})
+		It("should proceed when Retain SC but only thin pool LV exists", func(ctx SpecContext) {
+			logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+			logCtx := log.IntoContext(ctx, logger)
+
+			instances := setupInstances()
+
+			retainPolicy := corev1.PersistentVolumeReclaimRetain
+			sc := &storagev1.StorageClass{
+				ObjectMeta:    metav1.ObjectMeta{Name: "lvms-vg1"},
+				Provisioner:   "topolvm.io",
+				ReclaimPolicy: &retainPolicy,
+			}
+			Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vg1",
+					Namespace: instances.namespace.Name,
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+						Name:               "thin-pool-1",
+						SizePercent:        90,
+						OverprovisionRatio: 10,
+					},
+				},
+			}
+			Expect(instances.client.Create(ctx, vg)).To(Succeed())
+
+			existingVG := lvm.VolumeGroup{Name: "vg1"}
+			instances.LVM.EXPECT().ListVGs(mock.Anything, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+			// Only thin pool LV exists — no user data
+			instances.LVM.EXPECT().ListLVsByName(mock.Anything, "vg1").Return([]string{"thin-pool-1"}, nil).Once()
+			// Thin pool deletion should proceed
+			instances.LVM.EXPECT().LVExists(mock.Anything, "thin-pool-1", "vg1").Return(true, nil).Once()
+			instances.LVM.EXPECT().DeleteLV(mock.Anything, "thin-pool-1", "vg1").Return(nil).Once()
+			instances.LVM.EXPECT().DeleteVG(mock.Anything, existingVG).Return(nil).Once()
+
+			err := instances.Reconciler.processDelete(logCtx, vg)
+			Expect(err).ToNot(HaveOccurred())
+		})
+		It("should proceed when Retain SC but no LVs exist", func(ctx SpecContext) {
+			logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+			logCtx := log.IntoContext(ctx, logger)
+
+			instances := setupInstances()
+
+			retainPolicy := corev1.PersistentVolumeReclaimRetain
+			sc := &storagev1.StorageClass{
+				ObjectMeta:    metav1.ObjectMeta{Name: "lvms-vg1"},
+				Provisioner:   "topolvm.io",
+				ReclaimPolicy: &retainPolicy,
+			}
+			Expect(instances.client.Create(ctx, sc)).To(Succeed())
+
+			vg := &lvmv1alpha1.LVMVolumeGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vg1",
+					Namespace: instances.namespace.Name,
+				},
+				Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+					ThinPoolConfig: &lvmv1alpha1.ThinPoolConfig{
+						Name:               "thin-pool-1",
+						SizePercent:        90,
+						OverprovisionRatio: 10,
+					},
+				},
+			}
+			Expect(instances.client.Create(ctx, vg)).To(Succeed())
+
+			existingVG := lvm.VolumeGroup{Name: "vg1"}
+			instances.LVM.EXPECT().ListVGs(mock.Anything, true).Return([]lvm.VolumeGroup{existingVG}, nil).Once()
+			// No LVs at all
+			instances.LVM.EXPECT().ListLVsByName(mock.Anything, "vg1").Return([]string{}, nil).Once()
+			// Thin pool deletion — thin pool doesn't exist (no LVs)
+			instances.LVM.EXPECT().LVExists(mock.Anything, "thin-pool-1", "vg1").Return(false, nil).Once()
+			instances.LVM.EXPECT().DeleteVG(mock.Anything, existingVG).Return(nil).Once()
+
+			err := instances.Reconciler.processDelete(logCtx, vg)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
 })
 
 func init() {

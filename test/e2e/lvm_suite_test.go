@@ -70,6 +70,7 @@ var _ = Describe("LVM Operator e2e tests", func() {
 		SummaryOnFailure(ctx)
 	})
 	Describe("LVM Cluster Configuration", Serial, lvmClusterTest)
+	Describe("StorageClassOptions", Serial, storageClassOptionsTest)
 	Describe("PVC", Serial, Ordered, func() {
 		Describe("Thin", Serial, Ordered, pvcTestThinProvisioning)
 		Describe("Thick", Serial, Ordered, pvcTestThickProvisioning)
