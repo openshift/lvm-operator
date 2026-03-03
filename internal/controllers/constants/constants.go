@@ -30,6 +30,7 @@ const (
 
 	DefaultCSISocket              = "/run/topolvm/csi-topolvm.sock"
 	DeviceClassKey                = "topolvm.io/device-class"
+	FsTypeKey                     = "csi.storage.k8s.io/fstype"
 	DefaultPluginRegistrationPath = "/registration"
 
 	// name of the lvm-operator container
@@ -68,6 +69,16 @@ const (
 
 	DeleteProtectionFinalizer = "delete-protection.lvm.openshift.io"
 )
+
+// ReservedStorageClassLabelKeys are standard app.kubernetes.io label keys that are operator-reserved
+// and cannot be set or overridden via additionalLabels. This prevents users from spoofing
+// ownership/identity labels on cluster-scoped StorageClass resources.
+var ReservedStorageClassLabelKeys = map[string]struct{}{
+	AppKubernetesManagedByLabel: {},
+	AppKubernetesPartOfLabel:    {},
+	AppKubernetesNameLabel:      {},
+	AppKubernetesComponentLabel: {},
+}
 
 // these constants are derived from the TopoLVM recommendations but maintained separately to allow easy override.
 // see https://github.com/topolvm/topolvm/blob/a967c95da14f80955332a00ebb258e319c6c39ac/cmd/topolvm-controller/app/root.go#L17-L28
