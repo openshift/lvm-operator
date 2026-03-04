@@ -152,9 +152,11 @@ For each bug, determine its target version using this priority:
 4. If none available, place in "Unassigned" group
 
 **Track per version:**
-- Total bug count
-- CVE count
+- Total bug count (non-CVE)
+- CVE count (total trackers and unique CVEs)
+- CVE severity: derive from CVE labels or summary context (Critical/Important, Moderate, Low)
 - Count by priority: Blocker, Critical, Major, Normal, Minor/Trivial
+- Critical issues count: total of Blocker/Critical bugs PLUS Critical/Important CVEs (used in the overview table)
 
 ### Step 6: Calculate Urgency Score
 
@@ -195,7 +197,7 @@ Generate and display a comprehensive markdown report with the following sections
 | 4.XX | N (vX.Y.0 → vX.Y.Z) | vX.Y.Z (date) | NN | N | N (N) | N | <phase> | YYYY-MM-DD | NN | LEVEL |
 ```
 
-Combine release history and status into a single table. Include the total z-stream count and range, the latest release with date, and the current support phase (Full Support / Maintenance / EUS Term N) with its end date.
+Combine release history and status into a single table. Include the total z-stream count and range, the latest release with date, and the current support phase (Full Support / Maintenance / EUS Term N) with its end date. The **Blockers/Crit** column counts all critical issues: Blocker/Critical priority bugs PLUS Critical/Important CVEs.
 
 Sort the table by urgency score descending (most urgent first).
 
