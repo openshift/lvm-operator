@@ -31,6 +31,7 @@ import (
 func lvmClusterTest() {
 	var cluster *v1alpha1.LVMCluster
 	BeforeEach(func(ctx SpecContext) {
+		waitForExistingClusterDeletion(ctx)
 		cluster = GetDefaultTestLVMClusterTemplate()
 	})
 	AfterEach(func(ctx SpecContext) {

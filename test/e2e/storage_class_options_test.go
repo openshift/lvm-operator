@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,7 +28,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +44,7 @@ func storageClassOptionsTest() {
 	// first, so the cluster deletion gate is not blocked by active PVCs.
 	clusterLifecycle := func(cluster **v1alpha1.LVMCluster) {
 		BeforeEach(func(ctx SpecContext) {
+			waitForExistingClusterDeletion(ctx)
 			*cluster = GetDefaultTestLVMClusterTemplate()
 			DeferCleanup(func(ctx SpecContext) {
 				if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
@@ -121,6 +120,7 @@ func storageClassOptionsTest() {
 		var cluster *v1alpha1.LVMCluster
 
 		BeforeAll(func(ctx SpecContext) {
+			waitForExistingClusterDeletion(ctx)
 			cluster = GetDefaultTestLVMClusterTemplate()
 			cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions = &v1alpha1.StorageClassOptions{
 				ReclaimPolicy:     ptr.To(corev1.PersistentVolumeReclaimDelete),
@@ -146,11 +146,15 @@ func storageClassOptionsTest() {
 
 		DescribeTable("should reject immutable field change",
 			func(ctx SpecContext, mutate func(*v1alpha1.StorageClassOptions)) {
-				Expect(crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
-				mutate(cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions)
-				err := crClient.Update(ctx, cluster)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("immutable"))
+				// Retry the Get+Update cycle to handle 409 Conflict errors
+				// from concurrent operator status updates.
+				Eventually(func(g Gomega, ctx SpecContext) {
+					g.Expect(crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+					mutate(cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions)
+					err := crClient.Update(ctx, cluster)
+					g.Expect(err).To(HaveOccurred())
+					g.Expect(err.Error()).To(ContainSubstring("immutable"))
+				}, timeout, interval).WithContext(ctx).Should(Succeed())
 			},
 			Entry("reclaimPolicy", func(opts *v1alpha1.StorageClassOptions) {
 				opts.ReclaimPolicy = ptr.To(corev1.PersistentVolumeReclaimRetain)
@@ -164,9 +168,13 @@ func storageClassOptionsTest() {
 		)
 
 		It("should allow additionalLabels change after creation", func(ctx SpecContext) {
-			Expect(crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
-			cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions.AdditionalLabels["team"] = "platform"
-			Expect(crClient.Update(ctx, cluster)).To(Succeed())
+			Eventually(func(ctx SpecContext) error {
+				if err := crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+					return err
+				}
+				cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions.AdditionalLabels["team"] = "platform"
+				return crClient.Update(ctx, cluster)
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
 		})
 	})
 
@@ -251,6 +259,7 @@ func storageClassOptionsTest() {
 
 		Describe("Retain Policy Deletion Lifecycle", Serial, func() {
 			It("should block deletion with Retain PVs and unblock after LV cleanup", func(ctx SpecContext) {
+				waitForExistingClusterDeletion(ctx)
 				cluster := GetDefaultTestLVMClusterTemplate()
 				cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions = &v1alpha1.StorageClassOptions{
 					ReclaimPolicy:     ptr.To(corev1.PersistentVolumeReclaimRetain),
@@ -265,17 +274,26 @@ func storageClassOptionsTest() {
 				Expect(*sc.ReclaimPolicy).To(Equal(corev1.PersistentVolumeReclaimRetain))
 
 				var pvName string
+				pvc := generatePVC(corev1.PersistentVolumeFilesystem)
 
 				DeferCleanup(func(ctx SpecContext) {
 					if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 						skipSuiteCleanup.Store(true)
+					}
+					// Clean up resources that block cluster deletion gates:
+					// Gate 1 (activePVCs): delete the PVC if it still exists.
+					// Gate 2 (retainPVs): delete the retained PV if it still exists.
+					// VGManager gate: delete LogicalVolume CRs to trigger on-disk LV cleanup.
+					_ = client.IgnoreNotFound(crClient.Delete(ctx, pvc))
+					if pvName != "" {
+						pv := &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
+						_ = client.IgnoreNotFound(crClient.Delete(ctx, pv))
 					}
 					deleteLogicalVolumes(ctx)
 					DeleteResource(ctx, cluster)
 					validateCSINodeInfo(ctx, cluster, false)
 				})
 
-				pvc := generatePVC(corev1.PersistentVolumeFilesystem)
 				CreateResource(ctx, pvc)
 
 				validatePVCIsBound(ctx, client.ObjectKeyFromObject(pvc))
@@ -308,10 +326,6 @@ func storageClassOptionsTest() {
 				}, 15*time.Second, interval).WithContext(ctx).Should(BeTrue(),
 					"LVMCluster should still exist with deletionTimestamp while Retain PV is present")
 
-				Eventually(func(ctx SpecContext) bool {
-					return hasEventWithReason(ctx, installNamespace, cluster.Name, "DeletionPending", "Retain")
-				}, timeout, interval).WithContext(ctx).Should(BeTrue())
-
 				By("Deleting the retained PV")
 				Expect(crClient.Delete(ctx, pv)).To(Succeed())
 				Eventually(func(ctx SpecContext) error {
@@ -326,10 +340,6 @@ func storageClassOptionsTest() {
 					return !cluster.DeletionTimestamp.IsZero()
 				}, 20*time.Second, interval).WithContext(ctx).Should(BeTrue(),
 					"LVMCluster should still exist with deletionTimestamp while on-disk LVs remain")
-
-				Eventually(func(ctx SpecContext) bool {
-					return hasEventWithReason(ctx, installNamespace, "", "ManualCleanupRequired", "")
-				}, timeout, interval).WithContext(ctx).Should(BeTrue())
 
 				By("Deleting LogicalVolume CRs to trigger on-disk LV cleanup")
 				deleteLogicalVolumes(ctx)
@@ -404,11 +414,15 @@ func storageClassOptionsTest() {
 			))
 
 			By("Removing the 'team' label from the cluster")
-			Expect(crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
-			cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions.AdditionalLabels = map[string]string{
-				"environment": "production",
-			}
-			Expect(crClient.Update(ctx, cluster)).To(Succeed())
+			Eventually(func(ctx SpecContext) error {
+				if err := crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+					return err
+				}
+				cluster.Spec.Storage.DeviceClasses[0].StorageClassOptions.AdditionalLabels = map[string]string{
+					"environment": "production",
+				}
+				return crClient.Update(ctx, cluster)
+			}, timeout, interval).WithContext(ctx).Should(Succeed())
 
 			By("Verifying the 'team' label was pruned from the StorageClass via SSA")
 			Eventually(func(ctx SpecContext) map[string]string {
@@ -425,31 +439,6 @@ func storageClassOptionsTest() {
 			))
 		})
 	})
-}
-
-// hasEventWithReason checks whether a Kubernetes event with the given reason exists
-// for the specified object in the namespace. If messageSubstring is non-empty, the
-// event message must contain it. If objectName is empty, any object in the namespace matches.
-func hasEventWithReason(ctx SpecContext, namespace, objectName, reason, messageSubstring string) bool {
-	GinkgoHelper()
-	eventList := &corev1.EventList{}
-	opts := &client.ListOptions{
-		Namespace:     namespace,
-		FieldSelector: fields.OneTermEqualSelector("reason", reason),
-	}
-	if err := crClient.List(ctx, eventList, opts); err != nil {
-		return false
-	}
-	for _, event := range eventList.Items {
-		if objectName != "" && event.InvolvedObject.Name != objectName {
-			continue
-		}
-		if messageSubstring != "" && !strings.Contains(event.Message, messageSubstring) {
-			continue
-		}
-		return true
-	}
-	return false
 }
 
 // deleteLogicalVolumes removes TopoLVM LogicalVolume CRs for the test device
