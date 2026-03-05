@@ -122,7 +122,7 @@ Save the field ID (e.g., `customfield_12319940`) for use in subsequent queries. 
 
 ### Step 5: Query JIRA for Open Bugs
 
-Fetch all open bugs for the LVMS component. Use POST to avoid URL encoding issues.
+Fetch all non-closed bugs and vulnerabilities for the LVMS component. Use POST to avoid URL encoding issues. A single query covers both issue types — only exclude `Closed` status, as all other statuses (including ON_QA, Verified, Release Pending) indicate work that has not yet shipped in a z-stream.
 
 ```bash
 curl -s -X POST \
@@ -130,9 +130,9 @@ curl -s -X POST \
   -H "Content-Type: application/json" \
   "$JIRA_BASE_URL/rest/api/2/search" \
   -d '{
-    "jql": "project = OCPBUGS AND component = \"Logical Volume Manager Storage\" AND type = Bug AND status not in (Closed, Verified, \"Release Pending\", ON_QA)",
+    "jql": "project = OCPBUGS AND component = \"Logical Volume Manager Storage\" AND type in (Bug, Vulnerability) AND status != Closed",
     "maxResults": 500,
-    "fields": ["summary", "priority", "status", "fixVersions", "versions", "labels", "created", "<TARGET_VERSION_FIELD_ID>"]
+    "fields": ["summary", "priority", "status", "fixVersions", "versions", "labels", "created", "issuetype", "<TARGET_VERSION_FIELD_ID>"]
   }'
 ```
 
@@ -150,6 +150,8 @@ For each bug, determine its target version using this priority:
 2. `fixVersions` — use the first entry's minor version
 3. `versions` (Affects Version) — use the first entry's minor version
 4. If none available, place in "Unassigned" group
+
+**Skip issues targeting unreleased versions**: If the resolved version (from any of the above) maps to a version that is not yet released (not in the supported versions list), exclude the issue from the report entirely. These are tracked for future releases and do not affect z-stream urgency.
 
 **Track per version:**
 - Total bug count (non-CVE)
