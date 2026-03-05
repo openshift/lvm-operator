@@ -1,6 +1,6 @@
 ---
 name: check-release-readiness
-argument-hint: [--version <release-version>] [--k8s <kubernetes-version>] [--local] [--branch <branch>]
+argument-hint: "[--version <release-version>] [--k8s <kubernetes-version>] [--local] [--branch <branch>]"
 description: Check LVMS release readiness by verifying branches, dependencies, and configuration
 allowed-tools: Bash, Read, Glob, Grep, WebFetch
 ---
