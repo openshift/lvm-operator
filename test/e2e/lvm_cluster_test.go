@@ -17,13 +17,17 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
+	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 )
@@ -90,4 +94,102 @@ func lvmClusterTest() {
 			VerifyLVMSSetup(ctx, cluster)
 		})
 	})
+
+	Describe("Device Removal", Serial, func() {
+		BeforeEach(func(ctx SpecContext) {
+			if !IsSNO(ctx) {
+				Skip("Device removal tests run only on SNO instances")
+			}
+		})
+
+		It("should remove devices from volume group successfully", func(ctx SpecContext) {
+			// Configure cluster with multiple devices for removal testing
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
+				Paths: []v1alpha1.DevicePath{"/dev/nvme3n1", "/dev/nvme4n1"},
+			}
+
+			By("Creating cluster with multiple devices")
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Executing pvmove to migrate data from device to be removed")
+			err := executePvmoveOnVGManagerPods(ctx, "/dev/nvme4n1", "/dev/nvme3n1")
+			Expect(err).NotTo(HaveOccurred(), "pvmove should succeed before device removal")
+
+			By("Removing one device from the volume group")
+			// Update cluster to remove /dev/nvme1n1
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
+				"/dev/nvme3n1",
+			}
+
+			err = crClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying device removal completed successfully")
+			Eventually(func(ctx SpecContext) bool {
+				return validateDeviceRemovalSuccess(ctx, cluster, 1)
+			}, 5*timeout, interval).WithContext(ctx).Should(BeTrue())
+		})
+
+		It("should handle optional device removal", func(ctx SpecContext) {
+			// Configure cluster with both required and optional devices
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector = &v1alpha1.DeviceSelector{
+				Paths:         []v1alpha1.DevicePath{"/dev/nvme4n1"},
+				OptionalPaths: []v1alpha1.DevicePath{"/dev/nvme1n1", "/dev/nvme3n1"},
+			}
+
+			By("Creating cluster with required and optional devices")
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+
+			By("Executing pvmove to migrate data from optional devices before removal")
+			err := executePvmoveOnVGManagerPods(ctx, "/dev/nvme3n1", "/dev/nvme4n1")
+			Expect(err).NotTo(HaveOccurred(), "pvmove should succeed for optional device")
+
+			By("Removing optional devices")
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []v1alpha1.DevicePath{}
+
+			err = crClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred(), "Should allow removal of optional devices")
+
+			By("Verifying cluster remains Ready with required device only")
+			Eventually(func(ctx SpecContext) bool {
+				return validateClusterReady(ctx, cluster)
+			}, timeout, interval).WithContext(ctx).Should(BeTrue())
+		})
+	})
+}
+
+// executePvmoveOnVGManagerPods executes pvmove command on all vg-manager pods
+func executePvmoveOnVGManagerPods(ctx context.Context, sourceDevice, targetDevice string) error {
+	// Get all vg-manager pods
+	podList := &k8sv1.PodList{}
+	err := crClient.List(ctx, podList, &client.ListOptions{
+		Namespace: installNamespace,
+		LabelSelector: labels.Set{
+			"app.kubernetes.io/name": "vg-manager",
+		}.AsSelector(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list vg-manager pods: %w", err)
+	}
+
+	// Create pod runner for command execution
+	podRunner, err := NewPodRunner(config, scheme)
+	if err != nil {
+		return fmt.Errorf("failed to create pod runner: %w", err)
+	}
+
+	// Execute pvmove on each vg-manager pod that has the device
+	for _, pod := range podList.Items {
+		// Execute pvmove to migrate data away from the source device
+		pvmoveCmd := fmt.Sprintf("nsenter -m -u -i -n -p -t 1 pvmove %s %s", sourceDevice, targetDevice)
+		stdout, stderr, err := podRunner.ExecCommandInFirstPodContainer(ctx, &pod, pvmoveCmd)
+		if err != nil {
+			return fmt.Errorf("pvmove failed on pod %s (node: %s): %w\nstdout: %s\nstderr: %s",
+				pod.Name, pod.Spec.NodeName, err, stdout, stderr)
+		}
+	}
+
+	return nil
 }
