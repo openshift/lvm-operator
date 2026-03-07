@@ -793,4 +793,141 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, updated)).To(Succeed())
 	})
 
+	// StorageClassOptions validation tests
+	It("additionalParameters with LVMS-owned device-class key rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalParameters: map[string]string{
+				"topolvm.io/device-class": "attempt-override",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("managed by LVMS"))
+	})
+
+	It("additionalParameters with fstype key rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalParameters: map[string]string{
+				"csi.storage.k8s.io/fstype": "ext4",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("managed by LVMS"))
+	})
+
+	It("additionalParameters with empty key rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalParameters: map[string]string{
+				"": "empty-key",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("empty keys"))
+	})
+
+	It("additionalLabels with invalid key rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalLabels: map[string]string{
+				"bad key": "value",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("invalid"))
+	})
+
+	It("additionalLabels with invalid value rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalLabels: map[string]string{
+				"valid-key": "BAD@VALUE",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("invalid"))
+	})
+
+	It("additionalLabels with reserved app.kubernetes.io key rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalLabels: map[string]string{
+				"app.kubernetes.io/managed-by": "user-override",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("operator-reserved"))
+	})
+
+	It("additionalLabels with owned-by.topolvm.io prefix rejected on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalLabels: map[string]string{
+				"owned-by.topolvm.io/kind": "LVMCluster",
+			},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("operator-reserved"))
+	})
+
+	It("valid additionalParameters and additionalLabels accepted on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalParameters: map[string]string{
+				"my-custom-param": "my-value",
+			},
+			AdditionalLabels: map[string]string{
+				"team": "storage",
+			},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("LVMS-owned param key rejected on update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].StorageClassOptions = &StorageClassOptions{
+			AdditionalParameters: map[string]string{
+				"topolvm.io/device-class": "override-on-update",
+			},
+		}
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
 })

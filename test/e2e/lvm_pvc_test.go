@@ -67,6 +67,7 @@ type pvcTestOptions struct {
 func pvcTestThinProvisioning() {
 	var cluster *v1alpha1.LVMCluster
 	BeforeAll(func(ctx SpecContext) {
+		waitForExistingClusterDeletion(ctx)
 		cluster = GetDefaultTestLVMClusterTemplate()
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
@@ -110,6 +111,7 @@ func pvcTestThinProvisioning() {
 func pvcTestThickProvisioning() {
 	var cluster *v1alpha1.LVMCluster
 	BeforeAll(func(ctx SpecContext) {
+		waitForExistingClusterDeletion(ctx)
 		cluster = GetDefaultTestLVMClusterTemplate()
 
 		// set ThinPoolConfig to nil

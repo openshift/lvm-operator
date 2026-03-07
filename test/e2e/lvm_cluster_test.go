@@ -31,14 +31,15 @@ import (
 func lvmClusterTest() {
 	var cluster *v1alpha1.LVMCluster
 	BeforeEach(func(ctx SpecContext) {
+		waitForExistingClusterDeletion(ctx)
 		cluster = GetDefaultTestLVMClusterTemplate()
 	})
 	AfterEach(func(ctx SpecContext) {
 		if CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
-			By("Test failed, skipping cluster cleanup")
 			skipSuiteCleanup.Store(true)
-			return
 		}
+		// Always delete the cluster to prevent stale resources from
+		// causing "duplicate LVMClusters" rejections in subsequent tests.
 		DeleteResource(ctx, cluster)
 		validateCSINodeInfo(ctx, cluster, false)
 	})
