@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Red Hat, Inc.
+Copyright © 2026 Red Hat, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,38 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"testing"
 
-	"github.com/go-logr/logr/testr"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/resource"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+func newGinkgoReconciler(objs ...client.Object) *Reconciler {
+	scheme, err := lvmv1alpha1.SchemeBuilder.Build()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(corev1.AddToScheme(scheme)).To(Succeed())
+	Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+	Expect(storagev1.AddToScheme(scheme)).To(Succeed())
+	Expect(snapapi.AddToScheme(scheme)).To(Succeed())
+
+	return &Reconciler{
+		Client:                fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build(),
+		Namespace:             testNamespace,
+		LogPassthroughOptions: logpassthrough.NewOptions(),
+	}
+}
 
 func testLVMCluster(deviceClasses ...lvmv1alpha1.DeviceClass) *lvmv1alpha1.LVMCluster {
 	return &lvmv1alpha1.LVMCluster{
@@ -42,187 +62,6 @@ func testLVMCluster(deviceClasses ...lvmv1alpha1.DeviceClass) *lvmv1alpha1.LVMCl
 		Spec: lvmv1alpha1.LVMClusterSpec{
 			Storage: lvmv1alpha1.Storage{DeviceClasses: deviceClasses},
 		},
-	}
-}
-
-func TestActivePVCsExist_NoPVCs(t *testing.T) {
-	r := newFakeReconciler(t)
-	// Wrap with interceptor that returns empty list for PVC field queries
-	r.Client = newFieldFilteringClient(r.Client, resource.GetStorageClassName("vg1"), nil, nil, nil, nil)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-	})
-
-	exists, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Error("expected false when no PVCs exist, got true")
-	}
-}
-
-func TestActivePVCsExist_MatchingPVC(t *testing.T) {
-	scName := resource.GetStorageClassName("vg1")
-	pvc := corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pvc",
-			Namespace: "default",
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: &scName,
-		},
-	}
-
-	r := newFakeReconciler(t)
-	r.Client = newFieldFilteringClient(r.Client, scName, []corev1.PersistentVolumeClaim{pvc}, nil, nil, nil)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-	})
-
-	exists, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !exists {
-		t.Error("expected true when matching PVC exists, got false")
-	}
-}
-
-func TestActivePVCsExist_NonMatchingPVC(t *testing.T) {
-	r := newFakeReconciler(t)
-	// No matching PVCs for the target SC name
-	r.Client = newFieldFilteringClient(r.Client, resource.GetStorageClassName("vg1"), nil, nil, nil, nil)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-	})
-
-	exists, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Error("expected false when no matching PVC exists, got true")
-	}
-}
-
-func TestActivePVCsExist_ListError(t *testing.T) {
-	r := newFakeReconciler(t)
-
-	expectedErr := fmt.Errorf("list failed")
-	r.Client = newFieldFilteringClient(r.Client, resource.GetStorageClassName("vg1"), nil, nil, expectedErr, nil)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-	})
-
-	_, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
-	if err == nil {
-		t.Error("expected error to be propagated, got nil")
-	}
-}
-
-func TestRetainPVsExist_NoRetainPolicy(t *testing.T) {
-	r := newFakeReconciler(t)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	// All device classes have Delete policy (nil StorageClassOptions = default Delete)
-	cluster := testLVMCluster(
-		lvmv1alpha1.DeviceClass{Name: "vg1"},
-		lvmv1alpha1.DeviceClass{
-			Name: "vg2",
-			StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
-				ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimDelete),
-			},
-		},
-	)
-
-	exists, err := r.retainPVsExistForCluster(ctx, cluster)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Error("expected false when no Retain policy exists, got true")
-	}
-}
-
-func TestRetainPVsExist_RetainWithPVs(t *testing.T) {
-	scName := resource.GetStorageClassName("vg1")
-	pv := corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			StorageClassName: scName,
-		},
-	}
-
-	r := newFakeReconciler(t)
-	r.Client = newFieldFilteringClient(r.Client, scName, nil, []corev1.PersistentVolume{pv}, nil, nil)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-		StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
-			ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
-		},
-	})
-
-	exists, err := r.retainPVsExistForCluster(ctx, cluster)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !exists {
-		t.Error("expected true when Retain PVs exist, got false")
-	}
-}
-
-func TestRetainPVsExist_RetainNoPVs(t *testing.T) {
-	r := newFakeReconciler(t)
-	scName := resource.GetStorageClassName("vg1")
-	r.Client = newFieldFilteringClient(r.Client, scName, nil, nil, nil, nil)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-		StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
-			ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
-		},
-	})
-
-	exists, err := r.retainPVsExistForCluster(ctx, cluster)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Error("expected false when no Retain PVs exist, got true")
-	}
-}
-
-func TestRetainPVsExist_ListError(t *testing.T) {
-	r := newFakeReconciler(t)
-	scName := resource.GetStorageClassName("vg1")
-	expectedErr := fmt.Errorf("PV list failed")
-	r.Client = newFieldFilteringClient(r.Client, scName, nil, nil, nil, expectedErr)
-	ctx := log.IntoContext(context.Background(), testr.New(t))
-
-	cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
-		Name: "vg1",
-		StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
-			ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
-		},
-	})
-
-	_, err := r.retainPVsExistForCluster(ctx, cluster)
-	if err == nil {
-		t.Error("expected error to be propagated, got nil")
 	}
 }
 
@@ -238,7 +77,6 @@ func newFieldFilteringClient(
 	pvcListErr error,
 	pvListErr error,
 ) client.Client {
-	// The fake client implements client.WithWatch, which interceptor.NewClient requires.
 	watchBase := base.(client.WithWatch)
 	expectedSelector := fmt.Sprintf("spec.storageClassName=%s", targetSCName)
 	return interceptor.NewClient(watchBase, interceptor.Funcs{
@@ -285,3 +123,134 @@ func newFieldFilteringClient(
 		},
 	})
 }
+
+var _ = Describe("Deletion Gates", func() {
+
+	Describe("activePVCsExistForClusterStorageClasses", func() {
+		It("should return false when no PVCs exist", func(ctx context.Context) {
+			r := newGinkgoReconciler()
+			r.Client = newFieldFilteringClient(r.Client, resource.GetStorageClassName("vg1"), nil, nil, nil, nil)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{Name: "vg1"})
+
+			exists, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should return true when a matching PVC exists", func(ctx context.Context) {
+			scName := resource.GetStorageClassName("vg1")
+			pvc := corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pvc", Namespace: "default"},
+				Spec:       corev1.PersistentVolumeClaimSpec{StorageClassName: &scName},
+			}
+
+			r := newGinkgoReconciler()
+			r.Client = newFieldFilteringClient(r.Client, scName, []corev1.PersistentVolumeClaim{pvc}, nil, nil, nil)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{Name: "vg1"})
+
+			exists, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeTrue())
+		})
+
+		It("should return false when no matching PVC exists", func(ctx context.Context) {
+			r := newGinkgoReconciler()
+			r.Client = newFieldFilteringClient(r.Client, resource.GetStorageClassName("vg1"), nil, nil, nil, nil)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{Name: "vg1"})
+
+			exists, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should propagate list errors", func(ctx context.Context) {
+			r := newGinkgoReconciler()
+			expectedErr := fmt.Errorf("list failed")
+			r.Client = newFieldFilteringClient(r.Client, resource.GetStorageClassName("vg1"), nil, nil, expectedErr, nil)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{Name: "vg1"})
+
+			_, err := r.activePVCsExistForClusterStorageClasses(ctx, cluster)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("retainPVsExistForCluster", func() {
+		It("should return false when no Retain policy exists", func(ctx context.Context) {
+			r := newGinkgoReconciler()
+
+			cluster := testLVMCluster(
+				lvmv1alpha1.DeviceClass{Name: "vg1"},
+				lvmv1alpha1.DeviceClass{
+					Name: "vg2",
+					StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
+						ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimDelete),
+					},
+				},
+			)
+
+			exists, err := r.retainPVsExistForCluster(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should return true when Retain PVs exist", func(ctx context.Context) {
+			scName := resource.GetStorageClassName("vg1")
+			pv := corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pv"},
+				Spec:       corev1.PersistentVolumeSpec{StorageClassName: scName},
+			}
+
+			r := newGinkgoReconciler()
+			r.Client = newFieldFilteringClient(r.Client, scName, nil, []corev1.PersistentVolume{pv}, nil, nil)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
+				Name: "vg1",
+				StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
+					ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
+				},
+			})
+
+			exists, err := r.retainPVsExistForCluster(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeTrue())
+		})
+
+		It("should return false when Retain policy but no PVs", func(ctx context.Context) {
+			scName := resource.GetStorageClassName("vg1")
+			r := newGinkgoReconciler()
+			r.Client = newFieldFilteringClient(r.Client, scName, nil, nil, nil, nil)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
+				Name: "vg1",
+				StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
+					ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
+				},
+			})
+
+			exists, err := r.retainPVsExistForCluster(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should propagate list errors", func(ctx context.Context) {
+			scName := resource.GetStorageClassName("vg1")
+			expectedErr := fmt.Errorf("PV list failed")
+			r := newGinkgoReconciler()
+			r.Client = newFieldFilteringClient(r.Client, scName, nil, nil, nil, expectedErr)
+
+			cluster := testLVMCluster(lvmv1alpha1.DeviceClass{
+				Name: "vg1",
+				StorageClassOptions: &lvmv1alpha1.StorageClassOptions{
+					ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
+				},
+			})
+
+			_, err := r.retainPVsExistForCluster(ctx, cluster)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+})
