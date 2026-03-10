@@ -52,6 +52,26 @@ const (
 	vgManagerDaemonsetName  = "vg-manager"
 )
 
+// waitForExistingClusterDeletion ensures no LVMCluster is present before a new
+// test starts. This handles the case where a previous test's cleanup timed out
+// but the operator is still processing deletion in the background. Without this
+// guard, the next test would immediately fail with "duplicate LVMClusters".
+func waitForExistingClusterDeletion(ctx context.Context) {
+	GinkgoHelper()
+	By("ensuring no stale LVMCluster exists from a previous test")
+	Eventually(func(ctx context.Context) error {
+		list := &v1alpha1.LVMClusterList{}
+		if err := crClient.List(ctx, list, client.InNamespace(installNamespace)); err != nil {
+			return err
+		}
+		if len(list.Items) > 0 {
+			return fmt.Errorf("LVMCluster %q still exists (phase: %s, deletionTimestamp: %v)",
+				list.Items[0].Name, list.Items[0].Status.State, list.Items[0].DeletionTimestamp)
+		}
+		return nil
+	}, 5*time.Minute, interval).WithContext(ctx).Should(Succeed())
+}
+
 func validateLVMCluster(ctx context.Context, cluster *v1alpha1.LVMCluster) bool {
 	GinkgoHelper()
 	checkClusterIsReady := func(ctx context.Context) error {
