@@ -31,6 +31,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
+	v1 "github.com/openshift/api/config/v1"
+	ctrlRuntimeCommon "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/resource"
@@ -52,6 +54,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,6 +77,7 @@ const (
 )
 
 var ErrConfigModified = errors.New("lvmd config file is modified")
+var ErrTLSProfileModified = errors.New("API server TLS profile changed")
 var ErrNoDeviceClassesAvailable = errors.New("no device classes in lvmd.yaml configured, can not startup correctly")
 var ErrCSIPluginNotYetRegistered = errors.New("CSI plugin not yet registered")
 
@@ -141,6 +145,21 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to get operatorNamespace: %w", err)
 	}
 
+	setupClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: opts.Scheme})
+	if err != nil {
+		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
+	}
+
+	tlsProfile, err := ctrlRuntimeCommon.FetchAPIServerTLSProfile(ctx, setupClient)
+	if err != nil {
+		return fmt.Errorf("failed to get tls profile: %w", err)
+	}
+
+	tlsConfig, unsupportedCiphers := ctrlRuntimeCommon.NewTLSConfigFromProfile(tlsProfile)
+	if len(unsupportedCiphers) > 0 {
+		opts.SetupLog.Info("some ciphers from TLS profile are not supported", "unsupportedCiphers", unsupportedCiphers)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: opts.Scheme,
 		Metrics: metricsserver.Options{
@@ -149,18 +168,18 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
 			TLSOpts: []func(*tls.Config){
 				func(c *tls.Config) {
-					opts.SetupLog.Info("disabling http/2")
 					c.NextProtos = []string{"http/1.1"}
 				},
+				tlsConfig,
 			},
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port: 9443,
 			TLSOpts: []func(*tls.Config){
 				func(c *tls.Config) {
-					opts.SetupLog.Info("disabling http/2")
 					c.NextProtos = []string{"http/1.1"}
 				},
+				tlsConfig,
 			},
 		}},
 		HealthProbeBindAddress: opts.healthProbeAddr,
@@ -174,6 +193,21 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
+		InitialTLSProfileSpec: tlsProfile,
+		OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec v1.TLSProfileSpec) {
+			ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
+				"old profile", oldTLSProfileSpec,
+				"new profile", newTLSProfileSpec,
+			)
+			cancelWithCause(ErrTLSProfileModified)
+		},
+	}
+
+	if err := tlsWatcherController.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create controller for TLS config observation: %w", err)
 	}
 
 	registrationServer := icsi.NewRegistrationServer(
@@ -266,11 +300,15 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("problem running manager: %w", err)
 	}
 
-	if errors.Is(context.Cause(ctx), ErrConfigModified) {
+	cause := context.Cause(ctx)
+	if errors.Is(cause, ErrConfigModified) {
 		opts.SetupLog.Info("exiting pod due to modified configuration")
 		os.Exit(0)
-	} else if errors.Is(context.Cause(ctx), icsi.ErrPluginRegistrationFailed) {
-		opts.SetupLog.Error(context.Cause(ctx), "exiting pod due to failed plugin registration")
+	} else if errors.Is(cause, ErrTLSProfileModified) {
+		opts.SetupLog.Info("exiting pod due to modified TLS profile")
+		os.Exit(0)
+	} else if errors.Is(cause, icsi.ErrPluginRegistrationFailed) {
+		opts.SetupLog.Error(cause, "exiting pod due to failed plugin registration")
 		os.Exit(0)
 	} else if err := ctx.Err(); err != nil {
 		opts.SetupLog.Error(err, "exiting abnormally")
