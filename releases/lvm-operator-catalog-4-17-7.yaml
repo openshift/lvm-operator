@@ -6,4 +6,4 @@ metadata:
   namespace: logical-volume-manag-tenant
 spec:
   releasePlan: lvm-operator-catalog-production-releaseplan-4-17
-  snapshot: lvm-operator-catalog-4-17-20260224-140926-000
+  snapshot: lvm-operator-catalog-4-17-20260319-103001-000
