@@ -2,8 +2,8 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-catalog-4-17-7
+  name: lvm-operator-catalog-4-17-8
   namespace: logical-volume-manag-tenant
 spec:
   releasePlan: lvm-operator-catalog-production-releaseplan-4-17
-  snapshot: lvm-operator-catalog-4-17-20260224-140926-000
+  snapshot: lvm-operator-catalog-4-17-20260319-103001-000

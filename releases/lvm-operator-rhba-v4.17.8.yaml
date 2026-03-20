@@ -2,11 +2,11 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-rhba-v4.17.7
+  name: lvm-operator-rhba-v4.17.8
   namespace: logical-volume-manag-tenant
 spec:
   releasePlan: lvm-operator-production-releaseplan-4-17
-  snapshot: lvm-operator-4-17-20260222-182252-000
+  snapshot: lvm-operator-4-17-20260319-100440-000
   data:
     releaseNotes:
       description: |
@@ -15,5 +15,11 @@ spec:
         This erratum implements the following changes:
 
         - General base image version bumps
+        - Fixes memory exhaustion in query parameter parsing in net/url
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+
+      issues:
+        fixed:
+          - id: OCPBUGS-75512
+            source: issues.redhat.com
