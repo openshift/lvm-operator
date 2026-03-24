@@ -3,9 +3,11 @@ package selector
 import (
 	"errors"
 	"fmt"
+
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 )
 
 var ErrNotReadyTaintExists = fmt.Errorf("node has a %s taint", corev1.TaintNodeNotReady)
@@ -65,7 +67,7 @@ func ValidNodes(lvmCluster *lvmv1alpha1.LVMCluster, nodes *corev1.NodeList) ([]c
 // TolerateAllTaints returns true if all taints are tolerated by the provided tolerations
 func ToleratesAllTaints(taints []corev1.Taint, tolerations []corev1.Toleration) (bool, error) {
 	for _, taint := range taints {
-		if !corev1helper.TolerationsTolerateTaint(tolerations, &taint) {
+		if !corev1helper.TolerationsTolerateTaint(klog.Background(), tolerations, &taint, true) {
 			if taint.Key == corev1.TaintNodeNotReady {
 				return false, ErrNotReadyTaintExists
 			}

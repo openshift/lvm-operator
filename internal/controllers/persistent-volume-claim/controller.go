@@ -14,7 +14,7 @@ import (
 	v1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,11 +31,11 @@ const (
 // Reconciler reconciles a PersistentVolumeClaim object
 type Reconciler struct {
 	Client   client.Client
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 // NewReconciler returns Reconciler.
-func NewReconciler(client client.Client, eventRecorder record.EventRecorder) *Reconciler {
+func NewReconciler(client client.Client, eventRecorder events.EventRecorder) *Reconciler {
 	return &Reconciler{
 		Client:   client,
 		Recorder: eventRecorder,
@@ -126,7 +126,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// Publish an event if the requested storage is greater than the available capacity
 	if !found {
 		msg := fmt.Sprintf("Requested storage (%s) is greater than available capacity on any node (%s).", requestedStorage.String(), strings.Join(nodeMessage, ","))
-		r.Recorder.Event(pvc, "Warning", "NotEnoughCapacity", msg)
+		r.Recorder.Eventf(pvc, nil, "Warning", "NotEnoughCapacity", "CheckCapacity", msg)
 		logger.V(7).Info(msg)
 	}
 

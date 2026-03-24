@@ -33,6 +33,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvmd"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -98,7 +98,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 type Reconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	record.EventRecorder
+	events.EventRecorder
 	LVMD lvmd.Configurator
 	lvm.LVM
 	lsblk.LSBLK
@@ -932,7 +932,7 @@ func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolum
 	nodeStatus.SetNamespace(r.Namespace)
 	// even if the get does not succeed we can still issue an event, just without UUID / resourceVersion
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err == nil {
-		r.Event(nodeStatus, corev1.EventTypeWarning, string(reason), errMsg.Error())
+		r.Eventf(nodeStatus, nil, corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup", errMsg.Error())
 	}
 	for _, ref := range obj.GetOwnerReferences() {
 		owner := &v1.PartialObjectMetadata{}
@@ -940,11 +940,11 @@ func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolum
 		owner.SetNamespace(obj.GetNamespace())
 		owner.SetUID(ref.UID)
 		owner.SetGroupVersionKind(schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind))
-		r.Event(owner, corev1.EventTypeWarning, string(reason),
+		r.Eventf(owner, nil, corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup",
 			fmt.Errorf("error on node %s in volume group %s: %w",
 				client.ObjectKeyFromObject(nodeStatus), client.ObjectKeyFromObject(obj), errMsg).Error())
 	}
-	r.Event(obj, corev1.EventTypeWarning, string(reason),
+	r.Eventf(obj, nil, corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup",
 		fmt.Errorf("error on node %s: %w", client.ObjectKeyFromObject(nodeStatus), errMsg).Error())
 }
 
@@ -958,7 +958,7 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolume
 	nodeStatus.SetNamespace(r.Namespace)
 	// even if the get does not succeed we can still issue an event, just without UUID / resourceVersion
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err == nil {
-		r.Event(nodeStatus, corev1.EventTypeNormal, string(reason), message)
+		r.Eventf(nodeStatus, nil, corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup", message)
 	}
 	for _, ref := range obj.GetOwnerReferences() {
 		owner := &v1.PartialObjectMetadata{}
@@ -966,11 +966,11 @@ func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolume
 		owner.SetNamespace(obj.GetNamespace())
 		owner.SetUID(ref.UID)
 		owner.SetGroupVersionKind(schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind))
-		r.Event(owner, corev1.EventTypeNormal, string(reason),
+		r.Eventf(owner, nil, corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup",
 			fmt.Sprintf("update on node %s in volume group %s: %s",
 				client.ObjectKeyFromObject(nodeStatus), client.ObjectKeyFromObject(obj), message))
 	}
-	r.Event(obj, corev1.EventTypeNormal, string(reason),
+	r.Eventf(obj, nil, corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup",
 		fmt.Sprintf("update on node %s: %s", client.ObjectKeyFromObject(nodeStatus), message))
 }
 

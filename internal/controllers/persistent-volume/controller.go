@@ -7,7 +7,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,11 +22,11 @@ const pvLabel = "kubernetes.io/hostname"
 // Reconciler reconciles a PersistentVolume object
 type Reconciler struct {
 	client   client.Client
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 // NewReconciler returns Reconciler.
-func NewReconciler(client client.Client, eventRecorder record.EventRecorder) *Reconciler {
+func NewReconciler(client client.Client, eventRecorder events.EventRecorder) *Reconciler {
 	return &Reconciler{
 		client:   client,
 		recorder: eventRecorder,
@@ -57,7 +57,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Publish an event if PV has no claimRef
 	if pv.Spec.ClaimRef == nil {
-		r.recorder.Event(pv, "Warning", "ClaimReferenceRemoved", "Claim reference has been removed. This PV is no longer dynamically managed by LVM Storage and will need to be cleaned up manually.")
+		r.recorder.Eventf(pv, nil, "Warning", "ClaimReferenceRemoved", "CheckClaimReference", "Claim reference has been removed. This PV is no longer dynamically managed by LVM Storage and will need to be cleaned up manually.")
 		logger.Info("Event published for the PV", "PV", req.NamespacedName)
 	}
 

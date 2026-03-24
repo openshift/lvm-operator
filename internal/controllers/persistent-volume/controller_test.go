@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,7 +26,7 @@ func TestPersistentVolumeReconciler_SetupWithManager(t *testing.T) {
 	mgr, err := controllerruntime.NewManager(&rest.Config{}, controllerruntime.Options{})
 	assert.NoError(t, err)
 	fakeclient := fake.NewClientBuilder().Build()
-	r := persistentvolume.NewReconciler(fakeclient, record.NewFakeRecorder(1))
+	r := persistentvolume.NewReconciler(fakeclient, events.NewFakeRecorder(1))
 	assert.NoError(t, r.SetupWithManager(mgr))
 
 	predicates := r.Predicates()
@@ -161,7 +161,7 @@ func TestPersistentVolumeReconciler_Reconcile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder := record.NewFakeRecorder(1)
+			recorder := events.NewFakeRecorder(1)
 			clnt := fake.NewClientBuilder().WithObjects(tt.objs...).
 				WithInterceptorFuncs(interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					if tt.clientErr != nil {

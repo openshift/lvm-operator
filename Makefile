@@ -365,7 +365,7 @@ endif
 MOCKERY = $(shell pwd)/bin/mockery
 mockery: ## Download mockery and add locally if necessary
 ifeq (,$(wildcard $(MOCKERY)))
-	$(call go-get-tool,github.com/vektra/mockery/v2@v2.52.3)
+	$(call go-get-tool,github.com/vektra/mockery/v2@v2.53.6)
 endif
 
 # go-get-tool will 'go get' any package $2 and install it to $1.

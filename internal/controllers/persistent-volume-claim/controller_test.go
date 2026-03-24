@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,7 +30,7 @@ func TestPersistentVolumeClaimReconciler_SetupWithManager(t *testing.T) {
 	mgr, err := controllerruntime.NewManager(&rest.Config{}, controllerruntime.Options{})
 	assert.NoError(t, err)
 	fakeclient := fake.NewClientBuilder().Build()
-	r := persistentvolumeclaim.NewReconciler(fakeclient, record.NewFakeRecorder(1))
+	r := persistentvolumeclaim.NewReconciler(fakeclient, events.NewFakeRecorder(1))
 	assert.NoError(t, r.SetupWithManager(mgr))
 
 	predicates := r.Predicates()
@@ -303,7 +303,7 @@ func TestPersistentVolumeClaimReconciler_Reconcile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder := record.NewFakeRecorder(1)
+			recorder := events.NewFakeRecorder(1)
 			r := persistentvolumeclaim.NewReconciler(
 				fake.NewClientBuilder().WithObjects(tt.objs...).
 					WithInterceptorFuncs(interceptor.Funcs{

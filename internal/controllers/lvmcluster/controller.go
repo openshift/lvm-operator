@@ -38,7 +38,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -61,7 +61,7 @@ const (
 // Reconciler reconciles a LVMCluster object
 type Reconciler struct {
 	client.Client
-	record.EventRecorder
+	events.EventRecorder
 	ClusterType        cluster.Type
 	EnableSnapshotting bool
 	Namespace          string
@@ -573,12 +573,12 @@ func (r *Reconciler) clusterNodes(ctx context.Context) (map[string]struct{}, err
 }
 
 func (r *Reconciler) WarningEvent(_ context.Context, obj client.Object, reason EventReasonError, err error) {
-	r.Event(obj, corev1.EventTypeWarning, string(reason), err.Error())
+	r.Eventf(obj, nil, corev1.EventTypeWarning, string(reason), "ReconcileLVMCluster", err.Error())
 }
 
 func (r *Reconciler) NormalEvent(ctx context.Context, obj client.Object, reason EventReasonInfo, message string) {
 	if !log.FromContext(ctx).V(1).Enabled() {
 		return
 	}
-	r.Event(obj, corev1.EventTypeNormal, string(reason), message)
+	r.Eventf(obj, nil, corev1.EventTypeNormal, string(reason), "ReconcileLVMCluster", message)
 }

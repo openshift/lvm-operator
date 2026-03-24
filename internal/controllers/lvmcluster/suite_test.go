@@ -155,7 +155,7 @@ var _ = BeforeSuite(func() {
 
 	err = (&Reconciler{
 		Client:                k8sManager.GetClient(),
-		EventRecorder:         k8sManager.GetEventRecorderFor("LVMClusterReconciler"),
+		EventRecorder:         k8sManager.GetEventRecorder("LVMClusterReconciler"),
 		EnableSnapshotting:    enableSnapshotting,
 		ClusterType:           clusterType,
 		Namespace:             testLvmClusterNamespace,
