@@ -14,21 +14,22 @@ require (
 	github.com/kubernetes-csi/external-resizer v1.14.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.4.0
 	github.com/kubernetes-csi/external-snapshotter/v8 v8.3.0
-	github.com/onsi/ginkgo/v2 v2.25.3
-	github.com/onsi/gomega v1.38.2
-	github.com/openshift/api v0.0.0-20260107103503-6d35063ca179
-	github.com/openshift/client-go v0.0.0-20260105124352-f93a4291f9ae
-	github.com/openshift/library-go v0.0.0-20260108002748-aca7ba3a9b69
+	github.com/onsi/ginkgo/v2 v2.28.1
+	github.com/onsi/gomega v1.39.1
+	github.com/openshift/api v0.0.0-20260213155647-8fe9fe363807
+	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
+	github.com/openshift/controller-runtime-common v0.0.0-20260305203102-d1c60045a455
+	github.com/openshift/library-go v0.0.0-20260213153706-03f1709971c5
 	github.com/operator-framework/api v0.30.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
-	github.com/prometheus/client_golang v1.22.0
+	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/topolvm/topolvm v0.36.3
 	go.uber.org/zap v1.27.0
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.79.3
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.34.3
 	k8s.io/apiextensions-apiserver v0.34.3
@@ -39,18 +40,18 @@ require (
 	k8s.io/csi-translation-lib v0.34.3
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.34.3
-	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
-	sigs.k8s.io/controller-runtime v0.21.0
-	sigs.k8s.io/controller-tools v0.17.3
+	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	sigs.k8s.io/controller-runtime v0.22.5
+	sigs.k8s.io/controller-tools v0.19.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.7.0
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v11 v11.0.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
-replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20250902141549-bf55337a0ff7
+replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20260311063523-c3606f6ac8b0
 
 require (
-	cel.dev/expr v0.24.0 // indirect
+	cel.dev/expr v0.25.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -76,7 +77,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
@@ -95,10 +96,9 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.64.0 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -116,38 +116,38 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.6.0 // indirect
-	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.37.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
-	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
+	golang.org/x/tools v0.41.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/code-generator v0.34.3 // indirect
 	k8s.io/component-base v0.34.3 // indirect
-	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b // indirect
+	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
+	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/mount-utils v0.34.3 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.1 // indirect
 	sigs.k8s.io/gateway-api v1.3.0 // indirect
-	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
+	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.20.0 // indirect
 	sigs.k8s.io/kustomize/cmd/config v0.20.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.20.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
