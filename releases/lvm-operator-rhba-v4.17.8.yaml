@@ -2,7 +2,7 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-rhba-v4.17.8
+  name: lvm-operator-rhba-v4.17.8-1
   namespace: logical-volume-manag-tenant
 spec:
   releasePlan: lvm-operator-production-releaseplan-4-17
@@ -23,3 +23,5 @@ spec:
         fixed:
           - id: OCPBUGS-75512
             source: issues.redhat.com
+      cves:
+        - key: CVE-2025-61726
