@@ -230,7 +230,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	// register controllers
 	if err = (&lvmcluster.Reconciler{
 		Client:                           mgr.GetClient(),
-		EventRecorder:                    mgr.GetEventRecorderFor("LVMClusterReconciler"),
+		EventRecorder:                    mgr.GetEventRecorder("LVMClusterReconciler"),
 		ClusterType:                      clusterType,
 		Namespace:                        operatorNamespace,
 		TopoLVMLeaderElectionPassthrough: leaderElectionConfig,
@@ -250,12 +250,12 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create LVMCluster webhook: %w", err)
 	}
 
-	pvController := persistent_volume.NewReconciler(mgr.GetClient(), mgr.GetEventRecorderFor("lvms-pv-controller"))
+	pvController := persistent_volume.NewReconciler(mgr.GetClient(), mgr.GetEventRecorder("lvms-pv-controller"))
 	if err := pvController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create PersistentVolume controller: %w", err)
 	}
 
-	pvcController := persistent_volume_claim.NewReconciler(mgr.GetClient(), mgr.GetEventRecorderFor("lvms-pvc-controller"))
+	pvcController := persistent_volume_claim.NewReconciler(mgr.GetClient(), mgr.GetEventRecorder("lvms-pvc-controller"))
 	if err := pvcController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create PersistentVolumeClaim controller: %w", err)
 	}

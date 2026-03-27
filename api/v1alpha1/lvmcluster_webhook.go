@@ -28,12 +28,10 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -47,7 +45,7 @@ type lvmClusterValidator struct {
 	client.Client
 }
 
-var _ webhook.CustomValidator = &lvmClusterValidator{}
+var _ admission.Validator[*LVMCluster] = &lvmClusterValidator{}
 
 var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
@@ -68,15 +66,13 @@ var (
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
 
 func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(l).
+	return ctrl.NewWebhookManagedBy(mgr, l).
 		WithValidator(&lvmClusterValidator{Client: mgr.GetClient()}).
 		Complete()
 }
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	l := obj.(*LVMCluster)
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type
+func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, l *LVMCluster) (admission.Warnings, error) {
 
 	warnings := admission.Warnings{}
 	lvmclusterlog.Info("validate create", "name", l.Name)
@@ -148,10 +144,8 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Ob
 	return warnings, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime.Object) (admission.Warnings, error) {
-	l := new.(*LVMCluster)
-
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type
+func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, oldLVMCluster, l *LVMCluster) (admission.Warnings, error) {
 	lvmclusterlog.Info("validate update", "name", l.Name)
 	warnings := admission.Warnings{}
 
@@ -180,11 +174,6 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, old, new runtime
 	err = v.verifyFstype(l)
 	if err != nil {
 		return warnings, err
-	}
-
-	oldLVMCluster, ok := old.(*LVMCluster)
-	if !ok {
-		return warnings, fmt.Errorf("failed to parse LVMCluster")
 	}
 
 	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
@@ -308,9 +297,8 @@ func validateDeviceClassRemoval(old, new []DeviceClass) error {
 	return nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	l := obj.(*LVMCluster)
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type
+func (v *lvmClusterValidator) ValidateDelete(ctx context.Context, l *LVMCluster) (admission.Warnings, error) {
 
 	lvmclusterlog.Info("validate delete", "name", l.Name)
 

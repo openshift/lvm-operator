@@ -62,7 +62,7 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 
 	for _, sc := range topolvmStorageClasses {
 		if err := r.Patch(ctx, sc,
-			client.Apply,
+			client.Apply, //nolint:staticcheck // TODO: migrate to client.Client.Apply() with typed apply configurations
 			client.FieldOwner(storageClassFieldOwner),
 			client.ForceOwnership,
 		); err != nil {

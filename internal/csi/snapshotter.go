@@ -3,6 +3,7 @@ package csi
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
@@ -93,15 +94,18 @@ func (s *Snapshotter) Start(ctx context.Context) error {
 		false,
 		rateLimiter,
 		false,
-		factory.Groupsnapshot().V1beta1().VolumeGroupSnapshotContents(),
-		factory.Groupsnapshot().V1beta1().VolumeGroupSnapshotClasses(),
+		factory.Groupsnapshot().V1beta2().VolumeGroupSnapshotContents(),
+		factory.Groupsnapshot().V1beta2().VolumeGroupSnapshotClasses(),
 		rateLimiter,
 	)
 
 	// run...
 	factory.Start(ctx.Done())
 	coreFactory.Start(ctx.Done())
-	ctrl.Run(1, ctx.Done())
+
+	wg := &sync.WaitGroup{}
+	ctrl.Run(1, ctx.Done(), wg)
+	wg.Wait()
 
 	return nil
 }

@@ -225,7 +225,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 
 	if err = (&vgmanager.Reconciler{
 		Client:           mgr.GetClient(),
-		EventRecorder:    mgr.GetEventRecorderFor(vgmanager.ControllerName),
+		EventRecorder:    mgr.GetEventRecorder(vgmanager.ControllerName),
 		LVMD:             lvmd.DefaultConfigurator(),
 		Scheme:           mgr.GetScheme(),
 		LSBLK:            lsblk.NewDefaultHostLSBLK(),

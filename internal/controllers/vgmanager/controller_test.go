@@ -34,7 +34,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -342,7 +342,7 @@ type testInstances struct {
 
 	nodeSelector corev1.NodeSelector
 	client       client.WithWatch
-	recorder     *record.FakeRecorder
+	recorder     *events.FakeRecorder
 
 	Reconciler *Reconciler
 }
@@ -369,8 +369,7 @@ func setupInstances() testInstances {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).
 		WithObjects(node, namespace).
 		Build()
-	fakeRecorder := record.NewFakeRecorder(100)
-	fakeRecorder.IncludeObject = true
+	fakeRecorder := events.NewFakeRecorder(100)
 
 	return testInstances{
 		LVM:       mockLVM,
@@ -876,8 +875,7 @@ func testErrorOnGetLVMVolumeGroup(ctx context.Context) {
 }
 
 func testEvents(ctx context.Context) {
-	fakeRecorder := record.NewFakeRecorder(3)
-	fakeRecorder.IncludeObject = true
+	fakeRecorder := events.NewFakeRecorder(3)
 
 	vg := &lvmv1alpha1.LVMVolumeGroup{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"}}
 	vg.SetOwnerReferences([]metav1.OwnerReference{{Name: "owner", Kind: "Owner", UID: "123", APIVersion: "v1alpha1"}})
@@ -904,19 +902,19 @@ func testEvents(ctx context.Context) {
 
 	r.NormalEvent(ctx, vg, "normal_reason", "message")
 	Eventually(ctx, fakeRecorder.Events).Should(Receive(
-		Equal("Normal normal_reason message involvedObject{kind=LVMVolumeGroupNodeStatus,apiVersion=lvm.topolvm.io/v1alpha1}")))
+		Equal("Normal normal_reason message")))
 	Eventually(ctx, fakeRecorder.Events).Should(Receive(
-		Equal("Normal normal_reason update on node /test-node in volume group test/test: message involvedObject{kind=Owner,apiVersion=v1alpha1}")))
+		Equal("Normal normal_reason update on node /test-node in volume group test/test: message")))
 	Eventually(ctx, fakeRecorder.Events).Should(Receive(
-		Equal("Normal normal_reason update on node /test-node: message involvedObject{kind=,apiVersion=}")))
+		Equal("Normal normal_reason update on node /test-node: message")))
 
 	r.WarningEvent(ctx, vg, "warning_reason", errors.New("test"))
 	Eventually(ctx, fakeRecorder.Events).Should(Receive(
-		Equal("Warning warning_reason test involvedObject{kind=LVMVolumeGroupNodeStatus,apiVersion=lvm.topolvm.io/v1alpha1}")))
+		Equal("Warning warning_reason test")))
 	Eventually(ctx, fakeRecorder.Events).Should(Receive(
-		Equal("Warning warning_reason error on node /test-node in volume group test/test: test involvedObject{kind=Owner,apiVersion=v1alpha1}")))
+		Equal("Warning warning_reason error on node /test-node in volume group test/test: test")))
 	Eventually(ctx, fakeRecorder.Events).Should(Receive(
-		Equal("Warning warning_reason error on node /test-node: test involvedObject{kind=,apiVersion=}")))
+		Equal("Warning warning_reason error on node /test-node: test")))
 }
 
 func testLVMD(ctx context.Context) {
@@ -1202,7 +1200,7 @@ func testReconcileFailure(ctx context.Context) {
 func testLVMDConfigChange(ctx context.Context) {
 	r := &Reconciler{Scheme: scheme.Scheme, NodeName: "test", Namespace: "test"}
 	r.LVMD = lvmd.NewFileConfigurator(filepath.Join(GinkgoT().TempDir(), "lvmd.yaml"))
-	r.EventRecorder = record.NewFakeRecorder(100)
+	r.EventRecorder = events.NewFakeRecorder(100)
 	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	ctx = log.IntoContext(ctx, logger)
 
