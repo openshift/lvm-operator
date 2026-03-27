@@ -46,20 +46,20 @@ arches:
     name: dbus-common
     evr: 1:1.12.20-8.el9
     sourcerpm: dbus-1.12.20-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.1.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.2.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 140707
-    checksum: sha256:b3924f85b8a454a0cfdcc3c327d7f2708ce71faf5ae476ff88f964f41b27793e
+    size: 147680
+    checksum: sha256:80ba358e04beb2bd48e7dcd5246d2f5a23e239d012e314989352f95fbec1c534
     name: device-mapper
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.1.aarch64.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.2.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 176581
-    checksum: sha256:8cbd1ccb657e4e330be594ecf83d25ac3b6813184bd2f7a478edc89a6d9f47fd
+    size: 182801
+    checksum: sha256:d394f00090008c48cb20044bfa6386049f244e3ff2859415901fef5a8baaa8b8
     name: device-mapper-libs
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/e/e2fsprogs-1.46.5-8.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 1042058
@@ -394,12 +394,12 @@ arches:
     checksum: sha256:e48843d2734fefad084a86165860ea9575bdc53f63bb5845d8807ce9ccb4f914
     name: libutempter
     evr: 1.2.1-6.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.2.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 3006408
-    checksum: sha256:6f85d6ac6f304775a19d023309b80564c05198459558cdfd2e25363337a42793
+    size: 3014667
+    checksum: sha256:14d296fc1fd27c1252688df06501cc6ec0adf4951c2f51026484e6c95ffce56f
     name: lvm2
-    evr: 9:2.03.32-2.el9_7.1
+    evr: 9:2.03.32-2.el9_7.2
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/o/openssl-3.5.1-7.el9_7.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 53417882
@@ -487,20 +487,20 @@ arches:
     name: dbus-common
     evr: 1:1.12.20-8.el9
     sourcerpm: dbus-1.12.20-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.1.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.2.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 145170
-    checksum: sha256:6b9aa26d6bbbeaaefb5319ddb502215f4dffefda1da8a8cc27ff46b2a35350e7
+    size: 152121
+    checksum: sha256:bc75d476becb4a6e9e23207c2b0267c379c76cf3bebea06e98f96ffd7d513a12
     name: device-mapper
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.1.ppc64le.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.2.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 195480
-    checksum: sha256:e6b931cf586f0c1a1f0ff3e963a80f1c39d4067bb66f62aba640ba7f2a4c752e
+    size: 201647
+    checksum: sha256:5097afdcb2433b9dee26b6bd3e096f8c8c3b2c6ce69a9a080f044cda0541e605
     name: device-mapper-libs
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/e/e2fsprogs-1.46.5-8.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 1088668
@@ -848,12 +848,12 @@ arches:
     checksum: sha256:e48843d2734fefad084a86165860ea9575bdc53f63bb5845d8807ce9ccb4f914
     name: libutempter
     evr: 1.2.1-6.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.2.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 3006408
-    checksum: sha256:6f85d6ac6f304775a19d023309b80564c05198459558cdfd2e25363337a42793
+    size: 3014667
+    checksum: sha256:14d296fc1fd27c1252688df06501cc6ec0adf4951c2f51026484e6c95ffce56f
     name: lvm2
-    evr: 9:2.03.32-2.el9_7.1
+    evr: 9:2.03.32-2.el9_7.2
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/o/openssl-3.5.1-7.el9_7.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 53417882
@@ -941,20 +941,20 @@ arches:
     name: dbus-common
     evr: 1:1.12.20-8.el9
     sourcerpm: dbus-1.12.20-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.1.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.2.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 139694
-    checksum: sha256:8563b266d4ef25c70e9597e836f609b789cb1c263d96774676677a924ba4d13a
+    size: 146682
+    checksum: sha256:67c9607f803682f70fb8f892aece3ca79526bd147d178ed35771ff46d10be6ac
     name: device-mapper
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.1.s390x.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.2.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 175406
-    checksum: sha256:b2c6dcf6505e39e494020679cb03623bd9fac91fd6e5311415a153aaa4f5bef0
+    size: 181650
+    checksum: sha256:47330d5f33779acb07b51c2ec5c288e22d0445e68780474e2e0bd8738ab9b2dc
     name: device-mapper-libs
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/e/e2fsprogs-1.46.5-8.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 1038264
@@ -1289,12 +1289,12 @@ arches:
     checksum: sha256:e48843d2734fefad084a86165860ea9575bdc53f63bb5845d8807ce9ccb4f914
     name: libutempter
     evr: 1.2.1-6.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.2.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 3006408
-    checksum: sha256:6f85d6ac6f304775a19d023309b80564c05198459558cdfd2e25363337a42793
+    size: 3014667
+    checksum: sha256:14d296fc1fd27c1252688df06501cc6ec0adf4951c2f51026484e6c95ffce56f
     name: lvm2
-    evr: 9:2.03.32-2.el9_7.1
+    evr: 9:2.03.32-2.el9_7.2
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/o/openssl-3.5.1-7.el9_7.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 53417882
@@ -1382,20 +1382,20 @@ arches:
     name: dbus-common
     evr: 1:1.12.20-8.el9
     sourcerpm: dbus-1.12.20-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/d/device-mapper-1.02.206-2.el9_7.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 142440
-    checksum: sha256:b53023ea17d264973d851b7539b17732101f42741fb94ce7ccd8dafd8d8fc0ed
+    size: 149743
+    checksum: sha256:33402d85b67c6a27f2caf402330bfc176d44d91b833a10c9e14e08c1763124a0
     name: device-mapper
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.1.x86_64.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/d/device-mapper-libs-1.02.206-2.el9_7.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 182874
-    checksum: sha256:76796c7cf444b97c476270e269dfd0a6aca945ca3651e2a351836e5a164a33f0
+    size: 189084
+    checksum: sha256:188e4bee4b8ca8f10a52884df19b13c5e4c523484a7b65c9ab91d8aa23344651
     name: device-mapper-libs
-    evr: 9:1.02.206-2.el9_7.1
-    sourcerpm: lvm2-2.03.32-2.el9_7.1.src.rpm
+    evr: 9:1.02.206-2.el9_7.2
+    sourcerpm: lvm2-2.03.32-2.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/e/e2fsprogs-1.46.5-8.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 1048130
@@ -1730,12 +1730,12 @@ arches:
     checksum: sha256:e48843d2734fefad084a86165860ea9575bdc53f63bb5845d8807ce9ccb4f914
     name: libutempter
     evr: 1.2.1-6.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-2.el9_7.2.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 3006408
-    checksum: sha256:6f85d6ac6f304775a19d023309b80564c05198459558cdfd2e25363337a42793
+    size: 3014667
+    checksum: sha256:14d296fc1fd27c1252688df06501cc6ec0adf4951c2f51026484e6c95ffce56f
     name: lvm2
-    evr: 9:2.03.32-2.el9_7.1
+    evr: 9:2.03.32-2.el9_7.2
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.5.1-7.el9_7.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 53417882
