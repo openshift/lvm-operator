@@ -29,6 +29,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
+	v1 "github.com/openshift/api/config/v1"
+	ctrlRuntimeCommon "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/logpassthrough"
@@ -186,21 +188,32 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("failed to run wipe migration logic: %w", err)
 	}
 
+	tlsProfile, err := ctrlRuntimeCommon.FetchAPIServerTLSProfile(ctx, setupClient)
+	if err != nil {
+		return fmt.Errorf("failed to get tls profile: %w", err)
+	}
+
+	tlsOpts := []func(*tls.Config){
+		func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
+	}
+
+	tlsConfig, unsupportedCiphers := ctrlRuntimeCommon.NewTLSConfigFromProfile(tlsProfile)
+	if len(unsupportedCiphers) > 0 {
+		opts.SetupLog.Info("some ciphers from TLS profile are not supported", "unsupportedCiphers", unsupportedCiphers)
+	}
+	tlsOpts = append(tlsOpts, tlsConfig)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: opts.Scheme,
 		Metrics: metricsserver.Options{
 			BindAddress:    opts.diagnosticsAddr,
 			SecureServing:  true,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
-			TLSOpts: []func(*tls.Config){
-				func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
-			},
+			TLSOpts:        tlsOpts,
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
-			Port: 9443,
-			TLSOpts: []func(*tls.Config){
-				func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
-			},
+			Port:    9443,
+			TLSOpts: tlsOpts,
 		}},
 		Cache: cache.Options{
 			DefaultTransform: NoManagedFields,
@@ -225,6 +238,21 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
+		InitialTLSProfileSpec: tlsProfile,
+		OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec v1.TLSProfileSpec) {
+			ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
+				"old profile", oldTLSProfileSpec,
+				"new profile", newTLSProfileSpec,
+			)
+			cancel()
+		},
+	}
+
+	if err := tlsWatcherController.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create controller for TLS config observation: %w", err)
 	}
 
 	// register controllers
