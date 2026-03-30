@@ -16,9 +16,10 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/v8 v8.4.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/openshift/api v0.0.0-20260325070019-86893981287e
-	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
-	github.com/openshift/library-go v0.0.0-20260213153706-03f1709971c5
+	github.com/openshift/api v0.0.0-20260317165824-54a3998d81eb
+	github.com/openshift/client-go v0.0.0-20260317180604-743f664b82d1
+	github.com/openshift/controller-runtime-common v0.0.0-20260318085703-1812aed6dbd2
+	github.com/openshift/library-go v0.0.0-20260318142011-72bf34f474bc
 	github.com/operator-framework/api v0.30.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
