@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-//go:embed testdata/*.yaml
+//go:embed testdata/*.yaml testdata/*.policy
 var templateFS embed.FS
 
 func logf(format string, args ...interface{}) {
