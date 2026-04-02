@@ -368,11 +368,25 @@ func execCommandInNode(tc *TestClient, nodeName string, command string) string {
 	var output string
 	var err error
 
+	// Determine the namespace for the debug pod, following the same pattern as
+	// openshift-tests-private: check if the current namespace is Active on the
+	// target cluster and fall back to "default" if it is not (e.g. when running
+	// in CI where the kubeconfig context namespace does not exist on the target).
+	debugNamespace := tc.Namespace()
+	extraArgs := []string{}
+	nsOut, nsErr := tc.AsAdmin().Run("get").Args("ns/"+debugNamespace, "-o=jsonpath={.status.phase}", "--ignore-not-found").Output()
+	if nsOut != "Active" || nsErr != nil {
+		debugNamespace = "default"
+		extraArgs = append(extraArgs, "--to-namespace="+debugNamespace)
+	}
+
 	// Retry loop to handle transient failures (like reference repo)
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		// Use oc debug node with chroot to execute command on host
 		// This matches the reference repo's execCommandInSpecificNode behavior
-		cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", command)
+		args := append([]string{"debug", "node/" + nodeName}, extraArgs...)
+		args = append(args, "--", "chroot", "/host", "/bin/bash", "-c", command)
+		cmd := exec.Command("oc", args...)
 		outputBytes, execErr := cmd.CombinedOutput()
 		output = string(outputBytes)
 
@@ -789,10 +803,8 @@ func deleteLVMClusterWithCleanup(name string, namespace string, deviceClassName 
 		allCleaned := true
 		for _, nodeName := range workerNodes {
 			// Check if VG still exists on this node
-			checkCmd := exec.Command("oc", "debug", "node/"+nodeName, "--",
-				"chroot", "/host", "vgs", "--noheadings", "-o", "vg_name")
-			vgOutput, _ := checkCmd.CombinedOutput()
-			if strings.Contains(string(vgOutput), deviceClassName) {
+			vgOutput := execCommandInNode(tc, nodeName, "vgs --noheadings -o vg_name")
+			if strings.Contains(vgOutput, deviceClassName) {
 				allCleaned = false
 				break
 			}
@@ -1129,12 +1141,8 @@ fi
 echo "Cleanup completed"
 `, vgName)
 
-	cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "bash", "-c", cleanupScript)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		logf("Warning: VG cleanup on %s had errors: %v\n", nodeName, err)
-	}
-	logf("VG cleanup output on %s: %s\n", nodeName, string(output))
+	output := execCommandInNode(tc, nodeName, cleanupScript)
+	logf("VG cleanup output on %s: %s\n", nodeName, output)
 }
 
 func deleteLVMClusterForRecovery(name string, namespace string, deviceClassName string) error {
