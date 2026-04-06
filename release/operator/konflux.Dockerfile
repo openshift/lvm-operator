@@ -25,7 +25,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o manager main.go
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
 
-FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2-1773894626
+FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2-1775491691
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
