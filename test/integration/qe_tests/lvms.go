@@ -63,6 +63,22 @@ func setupTest() {
 	logf("Created test namespace: %s", testNamespace)
 }
 
+func createTestNamespace(name string) {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"pod-security.kubernetes.io/enforce": "privileged",
+				"pod-security.kubernetes.io/audit":   "privileged",
+				"pod-security.kubernetes.io/warn":    "privileged",
+			},
+		},
+	}
+	_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+	o.Expect(err).NotTo(o.HaveOccurred())
+	logf("Created test namespace with privileged PodSecurity: %s", name)
+}
+
 func cleanupTest() {
 	if tc == nil || testNamespace == "" {
 		return
@@ -1632,18 +1648,18 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		g.By("Check warning event is generated for the pvc resource")
 		expectedMessage := fmt.Sprintf("Requested storage (%s) is greater than available capacity on any node", pvcCapacity)
 		o.Eventually(func() bool {
-			events, err := tc.Clientset.CoreV1().Events(testNamespace).List(context.TODO(), metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=PersistentVolumeClaim", "test-pvc-66322"),
-			})
+			cmd := exec.Command("oc", "get", "event", "-n", testNamespace, "--field-selector=involvedObject.name=test-pvc-66322")
+			output, err := cmd.CombinedOutput()
 			if err != nil {
+				logf("Failed to get events: %v\n", err)
 				return false
 			}
-			for _, event := range events.Items {
-				if event.Reason == "NotEnoughCapacity" && strings.Contains(event.Message, expectedMessage) {
-					logf("Found expected event: %s - %s\n", event.Reason, event.Message)
-					return true
-				}
+			info := string(output)
+			if strings.Contains(info, "NotEnoughCapacity") && strings.Contains(info, expectedMessage) {
+				logf("Found expected event: NotEnoughCapacity\n")
+				return true
 			}
+			logf("Events for test-pvc-66322: %s\n", info)
 			return false
 		}, 60*time.Second, 10*time.Second).Should(o.BeTrue())
 	})
@@ -1743,23 +1759,20 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		}()
 
 		g.By("Check warning event is generated for the pv resource")
-		expectedReason := "ClaimReferenceRemoved"
-		expectedMessage := "Claim reference has been removed. This PV is no longer dynamically managed by LVM Storage and will need to be cleaned up manually"
 		o.Eventually(func() bool {
-			events, err := tc.Clientset.CoreV1().Events("default").List(context.TODO(), metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("involvedObject.name=%s", pvName),
-			})
+			cmd := exec.Command("oc", "get", "event", "-n", "default", "--field-selector=involvedObject.name="+pvName)
+			output, err := cmd.CombinedOutput()
 			if err != nil {
 				logf("Failed to get resource %s events: %v. Trying next round.\n", pvName, err)
 				return false
 			}
-			for _, event := range events.Items {
-				if strings.Contains(event.Reason, expectedReason) && strings.Contains(event.Message, expectedMessage) {
-					logf("Found expected event: %s - %s\n", event.Reason, event.Message)
-					return true
-				}
+			info := string(output)
+			if strings.Contains(info, "ClaimReferenceRemoved") &&
+				strings.Contains(info, "Claim reference has been removed") {
+				logf("Found expected event: ClaimReferenceRemoved\n")
+				return true
 			}
-			logf("The events of %s do not contain expected reason/message yet\n", pvName)
+			logf("The events of %s are: %s\n", pvName, info)
 			return false
 		}, 60*time.Second, 10*time.Second).Should(o.BeTrue())
 
@@ -3235,13 +3248,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := fmt.Sprintf("lvms-test-61863-%d", time.Now().UnixNano())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create a PVC with the lvms csi storageclass")
@@ -3260,7 +3267,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 				StorageClassName: &storageClassName,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -3451,13 +3458,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := fmt.Sprintf("lvms-test-61894-%d", time.Now().UnixNano())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create a PVC with Block volumeMode")
@@ -3478,7 +3479,7 @@ spec:
 				VolumeMode:       &volumeMode,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -3672,13 +3673,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := "test-61998-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Get thin pool size and calculate capacity bigger than disk size")
@@ -3704,7 +3699,7 @@ spec:
 				VolumeMode:       &volumeMode,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -4056,11 +4051,11 @@ spec:
 		}, 180*time.Second, 10*time.Second).Should(o.Equal(0))
 
 		g.By("#. Create a new LVMCluster resource without thin-pool device")
-		// Reference uses only devicePaths[0] - single path for LVMCluster creation
+		// Upstream uses all devicePaths for LVMCluster creation
 		lvmCluster := newLvmCluster(
 			setLvmClusterName("test-lvmcluster-73540"),
 			setLvmClusterNamespace(lvmsNamespace),
-			setLvmClusterPaths([]string{devicePaths[0]}), // Use only first device path (matching reference)
+			setLvmClusterPaths(devicePaths),
 		)
 		err = lvmCluster.createWithoutThinPool()
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -4075,13 +4070,7 @@ spec:
 
 		g.By("#. Create a new project/namespace for the scenario")
 		testNs := "test-73540-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Check there is no lvms volumeSnapshotClass resource is present")
@@ -4098,14 +4087,20 @@ spec:
 		}
 
 		g.By("#. Check available storage capacity of preset lvms SC (thick provisioning) equals to the backend total disks size")
-		thickProvisioningStorageCapacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClass) / 1024 // Convert MiB to GiB
-		logf("ACTUAL USABLE STORAGE CAPACITY: %d GiB\n", thickProvisioningStorageCapacity)
-		// Reference uses only devicePaths[0] for capacity comparison
-		pathsDiskTotalSize := getTotalDiskSizeOnAllWorkers(tc, devicePaths[0])
+		// Sum all device paths across all workers for multi-disk and MNO environments
+		pathsDiskTotalSize := 0
+		for _, dp := range devicePaths {
+			pathsDiskTotalSize += getTotalDiskSizeOnAllWorkers(tc, dp)
+		}
 		logf("BACKEND DISK SIZE: %d GiB\n", pathsDiskTotalSize)
-		storageDiff := float64(thickProvisioningStorageCapacity - pathsDiskTotalSize)
-		absDiff := math.Abs(storageDiff)
-		o.Expect(int(absDiff) < 2).To(o.BeTrue()) // there is always a difference of 1 Gi between backend disk size and usable size
+		// Poll until CSIStorageCapacity converges to the actual thick-provisioned capacity
+		// After switching from thin to thick provisioning, CSIStorageCapacity may still reflect stale overprovision values
+		o.Eventually(func() bool {
+			capacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClass) / 1024
+			logf("ACTUAL USABLE STORAGE CAPACITY: %d GiB (expected ~%d GiB)\n", capacity, pathsDiskTotalSize)
+			absDiff := math.Abs(float64(capacity - pathsDiskTotalSize))
+			return int(absDiff) < 2
+		}, 180*time.Second, 10*time.Second).Should(o.BeTrue())
 
 		g.By("#. Create a pvc with the preset lvms csi storageclass with thick provisioning")
 		pvc := &corev1.PersistentVolumeClaim{
@@ -4391,13 +4386,7 @@ spec:
 
 		g.By("#. Create new project/namespace for the scenario")
 		testNs := "test-73566-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer func() {
 			tc.Clientset.AppsV1().Deployments(testNs).Delete(context.TODO(), "test-dep-73566", metav1.DeleteOptions{
 				GracePeriodSeconds: int64Ptr(0),
@@ -4672,13 +4661,7 @@ spec:
 
 		g.By("#. Create a new project/namespace for the scenario")
 		testNs := "test-60835-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create a pvc-1 with the pre-set lvms csi storageclass-1")
@@ -4882,13 +4865,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := "test-61586-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create a PVC with Block volumeMode using lvms storageclass")
@@ -4909,7 +4886,7 @@ spec:
 				VolumeMode:       &volumeMode,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -5077,13 +5054,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := "test-61814-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Get thin pool size and calculate capacity bigger than disk size")
@@ -5107,7 +5078,7 @@ spec:
 				StorageClassName: &storageClassName,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -5281,13 +5252,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := "test-61997-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Get thin pool size and calculate capacity bigger than disk size")
@@ -5311,7 +5276,7 @@ spec:
 				StorageClassName: &storageClassName,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -5509,13 +5474,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := "test-61828-" + fmt.Sprintf("%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err := tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Get thin pool size and calculate capacity bigger than disk size")
@@ -5541,7 +5500,7 @@ spec:
 				VolumeMode:       &volumeMode,
 			},
 		}
-		_, err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
+		_, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Create(context.TODO(), pvcOri, metav1.CreateOptions{})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcOri.Name, metav1.DeleteOptions{})
 
@@ -5786,13 +5745,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := fmt.Sprintf("lvms-test-83247-%d", time.Now().UnixNano())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create a PVC")
@@ -6009,13 +5962,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := fmt.Sprintf("lvms-test-76425-%d", time.Now().UnixNano())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Get thin pool size and define PVC capacity bigger than disk size")
@@ -6333,13 +6280,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := fmt.Sprintf("test-86452-%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create PVC and Deployment on vg2 to verify it is functional")
@@ -6681,13 +6622,7 @@ spec:
 
 		g.By("#. Create new namespace for the test scenario")
 		testNs := fmt.Sprintf("test-86156-%d", time.Now().Unix())
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNs,
-			},
-		}
-		_, err = tc.Clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
+		createTestNamespace(testNs)
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Create PVC and Deployment")

@@ -3,6 +3,7 @@ package qe_tests
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -1810,19 +1811,30 @@ func getLvmClusterPaths(namespace string) ([]string, error) {
 }
 
 func (lvm *lvmCluster) createWithExportJSON(exportedJSON string) error {
-	// Clean the exported JSON by removing status and metadata fields that shouldn't be reapplied
-	// Use kubectl apply with --force-conflicts to handle any conflicts
-	cmd := exec.Command("oc", "apply", "-f", "-", "--force-conflicts=true", "--server-side=true")
-	cmd.Stdin = strings.NewReader(exportedJSON)
+	// Clean the exported JSON by removing status and server-set metadata fields
+	// Upstream uses sjson.Delete to strip status and replaces metadata with just the name
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(exportedJSON), &obj); err != nil {
+		return fmt.Errorf("failed to parse exported JSON: %w", err)
+	}
+	delete(obj, "status")
+	if meta, ok := obj["metadata"].(map[string]interface{}); ok {
+		delete(meta, "uid")
+		delete(meta, "resourceVersion")
+		delete(meta, "creationTimestamp")
+		delete(meta, "managedFields")
+		delete(meta, "generation")
+	}
+	cleanedJSON, err := json.Marshal(obj)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cleaned JSON: %w", err)
+	}
+
+	cmd := exec.Command("oc", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(string(cleanedJSON))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Try without server-side apply
-		cmd2 := exec.Command("oc", "apply", "-f", "-")
-		cmd2.Stdin = strings.NewReader(exportedJSON)
-		output2, err2 := cmd2.CombinedOutput()
-		if err2 != nil {
-			return fmt.Errorf("failed to create LVMCluster from exported JSON: %w, output: %s", err2, string(output2))
-		}
+		return fmt.Errorf("failed to create LVMCluster from exported JSON: %w, output: %s", err, string(output))
 	}
 	logf("Created LVMCluster from exported JSON: %s\n", string(output))
 	return nil
