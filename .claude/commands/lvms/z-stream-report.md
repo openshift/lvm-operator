@@ -11,8 +11,9 @@ Analyzes all currently supported LVMS versions and determines the urgency of rel
 ## Prerequisites
 
 Required environment variables:
-- `JIRA_BASE_URL`: Base URL for the Jira instance (e.g., `https://issues.redhat.com`)
-- `JIRA_TOKEN`: Personal Access Token for Jira authentication
+- `JIRA_BASE_URL`: Base URL for the Jira Cloud instance (e.g., `https://redhat.atlassian.net`)
+- `JIRA_EMAIL`: Email address for Jira authentication (e.g., `user@redhat.com`)
+- `JIRA_API_TOKEN`: Atlassian Cloud API token for authentication
 
 ## Synopsis
 
@@ -27,17 +28,19 @@ Required environment variables:
 Check that required environment variables are set:
 ```bash
 echo "JIRA_BASE_URL=${JIRA_BASE_URL:-(not set)}"
-echo "JIRA_TOKEN is $([ -n "$JIRA_TOKEN" ] && echo 'set' || echo 'NOT SET')"
+echo "JIRA_EMAIL=${JIRA_EMAIL:-(not set)}"
+echo "JIRA_API_TOKEN is $([ -n "$JIRA_API_TOKEN" ] && echo 'set' || echo 'NOT SET')"
 ```
 
-If either is not set, display an error and stop:
+If any are not set, display an error and stop:
 ```
 Error: Required environment variables are not set.
-Please set JIRA_BASE_URL and JIRA_TOKEN before running this command.
+Please set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN before running this command.
 
 Example:
-  export JIRA_BASE_URL=https://issues.redhat.com
-  export JIRA_TOKEN=<your-personal-access-token>
+  export JIRA_BASE_URL=https://redhat.atlassian.net
+  export JIRA_EMAIL=user@redhat.com
+  export JIRA_API_TOKEN=<your-atlassian-api-token>
 ```
 
 ### Step 2: Fetch Support Timeline
@@ -112,23 +115,25 @@ If no tags are found for a version, record "No releases found" and set days_sinc
 Before querying bugs, discover the custom field ID for "Target Version" in this JIRA instance:
 
 ```bash
-curl -s -H "Authorization: Bearer $JIRA_TOKEN" \
+curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
   -H "Content-Type: application/json" \
-  "$JIRA_BASE_URL/rest/api/2/field" | \
+  "$JIRA_BASE_URL/rest/api/3/field" | \
   jq -r '.[] | select(.name | test("target.*version"; "i")) | "\(.id) \(.name)"'
 ```
 
-Save the field ID (e.g., `customfield_12319940`) for use in subsequent queries. If no match is found, skip target version and rely on `fixVersions` and `versions` fields only.
+Save the field ID (e.g., `customfield_10855`) for use in subsequent queries. If no match is found, skip target version and rely on `fixVersions` and `versions` fields only.
 
 ### Step 5: Query JIRA for Open Bugs
 
 Fetch all non-closed bugs and vulnerabilities for the LVMS component. Use POST to avoid URL encoding issues. A single query covers both issue types — only exclude `Closed` status, as all other statuses (including ON_QA, Verified, Release Pending) indicate work that has not yet shipped in a z-stream.
 
+**IMPORTANT**: Use Basic auth (`-u "$JIRA_EMAIL:$JIRA_API_TOKEN"`) for Atlassian Cloud. Bearer token auth does not work with Cloud API tokens and will fail to return Vulnerability issues that have restricted visibility.
+
 ```bash
 curl -s -X POST \
-  -H "Authorization: Bearer $JIRA_TOKEN" \
+  -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
   -H "Content-Type: application/json" \
-  "$JIRA_BASE_URL/rest/api/2/search" \
+  "$JIRA_BASE_URL/rest/api/3/search/jql" \
   -d '{
     "jql": "project = OCPBUGS AND component = \"Logical Volume Manager Storage\" AND type in (Bug, Vulnerability) AND status != Closed",
     "maxResults": 500,
@@ -138,7 +143,7 @@ curl -s -X POST \
 
 Replace `<TARGET_VERSION_FIELD_ID>` with the field ID discovered in Step 4. If no target version field was found, omit it from the fields list.
 
-**Handle pagination**: If `total > maxResults`, fetch additional pages using `startAt` parameter.
+**Handle pagination**: The v3 API returns an `isLast` boolean. If `isLast` is `false`, fetch additional pages by incrementing `startAt` by the number of issues returned.
 
 **Classify each bug as CVE or regular bug:**
 - **CVE**: If `labels` contains `SecurityTracking` OR `summary` matches `CVE-\d{4}-\d+`
@@ -285,18 +290,22 @@ Do NOT save the report to a file unless the user explicitly requests it.
 | Error | Action |
 |-------|--------|
 | `JIRA_BASE_URL` not set | Display setup instructions, stop |
-| `JIRA_TOKEN` not set | Display setup instructions, stop |
-| JIRA returns 401/403 | Display auth error, suggest checking token validity |
+| `JIRA_EMAIL` not set | Display setup instructions, stop |
+| `JIRA_API_TOKEN` not set | Display setup instructions, stop |
+| JIRA returns 401/403 | Display auth error, suggest checking token and email validity |
+| JIRA returns `"Failed to parse Connect Session Auth Token"` | You are using Bearer auth instead of Basic auth — use `-u "$JIRA_EMAIL:$JIRA_API_TOKEN"` |
+| JIRA returns `"The requested API has been removed"` | You are using the v2 API — switch to `/rest/api/3/search/jql` |
 | JIRA returns other error | Display error, continue with available data |
-| `gh` CLI not available | Warn about missing release data, skip Step 3 |
-| GitHub API rate limited | Warn, continue with partial data |
+| `skopeo` not available | Display install instructions, stop |
 | Support timeline fetch fails | Warn user, ask them to provide supported versions manually |
 | No bugs found | Report 0 bugs (good news!) |
 | Target Version field not found | Fall back to fixVersions/versions, note in report |
 
 ## Notes
 
-- **JIRA Token**: Use a Personal Access Token (PAT) from your Jira instance. Generate one from your JIRA profile settings.
+- **JIRA Authentication**: Red Hat JIRA uses Atlassian Cloud (`redhat.atlassian.net`). Authentication requires Basic auth with your email and an API token. Generate an API token from https://id.atlassian.com/manage-profile/security/api-tokens. **Do NOT use Bearer auth** — it cannot access Vulnerability issues and will silently return incomplete results.
+- **API Version**: Use the Atlassian v3 REST API (`/rest/api/3/`). The v2 API has been removed from the Cloud instance.
+- **Vulnerability Visibility**: CVE/Vulnerability issues are security-restricted in JIRA. Basic auth with the Cloud API token can access them; PAT-based Bearer auth cannot.
 - **Data Freshness**: All data is fetched live; results reflect the current state at time of execution.
 - **Urgency Score**: The scoring algorithm is a guideline. Use engineering judgment — a single Critical CVE may warrant an immediate release regardless of the overall score.
 - **Component Name**: This skill uses `"Logical Volume Manager Storage"` as the JIRA component name. If your JIRA uses a different name, the query will return no results. Check your JIRA project's component list.
