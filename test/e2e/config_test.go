@@ -63,6 +63,7 @@ var (
 	lvmOperatorUninstall bool
 	scheme               = runtime.NewScheme()
 	crClient             crclient.Client
+	config               *rest.Config
 	deserializer         runtime.Decoder
 	contentTester        *PodRunner
 	summaryFile          string
@@ -87,8 +88,10 @@ func init() {
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
+	var err error
+
 	kubeconfig := os.Getenv("KUBECONFIG")
-	config, err := getKubeconfig(kubeconfig)
+	config, err = getKubeconfig(kubeconfig)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to set kubeconfig: %v", err))
 	}
