@@ -82,7 +82,8 @@ export OPERATOR_NAMESPACE=openshift-lvm-storage  # Namespace where operator runs
 
 ### Testing
 ```bash
-make test               # Run unit tests
+make test               # Run unit tests (requires Linux)
+make docker-test        # Run unit tests inside a Linux container (useful for macOS/Windows)
 
 # E2E tests require a live cluster
 make deploy-local       # Build, push, and deploy local changes
