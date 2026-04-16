@@ -27,6 +27,9 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 UNAME := $(shell uname)
+ifeq ($(UNAME), Linux)
+MOUNT_LABEL := :z
+endif
 
 SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
@@ -161,6 +164,19 @@ test: envtest godeps-update ## Run tests.
 ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
 endif
+
+docker-test: ## Run unit tests inside a Linux container (useful for non-Linux hosts).
+	$(IMAGE_BUILD_CMD) run --rm --platform=linux/$(ARCH) \
+		-v $(shell pwd):/workspace$(MOUNT_LABEL) \
+		-w /workspace \
+		-e NON_ROOT=true \
+		-e GOFLAGS=-buildvcs=false \
+		golang:1.25 \
+		bash -c '\
+			go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH) && \
+			KUBEBUILDER_ASSETS=$$(setup-envtest use $(ENVTEST_K8S_VERSION) -p path) \
+			go test -v -coverprofile=coverage.out $$(go list ./... | grep -v -e "e2e" -e "performance") \
+		'
 
 run: manifests generate ## Run the Operator from your host.
 	go run ./main.go
