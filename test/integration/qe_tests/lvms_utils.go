@@ -3,6 +3,8 @@ package qe_tests
 import (
 	"bytes"
 	"context"
+	"embed"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -20,6 +22,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 )
+
+//go:embed testdata/*.yaml
+var templateFS embed.FS
 
 func logf(format string, args ...interface{}) {
 	fmt.Fprintf(g.GinkgoWriter, format+"\n", args...)
@@ -320,14 +325,6 @@ func (lvm *lvmCluster) patchDevicePath(paths []string) error {
 	return nil
 }
 
-func int32Ptr(i int32) *int32 {
-	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 func getRandomNum(m int64, n int64) int64 {
 	return rand.Int63n(n-m+1) + m
 }
@@ -520,6 +517,16 @@ func getListOfFreeDisksFromWorkerNodes(tc *TestClient) (map[string]int64, error)
 		for _, diskName := range diskList {
 			diskName = strings.TrimSpace(diskName)
 			if diskName == "" {
+				continue
+			}
+
+			// Check if disk is mounted (catches Prometheus EBS and other CSI volumes
+			// where blkid may return empty even though the device is in use)
+			mountCmd := "mount | grep '/dev/" + diskName + " ' || true"
+			logf("    Running: %s\n", mountCmd)
+			mountOutput := execCommandInNode(tc, workerName, mountCmd)
+			if strings.TrimSpace(mountOutput) != "" {
+				logf("      [X] /dev/%s is MOUNTED: %s\n", diskName, strings.TrimSpace(mountOutput))
 				continue
 			}
 
@@ -760,67 +767,36 @@ func deleteLVMClusterWithCleanup(name string, namespace string, deviceClassName 
 	}
 	if !exists {
 		logf("LVMCluster %s does not exist, skipping deletion\n", name)
-		// Even if LVMCluster doesn't exist, clean up any orphaned VG state
-		cleanupVGOnAllNodes(deviceClassName)
 		return nil
 	}
 
-	logf("Deleting LVMCluster %s with full backend cleanup...\n", name)
+	logf("Deleting LVMCluster %s...\n", name)
 
-	// Delete with --wait=true to let controller do full cleanup
-	cmd := exec.Command("oc", "delete", "lvmcluster", name, "-n", namespace, "--timeout=4m")
+	// Delete and let the controller handle VG cleanup (matches upstream pattern)
+	cmd := exec.Command("oc", "delete", "lvmcluster", name, "-n", namespace, "--ignore-not-found", "--timeout=4m")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// If timeout, try to force delete by removing finalizers
-		logf("Normal delete timed out, forcing deletion by removing finalizers: %v\n", err)
+		logf("Normal delete timed out or failed: %v, output: %s\n", err, string(output))
+		// Fall back to removing finalizers
 		removeLVMVolumeGroupNodeStatusFinalizers(namespace)
 		removeLVMVolumeGroupFinalizers(deviceClassName, namespace)
 		removeLVMClusterFinalizers(name, namespace)
-
-		// Wait for deletion to complete
-		deadline := time.Now().Add(2 * time.Minute)
-		for time.Now().Before(deadline) {
-			exists, _ := resourceExists("lvmcluster", name, namespace)
-			if !exists {
-				break
-			}
-			time.Sleep(5 * time.Second)
-		}
-
-		// Since we forced deletion, the controller didn't clean up the VG
-		// We MUST clean it up manually
-		logf("Finalizers removed, manually cleaning up VG on all nodes...\n")
-		cleanupVGOnAllNodes(deviceClassName)
 	} else {
-		logf("LVMCluster %s deleted with cleanup: %s\n", name, string(output))
+		logf("LVMCluster %s deleted successfully: %s\n", name, string(output))
 	}
 
-	// Wait for VG to be removed from all nodes
-	logf("Waiting for VG %s to be removed from all nodes...\n", deviceClassName)
-	workerNodes, _ := getWorkersList()
+	// Wait for LVMCluster to be fully gone
 	deadline := time.Now().Add(2 * time.Minute)
 	for time.Now().Before(deadline) {
-		allCleaned := true
-		for _, nodeName := range workerNodes {
-			// Check if VG still exists on this node
-			vgOutput := execCommandInNode(tc, nodeName, "vgs --noheadings -o vg_name")
-			if strings.Contains(vgOutput, deviceClassName) {
-				allCleaned = false
-				break
-			}
-		}
-		if allCleaned {
-			logf("VG %s removed from all nodes\n", deviceClassName)
+		exists, _ := resourceExists("lvmcluster", name, namespace)
+		if !exists {
+			logf("LVMCluster %s fully removed\n", name)
 			return nil
 		}
 		time.Sleep(5 * time.Second)
 	}
 
-	// If VG still exists after timeout, force destroy it
-	logf("Warning: VG %s still exists after timeout, forcing destruction...\n", deviceClassName)
-	cleanupVGOnAllNodes(deviceClassName)
-
-	return nil
+	return fmt.Errorf("timed out waiting for LVMCluster %s in namespace %s to be deleted", name, namespace)
 }
 
 func createLVMClusterFromJSON(jsonContent string) error {
@@ -957,7 +933,7 @@ func removeLVMVolumeGroupNodeStatusFinalizers(namespace string) error {
 }
 
 func deleteLVMClusterSafely(name string, namespace string, deviceClassName string) error {
-	// Check if LVMCluster exists
+	// Matches upstream: remove LVMCluster finalizers then delete
 	exists, err := resourceExists("lvmcluster", name, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to check if LVMCluster exists: %w", err)
@@ -967,216 +943,13 @@ func deleteLVMClusterSafely(name string, namespace string, deviceClassName strin
 		return nil
 	}
 
-	logf("Deleting LVMCluster %s...\n", name)
+	logf("Safely deleting LVMCluster %s (removing finalizers first)...\n", name)
 
-	// Try normal delete with timeout
-	cmd := exec.Command("oc", "delete", "lvmcluster", name, "-n", namespace, "--timeout=2m")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		logf("Normal delete timed out or failed for %s: %v, removing finalizers...\n", name, err)
-
-		// Remove finalizers to force deletion
-		removeLVMVolumeGroupNodeStatusFinalizers(namespace)
-		removeLVMVolumeGroupFinalizers(deviceClassName, namespace)
-		removeLVMClusterFinalizers(name, namespace)
-
-		// Wait for deletion to complete
-		deadline := time.Now().Add(1 * time.Minute)
-		for time.Now().Before(deadline) {
-			exists, _ := resourceExists("lvmcluster", name, namespace)
-			if !exists {
-				logf("LVMCluster %s deleted after finalizer removal\n", name)
-				break
-			}
-			time.Sleep(5 * time.Second)
-		}
-
-		// Clean up VG on all nodes since we bypassed controller cleanup
-		cleanupVGOnAllNodes(deviceClassName)
-	} else {
-		logf("LVMCluster %s deleted successfully: %s\n", name, string(output))
-	}
-
-	// Wait for LVMCluster to be fully gone
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		exists, _ := resourceExists("lvmcluster", name, namespace)
-		if !exists {
-			return nil
-		}
-		time.Sleep(3 * time.Second)
-	}
-
-	return nil
-}
-
-func cleanupVGOnAllNodes(vgName string) {
-	workerNodes, err := getWorkersList()
-	if err != nil {
-		logf("Warning: could not get worker nodes for VG cleanup: %v\n", err)
-		return
-	}
-
-	for _, nodeName := range workerNodes {
-		logf("Cleaning up VG %s on node %s\n", vgName, nodeName)
-
-		// Use forceDestroyVG which handles partial/corrupted VG state
-		forceDestroyVGOnNode(nodeName, vgName)
-	}
-}
-
-func forceDestroyVGOnNode(nodeName string, vgName string) {
-	cleanupScript := fmt.Sprintf(`
-set -x
-
-# Check if VG exists at all
-if ! vgs %[1]s 2>/dev/null; then
-    echo "VG %[1]s does not exist, nothing to clean"
-    exit 0
-fi
-
-# Step 1: Handle missing PVs (partial VG state)
-echo "Checking for missing PVs in VG %[1]s..."
-if vgs %[1]s 2>&1 | grep -q "missing"; then
-    echo "VG has missing PVs, running vgreduce --removemissing..."
-    vgreduce --removemissing --force %[1]s 2>/dev/null || true
-fi
-
-# Step 2: Get list of all LVs in this VG
-echo "Finding all LVs in VG %[1]s..."
-lvs_list=$(lvs --noheadings -o lv_name %[1]s 2>/dev/null | tr -d ' ' || true)
-
-# Step 3: CRITICAL - Clean up kubelet CSI mount directories FIRST
-# These hold stale references that prevent DM device removal
-echo "Cleaning up kubelet CSI mount directories..."
-for mp in $(mount 2>/dev/null | grep "/dev/mapper/%[1]s-" | awk '{print $3}'); do
-    echo "Found mount: $mp"
-    # Extract pod UID from path like /var/lib/kubelet/pods/<uid>/volumes/...
-    pod_dir=$(echo "$mp" | grep -oE '/var/lib/kubelet/pods/[^/]+' || true)
-    if [ -n "$pod_dir" ]; then
-        echo "Force unmounting $mp..."
-        umount -f "$mp" 2>/dev/null || true
-        umount -l "$mp" 2>/dev/null || true
-        echo "Removing pod directory: $pod_dir"
-        rm -rf "$pod_dir" 2>/dev/null || true
-    fi
-done
-
-# Step 4: Kill any processes using VG devices
-echo "Killing processes using %[1]s devices..."
-for dm in $(dmsetup ls 2>/dev/null | grep "^%[1]s-" | awk '{print $1}'); do
-    fuser -km /dev/mapper/$dm 2>/dev/null || true
-done
-
-# Step 5: Force lazy unmount any remaining mounts
-echo "Force lazy unmount remaining mounts..."
-mount 2>/dev/null | grep "/dev/mapper/%[1]s-" | awk '{print $3}' | while read mp; do
-    umount -lf "$mp" 2>/dev/null || true
-done
-
-# Step 6: Remove DM devices FIRST (before LV removal)
-# This is critical - if DM devices are busy, LV removal will fail
-echo "Removing device-mapper entries (first pass)..."
-for dm in $(dmsetup ls 2>/dev/null | grep "^%[1]s-" | awk '{print $1}'); do
-    echo "Removing dm: $dm"
-    dmsetup remove --deferred "$dm" 2>/dev/null || true
-    dmsetup remove -f "$dm" 2>/dev/null || true
-done
-
-# Step 7: Deactivate ALL LVs in the VG
-echo "Deactivating LVs..."
-lvchange -an %[1]s 2>/dev/null || true
-
-# Step 8: Remove ALL LVs
-echo "Removing all LVs..."
-for lv in $lvs_list; do
-    echo "Removing LV $lv..."
-    lvremove -ff %[1]s/$lv 2>/dev/null || true
-done
-lvremove -ff %[1]s 2>/dev/null || true
-
-# Step 9: Get list of PVs before removing VG
-echo "Finding PVs in VG %[1]s..."
-pv_list=$(pvs --noheadings -o pv_name -S vg_name=%[1]s 2>/dev/null | tr -d ' ' || true)
-
-# Step 10: Remove the VG
-echo "Removing VG %[1]s..."
-vgremove -ff %[1]s 2>/dev/null || true
-
-# Step 11: Remove PVs and wipe signatures
-echo "Removing PVs and wiping signatures..."
-for pv in $pv_list; do
-    echo "Removing PV $pv..."
-    pvremove -ff "$pv" 2>/dev/null || true
-    wipefs -a "$pv" 2>/dev/null || true
-done
-
-# Step 12: Final DM cleanup pass with retry
-echo "Final device-mapper cleanup..."
-for i in 1 2 3; do
-    remaining=$(dmsetup ls 2>/dev/null | grep "^%[1]s-" | wc -l)
-    if [ "$remaining" -eq 0 ]; then
-        break
-    fi
-    echo "Retry $i: $remaining DM devices remaining..."
-    for dm in $(dmsetup ls 2>/dev/null | grep "^%[1]s-" | awk '{print $1}'); do
-        dmsetup remove -f "$dm" 2>/dev/null || true
-    done
-    sleep 1
-done
-
-# Step 13: Remove VG device directory
-echo "Removing /dev/%[1]s directory..."
-rm -rf /dev/%[1]s 2>/dev/null || true
-
-if vgs %[1]s 2>/dev/null; then
-    echo "WARNING: VG %[1]s still exists after cleanup!"
-elif dmsetup ls 2>/dev/null | grep -q "^%[1]s-"; then
-    echo "WARNING: DM devices for %[1]s still exist!"
-    dmsetup ls 2>/dev/null | grep "^%[1]s-"
-else
-    echo "VG %[1]s successfully removed"
-fi
-
-echo "Cleanup completed"
-`, vgName)
-
-	output := execCommandInNode(tc, nodeName, cleanupScript)
-	logf("VG cleanup output on %s: %s\n", nodeName, output)
-}
-
-func deleteLVMClusterForRecovery(name string, namespace string, deviceClassName string) error {
-	logf("Initiating delete of LVMCluster %s (without waiting)...\n", name)
-	cmd := exec.Command("oc", "delete", "lvmcluster", name, "-n", namespace, "--wait=false")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to initiate LVMCluster deletion: %w, output: %s", err, string(output))
-	}
-
-	// Step 2: Immediately remove finalizers (this prevents backend cleanup)
-	logf("Removing finalizers to prevent backend VG cleanup for %s...\n", name)
-	time.Sleep(2 * time.Second) // Small delay to let deletion start
-
+	// Remove only LVMCluster finalizers (matching upstream)
 	removeLVMClusterFinalizers(name, namespace)
-	removeLVMVolumeGroupFinalizers(deviceClassName, namespace)
-	removeLVMVolumeGroupNodeStatusFinalizers(namespace)
 
-	// Step 3: Wait for LVMCluster to be fully deleted from Kubernetes
-	logf("Waiting for LVMCluster %s to be deleted from Kubernetes...\n", name)
-	deadline := time.Now().Add(2 * time.Minute)
-	for time.Now().Before(deadline) {
-		exists, err := resourceExists("lvmcluster", name, namespace)
-		if err != nil {
-			logf("Warning: failed to check if LVMCluster %s exists: %v\n", name, err)
-		}
-		if !exists {
-			logf("LVMCluster %s deleted from Kubernetes (backend VG will remain for recovery)\n", name)
-			return nil
-		}
-		time.Sleep(5 * time.Second)
-	}
-
-	return fmt.Errorf("timeout waiting for LVMCluster %s to be deleted", name)
+	// Delete the resource
+	return deleteSpecifiedResource("lvmcluster", name, namespace)
 }
 
 func getLVMClusterName(namespace string) (string, error) {
@@ -1253,43 +1026,6 @@ func patchOverprovisionRatio(name string, namespace string, overprovisionRatio s
 		return fmt.Errorf("failed to patch LVMCluster overprovisionRatio: %w, output: %s", err, string(output))
 	}
 	return nil
-}
-
-func waitForVGManagerPodRunning(tc *TestClient, namespace string, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		pods, err := tc.Clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "app.kubernetes.io/component=vg-manager",
-		})
-		if err != nil {
-			logf("Failed to list vg-manager pods: %v\n", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		if len(pods.Items) == 0 {
-			logf("No vg-manager pods found, waiting...\n")
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		allRunning := true
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodRunning {
-				allRunning = false
-				logf("vg-manager pod %s is in %s phase, waiting...\n", pod.Name, pod.Status.Phase)
-				break
-			}
-		}
-
-		if allRunning {
-			logf("All vg-manager pods are Running\n")
-			return nil
-		}
-
-		time.Sleep(5 * time.Second)
-	}
-	return fmt.Errorf("timeout waiting for vg-manager pods to be Running")
 }
 
 func getVolSizeFromPvc(tc *TestClient, pvcName string, namespace string) (string, error) {
@@ -1653,39 +1389,6 @@ func removeRAIDLevelDisk(tc *TestClient, nodeName string, raidDiskName string) {
 	o.Expect(len(deviceList) < 2).NotTo(o.BeTrue(),
 		fmt.Sprintf("Could not find 2 RAID member disks on %s (found %d)", nodeName, len(deviceList)))
 
-	// Clean up any LVM on the RAID device before stopping the array
-	// This is needed because deleteLVMClusterSafely removes finalizers, which skips VG cleanup
-	logf("Cleaning up any LVM on /dev/%s before stopping RAID on %s\n", raidDiskName, nodeName)
-
-	// Check if the RAID device is a PV and get its VG
-	pvDisplayCmd := "pvs --noheadings -o vg_name /dev/" + raidDiskName + " 2>/dev/null || true"
-	vgName := strings.TrimSpace(execCommandInNode(tc, nodeName, pvDisplayCmd))
-
-	if vgName != "" {
-		logf("Found VG '%s' on RAID device /dev/%s, cleaning up...\n", vgName, raidDiskName)
-
-		// Deactivate all LVs in the VG
-		lvChangeCmd := "lvchange -an " + vgName + " 2>/dev/null || true"
-		execCommandInNode(tc, nodeName, lvChangeCmd)
-
-		// Remove all LVs in the VG
-		lvRemoveCmd := "lvremove -ff " + vgName + " 2>/dev/null || true"
-		execCommandInNode(tc, nodeName, lvRemoveCmd)
-
-		// Remove the VG
-		vgRemoveCmd := "vgremove -ff " + vgName + " 2>/dev/null || true"
-		execCommandInNode(tc, nodeName, vgRemoveCmd)
-
-		// Remove the PV
-		pvRemoveCmd := "pvremove -ff /dev/" + raidDiskName + " 2>/dev/null || true"
-		execCommandInNode(tc, nodeName, pvRemoveCmd)
-
-		logf("LVM cleanup completed for VG '%s' on node %s\n", vgName, nodeName)
-	}
-
-	// Sync filesystem buffers before stopping RAID to prevent data loss
-	execCommandInNode(tc, nodeName, "sync")
-
 	// Stop the RAID array
 	raidStopCmd := "mdadm --stop /dev/" + raidDiskName
 	stopOutput := execCommandInNode(tc, nodeName, raidStopCmd)
@@ -1758,6 +1461,14 @@ func (lvm *lvmCluster) createWithoutThinPool() error {
 			}
 		}
 	}
+	if len(lvm.optionalPaths) > 0 {
+		pathsYAML += "        optionalPaths:\n"
+		for _, path := range lvm.optionalPaths {
+			if path != "" {
+				pathsYAML += fmt.Sprintf("        - %s\n", path)
+			}
+		}
+	}
 
 	// Match reference template: includes fstype (defaults to xfs)
 	fstype := "xfs"
@@ -1783,46 +1494,112 @@ spec:
 }
 
 func getLvmClusterPaths(namespace string) ([]string, error) {
+	paths, _, err := getLvmClusterPathsWithOptional(namespace)
+	return paths, err
+}
+
+// getLvmClusterPathsWithOptional returns paths split into mandatory (common to all nodes)
+// and optional (exist on some nodes but not all, or have non-LVM filesystem on some nodes).
+// This handles MNO clusters where Prometheus EBS or asymmetric disk counts cause
+// non-uniform device names across worker nodes.
+func getLvmClusterPathsWithOptional(namespace string) ([]string, []string, error) {
 	lvmClusterName, err := getLVMClusterName(namespace)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cmd := exec.Command("oc", "get", "lvmcluster", lvmClusterName, "-n", namespace,
 		"-o=jsonpath={.status.deviceClassStatuses[*].nodeStatus[*].devices[*]}")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get LVMCluster paths: %w, output: %s", err, string(output))
+		return nil, nil, fmt.Errorf("failed to get LVMCluster paths: %w, output: %s", err, string(output))
 	}
 	allPaths := strings.Fields(string(output))
 
-	// Deduplicate paths - in MNO, the same device paths appear on multiple nodes
+	// Deduplicate paths
 	seen := make(map[string]bool)
-	var paths []string
+	var uniquePaths []string
 	for _, path := range allPaths {
 		if !seen[path] {
 			seen[path] = true
-			paths = append(paths, path)
+			uniquePaths = append(uniquePaths, path)
 		}
 	}
 
-	logf("LVMCluster device paths: %v\n", paths)
-	return paths, nil
+	// Classify paths: check each path on all worker nodes
+	// Paths valid on all nodes go to mandatory, others go to optional
+	workerNodes, err := getWorkersList()
+	if err != nil {
+		logf("Warning: could not get worker list for path filtering, returning all as mandatory\n")
+		return uniquePaths, nil, nil
+	}
+
+	var paths []string
+	var optionalPaths []string
+	for _, path := range uniquePaths {
+		validOnAll := true
+		validOnSome := false
+		for _, node := range workerNodes {
+			// Check device existence and filesystem type separately
+			// so an unformatted device (blkid returns non-zero) is not misclassified as missing
+			checkCmd := exec.Command("oc", "debug", "node/"+node, "--", "chroot", "/host", "bash", "-c",
+				fmt.Sprintf("if test -b %s; then echo 'DEVICE_EXISTS'; blkid %s 2>/dev/null || true; else echo 'DEVICE_NOT_FOUND'; fi", path, path))
+			checkOutput, err := checkCmd.CombinedOutput()
+			outputStr := string(checkOutput)
+			if err != nil {
+				logf("Warning: oc debug failed for node %s path %s: %v, output: %s\n", node, path, err, outputStr)
+				validOnAll = false
+				continue
+			}
+			if strings.Contains(outputStr, "DEVICE_NOT_FOUND") {
+				logf("Path %s: device does not exist on node %s\n", path, node)
+				validOnAll = false
+			} else if strings.Contains(outputStr, `TYPE="`) && !strings.Contains(outputStr, `TYPE="LVM2_member"`) {
+				logf("Path %s: has non-LVM filesystem on node %s (not usable)\n", path, node)
+				validOnAll = false
+			} else {
+				validOnSome = true
+			}
+		}
+		if validOnAll {
+			paths = append(paths, path)
+		} else if validOnSome {
+			optionalPaths = append(optionalPaths, path)
+		}
+		// If not valid on any node, skip entirely
+	}
+
+	logf("LVMCluster mandatory paths: %v, optional paths: %v\n", paths, optionalPaths)
+	return paths, optionalPaths, nil
 }
 
 func (lvm *lvmCluster) createWithExportJSON(exportedJSON string) error {
-	// Clean the exported JSON by removing status and metadata fields that shouldn't be reapplied
-	// Use kubectl apply with --force-conflicts to handle any conflicts
-	cmd := exec.Command("oc", "apply", "-f", "-", "--force-conflicts=true", "--server-side=true")
-	cmd.Stdin = strings.NewReader(exportedJSON)
+	// Strip status from the exported JSON (matching upstream pattern using sjson.Delete)
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(exportedJSON), &obj); err != nil {
+		return fmt.Errorf("failed to parse exported JSON: %w", err)
+	}
+	delete(obj, "status")
+	if metadata, ok := obj["metadata"].(map[string]interface{}); ok {
+		delete(metadata, "uid")
+		delete(metadata, "resourceVersion")
+		delete(metadata, "creationTimestamp")
+		delete(metadata, "managedFields")
+		delete(metadata, "generation")
+		delete(metadata, "selfLink")
+		delete(metadata, "ownerReferences")
+	}
+
+	cleanedJSON, err := json.Marshal(obj)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cleaned JSON: %w", err)
+	}
+
+	// Use plain oc apply (no --server-side) matching upstream
+	cmd := exec.Command("oc", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(string(cleanedJSON))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Try without server-side apply
-		cmd2 := exec.Command("oc", "apply", "-f", "-")
-		cmd2.Stdin = strings.NewReader(exportedJSON)
-		output2, err2 := cmd2.CombinedOutput()
-		if err2 != nil {
-			return fmt.Errorf("failed to create LVMCluster from exported JSON: %w, output: %s", err2, string(output2))
-		}
+		return fmt.Errorf("failed to create LVMCluster from exported JSON: %w, output: %s", err, string(output))
 	}
 	logf("Created LVMCluster from exported JSON: %s\n", string(output))
 	return nil
@@ -1960,6 +1737,228 @@ func checkResourcesNotExist(resourceType string, resourceName string, namespace 
 		time.Sleep(5 * time.Second)
 	}
 	o.Expect(fmt.Errorf("the resources %s still exists in the namespace %s", resourceType, namespace)).NotTo(o.HaveOccurred())
+}
+
+// --- oc CLI helper functions using OpenShift Templates (aligned with upstream openshift-tests-private) ---
+
+// readTemplate reads an embedded template file from the testdata directory.
+func readTemplate(name string) (string, error) {
+	data, err := templateFS.ReadFile("testdata/" + name)
+	if err != nil {
+		return "", fmt.Errorf("failed to read embedded template %s: %w", name, err)
+	}
+	return string(data), nil
+}
+
+// applyResourceFromTemplate processes an OpenShift template and applies the result.
+// This mirrors upstream's applyResourceFromTemplateAsAdmin pattern:
+//
+//	oc process -f - -p KEY=VALUE ... | oc apply -f -
+//
+// The templateName is the filename within testdata/ (e.g., "namespace-template.yaml").
+// Remaining parameters are passed to oc process (e.g., "--ignore-unknown-parameters=true", "-p", "KEY=VALUE").
+func applyResourceFromTemplate(templateName string, parameters ...string) error {
+	templateContent, err := readTemplate(templateName)
+	if err != nil {
+		return err
+	}
+
+	processArgs := append([]string{"process", "-f", "-"}, parameters...)
+	processCmd := exec.Command("oc", processArgs...)
+	processCmd.Stdin = strings.NewReader(templateContent)
+	processOutput, err := processCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to process template %s: %w, output: %s", templateName, err, string(processOutput))
+	}
+
+	applyCmd := exec.Command("oc", "apply", "-f", "-")
+	applyCmd.Stdin = strings.NewReader(string(processOutput))
+	applyOutput, err := applyCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to apply processed template: %w, output: %s", err, string(applyOutput))
+	}
+	return nil
+}
+
+// createNamespaceWithOC creates a namespace using oc process + oc apply with privileged PodSecurity labels
+func createNamespaceWithOC(name string) error {
+	err := applyResourceFromTemplate("namespace-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "NAME="+name,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", name, err)
+	}
+	logf("Created namespace: %s\n", name)
+	return nil
+}
+
+// pvcConfig holds configuration for creating a PVC via oc CLI
+type pvcConfig struct {
+	name             string
+	namespace        string
+	storageClassName string
+	accessMode       string // default "ReadWriteOnce"
+	volumeMode       string // "Filesystem" or "Block", default "Filesystem"
+	storage          string // e.g. "1Gi"
+	dataSourceName   string // for clones or snapshot restores
+	dataSourceKind   string // "PersistentVolumeClaim" or "VolumeSnapshot"
+}
+
+// createPVCWithOC creates a PVC using oc process + oc apply
+func createPVCWithOC(cfg pvcConfig) error {
+	if cfg.accessMode == "" {
+		cfg.accessMode = "ReadWriteOnce"
+	}
+	if cfg.volumeMode == "" {
+		cfg.volumeMode = "Filesystem"
+	}
+	if cfg.storage == "" {
+		cfg.storage = "1Gi"
+	}
+
+	var templateName string
+	params := []string{
+		"--ignore-unknown-parameters=true",
+		"-p", "PVCNAME=" + cfg.name,
+		"-p", "PVCNAMESPACE=" + cfg.namespace,
+		"-p", "SCNAME=" + cfg.storageClassName,
+		"-p", "ACCESSMODE=" + cfg.accessMode,
+		"-p", "VOLUMEMODE=" + cfg.volumeMode,
+		"-p", "PVCCAPACITY=" + cfg.storage,
+	}
+
+	if cfg.dataSourceName != "" && cfg.dataSourceKind == "VolumeSnapshot" {
+		templateName = "pvc-snapshot-restore-template.yaml"
+		params = append(params, "-p", "DATASOURCENAME="+cfg.dataSourceName)
+	} else if cfg.dataSourceName != "" {
+		templateName = "pvc-clone-template.yaml"
+		kind := cfg.dataSourceKind
+		if kind == "" {
+			kind = "PersistentVolumeClaim"
+		}
+		params = append(params, "-p", "DATASOURCEKIND="+kind, "-p", "DATASOURCENAME="+cfg.dataSourceName)
+	} else {
+		templateName = "pvc-template.yaml"
+	}
+
+	err := applyResourceFromTemplate(templateName, params...)
+	if err != nil {
+		return fmt.Errorf("failed to create PVC %s: %w", cfg.name, err)
+	}
+	logf("Created PVC: %s in namespace %s\n", cfg.name, cfg.namespace)
+	return nil
+}
+
+// podConfig holds configuration for creating a Pod via oc CLI
+type podConfig struct {
+	name      string
+	namespace string
+	image     string
+	pvcName   string
+	mountPath string // for filesystem volumes
+	isBlock   bool   // true = VolumeDevices, false = VolumeMounts
+}
+
+// createPodWithOC creates a Pod using oc process + oc apply with proper SecurityContext
+func createPodWithOC(cfg podConfig) error {
+	if cfg.image == "" {
+		cfg.image = "registry.redhat.io/rhel8/support-tools:latest"
+	}
+	if cfg.mountPath == "" && !cfg.isBlock {
+		cfg.mountPath = "/mnt/test"
+	}
+
+	volumeType := "volumeMounts"
+	pathType := "mountPath"
+	mountPath := cfg.mountPath
+	if cfg.isBlock {
+		volumeType = "volumeDevices"
+		pathType = "devicePath"
+		if mountPath == "" {
+			mountPath = "/dev/dblock"
+		}
+	}
+
+	err := applyResourceFromTemplate("pod-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "PODNAME="+cfg.name,
+		"-p", "PODNAMESPACE="+cfg.namespace,
+		"-p", "PODIMAGE="+cfg.image,
+		"-p", "PVCNAME="+cfg.pvcName,
+		"-p", "VOLUMETYPE="+volumeType,
+		"-p", "PATHTYPE="+pathType,
+		"-p", "PODMOUNTPATH="+mountPath,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Pod %s: %w", cfg.name, err)
+	}
+	logf("Created Pod: %s in namespace %s\n", cfg.name, cfg.namespace)
+	return nil
+}
+
+// deploymentConfig holds configuration for creating a Deployment via oc CLI
+type deploymentConfig struct {
+	name         string
+	namespace    string
+	replicas     int32
+	image        string
+	pvcName      string
+	mountPath    string // for filesystem volumes
+	isBlock      bool   // true = VolumeDevices, false = VolumeMounts
+	nodeSelector string // optional: node hostname for pinning
+}
+
+// createDeploymentWithOC creates a Deployment using oc process + oc apply with proper SecurityContext
+func createDeploymentWithOC(cfg deploymentConfig) error {
+	if cfg.image == "" {
+		cfg.image = "registry.redhat.io/rhel8/support-tools:latest"
+	}
+	if cfg.replicas == 0 {
+		cfg.replicas = 1
+	}
+	if cfg.mountPath == "" && !cfg.isBlock {
+		cfg.mountPath = "/mnt/test"
+	}
+
+	volumeType := "volumeMounts"
+	typePath := "mountPath"
+	mPath := cfg.mountPath
+	if cfg.isBlock {
+		volumeType = "volumeDevices"
+		typePath = "devicePath"
+		if mPath == "" {
+			mPath = "/dev/dblock"
+		}
+	}
+
+	var templateName string
+	params := []string{
+		"--ignore-unknown-parameters=true",
+		"-p", "DNAME=" + cfg.name,
+		"-p", "DNAMESPACE=" + cfg.namespace,
+		"-p", fmt.Sprintf("REPLICASNUM=%d", cfg.replicas),
+		"-p", "DLABEL=" + cfg.name,
+		"-p", "MPATH=" + mPath,
+		"-p", "PVCNAME=" + cfg.pvcName,
+		"-p", "VOLUMETYPE=" + volumeType,
+		"-p", "PATHTYPE=" + typePath,
+		"-p", "PODIMAGE=" + cfg.image,
+	}
+
+	if cfg.nodeSelector != "" {
+		templateName = "dep-with-nodeselector-template.yaml"
+		params = append(params, "-p", "NODENAME="+cfg.nodeSelector)
+	} else {
+		templateName = "dep-template.yaml"
+	}
+
+	err := applyResourceFromTemplate(templateName, params...)
+	if err != nil {
+		return fmt.Errorf("failed to create Deployment %s: %w", cfg.name, err)
+	}
+	logf("Created Deployment: %s in namespace %s\n", cfg.name, cfg.namespace)
+	return nil
 }
 
 func getPVCVolumeName(namespace string, pvcName string) string {

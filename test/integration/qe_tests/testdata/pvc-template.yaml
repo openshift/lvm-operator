@@ -1,0 +1,28 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: storage-pvc-template
+objects:
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    name: ${PVCNAME}
+    namespace: ${PVCNAMESPACE}
+  spec:
+    accessModes:
+    - ${ACCESSMODE}
+    resources:
+      requests:
+        storage: ${PVCCAPACITY}
+    storageClassName: ${SCNAME}
+    volumeMode: ${VOLUMEMODE}
+parameters:
+- name: SCNAME
+- name: PVCNAME
+- name: PVCNAMESPACE
+- name: ACCESSMODE
+  value: ReadWriteOnce
+- name: VOLUMEMODE
+  value: Filesystem
+- name: PVCCAPACITY
+  value: 1Gi

@@ -1,0 +1,15 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: namespace-template
+objects:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ${NAME}
+    labels:
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+parameters:
+- name: NAME

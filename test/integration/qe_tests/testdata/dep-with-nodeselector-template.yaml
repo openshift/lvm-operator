@@ -1,0 +1,61 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: deploy-with-nodeselector-template
+objects:
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: ${DNAME}
+    namespace: ${DNAMESPACE}
+  spec:
+    replicas: ${{REPLICASNUM}}
+    selector:
+      matchLabels:
+        app: ${DLABEL}
+    template:
+      metadata:
+        labels:
+          app: ${DLABEL}
+      spec:
+        nodeSelector:
+          kubernetes.io/hostname: ${NODENAME}
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: test-container
+          image: ${PODIMAGE}
+          command:
+          - /bin/sh
+          - -c
+          - sleep 3600
+          ${VOLUMETYPE}:
+          - name: test-volume
+            ${PATHTYPE}: ${MPATH}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+        volumes:
+        - name: test-volume
+          persistentVolumeClaim:
+            claimName: ${PVCNAME}
+parameters:
+- name: DNAME
+- name: DNAMESPACE
+- name: REPLICASNUM
+  value: "1"
+- name: DLABEL
+- name: MPATH
+  value: /mnt/test
+- name: PVCNAME
+- name: VOLUMETYPE
+  value: volumeMounts
+- name: PATHTYPE
+  value: mountPath
+- name: PODIMAGE
+  value: registry.redhat.io/rhel8/support-tools:latest
+- name: NODENAME
