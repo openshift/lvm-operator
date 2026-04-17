@@ -752,11 +752,15 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		selectedDisk := strings.Fields(diskPaths)[0]
 		logf("Selected Disk Path: %s\n", selectedDisk)
 
-		g.By("#. Remove finalizers from LVMCluster and LVMVolumeGroup and delete LVMCluster")
-		// Use deleteLVMClusterSafely (finalizer removal) intentionally — this test verifies
-		// recovery from on-disk metadata, so VG must be left on disk (matching upstream)
-		err = deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		g.By("#. Remove finalizers from LVMCluster, LVMVolumeGroup, and LVMVolumeGroupNodeStatus, then delete LVMCluster")
+		// Matching upstream exactly: non-blocking delete, then immediately remove all finalizers
+		deleteCmd := exec.Command("oc", "delete", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--ignore-not-found", "--wait=false")
+		deleteCmdOutput, err := deleteCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "failed to delete lvmcluster: %s", string(deleteCmdOutput))
+		removeLVMClusterFinalizers(newLVMClusterName, lvmsNamespace)
+		removeLVMVolumeGroupFinalizers(deviceClassName, lvmsNamespace)
+		removeLVMVolumeGroupNodeStatusFinalizers(lvmsNamespace)
+		logf("LVMCluster %s deleted with all finalizers removed\n", newLVMClusterName)
 
 		g.By("#. Create a new LVMCluster resource with same disk path (testing recovery)")
 		// Use same cluster name pattern - this tests actual recovery where VG on disk is reused
@@ -1635,6 +1639,9 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		duplicatePath := "/dev/diskpath-1"
 		paths := []string{duplicatePath}
 		optionalPaths := []string{duplicatePath}
+
+		// Cleanup test LVMCluster in case webhook fails to reject (matches upstream pattern)
+		defer deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 		g.By("Attempt to create LVMCluster with duplicate paths - expect error")
 		err = createLVMClusterWithPathsAndOptionalPaths(newLVMClusterName, lvmsNamespace, deviceClassName, paths, optionalPaths)
