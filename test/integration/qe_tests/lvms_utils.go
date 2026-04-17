@@ -1751,31 +1751,57 @@ func readTemplate(name string) (string, error) {
 }
 
 // applyResourceFromTemplate processes an OpenShift template and applies the result.
-// This mirrors upstream's applyResourceFromTemplateAsAdmin pattern:
-//
-//	oc process -f - -p KEY=VALUE ... | oc apply -f -
+// Mirrors upstream's applyResourceFromTemplateAsAdmin fallback path: performs manual
+// parameter substitution instead of calling oc process, so it works without the
+// Template API (e.g. MicroShift) and in CI where the namespace context is wrong.
 //
 // The templateName is the filename within testdata/ (e.g., "namespace-template.yaml").
-// Remaining parameters are passed to oc process (e.g., "--ignore-unknown-parameters=true", "-p", "KEY=VALUE").
+// Remaining parameters follow the oc process convention: "-p", "KEY=VALUE", etc.
 func applyResourceFromTemplate(templateName string, parameters ...string) error {
 	templateContent, err := readTemplate(templateName)
 	if err != nil {
 		return err
 	}
 
-	processArgs := append([]string{"process", "-f", "-"}, parameters...)
-	processCmd := exec.Command("oc", processArgs...)
-	processCmd.Stdin = strings.NewReader(templateContent)
-	processOutput, err := processCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to process template %s: %w, output: %s", templateName, err, string(processOutput))
+	// Extract -p KEY=VALUE pairs and perform manual substitution,
+	// matching upstream's parameterizedTemplateByReplaceToFile fallback.
+	processed := templateContent
+	for i := 0; i < len(parameters); i++ {
+		if parameters[i] == "-p" && i+1 < len(parameters) {
+			i++
+			parts := strings.SplitN(parameters[i], "=", 2)
+			if len(parts) == 2 {
+				// Replace ${{KEY}} (integer params) and ${KEY} (string params)
+				processed = strings.ReplaceAll(processed, "${{"+parts[0]+"}}", parts[1])
+				processed = strings.ReplaceAll(processed, "${"+parts[0]+"}", parts[1])
+			}
+		}
 	}
 
+	// Strip the Template wrapper — extract just the objects list as plain YAML.
+	// The template YAML has metadata and parameters sections that oc apply doesn't understand.
+	objectsIdx := strings.Index(processed, "\nobjects:\n")
+	if objectsIdx == -1 {
+		return fmt.Errorf("template %s has no 'objects:' section", templateName)
+	}
+	// Find where 'parameters:' starts (end of objects section)
+	paramsIdx := strings.Index(processed, "\nparameters:\n")
+	var objectsSection string
+	if paramsIdx != -1 {
+		objectsSection = processed[objectsIdx+len("\nobjects:\n") : paramsIdx]
+	} else {
+		objectsSection = processed[objectsIdx+len("\nobjects:\n"):]
+	}
+
+	// Remove the leading "- " list prefix and de-indent to produce valid YAML
+	objectsSection = strings.TrimPrefix(objectsSection, "- ")
+	objectsSection = strings.ReplaceAll(objectsSection, "\n  ", "\n")
+
 	applyCmd := exec.Command("oc", "apply", "-f", "-")
-	applyCmd.Stdin = strings.NewReader(string(processOutput))
+	applyCmd.Stdin = strings.NewReader(objectsSection)
 	applyOutput, err := applyCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to apply processed template: %w, output: %s", err, string(applyOutput))
+		return fmt.Errorf("failed to apply template %s: %w, output: %s", templateName, err, string(applyOutput))
 	}
 	return nil
 }
