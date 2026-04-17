@@ -196,6 +196,7 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
+		Client:                mgr.GetClient(),
 		InitialTLSProfileSpec: tlsProfile,
 		OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec v1.TLSProfileSpec) {
 			ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
