@@ -575,7 +575,14 @@ func createLogicalVolumeOnDisk(tc *TestClient, nodeHostName string, disk string,
 	_, err := execCommandInNodeWithError(tc, nodeHostName, createPartitionCmd)
 	o.Expect(err).NotTo(o.HaveOccurred())
 
-	partitionName := diskName + "p1"
+	// Devices ending with a digit (nvme0n1, mmcblk0, md0) use "p" separator for
+	// partitions (e.g. nvme0n1p1), others (sda, vdb) don't (e.g. sda1)
+	var partitionName string
+	if len(diskName) > 0 && diskName[len(diskName)-1] >= '0' && diskName[len(diskName)-1] <= '9' {
+		partitionName = diskName + "p1"
+	} else {
+		partitionName = diskName + "1"
+	}
 	// Unmount the partition if it's mounted
 	unmountCmd := "umount " + partitionName + " || true"
 	_, err = execCommandInNodeWithError(tc, nodeHostName, unmountCmd)
@@ -599,8 +606,16 @@ func createLogicalVolumeOnDisk(tc *TestClient, nodeHostName string, disk string,
 
 func removeLogicalVolumeOnDisk(tc *TestClient, nodeHostName string, disk string, vgName string, lvName string) {
 	diskName := "/dev/" + disk
-	partitionName := disk + "p1"
-	pvName := diskName + "p1"
+	// Devices ending with a digit (nvme0n1, mmcblk0, md0) use "p" separator for
+	// partitions (e.g. nvme0n1p1), others (sda, vdb) don't (e.g. sda1)
+	var partitionName, pvName string
+	if len(disk) > 0 && disk[len(disk)-1] >= '0' && disk[len(disk)-1] <= '9' {
+		partitionName = disk + "p1"
+		pvName = diskName + "p1"
+	} else {
+		partitionName = disk + "1"
+		pvName = diskName + "1"
+	}
 
 	existsLV := `lvdisplay /dev/` + vgName + `/` + lvName + ` && echo "true" || echo "false"`
 	outputLV, err := execCommandInNodeWithError(tc, nodeHostName, existsLV)
@@ -1541,7 +1556,7 @@ func getLvmClusterPathsWithOptional(namespace string) ([]string, []string, error
 		for _, node := range workerNodes {
 			// Check device existence and filesystem type separately
 			// so an unformatted device (blkid returns non-zero) is not misclassified as missing
-			checkCmd := exec.Command("oc", "debug", "node/"+node, "--", "chroot", "/host", "bash", "-c",
+			checkCmd := exec.Command("oc", "debug", "node/"+node, "--to-namespace=default", "--", "chroot", "/host", "bash", "-c",
 				fmt.Sprintf("if test -b %s; then echo 'DEVICE_EXISTS'; blkid %s 2>/dev/null || true; else echo 'DEVICE_NOT_FOUND'; fi", path, path))
 			checkOutput, err := checkCmd.CombinedOutput()
 			outputStr := string(checkOutput)
