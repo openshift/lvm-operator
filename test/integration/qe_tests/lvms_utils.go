@@ -1113,16 +1113,22 @@ func getTotalDiskSizeOnAllWorkers(tc *TestClient, diskPath string) int {
 		return 0
 	}
 
-	var totalDiskSize int = 0
+	// Sum raw bytes across all nodes first, then convert to GiB once to avoid
+	// per-node truncation errors compounding on multi-node clusters.
+	var totalBytes uint64 = 0
 	for _, workerName := range workerNodes {
 		cmd := "lsblk -b --output SIZE -n -d " + diskPath
 		output := execCommandInNode(tc, workerName, cmd)
 		if !strings.Contains(output, "not a block device") && output != "" {
 			logf("Disk: %s found in worker node: %s\n", diskPath, workerName)
-			size := bytesToGiB(strings.TrimSpace(output))
-			totalDiskSize = totalDiskSize + size
+			bytes, parseErr := strconv.ParseUint(strings.TrimSpace(output), 10, 64)
+			if parseErr == nil {
+				totalBytes += bytes
+			}
 		}
 	}
+	const bytesPerGiB = 1024 * 1024 * 1024
+	totalDiskSize := int(totalBytes / bytesPerGiB)
 	logf("Total Disk size of %s is equals %d Gi\n", diskPath, totalDiskSize)
 	return totalDiskSize
 }
@@ -1257,7 +1263,15 @@ spec:
         forceWipeDevicesAndDestroyAllData: true
 `, name, namespace, deviceClass, pathsJSON, optionalPathsJSON)
 
-	return createLVMClusterFromJSON(lvmClusterYAML)
+	// Use plain "oc apply" (matching upstream) so the validating webhook is invoked.
+	// createLVMClusterFromJSON uses --server-side --force-conflicts which can bypass the webhook.
+	cmd := exec.Command("oc", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(lvmClusterYAML)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %w", strings.TrimSpace(string(output)), err)
+	}
+	return nil
 }
 
 func checkPodDataExists(tc *TestClient, namespace string, podName string, containerName string, mountPath string, shouldExist bool) {
@@ -1339,7 +1353,7 @@ func checkDeploymentDataBlockType(tc *TestClient, namespace string, deploymentNa
 }
 
 func getUnusedBlockDevicesFromNode(tc *TestClient, nodeName string) (deviceList []string) {
-	listDeviceCmd := "echo $(lsblk --fs --json | jq -r '.blockdevices[] | select(.children == null and .fstype == null) | .name')"
+	listDeviceCmd := "echo $(lsblk -J -o NAME,FSTYPE,TYPE | jq -r '.blockdevices[] | select(.children == null and (.fstype == null or .fstype == \"LVM2_member\") and .type == \"disk\") | .name')"
 	output := execCommandInNode(tc, nodeName, listDeviceCmd)
 	deviceList = strings.Fields(output)
 	return deviceList
