@@ -2964,15 +2964,13 @@ spec:
 		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
 
 		// Register cleanup BEFORE any destructive operations to ensure LVMCluster is restored even if test fails
-		g.DeferCleanup(func() {
-			logf("DeferCleanup: Ensuring original LVMCluster %s is restored...\n", originLVMClusterName)
+		defer func() {
 			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
 			if !exists {
-				logf("Original LVMCluster not found, restoring from saved JSON...\n")
 				originLvmCluster.createWithExportJSON(originLVMJSON)
-				waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 			}
-		})
+			waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		}()
 
 		g.By("#. Delete existing LVMCluster resource")
 		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
@@ -3011,17 +3009,10 @@ spec:
 		defer tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNs, metav1.DeleteOptions{})
 
 		g.By("#. Check there is no lvms volumeSnapshotClass resource is present")
-		// Reference: o.Expect(isSpecifiedResourceExist(oc, "volumesnapshotclass/lvms-vg1", "")).To(o.BeFalse())
-		// For thick provisioning, volumeSnapshotClass should NOT be created
-		vscCmd := exec.Command("oc", "get", "volumesnapshotclass", "lvms-"+volumeGroup, "--ignore-not-found")
+		// For thick provisioning, volumeSnapshotClass should NOT be created (matching upstream)
+		vscCmd := exec.Command("oc", "get", "volumesnapshotclass", "lvms-"+volumeGroup, "--ignore-not-found", "-o=jsonpath={.metadata.name}")
 		vscOutput, _ := vscCmd.CombinedOutput()
-		vscExists := strings.TrimSpace(string(vscOutput)) != ""
-		if vscExists {
-			// Log but don't fail - LVMS 4.21+ may create volumeSnapshotClass even for thick provisioning
-			logf("WARNING: VolumeSnapshotClass lvms-%s exists for thick-provisioned LVMCluster. This may be expected in LVMS 4.21+\n", volumeGroup)
-		} else {
-			logf("Verified: No volumeSnapshotClass exists for thick-provisioned LVMCluster (expected behavior)\n")
-		}
+		o.Expect(strings.TrimSpace(string(vscOutput))).To(o.BeEmpty(), "VolumeSnapshotClass lvms-%s should not exist for thick-provisioned LVMCluster", volumeGroup)
 
 		g.By("#. Check available storage capacity of preset lvms SC (thick provisioning) equals to the backend total disks size")
 		thickProvisioningStorageCapacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClass) / 1024 // Convert MiB to GiB
@@ -3054,7 +3045,7 @@ spec:
 			mountPath: mountPath,
 		})
 		o.Expect(err).NotTo(o.HaveOccurred())
-		defer tc.Clientset.AppsV1().Deployments(testNs).Delete(context.TODO(), deploymentName, metav1.DeleteOptions{})
+		defer deleteSpecifiedResource("deployment", deploymentName, testNs)
 
 		g.By("#. Wait for PVC to be bound")
 		o.Eventually(func() corev1.PersistentVolumeClaimPhase {
@@ -3141,27 +3132,9 @@ spec:
 		logf("Post-resize write/read verification passed\n")
 
 		g.By("#. Delete Deployment and PVC")
-		err = tc.Clientset.AppsV1().Deployments(testNs).Delete(context.TODO(), deploymentName, metav1.DeleteOptions{GracePeriodSeconds: int64Ptr(0)})
-		o.Expect(err).NotTo(o.HaveOccurred())
-		o.Eventually(func() bool {
-			_, err := tc.Clientset.AppsV1().Deployments(testNs).Get(context.TODO(), deploymentName, metav1.GetOptions{})
-			return err != nil
-		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
-
-		pvName := ""
-		pvcForPV, _ := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Get(context.TODO(), pvcName, metav1.GetOptions{})
-		if pvcForPV != nil {
-			pvName = pvcForPV.Spec.VolumeName
-		}
-		err = tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
-		o.Expect(err).NotTo(o.HaveOccurred())
-		if pvName != "" {
-			cleanupLogicalVolumeByName(pvName)
-			o.Eventually(func() bool {
-				_, err := tc.Clientset.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
-				return err != nil
-			}, 2*time.Minute, 5*time.Second).Should(o.BeTrue())
-		}
+		// Matching upstream: simple delete of deployment and PVC
+		deleteSpecifiedResource("deployment", deploymentName, testNs)
+		deleteSpecifiedResource("pvc", pvcName, testNs)
 
 		g.By("#. Delete newly created LVMCluster resource")
 		err = lvmCluster.deleteSafely()
