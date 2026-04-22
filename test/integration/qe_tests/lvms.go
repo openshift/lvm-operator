@@ -51,25 +51,6 @@ func setupTest() {
 	o.Expect(err).NotTo(o.HaveOccurred())
 }
 
-func cleanupTest() {
-	if tc == nil || testNamespace == "" {
-		return
-	}
-
-	logf("Starting cleanup for namespace: %s", testNamespace)
-
-	// Delete volume snapshots first (they block PVC deletion)
-	deleteVolumeSnapshots(testNamespace)
-
-	// Delete namespace - this cascades to all resources in it
-	err := tc.Clientset.CoreV1().Namespaces().Delete(context.TODO(), testNamespace, metav1.DeleteOptions{})
-	if err != nil {
-		logf("Warning: failed to delete namespace %s: %v", testNamespace, err)
-	}
-
-	logf("Cleanup complete for namespace: %s", testNamespace)
-}
-
 func cleanupLogicalVolumeByName(lvName string) {
 	checkCmd := exec.Command("oc", "get", "logicalvolume", lvName, "--ignore-not-found", "-o=name")
 	output, _ := checkCmd.CombinedOutput()
@@ -86,20 +67,21 @@ func cleanupLogicalVolumeByName(lvName string) {
 	logf("Cleaned up LogicalVolume: %s", lvName)
 }
 
-func deleteVolumeSnapshots(namespace string) {
-	cmd := exec.Command("oc", "delete", "volumesnapshot", "--all", "-n", namespace, "--ignore-not-found")
-	cmd.CombinedOutput()
-}
-
 func int64Ptr(i int64) *int64 {
 	return &i
 }
 
 var _ = g.Describe("[sig-storage] STORAGE", func() {
 
-	g.It("Author:rdeore-LEVEL0-Critical-61585-[OTP][LVMS] [Filesystem] [Clone] a pvc with the same capacity should be successful", g.Label("SNO", "MNO"), func() {
+	g.BeforeEach(func() {
 		setupTest()
-		g.DeferCleanup(cleanupTest)
+	})
+
+	g.AfterEach(func() {
+		deleteSpecifiedResource("namespace", testNamespace, "")
+	})
+
+	g.It("Author:rdeore-LEVEL0-Critical-61585-[OTP][LVMS] [Filesystem] [Clone] a pvc with the same capacity should be successful", g.Label("SNO", "MNO"), func() {
 
 		g.By("Create a PVC with the lvms csi storageclass")
 		err := createPVCWithOC(pvcConfig{
@@ -193,8 +175,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-61425-[OTP][LVMS] [Filesystem] [WaitForFirstConsumer] PVC resize on LVM cluster beyond thinpool size, but within over-provisioning limit", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Get thin pool size and over provision limit")
 		thinPoolSize := getThinPoolSizeByVolumeGroup(tc, volumeGroup, "thin-pool-1")
@@ -281,8 +261,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-Critical-61433-[OTP][LVMS] [Block] [WaitForFirstConsumer] PVC resize on LVM cluster beyond thinpool size, but within over-provisioning limit", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Get thin pool size and over provision limit")
 		thinPoolSize := getThinPoolSizeByVolumeGroup(tc, volumeGroup, "thin-pool-1")
@@ -366,8 +344,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-High-66320-[OTP][LVMS] Pre-defined CSI Storageclass should get re-created automatically after deleting [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Check lvms storageclass exists on cluster")
 		_, err := tc.Clientset.StorageV1().StorageClasses().Get(context.TODO(), storageClass, metav1.GetOptions{})
@@ -412,8 +388,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:mmakwana-High-71012-[OTP][LVMS] Verify the wiping of local volumes in LVMS [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			volumeGroup      = "vg1"
@@ -454,8 +428,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		// Defer: Restore original LVMCluster from saved JSON
 		defer func() {
@@ -492,7 +465,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		// Defer: Delete new LVMCluster safely (runs before LV cleanup)
 		defer func() {
 			logf("Cleaning up test LVMCluster %s...\n", newLVMClusterName)
-			deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, volumeGroup)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup)
 		}()
 
 		g.By("#. Wait for new LVMCluster to be Ready")
@@ -531,13 +504,11 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		checkDeploymentPodMountedVolumeCouldRW(tc, testNamespace, "test-dep-71012", "/mnt/test")
 
 		g.By("#. Delete Deployment and PVC resources")
-		err = deleteSpecifiedResource("deployment", "test-dep-71012", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
-		err = deleteSpecifiedResource("pvc", "test-pvc-71012", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("deployment", "test-dep-71012", testNamespace)
+		deleteSpecifiedResource("pvc", "test-pvc-71012", testNamespace)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, volumeGroup)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup)
 
 		g.By("#. Create original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
@@ -547,8 +518,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:mmakwana-High-66241-[OTP][LVMS] Check workload management annotations are present in LVMS resources [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("#. Get list of available block devices/disks attached to all worker nodes")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
@@ -586,8 +555,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		logf("Original LVMCluster saved\n")
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		// Defer 1: Restore original LVMCluster if not exists
 		defer func() {
@@ -631,7 +599,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(annotation2).To(o.ContainSubstring(expectedSubstring))
 
 		g.By("#. Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 		g.By("#. Create original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
@@ -641,8 +609,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:mmakwana-High-71378-[OTP][LVMS] Recover LVMS cluster from on-disk metadata [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup := "vg1"
 		storageClassName := "lvms-" + volumeGroup
@@ -683,8 +649,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		logf("Original LVMCluster saved\n")
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		// Defer 1: Restore original LVMCluster if not exists
 		defer func() {
@@ -820,17 +785,13 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		logf("The deployment %s in namespace %s is in healthy state after recovery\n", dep1.Name, dep1.Namespace)
 
 		g.By("#. Delete Deployment and PVC resources")
-		err = deleteSpecifiedResource("deployment", "test-dep-71378-2", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
-		err = deleteSpecifiedResource("pvc", "test-pvc-71378-2", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
-		err = deleteSpecifiedResource("deployment", "test-dep-71378-1", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
-		err = deleteSpecifiedResource("pvc", "test-pvc-71378-1", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("deployment", "test-dep-71378-2", testNamespace)
+		deleteSpecifiedResource("pvc", "test-pvc-71378-2", testNamespace)
+		deleteSpecifiedResource("deployment", "test-dep-71378-1", testNamespace)
+		deleteSpecifiedResource("pvc", "test-pvc-71378-1", testNamespace)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 		g.By("#. Create original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
@@ -840,8 +801,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:mmakwana-High-77069-[OTP][LVMS] Make thin pool metadata size configurable in LVMS [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("#. Get list of available block devices/disks attached to all worker nodes")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
@@ -876,8 +835,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		// Defer 1: Restore original LVMCluster if not exists
 		defer func() {
@@ -959,13 +917,11 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(lvsOutput).To(o.ContainSubstring(expectedLvsOutput))
 
 		g.By("#. Delete Deployment and PVC resources")
-		err = deleteSpecifiedResource("deployment", "test-dep-77069", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
-		err = deleteSpecifiedResource("pvc", "test-pvc-77069", testNamespace)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("deployment", "test-dep-77069", testNamespace)
+		deleteSpecifiedResource("pvc", "test-pvc-77069", testNamespace)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 		g.By("#. Create original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
@@ -975,8 +931,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-High-66321-[OTP][LVMS] [Filesystem] [ext4] provision a PVC with fsType:'ext4'", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		mountPath := "/mnt/storage"
 		uniqueSuffix := testNamespace[len(testNamespace)-10:]
@@ -1088,8 +1042,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-High-66322-[OTP][LVMS] Show status column for lvmCluster and show warning event for 'Not Enough Storage capacity' directly from PVC", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		thinPoolName := "thin-pool-1"
 		storageClassName := "lvms-" + volumeGroup
@@ -1163,8 +1115,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-High-66764-[OTP][LVMS] Show warning event for 'Removed Claim Reference' directly from PV", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		storageClassName := "lvms-" + volumeGroup
 
@@ -1247,8 +1197,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-High-67001-[OTP][LVMS] Check deviceSelector logic works with combination of one valid device Path and two optionalPaths [Disruptive]", g.Label("MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Get list of available block devices/disks attached to all worker nodes")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
@@ -1298,8 +1246,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		defer func() {
 			g.By("Restoring original LVMCluster")
@@ -1320,7 +1267,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 
 		defer func() {
 			g.By("Cleaning up test LVMCluster")
-			deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 		}()
 
 		g.By("Wait for new LVMCluster to be Ready")
@@ -1382,7 +1329,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		deleteSpecifiedResource("pvc", "test-pvc-67001", testNamespace)
 
 		g.By("Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 		g.By("#. Create original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
@@ -1393,8 +1340,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-High-67002-[OTP][LVMS] Check deviceSelector logic works with only optional paths [Disruptive]", g.Label("MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Get list of available block devices/disks attached to all worker nodes")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
@@ -1432,8 +1377,15 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		defer func() {
+			g.By("Restoring original LVMCluster")
+			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			if !exists {
+				createLVMClusterFromJSON(originLVMJSON)
+			}
+			waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		}()
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("Wait for old CSIStorageCapacity objects to be cleaned up")
 		o.Eventually(func() int {
@@ -1443,27 +1395,16 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 			return len(strings.Fields(strings.TrimSpace(string(output))))
 		}, 180*time.Second, 10*time.Second).Should(o.Equal(0))
 
-		defer func() {
-			g.By("Restoring original LVMCluster")
-			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
-			if !exists {
-				createLVMClusterFromJSON(originLVMJSON)
-			}
-			waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
-		}()
-
-		g.By("Create a new LVMCluster resource with only optional paths")
+		g.By("Create a new LVMCluster resource with optional paths")
 		newLVMClusterName := "test-lvmcluster-67002"
 		deviceClassName := "vg1"
 		optionalPaths := []string{"/dev/" + optionalDisk, "/dev/invalid-path"}
-		err = createLVMClusterWithOnlyOptionalPaths(newLVMClusterName, lvmsNamespace, deviceClassName, optionalPaths)
-		o.Expect(err).NotTo(o.HaveOccurred())
-
 		defer func() {
 			g.By("Cleaning up test LVMCluster")
-			deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 		}()
-
+		err = createLVMClusterWithOnlyOptionalPaths(newLVMClusterName, lvmsNamespace, deviceClassName, optionalPaths)
+		o.Expect(err).NotTo(o.HaveOccurred())
 		g.By("Wait for new LVMCluster to be Ready")
 		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -1530,13 +1471,11 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		deleteSpecifiedResource("pvc", "test-pvc-67002", testNamespace)
 
 		g.By("Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 	})
 
 	g.It("Author:rdeore-High-67003-[OTP][LVMS] Check deviceSelector logic shows error when only optionalPaths are used which are invalid device paths [Disruptive]", g.Label("MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Copy and save existing LVMCluster configuration")
 		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
@@ -1545,8 +1484,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("Create a new LVMCluster resource with invalid optional paths")
 		newLVMClusterName := "test-lvmcluster-67003"
@@ -1555,10 +1493,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 
 		defer func() {
 			g.By("Cleaning up test LVMCluster")
-			logf("Cleanup: Deleting test LVMCluster %s...\n", newLVMClusterName)
-			if err := deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 			deadline := time.Now().Add(2 * time.Minute)
 			for time.Now().Before(deadline) {
@@ -1606,13 +1541,11 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		}, 120*time.Second, 5*time.Second).Should(o.ContainSubstring(errMsg))
 
 		g.By("Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 	})
 
 	g.It("Author:rdeore-High-67004-[OTP][LVMS] Check deviceSelector logic shows error when identical device path is used in both paths and optionalPaths [Disruptive]", g.Label("MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Copy and save existing LVMCluster configuration")
 		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
@@ -1621,8 +1554,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		defer func() {
 			g.By("Restoring original LVMCluster")
@@ -1654,8 +1586,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-69191-[OTP][LVMS] [Filesystem] Support provisioning less than 1Gi size PV and re-size", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		storageClassName := "lvms-" + volumeGroup
 		pvcName := "test-pvc-69191"
@@ -1763,8 +1693,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-69753-[OTP][LVMS] [Block] Support provisioning less than 1Gi size PV and re-size", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		storageClassName := "lvms-" + volumeGroup
 		pvcName := "test-pvc-69753"
@@ -1866,8 +1794,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-High-69611-[OTP][LVMS] Check optionalPaths work as expected with nodeSelector on multi-node OCP cluster [Disruptive]", g.Label("MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("Get list of available block devices/disks attached to all worker nodes")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
@@ -1908,8 +1834,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("Create a new LVMCluster resource with nodeSelector and optionalPaths")
 		lvmClusterObj := newLvmCluster(
@@ -1921,19 +1846,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		)
 
 		defer func() {
-			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmClusterObj.name)
-			if err := lvmClusterObj.deleteSafely(); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
-
-			deadline := time.Now().Add(2 * time.Minute)
-			for time.Now().Before(deadline) {
-				exists, _ := resourceExists("lvmcluster", lvmClusterObj.name, lvmsNamespace)
-				if !exists {
-					break
-				}
-				time.Sleep(5 * time.Second)
-			}
+			lvmClusterObj.deleteSafely()
 
 			g.By("Restoring original LVMCluster")
 			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
@@ -2013,8 +1926,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		tc.Clientset.CoreV1().PersistentVolumeClaims(testNamespace).Delete(context.TODO(), "test-pvc-69611", metav1.DeleteOptions{})
 
 		g.By("Delete newly created LVMCluster resource")
-		err = lvmClusterObj.deleteSafely()
-		o.Expect(err).NotTo(o.HaveOccurred())
+		lvmClusterObj.deleteSafely()
 
 		g.By("Create original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
@@ -2025,8 +1937,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-High-69772-[OTP][LVMS] Check LVMS operator should work with user created RAID volume as devicePath [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		pvcName := "test-pvc-69772"
 		podName := "test-pod-69772"
@@ -2056,7 +1966,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		// Defer to restore original LVMCluster (registered first, runs last)
 		defer func() {
@@ -2095,7 +2005,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		// Defer to delete new LVMCluster (registered after creation, runs before RAID removal)
 		defer func() {
 			g.By("Deleting test LVMCluster")
-			deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 			// Wait for LVMCluster deletion
 			deadline := time.Now().Add(2 * time.Minute)
 			for time.Now().Before(deadline) {
@@ -2151,12 +2061,10 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		deleteSpecifiedResource("pvc", pvcName, testNamespace)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-73162-[OTP][LVMS] Check LVMCluster works with the devices configured for both thin and thick provisioning [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		storageClass1 := "lvms-vg1"
 		storageClass2 := "lvms-vg2"
@@ -2197,8 +2105,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, "vg1")
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("Create a new LVMCluster resource with two device-classes (thin + thick)")
 		lvmClusterObj := newLvmCluster(
@@ -2210,19 +2117,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		)
 
 		defer func() {
-			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmClusterObj.name)
-			if err := lvmClusterObj.deleteSafely(); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
-
-			deadline := time.Now().Add(2 * time.Minute)
-			for time.Now().Before(deadline) {
-				exists, _ := resourceExists("lvmcluster", lvmClusterObj.name, lvmsNamespace)
-				if !exists {
-					break
-				}
-				time.Sleep(5 * time.Second)
-			}
+			lvmClusterObj.deleteSafely()
 
 			g.By("Restoring original LVMCluster")
 			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
@@ -2383,8 +2278,6 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-61863-[OTP][LVMS] [Filesystem] [Snapshot] should restore volume with snapshot dataSource successfully and the volume could be read and written", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup := "vg1"
 		storageClassName := "lvms-" + volumeGroup
@@ -2523,8 +2416,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-61894-[OTP][LVMS] [Block] [Snapshot] should restore volume with snapshot dataSource successfully and the volume could be read and written", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup := "vg1"
 		storageClassName := "lvms-" + volumeGroup
@@ -2667,8 +2558,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-Critical-61998-[OTP][LVMS] [Block] [Snapshot] should restore volume larger than disk size with snapshot dataSource successfully and the volume could be read and written [Serial]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageClassName        = "lvms-" + volumeGroup
@@ -2826,8 +2715,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-High-73363-[OTP][LVMS] Check hot reload of lvmd configuration is working [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageCapacity    int
@@ -2858,8 +2745,8 @@ spec:
 		originStorageCapacity := originLvmCluster.getCurrentTotalLvmStorageCapacityByWorkerNode(workerNode)
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLvmCluster.name, lvmsNamespace, originLvmCluster.deviceClassName)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		// Normal delete matching upstream: no finalizer bypass, if it hangs the test fails
+		deleteSpecifiedResource("lvmcluster", originLvmCluster.name, lvmsNamespace)
 
 		g.By("#. Create a new LVMCluster resource without thin-pool deviceClass, as 'spare-gb' is only applicable to thick provisioning")
 		// Upstream template uses only paths[0] (single path) for thick provisioning
@@ -2873,19 +2760,7 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		defer func() {
-			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmClusterObj.name)
-			if err := lvmClusterObj.deleteSafely(); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
-
-			deadline := time.Now().Add(2 * time.Minute)
-			for time.Now().Before(deadline) {
-				exists, _ := resourceExists("lvmcluster", lvmClusterObj.name, lvmsNamespace)
-				if !exists {
-					break
-				}
-				time.Sleep(5 * time.Second)
-			}
+			lvmClusterObj.deleteSafely()
 
 			// Wait for CSIStorageCapacity objects to be cleaned up before restoring
 			storageClassName := "lvms-" + lvmClusterObj.deviceClassName
@@ -2948,8 +2823,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-High-73540-[OTP][LVMS] [Resize] [Thick] Enable LVMCluster configurations without thinPoolConfig [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("#. Copy and save existing LVMCluster configuration in JSON format")
 		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
@@ -2973,8 +2846,7 @@ spec:
 		}()
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("#. Wait for old CSIStorageCapacity objects to be cleaned up")
 		o.Eventually(func() int {
@@ -3015,14 +2887,17 @@ spec:
 		o.Expect(strings.TrimSpace(string(vscOutput))).To(o.BeEmpty(), "VolumeSnapshotClass lvms-%s should not exist for thick-provisioned LVMCluster", volumeGroup)
 
 		g.By("#. Check available storage capacity of preset lvms SC (thick provisioning) equals to the backend total disks size")
-		thickProvisioningStorageCapacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClass) / 1024 // Convert MiB to GiB
-		logf("ACTUAL USABLE STORAGE CAPACITY: %d GiB\n", thickProvisioningStorageCapacity)
 		// Reference uses only devicePaths[0] for capacity comparison
 		pathsDiskTotalSize := getTotalDiskSizeOnAllWorkers(tc, devicePaths[0])
 		logf("BACKEND DISK SIZE: %d GiB\n", pathsDiskTotalSize)
-		storageDiff := float64(thickProvisioningStorageCapacity - pathsDiskTotalSize)
-		absDiff := math.Abs(storageDiff)
-		o.Expect(int(absDiff) < 2).To(o.BeTrue()) // there is always a difference of 1 Gi between backend disk size and usable size
+		// Wait for CSIStorageCapacity to converge to thick-provisioned values (no overprovision)
+		o.Eventually(func() bool {
+			thickProvisioningStorageCapacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClass) / 1024
+			logf("ACTUAL USABLE STORAGE CAPACITY: %d GiB\n", thickProvisioningStorageCapacity)
+			storageDiff := float64(thickProvisioningStorageCapacity - pathsDiskTotalSize)
+			absDiff := math.Abs(storageDiff)
+			return int(absDiff) < 2
+		}, 180*time.Second, 10*time.Second).Should(o.BeTrue(), "thick-provisioned capacity should be within 2 GiB of backend disk size %d GiB", pathsDiskTotalSize)
 
 		g.By("#. Create a pvc with the preset lvms csi storageclass with thick provisioning")
 		pvcName := "test-pvc-73540"
@@ -3137,8 +3012,7 @@ spec:
 		deleteSpecifiedResource("pvc", pvcName, testNs)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = lvmCluster.deleteSafely()
-		o.Expect(err).NotTo(o.HaveOccurred())
+		lvmCluster.deleteSafely()
 
 		g.By("#. Create original LVMCluster resource")
 		err = originLvmCluster.createWithExportJSON(originLVMJSON)
@@ -3148,8 +3022,6 @@ spec:
 	})
 
 	g.It("Author:mmakwana-High-73566-[OTP][LVMS] Verify support using encrypted devices [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		g.By("#. Get list of available block devices/disks attached to all worker nodes")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
@@ -3182,8 +3054,7 @@ spec:
 		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("#. Set an encryption passphrase for the disk")
 		passphrase := "encrypted"
@@ -3200,21 +3071,9 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		defer func() {
-			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmCluster.name)
-			if err := lvmCluster.deleteSafely(); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
+			lvmCluster.deleteSafely()
 
-			deadline := time.Now().Add(2 * time.Minute)
-			for time.Now().Before(deadline) {
-				exists, _ := resourceExists("lvmcluster", lvmCluster.name, lvmsNamespace)
-				if !exists {
-					break
-				}
-				time.Sleep(5 * time.Second)
-			}
-
-			deadline = time.Now().Add(3 * time.Minute)
+			deadline := time.Now().Add(3 * time.Minute)
 			for time.Now().Before(deadline) {
 				cmd := exec.Command("oc", "get", "csistoragecapacity", "-n", "openshift-lvm-storage",
 					"-o=jsonpath={.items[?(@.storageClassName==\""+storageClass+"\")].capacity}")
@@ -3348,8 +3207,7 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = lvmCluster.deleteSafely()
-		o.Expect(err).NotTo(o.HaveOccurred())
+		lvmCluster.deleteSafely()
 
 		g.By("#. Wait for disk to be released after LVMCluster deletion")
 		time.Sleep(30 * time.Second) // Give time for LVM to fully release the disk
@@ -3376,8 +3234,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-High-60835-[OTP][LVMS] Support multiple storage classes on single lvms deployment [Disruptive]", g.Label("MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageClass1 = "lvms-vg1"
@@ -3415,8 +3271,7 @@ spec:
 		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("#. Create a new LVMCluster resource with multiple device classes")
 		lvmCluster := newLvmCluster(
@@ -3430,19 +3285,7 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		defer func() {
-			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmCluster.name)
-			if err := lvmCluster.deleteSafely(); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
-
-			deadline := time.Now().Add(2 * time.Minute)
-			for time.Now().Before(deadline) {
-				exists, _ := resourceExists("lvmcluster", lvmCluster.name, lvmsNamespace)
-				if !exists {
-					break
-				}
-				time.Sleep(5 * time.Second)
-			}
+			lvmCluster.deleteSafely()
 
 			g.By("#. Restoring original LVMCluster")
 			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
@@ -3580,8 +3423,7 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = lvmCluster.deleteSafely()
-		o.Expect(err).NotTo(o.HaveOccurred())
+		lvmCluster.deleteSafely()
 
 		g.By("#. Check storageClasses are deleted successfully")
 		checkResourcesNotExist("sc", storageClass1, "")
@@ -3595,8 +3437,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-Critical-61586-[OTP][LVMS] [Block] Clone a pvc with Block VolumeMode", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageClassName = "lvms-" + volumeGroup
@@ -3710,8 +3550,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-Critical-61814-[OTP][LVMS] [Filesystem] [Clone] a pvc larger than disk size should be successful", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageClassName = "lvms-" + volumeGroup
@@ -3833,8 +3671,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-Critical-61997-[OTP][LVMS] [Filesystem] [Snapshot] should restore volume larger than disk size with snapshot dataSource successfully and the volume could be read and written [Serial]", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageClassName        = "lvms-" + volumeGroup
@@ -3986,8 +3822,6 @@ spec:
 	})
 
 	g.It("Author:rdeore-LEVEL0-Critical-61828-[OTP][LVMS] [Block] [Clone] a pvc larger than disk size should be successful", g.Label("SNO", "MNO"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		var (
 			storageClassName = "lvms-" + volumeGroup
@@ -4113,8 +3947,6 @@ spec:
 	})
 
 	g.It("Author:mmakwana-High-83247-[OTP][LVMS] Verify that the LVMS PV label matches the node name [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup := "vg1"
 		storageClassName := "lvms-" + volumeGroup
@@ -4158,8 +3990,7 @@ spec:
 		logf("Original LVMCluster JSON saved\n")
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 
 		g.By("#. Create a new LVMCluster resource with specific paths")
 		newLVMClusterName := "test-lvmcluster-83247"
@@ -4167,10 +3998,7 @@ spec:
 		diskPath := "/dev/" + diskName
 
 		defer func() {
-			logf("Cleanup: Deleting test LVMCluster %s...\n", newLVMClusterName)
-			if err := deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName); err != nil {
-				logf("Warning: Failed to delete test LVMCluster: %v\n", err)
-			}
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
 			deadline := time.Now().Add(2 * time.Minute)
 			for time.Now().Before(deadline) {
@@ -4285,7 +4113,7 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Restore original LVMCluster resource")
@@ -4296,8 +4124,6 @@ spec:
 	})
 
 	g.It("Author:mmakwana-High-76425-[OTP][LVMS] Make thin pool overprovisionRatio editable in LVMS [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup := "vg1"
 		storageClassName := "lvms-" + volumeGroup
@@ -4342,8 +4168,7 @@ spec:
 		logf("Original LVMCluster JSON saved\n")
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup)
-		o.Expect(err).NotTo(o.HaveOccurred())
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 		defer func() {
 			cmd := exec.Command("oc", "get", "lvmcluster", originLVMClusterName, "-n", lvmsNamespace)
 			if err := cmd.Run(); err != nil {
@@ -4488,7 +4313,7 @@ spec:
 		time.Sleep(10 * time.Second)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(newLVMClusterName, lvmsNamespace, deviceClassName)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Restore original LVMCluster resource")
@@ -4499,8 +4324,6 @@ spec:
 	})
 
 	g.It("Author:mmakwana-High-86452-[LVMS] Verify LVMS allows removal of device classes on day 2 [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup1 := "vg1"
 		volumeGroup2 := "vg2"
@@ -4541,16 +4364,14 @@ spec:
 		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup1)
-		o.Expect(err).NotTo(o.HaveOccurred())
-
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 		defer func() {
 			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
 			if !exists {
 				logf("Restoring original LVMCluster %s...\n", originLVMClusterName)
 				originLvmCluster.createWithExportJSON(originLVMJSON)
-				waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 			}
+			waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		}()
 
 		g.By("#. Wait for old CSIStorageCapacity objects to be cleaned up")
@@ -4572,15 +4393,14 @@ spec:
 		)
 		err = lvmCluster.createWithTwoDeviceClasses()
 		o.Expect(err).NotTo(o.HaveOccurred())
-
 		defer func() {
 			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmCluster.name)
-			deleteLVMClusterWithCleanup(lvmCluster.name, lvmsNamespace, volumeGroup1)
+			deleteLVMClusterSafely(lvmCluster.name, lvmsNamespace, volumeGroup1)
 		}()
-
 		g.By("#. Wait for LVMCluster to be Ready")
 		err = lvmCluster.waitReady(LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
+
 		checkStorageclassExists(storageClassName)
 		checkStorageclassExists(storageClassName2)
 		logf("Verified both storage classes %s and %s are present\n", storageClassName, storageClassName2)
@@ -4728,7 +4548,7 @@ spec:
 		}
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(lvmCluster.name, lvmsNamespace, volumeGroup1)
+		deleteLVMClusterSafely(lvmCluster.name, lvmsNamespace, volumeGroup1)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Create original LVMCluster resource")
@@ -4739,8 +4559,6 @@ spec:
 	})
 
 	g.It("Author:mmakwana-High-86156-[LVMS] Verify LVMS allows removal of devices on day 2 [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-		setupTest()
-		g.DeferCleanup(cleanupTest)
 
 		volumeGroup1 := "vg1"
 		storageClassName := "lvms-" + volumeGroup1
@@ -4779,16 +4597,14 @@ spec:
 		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
 
 		g.By("#. Delete existing LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(originLVMClusterName, lvmsNamespace, volumeGroup1)
-		o.Expect(err).NotTo(o.HaveOccurred())
-
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
 		defer func() {
 			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
 			if !exists {
 				logf("Restoring original LVMCluster %s...\n", originLVMClusterName)
 				originLvmCluster.createWithExportJSON(originLVMJSON)
-				waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 			}
+			waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		}()
 
 		g.By("#. Wait for old CSIStorageCapacity objects to be cleaned up")
@@ -4809,12 +4625,10 @@ spec:
 		)
 		err = lvmCluster.createWithTwoPaths()
 		o.Expect(err).NotTo(o.HaveOccurred())
-
 		defer func() {
 			logf("Cleanup: Deleting test LVMCluster %s...\n", lvmCluster.name)
-			deleteLVMClusterWithCleanup(lvmCluster.name, lvmsNamespace, volumeGroup1)
+			deleteLVMClusterSafely(lvmCluster.name, lvmsNamespace, volumeGroup1)
 		}()
-
 		g.By("#. Wait for LVMCluster to be Ready")
 		err = lvmCluster.waitReady(LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -4962,7 +4776,7 @@ spec:
 		time.Sleep(10 * time.Second)
 
 		g.By("#. Delete newly created LVMCluster resource")
-		err = deleteLVMClusterWithCleanup(lvmCluster.name, lvmsNamespace, volumeGroup1)
+		deleteLVMClusterSafely(lvmCluster.name, lvmsNamespace, volumeGroup1)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		g.By("#. Create original LVMCluster resource")
