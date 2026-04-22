@@ -194,8 +194,8 @@ func (lvm *lvmCluster) waitReady(timeout time.Duration) error {
 	return waitForLVMClusterReady(lvm.name, lvm.namespace, timeout)
 }
 
-func (lvm *lvmCluster) deleteSafely() error {
-	return deleteLVMClusterSafely(lvm.name, lvm.namespace, lvm.deviceClassName)
+func (lvm *lvmCluster) deleteSafely() {
+	deleteLVMClusterSafely(lvm.name, lvm.namespace, lvm.deviceClassName)
 }
 
 func (lvm *lvmCluster) createWithMultiDeviceClasses() error {
@@ -677,30 +677,16 @@ func getLVMClusterJSON(name string, namespace string) (string, error) {
 	return string(output), nil
 }
 
-func deleteSpecifiedResource(resourceType string, name string, namespace string) error {
-	// Issue delete with --wait=false to return immediately, then poll for deletion
+func deleteSpecifiedResource(resourceType string, name string, namespace string) {
 	var cmd *exec.Cmd
 	if namespace == "" {
-		cmd = exec.Command("oc", "delete", resourceType, name, "--ignore-not-found", "--wait=false")
+		cmd = exec.Command("oc", "delete", resourceType, name, "--ignore-not-found")
 	} else {
-		cmd = exec.Command("oc", "delete", resourceType, name, "-n", namespace, "--ignore-not-found", "--wait=false")
+		cmd = exec.Command("oc", "delete", resourceType, name, "-n", namespace, "--ignore-not-found")
 	}
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to delete %s %s: %w, output: %s", resourceType, name, err, string(output))
-	}
-	logf("Deleted %s %s: %s\n", resourceType, name, strings.TrimSpace(string(output)))
-
-	// Wait for resource to be fully deleted
-	deadline := time.Now().Add(5 * time.Minute)
-	for time.Now().Before(deadline) {
-		exists, _ := resourceExists(resourceType, name, namespace)
-		if !exists {
-			return nil
-		}
-		time.Sleep(5 * time.Second)
-	}
-	return fmt.Errorf("timeout waiting for %s %s to be deleted", resourceType, name)
+	_, err := cmd.CombinedOutput()
+	o.Expect(err).NotTo(o.HaveOccurred())
+	checkResourcesNotExist(resourceType, name, namespace)
 }
 
 func checkDeploymentPodMountedVolumeCouldRW(tc *TestClient, namespace string, deploymentName string, mountPath string) (string, string) {
@@ -947,24 +933,13 @@ func removeLVMVolumeGroupNodeStatusFinalizers(namespace string) error {
 	return nil
 }
 
-func deleteLVMClusterSafely(name string, namespace string, deviceClassName string) error {
-	// Matches upstream: remove LVMCluster finalizers then delete
-	exists, err := resourceExists("lvmcluster", name, namespace)
-	if err != nil {
-		return fmt.Errorf("failed to check if LVMCluster exists: %w", err)
-	}
+func deleteLVMClusterSafely(name string, namespace string, deviceClassName string) {
+	exists, _ := resourceExists("lvmcluster", name, namespace)
 	if !exists {
-		logf("LVMCluster %s does not exist, skipping deletion\n", name)
-		return nil
+		return
 	}
-
-	logf("Safely deleting LVMCluster %s (removing finalizers first)...\n", name)
-
-	// Remove only LVMCluster finalizers (matching upstream)
 	removeLVMClusterFinalizers(name, namespace)
-
-	// Delete the resource
-	return deleteSpecifiedResource("lvmcluster", name, namespace)
+	deleteSpecifiedResource("lvmcluster", name, namespace)
 }
 
 func getLVMClusterName(namespace string) (string, error) {
