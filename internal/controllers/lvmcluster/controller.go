@@ -122,7 +122,7 @@ func (r *Reconciler) GetLogPassthroughOptions() *logpassthrough.Options {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=topolvm.io,resources=logicalvolumes/status,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;delete
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;delete
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;patch;update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;patch;delete
