@@ -52,22 +52,43 @@ const (
 	vgManagerDaemonsetName  = "vg-manager"
 )
 
-// waitForExistingClusterDeletion ensures no LVMCluster is present before a new
-// test starts. This handles the case where a previous test's cleanup timed out
-// but the operator is still processing deletion in the background. Without this
-// guard, the next test would immediately fail with "duplicate LVMClusters".
+// waitForExistingClusterDeletion ensures no LVMS resources remain from a
+// previous test. The LVMCluster finalizer removes resources in order:
+// LVMVolumeGroup (triggers on-disk VG cleanup) → LVMVolumeGroupNodeStatus →
+// vg-manager DaemonSet → LVMCluster finalizer removed. Checking all three
+// resource types ensures the full deletion chain — including on-disk VG
+// removal — has completed before the next test starts.
 func waitForExistingClusterDeletion(ctx context.Context) {
 	GinkgoHelper()
-	By("ensuring no stale LVMCluster exists from a previous test")
+	By("ensuring no stale LVMS resources exist from a previous test")
 	Eventually(func(ctx context.Context) error {
-		list := &v1alpha1.LVMClusterList{}
-		if err := crClient.List(ctx, list, client.InNamespace(installNamespace)); err != nil {
+		clusterList := &v1alpha1.LVMClusterList{}
+		if err := crClient.List(ctx, clusterList, client.InNamespace(installNamespace)); err != nil {
 			return err
 		}
-		if len(list.Items) > 0 {
+		if len(clusterList.Items) > 0 {
 			return fmt.Errorf("LVMCluster %q still exists (phase: %s, deletionTimestamp: %v)",
-				list.Items[0].Name, list.Items[0].Status.State, list.Items[0].DeletionTimestamp)
+				clusterList.Items[0].Name, clusterList.Items[0].Status.State, clusterList.Items[0].DeletionTimestamp)
 		}
+
+		vgList := &v1alpha1.LVMVolumeGroupList{}
+		if err := crClient.List(ctx, vgList, client.InNamespace(installNamespace)); err != nil {
+			return err
+		}
+		if len(vgList.Items) > 0 {
+			return fmt.Errorf("LVMVolumeGroup %q still exists (deletionTimestamp: %v)",
+				vgList.Items[0].Name, vgList.Items[0].DeletionTimestamp)
+		}
+
+		nodeStatusList := &v1alpha1.LVMVolumeGroupNodeStatusList{}
+		if err := crClient.List(ctx, nodeStatusList, client.InNamespace(installNamespace)); err != nil {
+			return err
+		}
+		if len(nodeStatusList.Items) > 0 {
+			return fmt.Errorf("LVMVolumeGroupNodeStatus %q still exists (deletionTimestamp: %v)",
+				nodeStatusList.Items[0].Name, nodeStatusList.Items[0].DeletionTimestamp)
+		}
+
 		return nil
 	}, 5*time.Minute, interval).WithContext(ctx).Should(Succeed())
 }
