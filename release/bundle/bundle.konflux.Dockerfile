@@ -3,7 +3,7 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.25 as bui
 
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:7e3b392c09e59e218dd7a6e7d606fb97bda1a2bb5fa2e3cce9bf9418e0a84009
 
-ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:f5c0c91dce72309aee1aa5fbc3fa050f48ab54faba57d316f40552cd2283929a
+ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:c247591a497c88b9651c48d291704552fc6cbbc9c690aa54755ef87239545fef
 
 ARG OPERATOR_VERSION
 
