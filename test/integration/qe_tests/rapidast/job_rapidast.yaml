@@ -1,0 +1,84 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: rapidast-job-template
+objects:
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    name: ${NAME}
+  spec:
+    backoffLimit: 0
+    completionMode: NonIndexed
+    completions: 1
+    parallelism: 1
+    selector:
+      matchLabels:
+        job-name: ${NAME}
+    suspend: false
+    template:
+      metadata:
+        labels:
+          job-name: ${NAME}
+        name: rapidast-job
+      spec:
+        containers:
+        - command: ["/bin/sh"]
+          args:
+          - "-c"
+          - |
+            export HOME=/home/rapidast
+            mkdir -p /opt/rapidast/scanners/zap/policies
+            cp /opt/rapidast/config/customscan.policy /opt/rapidast/scanners/zap/policies/custom-scan.policy
+            # Read the projected SA token and inject it into the config
+            TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+            sed "s|Bearer sha256~xxxxxxxx|Bearer ${TOKEN}|g" /opt/rapidast/config/rapidastconfig.yaml > /tmp/rapidastconfig.yaml
+            rapidast.py --config /tmp/rapidastconfig.yaml
+            echo "--------------- show rapidast result -----------------"
+            find $HOME/results/ocptest -name zap-report.json -exec cat {} \;
+            echo "--------------- rapidast result end -----------------"
+          image: quay.io/redhatproductsecurity/rapidast:latest
+          workingDir: "/home/rapidast"
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+          name: rapidast
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /opt/rapidast/config
+            name: config-volume
+          - mountPath: /home/rapidast
+            name: work-volume
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+        terminationGracePeriodSeconds: 30
+        nodeSelector:
+          kubernetes.io/os: linux
+          kubernetes.io/arch: amd64
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: ${NAME}
+          name: config-volume
+        - name: work-volume
+          emptyDir:
+            sizeLimit: 10Mi
+parameters:
+- name: NAME
+  value: rapidast-job
