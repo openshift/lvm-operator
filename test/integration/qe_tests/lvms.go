@@ -4785,6 +4785,258 @@ spec:
 		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 	})
+
+	g.It("Author:mmakwana-LEVEL0-Critical-68707-[OTP][LVMS] [Filesystem] Restoring PVC with storage size larger than Snapshot size should be successful", g.Label("SNO", "MNO"), func() {
+		setupTest()
+
+		volumeGroup := "vg1"
+		storageClassName := "lvms-" + volumeGroup
+		volumeSnapshotClassName := "lvms-" + volumeGroup
+		mountPath := "/mnt/storage"
+		originalPvcSize := "1Gi"
+		restoredPvcSize := "2Gi" // Larger than original
+
+		g.By("#. Create new namespace for the test scenario")
+		testNs := fmt.Sprintf("lvms-test-68707-%d", time.Now().UnixNano())
+		err := createNamespaceWithOC(testNs)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer func() {
+			// Delete all volume snapshots, handling errors properly
+			cmd := exec.Command("oc", "delete", "volumesnapshot", "--all", "-n", testNs, "--ignore-not-found", "--timeout=60s")
+			if output, err := cmd.CombinedOutput(); err != nil {
+				logf("Warning: failed to delete volumesnapshots in namespace %s: %v, output: %s", testNs, err, string(output))
+				// Get list of snapshots and their bound VolumeSnapshotContents
+				listCmd := exec.Command("oc", "get", "volumesnapshot", "-n", testNs, "-o", "jsonpath={range .items[*]}{.metadata.name},{.status.boundVolumeSnapshotContentName}{\"\\n\"}{end}")
+				if listOutput, listErr := listCmd.CombinedOutput(); listErr == nil {
+					for _, line := range strings.Split(strings.TrimSpace(string(listOutput)), "\n") {
+						if line == "" {
+							continue
+						}
+						parts := strings.SplitN(line, ",", 2)
+						snapshotName := parts[0]
+						var vscName string
+						if len(parts) > 1 {
+							vscName = parts[1]
+						}
+
+						// Delete the bound VolumeSnapshotContent first (cluster-scoped)
+						if vscName != "" {
+							vscDeleteCmd := exec.Command("oc", "delete", "volumesnapshotcontent", vscName, "--ignore-not-found", "--timeout=30s")
+							if vscOutput, vscErr := vscDeleteCmd.CombinedOutput(); vscErr != nil {
+								logf("Error: failed to delete VolumeSnapshotContent %s: %v, output: %s", vscName, vscErr, string(vscOutput))
+								g.Fail(fmt.Sprintf("Cleanup failed: unable to delete VolumeSnapshotContent %s: %v", vscName, vscErr))
+							}
+							logf("Deleted VolumeSnapshotContent %s", vscName)
+						}
+
+						// Now delete the VolumeSnapshot
+						vsDeleteCmd := exec.Command("oc", "delete", "volumesnapshot", snapshotName, "-n", testNs, "--ignore-not-found", "--timeout=30s")
+						if vsOutput, vsErr := vsDeleteCmd.CombinedOutput(); vsErr != nil {
+							logf("Error: failed to delete VolumeSnapshot %s: %v, output: %s", snapshotName, vsErr, string(vsOutput))
+							g.Fail(fmt.Sprintf("Cleanup failed: unable to delete VolumeSnapshot %s in namespace %s: %v", snapshotName, testNs, vsErr))
+						}
+						logf("Deleted VolumeSnapshot %s", snapshotName)
+					}
+				} else {
+					logf("Error: failed to list volumesnapshots in namespace %s: %v, output: %s", testNs, listErr, string(listOutput))
+					g.Fail(fmt.Sprintf("Cleanup failed: unable to list volumesnapshots in namespace %s: %v", testNs, listErr))
+				}
+			}
+			deleteSpecifiedResource("namespace", testNs, "")
+		}()
+
+		g.By("#. Verify storageclass (lvms-vg1) is present")
+		_, err = tc.Clientset.StorageV1().StorageClasses().Get(context.TODO(), storageClassName, metav1.GetOptions{})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("StorageClass %s exists\n", storageClassName)
+
+		g.By("#. Verify volumesnapshotclass (lvms-vg1) is present")
+		vscExists, _ := resourceExists("volumesnapshotclass", volumeSnapshotClassName, "")
+		o.Expect(vscExists).To(o.BeTrue())
+		logf("VolumeSnapshotClass %s exists\n", volumeSnapshotClassName)
+
+		g.By("#. Create PVC pvc-ori with storage class lvms-vg1")
+		pvcOriName := "pvc-ori"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcOriName,
+			namespace:        testNs,
+			storageClassName: storageClassName,
+			storage:          originalPvcSize,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", pvcOriName, testNs)
+
+		g.By("#. Create POD pod-ori with PVC pvc-ori")
+		podOriName := "pod-ori"
+		err = createPodWithOC(podConfig{
+			name:      podOriName,
+			namespace: testNs,
+			pvcName:   pvcOriName,
+			mountPath: mountPath,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pod", podOriName, testNs)
+
+		g.By("#. Wait for PVC to be bound")
+		o.Eventually(func() corev1.PersistentVolumeClaimPhase {
+			pvcObj, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Get(context.TODO(), pvcOriName, metav1.GetOptions{})
+			if err != nil {
+				return corev1.ClaimPending
+			}
+			return pvcObj.Status.Phase
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal(corev1.ClaimBound))
+
+		g.By("#. Wait for pod to be running")
+		o.Eventually(func() corev1.PodPhase {
+			podObj, err := tc.Clientset.CoreV1().Pods(testNs).Get(context.TODO(), podOriName, metav1.GetOptions{})
+			if err != nil {
+				return corev1.PodPending
+			}
+			return podObj.Status.Phase
+		}, PodReadyTimeout, 5*time.Second).Should(o.Equal(corev1.PodRunning))
+
+		g.By("#. Write something into /mnt/storage in the pod-ori")
+		writePodData(tc, testNs, podOriName, "test-container", mountPath)
+		execCommandInPod(tc, testNs, podOriName, "test-container", "sync")
+		logf("Data written to volume in pod-ori\n")
+
+		g.By("#. Create a VolumeSnapshot (mysnap) with volumeSnapshotClass and source pvc-ori")
+		snapshotName := "mysnap"
+		snapshotYAML := fmt.Sprintf(`apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  volumeSnapshotClassName: %s
+  source:
+    persistentVolumeClaimName: %s
+`, snapshotName, testNs, volumeSnapshotClassName, pvcOriName)
+
+		cmd := exec.Command("oc", "apply", "-f", "-")
+		cmd.Stdin = strings.NewReader(snapshotYAML)
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Failed to create snapshot: %s", string(output)))
+		defer func() {
+			// Delete the snapshot, handling errors to prevent namespace stuck on finalizers
+			deleteCmd := exec.Command("oc", "delete", "volumesnapshot", snapshotName, "-n", testNs, "--ignore-not-found")
+			if deleteOutput, deleteErr := deleteCmd.CombinedOutput(); deleteErr != nil {
+				logf("Warning: failed to delete volumesnapshot %s in namespace %s: %v, output: %s", snapshotName, testNs, deleteErr, string(deleteOutput))
+				// Attempt to remove finalizers from the snapshot to unblock deletion
+				finalizerCmd := exec.Command("oc", "patch", "volumesnapshot", snapshotName, "-n", testNs, "--type", "merge", "-p", `{"metadata":{"finalizers":null}}`)
+				if finalizerOutput, finalizerErr := finalizerCmd.CombinedOutput(); finalizerErr != nil {
+					logf("Warning: failed to remove finalizers from volumesnapshot %s: %v, output: %s", snapshotName, finalizerErr, string(finalizerOutput))
+				}
+				// Retry deletion after removing finalizers
+				retryCmd := exec.Command("oc", "delete", "volumesnapshot", snapshotName, "-n", testNs, "--ignore-not-found")
+				if retryOutput, retryErr := retryCmd.CombinedOutput(); retryErr != nil {
+					logf("Error: failed to delete volumesnapshot %s after removing finalizers: %v, output: %s", snapshotName, retryErr, string(retryOutput))
+					g.Fail(fmt.Sprintf("Cleanup failed: unable to delete volumesnapshot %s in namespace %s: %v", snapshotName, testNs, retryErr))
+				}
+			}
+		}()
+		logf("VolumeSnapshot %s created\n", snapshotName)
+
+		g.By("#. Wait for volumesnapshot to be ready")
+		o.Eventually(func() string {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			cmd := exec.CommandContext(ctx, "oc", "get", "volumesnapshot", snapshotName, "-n", testNs, "-o=jsonpath={.status.readyToUse}")
+			output, _ := cmd.CombinedOutput()
+			return strings.TrimSpace(string(output))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("true"))
+		logf("VolumeSnapshot %s is ready to use\n", snapshotName)
+
+		g.By("#. Create PVC pvc-restore with dataSource (VolumeSnapshot) with LARGER storage size than original PVC")
+		pvcRestoreName := "pvc-restore"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcRestoreName,
+			namespace:        testNs,
+			storageClassName: storageClassName,
+			storage:          restoredPvcSize,
+			dataSourceName:   snapshotName,
+			dataSourceKind:   "VolumeSnapshot",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", pvcRestoreName, testNs)
+		logf("PVC pvc-restore created with size %s (larger than original %s)\n", restoredPvcSize, originalPvcSize)
+
+		g.By("#. Create pod pod-restore to consume PVC pvc-restore")
+		podRestoreName := "pod-restore"
+		err = createPodWithOC(podConfig{
+			name:      podRestoreName,
+			namespace: testNs,
+			pvcName:   pvcRestoreName,
+			mountPath: mountPath,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pod", podRestoreName, testNs)
+
+		g.By("#. Wait for restored PVC to be bound")
+		o.Eventually(func() corev1.PersistentVolumeClaimPhase {
+			pvcObj, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Get(context.TODO(), pvcRestoreName, metav1.GetOptions{})
+			if err != nil {
+				return corev1.ClaimPending
+			}
+			return pvcObj.Status.Phase
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal(corev1.ClaimBound))
+
+		g.By("#. Wait for restore pod to be running")
+		o.Eventually(func() corev1.PodPhase {
+			podObj, err := tc.Clientset.CoreV1().Pods(testNs).Get(context.TODO(), podRestoreName, metav1.GetOptions{})
+			if err != nil {
+				return corev1.PodPending
+			}
+			return podObj.Status.Phase
+		}, PodReadyTimeout, 5*time.Second).Should(o.Equal(corev1.PodRunning))
+
+		g.By("#. Check the file written in pod-ori exists in restored volume")
+		checkPodDataExists(tc, testNs, podRestoreName, "test-container", mountPath, true)
+		logf("Data from original volume successfully restored in pod-restore\n")
+
+		g.By("#. Verify restored PVC has the larger capacity")
+		expectedCapacity := resource.MustParse(restoredPvcSize)
+		var restoredCapacity resource.Quantity
+		o.Eventually(func() bool {
+			pvcRestoreObj, err := tc.Clientset.CoreV1().PersistentVolumeClaims(testNs).Get(context.TODO(), pvcRestoreName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+			capacity, ok := pvcRestoreObj.Status.Capacity[corev1.ResourceStorage]
+			if !ok {
+				return false
+			}
+			restoredCapacity = capacity
+			return restoredCapacity.Cmp(expectedCapacity) >= 0
+		}, LVMClusterReadyTimeout, 5*time.Second).Should(o.BeTrue(),
+			fmt.Sprintf("Restored PVC capacity should be >= %s", restoredPvcSize))
+		logf("Restored PVC capacity verified: %s (expected: %s)\n", restoredCapacity.String(), restoredPvcSize)
+
+		g.By("#. Verify the mounted filesystem grew beyond the snapshot size")
+		originalCapacity := resource.MustParse(originalPvcSize)
+		o.Eventually(func() int64 {
+			sizeOutput := execCommandInPod(tc, testNs, podRestoreName, "test-container",
+				fmt.Sprintf("df --output=size -B1 %s | tail -1", mountPath))
+			sizeBytes, parseErr := strconv.ParseInt(strings.TrimSpace(sizeOutput), 10, 64)
+			if parseErr != nil {
+				return 0
+			}
+			return sizeBytes
+		}, LVMClusterReadyTimeout, 5*time.Second).Should(
+			o.BeNumerically(">", originalCapacity.Value()))
+
+		g.By("#. Write new data to the restored volume to verify it's writable")
+		writeCmd := fmt.Sprintf("echo 'new-data-after-restore' > %s/newfile && sync", mountPath)
+		execCommandInPod(tc, testNs, podRestoreName, "test-container", writeCmd)
+		logf("Successfully wrote new data to restored volume\n")
+
+		g.By("#. Verify the new data can be read back")
+		readCmd := fmt.Sprintf("cat %s/newfile", mountPath)
+		output2 := execCommandInPod(tc, testNs, podRestoreName, "test-container", readCmd)
+		o.Expect(output2).To(o.ContainSubstring("new-data-after-restore"))
+		logf("Successfully read new data from restored volume\n")
+	})
 })
 
 func checkLvmsOperatorInstalled(tc *TestClient) {
