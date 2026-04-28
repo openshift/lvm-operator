@@ -216,8 +216,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 		logger.Info("processing LVMCluster deletion")
 		if err := r.processDelete(ctx, lvmCluster); err != nil {
-			// check in backing off intervals if there are still PVCs present or the LogicalVolumes are removed
-			return ctrl.Result{}, fmt.Errorf("failed to process LVMCluster deletion: %w", err)
+			logger.Info("LVMCluster deletion in progress, requeueing", "reason", err.Error())
+			return ctrl.Result{RequeueAfter: waitForDeletion}, nil
 		}
 		return reconcile.Result{}, nil
 	}
@@ -525,10 +525,10 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 	if controllerutil.ContainsFinalizer(instance, lvmClusterFinalizer) {
 		resourceDeletionList := []resource.Manager{
 			resource.LVMVGs(),
+			resource.VGManager(r.ClusterType),
 			resource.LVMVGNodeStatus(),
 			resource.TopoLVMStorageClass(),
 			resource.CSIDriver(),
-			resource.VGManager(r.ClusterType),
 			resource.CSINode(),
 			resource.ServiceMonitor(),
 		}

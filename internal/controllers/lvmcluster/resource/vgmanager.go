@@ -149,13 +149,11 @@ func (v vgManager) EnsureDeleted(r Reconciler, ctx context.Context, lvmCluster *
 		r.GetLogPassthroughOptions().VGManager.AsArgs(),
 	)
 
-	if err := r.Delete(ctx, &ds); errors.IsNotFound(err) {
-		return nil
-	} else if err != nil {
+	if err := r.Delete(ctx, &ds); err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete %s daemonset %q: %w", v.GetName(), ds.Name, err)
+	} else if err == nil {
+		logger.Info("initiated DaemonSet deletion", "DaemonSet", ds.Name)
 	}
-
-	logger.Info("initiated DaemonSet deletion", "DaemonSet", ds.Name)
 
 	if err := r.Get(ctx, client.ObjectKeyFromObject(&ds), &ds); err == nil {
 		return fmt.Errorf("%s daemonset %q still has to be removed", v.GetName(), ds.Name)
