@@ -17,7 +17,7 @@ ARG CSI_PROVISIONER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-provisi
 
 ARG CSI_SNAPSHOTTER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-snapshotter@sha256:5d874f411747733394335aa2193b7fe495074d17bbddc0e324a040b202de3166
 
-ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:6ba961c2c2a29750c0132fe6dd6fa9f6001010afbc5f19b98add87b31b54bcf6
+ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:b1eb6dcd9a8cbe2371b67052b02681bf5feb38b5469ea0de8ffa84f8e1d92943
 
 ARG OPERATOR_VERSION
 
