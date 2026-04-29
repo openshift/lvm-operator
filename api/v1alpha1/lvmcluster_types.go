@@ -211,11 +211,16 @@ type DeviceSelector struct {
 	// +optional
 	// MinSize *resource.Quantity `json:"minSize,omitempty"`
 
-	// Paths specify the device paths.
+	// Paths is a list of device paths. All paths must resolve on each node.
+	// Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
+	// /dev/sda, which may be renamed or reordered by the kernel on reboot.
 	// +optional
 	Paths []DevicePath `json:"paths,omitempty"`
 
-	// OptionalPaths specify the optional device paths.
+	// OptionalPaths is a list of device paths. At least one path must resolve on each node.
+	// Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
+	// /dev/sda, which may be renamed or reordered by the kernel on reboot.
+	// This can be used to provide a single list of disk IDs across multiple nodes.
 	// +optional
 	OptionalPaths []DevicePath `json:"optionalPaths,omitempty"`
 
