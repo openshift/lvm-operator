@@ -76,13 +76,19 @@ spec:
                                 Force wipe the devices only when you know that they do not contain any important data.
                               type: boolean
                             optionalPaths:
-                              description: OptionalPaths specify the optional device
-                                paths.
+                              description: |-
+                                OptionalPaths is a list of device paths. At least one path must resolve on each node.
+                                Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
+                                /dev/sda, which may be renamed or reordered by the kernel on reboot.
+                                This can be used to provide a single list of disk IDs across multiple nodes.
                               items:
                                 type: string
                               type: array
                             paths:
-                              description: Paths specify the device paths.
+                              description: |-
+                                Paths is a list of device paths. All paths must resolve on each node.
+                                Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
+                                /dev/sda, which may be renamed or reordered by the kernel on reboot.
                               items:
                                 type: string
                               type: array
