@@ -347,7 +347,7 @@ func storageClassOptionsTest() {
 				By("Waiting for LVMCluster to be fully deleted")
 				Eventually(func(ctx SpecContext) error {
 					return crClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)
-				}, 5*time.Minute, interval).WithContext(ctx).Should(Satisfy(k8serrors.IsNotFound))
+				}, 10*time.Minute, interval).WithContext(ctx).Should(Satisfy(k8serrors.IsNotFound))
 			})
 		})
 

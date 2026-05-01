@@ -76,4 +76,5 @@ var _ = Describe("LVM Operator e2e tests", func() {
 		Describe("Thick", Serial, Ordered, pvcTestThickProvisioning)
 	})
 	Describe("Device Removal", Serial, deviceRemovalTest)
+	Describe("Device Class Removal", Serial, deviceClassRemovalTest)
 })
