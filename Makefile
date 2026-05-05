@@ -154,10 +154,10 @@ godeps-update: ## Run go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
-	hack/verify-deps.sh
-	hack/verify-bundle.sh
-	hack/verify-catalog.sh
-	hack/verify-generated.sh
+	timeout 5m hack/verify-deps.sh
+	timeout 10m hack/verify-bundle.sh
+	timeout 10m hack/verify-catalog.sh
+	timeout 10m hack/verify-generated.sh
 
 test: envtest godeps-update ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
