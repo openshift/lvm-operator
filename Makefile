@@ -154,10 +154,10 @@ godeps-update: ## Run go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
-	hack/verify-deps.sh
-	hack/verify-bundle.sh
-	hack/verify-catalog.sh
-	hack/verify-generated.sh
+	timeout 5m hack/verify-deps.sh
+	timeout 10m hack/verify-bundle.sh
+	timeout 10m hack/verify-catalog.sh
+	timeout 10m hack/verify-generated.sh
 
 test: envtest godeps-update ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
@@ -399,7 +399,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.59.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) --connect-timeout 30 --max-time 300 https://github.com/operator-framework/operator-registry/releases/download/v1.59.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
@@ -416,7 +416,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH};\
+	curl -sSLo $(OPERATOR_SDK) --connect-timeout 30 --max-time 300 https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH};\
 	chmod +x $(OPERATOR_SDK) ;\
 	}
 else
