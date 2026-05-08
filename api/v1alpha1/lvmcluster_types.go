@@ -21,6 +21,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // LVMClusterSpec defines the desired state of LVMCluster
@@ -126,6 +127,69 @@ const (
 	FilesystemTypeXFS  DeviceFilesystemType = "xfs"
 )
 
+// RAIDType represents the LVM RAID level for a device class.
+// +kubebuilder:validation:Enum=raid1;raid4;raid5;raid6;raid10
+type RAIDType string
+
+const (
+	RAIDTypeRAID1  RAIDType = "raid1"
+	RAIDTypeRAID4  RAIDType = "raid4"
+	RAIDTypeRAID5  RAIDType = "raid5"
+	RAIDTypeRAID6  RAIDType = "raid6"
+	RAIDTypeRAID10 RAIDType = "raid10"
+)
+
+// MinDeviceCount returns the minimum number of devices required for this RAID type.
+// For parity RAID levels (raid4/5/6), stripes determines the data stripe count,
+// and the total minimum is stripes plus the parity drive count.
+func (r RAIDType) MinDeviceCount(mirrors int, stripes *int) int {
+	switch r {
+	case RAIDTypeRAID1:
+		return mirrors + 1
+	case RAIDTypeRAID4, RAIDTypeRAID5:
+		return ptr.Deref(stripes, 2) + 1
+	case RAIDTypeRAID6:
+		return ptr.Deref(stripes, 3) + 2
+	case RAIDTypeRAID10:
+		return 2 * (mirrors + 1)
+	default:
+		return 0
+	}
+}
+
+// RAIDConfig configures LVM RAID for a device class. Mutually exclusive with ThinPoolConfig.
+type RAIDConfig struct {
+	// Type is the LVM RAID level.
+	// +kubebuilder:validation:Required
+	// +required
+	Type RAIDType `json:"type"`
+
+	// Mirrors is the number of mirror copies. Only valid for raid1 and raid10.
+	// Default is 1 (2 total copies: original + 1 mirror).
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	Mirrors *int `json:"mirrors,omitempty"`
+
+	// Stripes is the number of data stripes. Only valid for raid4, raid5, raid6, and raid10.
+	// When not specified, LVM uses its default (typically all available devices minus parity).
+	// +optional
+	// +kubebuilder:validation:Minimum=2
+	Stripes *int `json:"stripes,omitempty"`
+
+	// StripeSize is the size of each stripe chunk. Only valid for raid4, raid5, raid6, and raid10.
+	// Must be a power of 2 (e.g., 64Ki, 128Ki, 256Ki, 512Ki). Default is 64Ki.
+	// +optional
+	StripeSize *resource.Quantity `json:"stripeSize,omitempty"`
+}
+
+// EffectiveMirrors returns the configured mirror count or the default of 1.
+func (r *RAIDConfig) EffectiveMirrors() int {
+	if r.Mirrors != nil {
+		return *r.Mirrors
+	}
+	return 1
+}
+
 type DeviceClass struct {
 	// Name specifies a name for the device class
 	// +kubebuilder:validation:MaxLength=245
@@ -145,6 +209,13 @@ type DeviceClass struct {
 	// ThinPoolConfig contains the configuration to create a thin pool in the LVM volume group. If you exclude this field, logical volumes are thick provisioned.
 	// +optional
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
+
+	// RAIDConfig configures native LVM RAID for this device class. When set, the device class
+	// uses thick provisioning and all logical volumes are RAID-protected at the specified level.
+	// Mutually exclusive with ThinPoolConfig. All fields are immutable after creation.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="raidConfig is immutable after creation"
+	RAIDConfig *RAIDConfig `json:"raidConfig,omitempty"`
 
 	// Default is a flag to indicate that a device class is the default. You can configure only a single default device class.
 	// +optional
