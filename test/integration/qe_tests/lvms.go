@@ -5038,6 +5038,187 @@ spec:
 		logf("Successfully read new data from restored volume\n")
 	})
 
+	g.It("Author:mmakwana-High-88797-[OTP][LVMS] Verify StorageClassOptions reclaimPolicy and volumeBindingMode are applied to StorageClass [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		g.By("#1. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Original LVMCluster saved: %s\n", originLVMClusterName)
+
+		g.By("#2. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		newLVMClusterName := "lvmcluster-88797"
+		defer func() {
+			// Delete the test LVMCluster if it exists
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup)
+
+			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			if !exists {
+				logf("Restoring original LVMCluster from saved JSON...\n")
+				// Delete the StorageClass so operator can recreate with original settings
+				defaultSCName := "lvms-" + volumeGroup
+				deleteSpecifiedResource("storageclass", defaultSCName, "")
+
+				if err := createLVMClusterFromJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		// Wait for operator to settle and StorageClass to be cleaned up
+		defaultSCName := "lvms-" + volumeGroup
+		o.Eventually(func() bool {
+			exists, _ := resourceExists("storageclass", defaultSCName, "")
+			return !exists
+		}, 2*time.Minute, 5*time.Second).Should(o.BeTrue(), "StorageClass should be deleted by operator after LVMCluster deletion")
+
+		g.By("#3. Create new LVMCluster with storageClassOptions (reclaimPolicy: Retain, volumeBindingMode: Immediate)")
+		newLVMClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+    - name: %s
+      default: true
+      fstype: xfs
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+      storageClassOptions:
+        reclaimPolicy: Retain
+        volumeBindingMode: Immediate
+`, newLVMClusterName, lvmsNamespace, volumeGroup)
+
+		err = createLVMClusterFromJSON(newLVMClusterYAML)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Created new LVMCluster with storageClassOptions\n")
+
+		g.By("#4. Wait for LVMCluster to become Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("LVMCluster %s is Ready\n", newLVMClusterName)
+
+		g.By("#5. Get the created StorageClass and verify reclaimPolicy is Retain")
+		cmd := exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.reclaimPolicy}")
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Retain"))
+		logf("StorageClass %s has reclaimPolicy: Retain as expected\n", defaultSCName)
+
+		g.By("#6. Verify StorageClass volumeBindingMode is Immediate")
+		cmd = exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.volumeBindingMode}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Immediate"))
+		logf("StorageClass %s has volumeBindingMode: Immediate as expected\n", defaultSCName)
+
+		g.By("#7. Create a PVC using the StorageClass (without creating a pod)")
+		pvcName := "test-pvc-88797"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcName,
+			namespace:        testNamespace,
+			storageClassName: defaultSCName,
+			storage:          "2Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#8. Verify PVC binds immediately without a pod (proves Immediate binding works)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Sprintf("oc error: %v: %s", err, string(output))
+			}
+			return strings.TrimSpace(string(output))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+		logf("PVC %s is Bound immediately without a pod - volumeBindingMode: Immediate works\n", pvcName)
+
+		g.By("#9. Get the bound PV and verify its reclaim policy is Retain")
+		pvName := getPVCVolumeName(testNamespace, pvcName)
+		o.Expect(pvName).NotTo(o.BeEmpty())
+
+		cmd = exec.Command("oc", "get", "pv", pvName, "-o=jsonpath={.spec.persistentVolumeReclaimPolicy}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Retain"))
+		logf("PV %s has persistentVolumeReclaimPolicy: Retain as expected\n", pvName)
+
+		g.By("#10. Delete PVC")
+		deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#11. Verify PV still exists after PVC deletion with status Released (proves Retain policy works)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pv", pvName, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Sprintf("oc error: %v: %s", err, string(output))
+			}
+			return strings.TrimSpace(string(output))
+		}, 2*time.Minute, 5*time.Second).Should(o.Equal("Released"))
+		logf("PV %s has status Released after PVC deletion - reclaimPolicy: Retain works\n", pvName)
+
+		g.By("#12. Verify CEL rejects reclaimPolicy change (immutability test)")
+		patchJSON := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/reclaimPolicy","value":"Delete"}]`
+		cmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace,
+			"--type=json", "-p", patchJSON)
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred())
+		o.Expect(string(output)).To(o.ContainSubstring("reclaimPolicy is immutable"))
+		logf("CEL validation correctly rejected reclaimPolicy change: %s\n", string(output))
+
+		g.By("#13. Delete the orphaned PV and its LogicalVolume CR")
+		deleteSpecifiedResource("pv", pvName, "")
+		cleanupLogicalVolumeByName(pvName)
+
+		g.By("#14. Verify orphaned PV is deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pv", pvName, "--ignore-not-found", "-o=jsonpath={.metadata.name}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("oc error checking PV deletion: %v: %s\n", err, string(output))
+				return false
+			}
+			return strings.TrimSpace(string(output)) == ""
+		}, 2*time.Minute, 5*time.Second).Should(o.BeTrue())
+		logf("Orphaned PV %s deleted successfully\n", pvName)
+
+		g.By("#15. Delete newly created LVMCluster resource")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup)
+
+		g.By("#16. Create original LVMCluster resource")
+		// Delete the StorageClass so operator can recreate with original settings
+		deleteSpecifiedResource("storageclass", defaultSCName, "")
+		err = createLVMClusterFromJSON(originLVMJSON)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Original LVMCluster restored\n")
+
+		g.By("#17. Verify restored StorageClass has default storageClassOptions")
+		cmd = exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.reclaimPolicy}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Delete"))
+		logf("Restored StorageClass %s has default reclaimPolicy: Delete\n", defaultSCName)
+
+		cmd = exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.volumeBindingMode}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("WaitForFirstConsumer"))
+		logf("Restored StorageClass %s has default volumeBindingMode: WaitForFirstConsumer\n", defaultSCName)
+	})
+
 	g.It("Author:mmakwana-High-88798-[OTP][LVMS] Verify StorageClassOptions additionalParameters and additionalLabels are applied to StorageClass [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
 
 		g.By("#. Get list of available block devices/disks attached to all worker nodes")
