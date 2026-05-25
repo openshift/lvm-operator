@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 AUTH_FILE?=$(shell echo ${XDG_RUNTIME_DIR}/containers/auth.json)
 TARGET?="operator"
-Y_STREAM?="v4.22"
+Y_STREAM?="v4.23"
 
 .PHONY: rpm-lock
 rpm-lock: rhsm-keys
