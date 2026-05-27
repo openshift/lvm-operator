@@ -1,5 +1,5 @@
 aliases:
-  edge-enablement-dev:
+  ocp-edge-dev:
   - jerpeter1
   - eggfoobar
   - jeff-roche
@@ -8,7 +8,7 @@ aliases:
   - qJkee
   - jaypoulz
   - pacevedom
-  edge-enablement-qe:
+  ocp-edge-qe:
   - mmakwana30
   - neilhamza
   - kasturinarra
