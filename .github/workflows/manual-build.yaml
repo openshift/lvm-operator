@@ -39,7 +39,7 @@ jobs:
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
       - name: Login to quay (quay.io/lvmo)
-        uses: docker/login-action@v1
+        uses: docker/login-action@v4
         with:
           registry: quay.io
           username: ${{ secrets.QUAY_LVMO_ROBOT_NAME }}
