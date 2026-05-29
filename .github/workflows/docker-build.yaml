@@ -16,7 +16,7 @@ jobs:
       matrix:
         go: ["1.18"]
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
 
