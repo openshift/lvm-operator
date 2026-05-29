@@ -801,26 +801,19 @@ func testNodeSelector(ctx context.Context) {
 	Expect(err).ToNot(HaveOccurred(), "should not error on invalid node selector, but filter out")
 	Expect(res).To(Equal(reconcile.Result{}))
 
-	By("then verifying incorrect node resolution because nodestatus cannot be created")
-	funcs := interceptor.Funcs{Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-		if obj.GetName() == "test-node" {
-			return fmt.Errorf("mock creation failure for LVMVolumeGroupNodeStatus")
-		}
-		return client.Create(ctx, obj, opts...)
-	}}
+	By("then verifying requeue when LVMVolumeGroupNodeStatus does not exist yet")
 	fakeClient = fake.NewClientBuilder().WithScheme(scheme.Scheme).
 		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
-		WithInterceptorFuncs(funcs).
 		Build()
 	r = &Reconciler{
-		Client:   fakeClient,
-		Scheme:   scheme.Scheme,
-		NodeName: "test-node",
+		Client:    fakeClient,
+		Scheme:    scheme.Scheme,
+		NodeName:  "test-node",
+		Namespace: volumeGroup.GetNamespace(),
 	}
-	By("verifying incorrect node resolution because nodestatus cannot be created")
 	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
-	Expect(err).To(HaveOccurred(), "should error on valid node selector due to failure of nodestatus creation")
-	Expect(res).To(Equal(reconcile.Result{}))
+	Expect(err).ToNot(HaveOccurred(), "should not error when LVMVolumeGroupNodeStatus is not found, but requeue")
+	Expect(res).To(Equal(reconcile.Result{RequeueAfter: 10 * time.Second}))
 
 	fakeClient = fake.NewClientBuilder().WithScheme(scheme.Scheme).
 		WithObjects(matchingNode, notMatchingNode, volumeGroup, invalidVolumeGroup).
@@ -834,8 +827,8 @@ func testNodeSelector(ctx context.Context) {
 	Expect(err).To(HaveOccurred(), "should error during node match resolution")
 	Expect(res).To(Equal(reconcile.Result{}))
 
-	By("then verifying incorrect node resolution because nodestatus cannot be created")
-	funcs = interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	By("then verifying error when LVMVolumeGroupNodeStatus get fails with non-NotFound error")
+	funcs := interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 		if key.Name == matchingNode.Name {
 			if nodeStatus, ok := obj.(*lvmv1alpha1.LVMVolumeGroupNodeStatus); ok {
 				return fmt.Errorf("mock get failure for LVMVolumeGroupNodeStatus %s", nodeStatus.GetName())
@@ -848,9 +841,10 @@ func testNodeSelector(ctx context.Context) {
 		WithInterceptorFuncs(funcs).
 		Build()
 	r = &Reconciler{
-		Client:   fakeClient,
-		Scheme:   scheme.Scheme,
-		NodeName: "test-node",
+		Client:    fakeClient,
+		Scheme:    scheme.Scheme,
+		NodeName:  "test-node",
+		Namespace: volumeGroup.GetNamespace(),
 	}
 	By("verifying incorrect node resolution because nodestatus cannot be fetched from cluster")
 	res, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(volumeGroup)})
