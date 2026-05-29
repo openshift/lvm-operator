@@ -930,4 +930,283 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	// RAIDConfig validation tests
+
+	It("rejects raidConfig and thinPoolConfig both set", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDAndThinPoolMutuallyExclusive.Error()))
+	})
+
+	It("accepts raidConfig without thinPoolConfig", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("rejects mirrors on raid5", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type:    RAIDTypeRAID5,
+			Mirrors: ptr.To(1),
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb", "/dev/sdc"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDMirrorsOnlyForRAID1AndRAID10.Error()))
+	})
+
+	It("rejects stripes on raid1", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type:    RAIDTypeRAID1,
+			Stripes: ptr.To(2),
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDStripesNotForRAID1.Error()))
+	})
+
+	It("rejects stripeSize on raid1", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type:       RAIDTypeRAID1,
+			StripeSize: ptr.To(k8sresource.MustParse("256Ki")),
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDStripeSizeNotForRAID1.Error()))
+	})
+
+	It("rejects raid1 with fewer than 2 devices", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("requires at least 2 devices"))
+	})
+
+	It("rejects raid6 with fewer than 5 devices", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID6,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("requires at least 5 devices"))
+	})
+
+	It("rejects raid10 with device count not divisible by mirrors+1", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID10,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd", "/dev/sde"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("requires device count to be a multiple of"))
+	})
+
+	It("rejects stripeSize that is not a power of 2", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type:       RAIDTypeRAID5,
+			StripeSize: ptr.To(k8sresource.MustParse("100Ki")),
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb", "/dev/sdc"},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDStripeSizeNotPowerOf2.Error()))
+	})
+
+	It("rejects raidConfig without any device paths", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = nil
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDDeviceSelectorRequired.Error()))
+	})
+
+	It("accepts raidConfig with only optionalPaths", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			OptionalPaths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("accepts raid5 with valid stripeSize", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type:       RAIDTypeRAID5,
+			StripeSize: ptr.To(k8sresource.MustParse("256Ki")),
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb", "/dev/sdc"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("rejects changing raidConfig mirrors on update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].RAIDConfig.Mirrors = ptr.To(1)
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsInvalid))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("raidConfig is immutable after creation"))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("rejects removing raidConfig from existing device class", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].RAIDConfig = nil
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(ErrRAIDConfigCannotBeChanged.Error()))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("rejects adding raidConfig to existing device class that had thinPoolConfig", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		updated.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		err := k8sClient.Update(ctx, updated)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("allows adding device paths to existing raidConfig device class", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig = nil
+		resource.Spec.Storage.DeviceClasses[0].RAIDConfig = &RAIDConfig{
+			Type: RAIDTypeRAID1,
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda", "/dev/sdb"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		updated := resource.DeepCopy()
+		updated.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []DevicePath{"/dev/sda", "/dev/sdb", "/dev/sdc"}
+		Expect(k8sClient.Update(ctx, updated)).To(Succeed())
+
+		Expect(k8sClient.Delete(ctx, updated)).To(Succeed())
+	})
+
 })

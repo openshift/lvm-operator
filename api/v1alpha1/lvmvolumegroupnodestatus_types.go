@@ -86,6 +86,42 @@ type VGStatus struct {
 	// +kubebuilder:default=RuntimeStatic
 	// +kubebuilder:validation:Required
 	DeviceDiscoveryPolicy DeviceDiscoveryPolicyStatus `json:"deviceDiscoveryPolicy,omitempty"`
+	// RAIDStatus reports the RAID health for this device class. Only set when the device class uses RAIDConfig.
+	// +optional
+	RAIDStatus *RAIDStatus `json:"raidStatus,omitempty"`
+}
+
+// RAIDHealthStatus represents the overall health of RAID in a device class.
+// +kubebuilder:validation:Enum=Healthy;Degraded;Failed
+type RAIDHealthStatus string
+
+const (
+	RAIDHealthStatusHealthy  RAIDHealthStatus = "Healthy"
+	RAIDHealthStatusDegraded RAIDHealthStatus = "Degraded"
+	RAIDHealthStatusFailed   RAIDHealthStatus = "Failed"
+)
+
+// RAIDLVHealth reports the health of a single RAID logical volume.
+type RAIDLVHealth struct {
+	// Name is the logical volume name.
+	Name string `json:"name"`
+	// RAIDType is the RAID level of this logical volume.
+	RAIDType RAIDType `json:"raidType"`
+	// SyncPercent is the resynchronization progress (0-100).
+	SyncPercent int `json:"syncPercent"`
+	// HealthStatus is the LVM health status string. Empty for healthy volumes.
+	// Examples: "partial", "refresh needed", "mismatches exist".
+	// +optional
+	HealthStatus string `json:"healthStatus,omitempty"`
+}
+
+// RAIDStatus reports the overall RAID health for a device class on a node.
+type RAIDStatus struct {
+	// Status is the overall RAID health.
+	Status RAIDHealthStatus `json:"status"`
+	// LVHealth contains per-logical-volume RAID health details.
+	// +optional
+	LVHealth []RAIDLVHealth `json:"lvHealth,omitempty"`
 }
 
 type ExcludedDevice struct {

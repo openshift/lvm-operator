@@ -61,6 +61,14 @@ var (
 	ErrNodeSelectorCannotBeChanged                           = errors.New("NodeSelector can not be changed")
 	ErrDevicePathsCannotBeAddedInUpdate                      = errors.New("device paths can not be added after a device class has been initialized")
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
+	ErrRAIDAndThinPoolMutuallyExclusive                      = errors.New("raidConfig and thinPoolConfig are mutually exclusive")
+	ErrRAIDMirrorsOnlyForRAID1AndRAID10                      = errors.New("mirrors is only valid for raid1 and raid10")
+	ErrRAIDStripesNotForRAID1                                = errors.New("stripes is only valid for raid4, raid5, raid6, and raid10")
+	ErrRAIDStripeSizeNotForRAID1                             = errors.New("stripeSize is only valid for raid4, raid5, raid6, and raid10")
+	ErrRAIDDeviceSelectorRequired                            = errors.New("at least one of paths or optionalPaths is required when raidConfig is set")
+	ErrRAIDStripeSizeNotPowerOf2                             = errors.New("stripeSize must be a power of 2 (e.g., 64Ki, 128Ki, 256Ki, 512Ki)")
+	ErrRAIDConfigCannotBeChanged                             = errors.New("raidConfig cannot be changed")
+	ErrRAIDConfigNotSet                                      = errors.New("RAIDConfig is not set for the DeviceClass")
 )
 
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
@@ -96,6 +104,11 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, l *LVMCluster)
 
 	deviceClassWarnings, err := v.verifyDeviceClass(l)
 	warnings = append(warnings, deviceClassWarnings...)
+	if err != nil {
+		return warnings, err
+	}
+
+	err = v.verifyRAIDConfig(l)
 	if err != nil {
 		return warnings, err
 	}
@@ -151,6 +164,11 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, oldLVMCluster, l
 
 	deviceClassWarnings, err := v.verifyDeviceClass(l)
 	warnings = append(warnings, deviceClassWarnings...)
+	if err != nil {
+		return warnings, err
+	}
+
+	err = v.verifyRAIDConfig(l)
 	if err != nil {
 		return warnings, err
 	}
@@ -225,6 +243,21 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, oldLVMCluster, l
 						return warnings, fmt.Errorf("ThinPoolConfig.MetadataSize is invalid: %w", ErrThinPoolMetadataSizeCanOnlyBeIncreased)
 					}
 				}
+			}
+		}
+
+		var newRAIDConfig, oldRAIDConfig *RAIDConfig
+		newRAIDConfig = deviceClass.RAIDConfig
+		oldRAIDConfig, err = v.getRAIDConfigOfDeviceClass(oldLVMCluster, deviceClass.Name)
+
+		if (newRAIDConfig != nil && oldRAIDConfig == nil && !errors.Is(err, ErrDeviceClassNotFound)) ||
+			(newRAIDConfig == nil && oldRAIDConfig != nil) {
+			return warnings, ErrRAIDConfigCannotBeChanged
+		}
+
+		if newRAIDConfig != nil && oldRAIDConfig != nil {
+			if !reflect.DeepEqual(newRAIDConfig, oldRAIDConfig) {
+				return warnings, fmt.Errorf("RAIDConfig fields are immutable: %w", ErrRAIDConfigCannotBeChanged)
 			}
 		}
 
@@ -617,4 +650,72 @@ func (v *lvmClusterValidator) validateAdditionalParamsAndLabels(l *LVMCluster) (
 		}
 	}
 	return warnings, nil
+}
+
+func (v *lvmClusterValidator) verifyRAIDConfig(l *LVMCluster) error {
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.RAIDConfig == nil {
+			continue
+		}
+
+		if dc.ThinPoolConfig != nil {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDAndThinPoolMutuallyExclusive)
+		}
+
+		rc := dc.RAIDConfig
+
+		if rc.Mirrors != nil && rc.Type != RAIDTypeRAID1 && rc.Type != RAIDTypeRAID10 {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDMirrorsOnlyForRAID1AndRAID10)
+		}
+
+		if rc.Stripes != nil && rc.Type == RAIDTypeRAID1 {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDStripesNotForRAID1)
+		}
+
+		if rc.StripeSize != nil && rc.Type == RAIDTypeRAID1 {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDStripeSizeNotForRAID1)
+		}
+
+		if rc.StripeSize != nil {
+			bytes := rc.StripeSize.Value()
+			if bytes <= 0 || (bytes&(bytes-1)) != 0 {
+				return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDStripeSizeNotPowerOf2)
+			}
+		}
+
+		hasDevices := dc.DeviceSelector != nil &&
+			(len(dc.DeviceSelector.Paths) > 0 || len(dc.DeviceSelector.OptionalPaths) > 0)
+		if !hasDevices {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDDeviceSelectorRequired)
+		}
+
+		totalDevices := len(dc.DeviceSelector.Paths) + len(dc.DeviceSelector.OptionalPaths)
+
+		minDevices := rc.Type.MinDeviceCount(rc.EffectiveMirrors(), rc.Stripes)
+		if totalDevices < minDevices {
+			return fmt.Errorf("device class %q: %s requires at least %d devices, got %d",
+				dc.Name, rc.Type, minDevices, totalDevices)
+		}
+
+		if rc.Type == RAIDTypeRAID10 && len(dc.DeviceSelector.OptionalPaths) == 0 {
+			divisor := rc.EffectiveMirrors() + 1
+			if totalDevices%divisor != 0 {
+				return fmt.Errorf("device class %q: raid10 with mirrors=%d requires device count to be a multiple of %d, got %d",
+					dc.Name, rc.EffectiveMirrors(), divisor, totalDevices)
+			}
+		}
+	}
+	return nil
+}
+
+func (v *lvmClusterValidator) getRAIDConfigOfDeviceClass(l *LVMCluster, deviceClassName string) (*RAIDConfig, error) {
+	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
+		if deviceClass.Name == deviceClassName {
+			if deviceClass.RAIDConfig != nil {
+				return deviceClass.RAIDConfig, nil
+			}
+			return nil, ErrRAIDConfigNotSet
+		}
+	}
+	return nil, ErrDeviceClassNotFound
 }
