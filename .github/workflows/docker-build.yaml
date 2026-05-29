@@ -20,7 +20,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       # 'test' is a sub-target of 'docker-build' and so cache go build & mod
       - id: go-cache-paths
