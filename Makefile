@@ -191,7 +191,7 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-generated.sh
 
 test: envtest godeps-update ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -p 2 -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --use-deprecated-gcs=false -p path)" go test -v -p 2 -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
 ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
 endif
@@ -360,7 +360,7 @@ endif
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 ifeq (,$(wildcard $(ENVTEST)))
-	$(call go-get-tool,sigs.k8s.io/controller-runtime/tools/setup-envtest@bf15e44028f908c790721fc8fe67c7bf2d06a611)
+	$(call go-get-tool,sigs.k8s.io/controller-runtime/tools/setup-envtest@cb94c680f5d5111680cdd85e46683797fad7013e)
 endif
 
 JSONNET = $(shell pwd)/bin/jsonnet
