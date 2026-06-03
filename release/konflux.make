@@ -44,6 +44,13 @@ catalog-source: opm
 
 IMAGE_BUILD_CMD ?= $(shell command -v podman 2>&1 >/dev/null && echo podman || echo docker)
 
+.PHONY: validate-renovate-config
+validate-renovate-config:
+	$(IMAGE_BUILD_CMD) run --rm \
+	-v $(shell pwd)/renovate.json:/workspace/renovate.json:ro,Z \
+	quay.io/konflux-ci/mintmaker-renovate-image:latest \
+	renovate-config-validator /workspace/renovate.json
+
 .PHONY: catalog-container
 catalog-container:
 	$(IMAGE_BUILD_CMD) build --build-arg=CATALOG_VERSION=$(Y_STREAM) -t lvm-operator-catalog:$(Y_STREAM) -f release/catalog/catalog.konflux.Dockerfile .

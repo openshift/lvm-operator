@@ -1,0 +1,26 @@
+# This utilizes konflux-ci's github workflow for validating the renovate configuration
+name: "Validate renovate.json config file"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "renovate.json"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "renovate.json"
+
+jobs:
+  renovate-config-file-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: konflux-ci/renovate-config-validator-action@main
+        with:
+          config_file: renovate.json
