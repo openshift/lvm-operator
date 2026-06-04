@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -198,6 +199,10 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, oldLVMCluster, l
 	warnings = append(warnings, scOptionWarnings...)
 	if err != nil {
 		return warnings, err
+	}
+
+	if err := validateStorageClassOptionsUpgrade(oldLVMCluster.Spec.Storage.DeviceClasses, l.Spec.Storage.DeviceClasses); err != nil {
+		return warnings, fmt.Errorf("storageClassOptions upgrade validation failed: %w", err)
 	}
 
 	// Validate device class removal follows the business rules
@@ -718,4 +723,38 @@ func (v *lvmClusterValidator) getRAIDConfigOfDeviceClass(l *LVMCluster, deviceCl
 		}
 	}
 	return nil, ErrDeviceClassNotFound
+}
+
+// validateStorageClassOptionsUpgrade guards against the nil→non-nil storageClassOptions
+// transition on upgrade. Existing LVMCluster CRs created before the +kubebuilder:default={}
+// marker may still have storageClassOptions == nil. The CRD XValidation transition rules
+// (oldSelf == self) do not fire when the parent transitions from nil to non-nil, so this
+// webhook check covers that gap until the CR is re-saved with defaults populated.
+func validateStorageClassOptionsUpgrade(oldDeviceClasses, newDeviceClasses []DeviceClass) error {
+	oldMap := make(map[string]*StorageClassOptions, len(oldDeviceClasses))
+	for i := range oldDeviceClasses {
+		oldMap[oldDeviceClasses[i].Name] = oldDeviceClasses[i].StorageClassOptions
+	}
+	for _, dc := range newDeviceClasses {
+		if dc.StorageClassOptions == nil {
+			continue
+		}
+		oldOpts, found := oldMap[dc.Name]
+		if !found {
+			continue // new device class, no existing SC to conflict with
+		}
+		if oldOpts != nil {
+			continue // both exist, XValidation handles it
+		}
+		if dc.StorageClassOptions.ReclaimPolicy != nil && *dc.StorageClassOptions.ReclaimPolicy != corev1.PersistentVolumeReclaimDelete {
+			return fmt.Errorf("device class %q: reclaimPolicy is immutable once set", dc.Name)
+		}
+		if dc.StorageClassOptions.VolumeBindingMode != nil && *dc.StorageClassOptions.VolumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
+			return fmt.Errorf("device class %q: volumeBindingMode is immutable once set", dc.Name)
+		}
+		if len(dc.StorageClassOptions.AdditionalParameters) > 0 {
+			return fmt.Errorf("device class %q: additionalParameters is immutable once set", dc.Name)
+		}
+	}
+	return nil
 }

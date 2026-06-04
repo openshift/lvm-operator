@@ -250,6 +250,7 @@ spec:
                           - message: raidConfig is immutable after creation
                             rule: oldSelf == self
                         storageClassOptions:
+                          default: {}
                           description: StorageClassOptions allows customization of
                             the StorageClass created for this device class.
                           properties:
