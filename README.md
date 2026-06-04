@@ -13,7 +13,7 @@ This allows applications running on the cluster to consume storage from LVM logi
 
 The LVM Operator, in conjunction with the TopoLVM CSI Driver, Volume Group Manager, and other related components, collectively comprise the Logical Volume Manager Storage (LVMS) solution.
 
-Here is a brief overview of how the Operator works. See [here](docs/design/architecture.md) for the architecture diagram.
+Here is a brief overview of how the Operator works. See the [architecture overview](docs/architecture.md) for design rationale and the [component diagram](docs/design/architecture.md) for deployment topology.
 
 ```mermaid
 graph LR
