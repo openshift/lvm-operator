@@ -219,3 +219,42 @@ Signed-off-by: First_Name Last_Name <email address>
 - Your commit must be signed-off.
 - *Recommendation*: A "Co-authored-by:" line should be added for each
   additional author.
+
+## AI-Assisted Contributions
+
+We welcome contributions that use AI coding tools. The following conventions ensure transparency and maintain code quality.
+
+### Attribution
+
+Commits that include AI-generated code must add a `Co-Authored-By:` trailer identifying the AI tool used:
+
+```
+component: commit title
+
+Description of the change.
+
+Signed-off-by: First_Name Last_Name <email address>
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### Pull Request Descriptions
+
+PRs that include AI-generated code should note this in the description. Describe what was human-directed versus AI-generated, and confirm that the changes were human-reviewed.
+
+### Testing Expectations
+
+AI-generated code changes must pass the same CI gates as any other contribution:
+
+- `make verify` — formatting and generated file checks
+- `make test` — unit tests
+- `make e2e` — end-to-end tests (when the change affects user-facing behavior)
+
+If modifying API types in `api/v1alpha1/`, always run `make generate && make manifests` to update generated code and CRD manifests.
+
+### Scope
+
+AI contributions should be focused, single-purpose changes. Avoid sweeping refactors, large-scale rewrites, or speculative cleanup without human direction. When in doubt, keep the change small and open a follow-up issue for broader work.
+
+### Code Review
+
+AI-generated PRs require the same human review and approval as any other PR. The contributor is responsible for understanding and being able to explain every change in the PR.
