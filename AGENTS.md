@@ -20,6 +20,8 @@ This is the LVM Operator, part of LVMS (Logical Volume Manager Storage) for Open
 | [docs/design/raid-support.md](docs/design/raid-support.md) | RAID support design |
 | [docs/upstream.md](docs/upstream.md) | Upstream TopoLVM workflow, when to contribute upstream vs. downstream fork |
 | [docs/dependency-management.md](docs/dependency-management.md) | Updating Go, Kubernetes, and TopoLVM dependencies |
+| [docs/known-limitations.md](docs/known-limitations.md) | Device filters, RAID/encryption workarounds, snapshot constraints |
+| [docs/loop-devices.md](docs/loop-devices.md) | Using loop devices for testing and development |
 | [docs/security.md](docs/security.md) | Snyk vulnerability scanning |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Troubleshooting guide |
 

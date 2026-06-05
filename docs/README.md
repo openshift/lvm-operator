@@ -7,5 +7,7 @@
 5. [Thin Provisioning](design/thin-provisioning.md)
 6. [Upstream Workflow: TopoLVM](upstream.md) — how we consume and contribute to upstream TopoLVM
 7. [Dependency Management](dependency-management.md) — updating Go, Kubernetes, and TopoLVM dependencies
-8. [Security](security.md) — Snyk vulnerability scanning
-9. [Troubleshooting Guide](troubleshooting.md)
+8. [Known Limitations](known-limitations.md) — device filters, RAID/encryption workarounds, snapshot constraints
+9. [Using Loop Devices](loop-devices.md) — testing with loop devices
+10. [Security](security.md) — Snyk vulnerability scanning
+11. [Troubleshooting Guide](troubleshooting.md)
