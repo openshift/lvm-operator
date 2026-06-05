@@ -216,6 +216,9 @@ func (r *Reconciler) reconcile(
 	}
 
 	effectivePolicy := ptr.Deref(volumeGroup.Spec.DeviceDiscoveryPolicy, lvmv1alpha1.DeviceDiscoveryPolicyDynamic)
+	if volumeGroup.Spec.RAIDConfig != nil {
+		effectivePolicy = lvmv1alpha1.DeviceDiscoveryPolicyStatic
+	}
 
 	// In static mode, if the VG already exists, exclude any newly discovered devices.
 	// This only applies when no explicit device paths are configured.
@@ -307,6 +310,23 @@ func (r *Reconciler) reconcile(
 	}
 
 	logger.Info("new available devices discovered", "available", devices.Available)
+
+	if volumeGroup.Spec.RAIDConfig != nil {
+		totalDevices := len(devices.Available)
+		for _, vg := range vgs {
+			if vg.Name == volumeGroup.Name {
+				totalDevices += len(vg.PVs)
+				break
+			}
+		}
+		if err := validateRAIDDeviceCount(volumeGroup.Spec.RAIDConfig, totalDevices); err != nil {
+			r.WarningEvent(ctx, volumeGroup, EventReasonErrorNoAvailableDevicesForVG, err)
+			if _, err := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, devices, err); err != nil {
+				logger.Error(err, "failed to set status to failed")
+			}
+			return ctrl.Result{}, err
+		}
+	}
 
 	// Create VG/extend VG
 	if err = r.addDevicesToVG(ctx, vgs, volumeGroup.Name, devices.Available, r.shouldWipeDevicesOnVolumeGroup(volumeGroup)); err != nil {
@@ -432,6 +452,10 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 			dc.Type = lvmd.TypeThick
 			// set SpareGB to 0 to avoid automatic default to 10GiB
 			dc.SpareGB = ptr.To(uint64(0))
+		}
+
+		if volumeGroup.Spec.RAIDConfig != nil {
+			dc.LVCreateOptions = buildRAIDLVCreateOptions(volumeGroup.Spec.RAIDConfig)
 		}
 
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)

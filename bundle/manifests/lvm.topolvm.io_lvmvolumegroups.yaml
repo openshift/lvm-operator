@@ -169,6 +169,47 @@ spec:
                 - nodeSelectorTerms
                 type: object
                 x-kubernetes-map-type: atomic
+              raidConfig:
+                description: |-
+                  RAIDConfig configures native LVM RAID for this volume group.
+                  Mutually exclusive with ThinPoolConfig. All fields are immutable after creation.
+                properties:
+                  mirrors:
+                    description: |-
+                      Mirrors is the number of mirror copies. Only valid for raid1 and raid10.
+                      Default is 1 (2 total copies: original + 1 mirror).
+                    minimum: 1
+                    type: integer
+                  stripeSize:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      StripeSize is the size of each stripe chunk. Only valid for raid4, raid5, raid6, and raid10.
+                      Must be a power of 2 (e.g., 64Ki, 128Ki, 256Ki, 512Ki). Default is 64Ki.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  stripes:
+                    description: |-
+                      Stripes is the number of data stripes. Only valid for raid4, raid5, raid6, and raid10.
+                      When not specified, LVM uses its default (typically all available devices minus parity).
+                    minimum: 2
+                    type: integer
+                  type:
+                    description: Type is the LVM RAID level.
+                    enum:
+                    - raid1
+                    - raid4
+                    - raid5
+                    - raid6
+                    - raid10
+                    type: string
+                required:
+                - type
+                type: object
+                x-kubernetes-validations:
+                - message: raidConfig is immutable after creation
+                  rule: oldSelf == self
               thinPoolConfig:
                 description: ThinPoolConfig contains configurations for the thin-pool
                 properties:
@@ -238,6 +279,9 @@ spec:
                 - overprovisionRatio
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: raidConfig and thinPoolConfig are mutually exclusive
+              rule: '!(has(self.raidConfig) && has(self.thinPoolConfig))'
           status:
             description: LVMVolumeGroupStatus defines the observed state of LVMVolumeGroup
             type: object

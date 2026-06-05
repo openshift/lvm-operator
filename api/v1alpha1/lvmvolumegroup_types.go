@@ -24,6 +24,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // LVMVolumeGroupSpec defines the desired state of LVMVolumeGroup
+// +kubebuilder:validation:XValidation:rule="!(has(self.raidConfig) && has(self.thinPoolConfig))",message="raidConfig and thinPoolConfig are mutually exclusive"
 type LVMVolumeGroupSpec struct {
 	// DeviceSelector is a set of rules that should match for a device to be included in this TopoLVMCluster
 	// +optional
@@ -36,6 +37,12 @@ type LVMVolumeGroupSpec struct {
 	// ThinPoolConfig contains configurations for the thin-pool
 	// +optional
 	ThinPoolConfig *ThinPoolConfig `json:"thinPoolConfig,omitempty"`
+
+	// RAIDConfig configures native LVM RAID for this volume group.
+	// Mutually exclusive with ThinPoolConfig. All fields are immutable after creation.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="raidConfig is immutable after creation"
+	RAIDConfig *RAIDConfig `json:"raidConfig,omitempty"`
 
 	// Default is a flag to indicate whether the device-class is the default
 	// +optional
