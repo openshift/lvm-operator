@@ -53,7 +53,7 @@ end
 
 Due to the absence of a CI pipeline that builds this repository, you will need to either build it yourself or use a pre-built image that has been made available. Please note that the pre-built image may not be in sync with the current state of the repository.
 
-To build the Operator from source (including OLM bundle and catalog images), see the [contribution guide](CONTRIBUTING.md#cluster-builds).
+To build the Operator from source (including OLM bundle and catalog images), see the [contribution guide](CONTRIBUTING.md#local-builds).
 
 ### Deploying the Operator
 

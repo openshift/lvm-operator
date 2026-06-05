@@ -27,6 +27,38 @@ pre-commit hooks contain all important verifications that are also checked by ou
 After installing `pre-commit`, navigate to the repository root and run `pre-commit install`. Now, whenever you commit, all pre-commit checks will be executed for you.
 Also, you can run `pre-commit run` to run the check with all currently staged files.
 
+### Local builds
+
+To build the Operator locally, install Docker or Podman and log into your registry.
+
+1. Set the following environment variables to the repository where you want to host your image:
+
+    ```bash
+    $ export IMAGE_REGISTRY=<quay/docker etc>
+    $ export REGISTRY_NAMESPACE=<registry-username>
+    $ export IMAGE_TAG=<some-tag>
+    ```
+
+2. Build and push the container image:
+
+    ```bash
+    $ make docker-build docker-push
+    ```
+
+3. (Optional) For OLM-based deployment, also build and push the bundle and catalog images:
+
+    ```bash
+    $ make bundle-build bundle-push
+    $ make catalog-build catalog-push
+    ```
+
+4. Deploy to a cluster:
+
+    ```bash
+    $ make deploy          # standard deployment
+    $ make deploy-with-olm # OLM-based deployment (requires bundle and catalog images)
+    ```
+
 ### Cluster builds
 In order to build on the cluster you need to first have your kubeconfig configured. Once configured you can run the following steps to build on the cluster:
 
