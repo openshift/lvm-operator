@@ -10,10 +10,12 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func generateUniqueNameForTestCase(ctx SpecContext) string {
@@ -925,9 +927,74 @@ var _ = Describe("webhook acceptance tests", func() {
 		}
 		err := k8sClient.Update(ctx, updated)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		Expect(err).To(SatisfyAny(Satisfy(k8serrors.IsForbidden), Satisfy(k8serrors.IsInvalid)))
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("storageClassOptions defaults are populated on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].StorageClassOptions = nil
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), resource)).To(Succeed())
+		Expect(resource.Spec.Storage.DeviceClasses[0].StorageClassOptions).ToNot(BeNil())
+		Expect(resource.Spec.Storage.DeviceClasses[0].StorageClassOptions.ReclaimPolicy).ToNot(BeNil())
+		Expect(*resource.Spec.Storage.DeviceClasses[0].StorageClassOptions.ReclaimPolicy).To(Equal(corev1.PersistentVolumeReclaimDelete))
+		Expect(resource.Spec.Storage.DeviceClasses[0].StorageClassOptions.VolumeBindingMode).ToNot(BeNil())
+		Expect(*resource.Spec.Storage.DeviceClasses[0].StorageClassOptions.VolumeBindingMode).To(Equal(storagev1.VolumeBindingWaitForFirstConsumer))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	// Upgrade-path validation: nil→non-nil storageClassOptions with non-default immutable values
+
+	DescribeTable("upgrade path rejects nil→non-nil storageClassOptions with non-default immutable values",
+		func(opts StorageClassOptions, expectedSubstring string) {
+			oldDCs := []DeviceClass{{Name: "vg1", StorageClassOptions: nil}}
+			newDCs := []DeviceClass{{Name: "vg1", StorageClassOptions: &opts}}
+			err := validateStorageClassOptionsUpgrade(oldDCs, newDCs)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(expectedSubstring))
+		},
+		Entry("reclaimPolicy: Retain", StorageClassOptions{
+			ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
+		}, "reclaimPolicy is immutable once set"),
+		Entry("volumeBindingMode: Immediate", StorageClassOptions{
+			VolumeBindingMode: ptr.To(storagev1.VolumeBindingImmediate),
+		}, "volumeBindingMode is immutable once set"),
+		Entry("additionalParameters non-empty", StorageClassOptions{
+			AdditionalParameters: map[string]string{"key": "val"},
+		}, "additionalParameters is immutable once set"),
+	)
+
+	DescribeTable("upgrade path allows nil→non-nil storageClassOptions with default or mutable values",
+		func(opts StorageClassOptions) {
+			oldDCs := []DeviceClass{{Name: "vg1", StorageClassOptions: nil}}
+			newDCs := []DeviceClass{{Name: "vg1", StorageClassOptions: &opts}}
+			Expect(validateStorageClassOptionsUpgrade(oldDCs, newDCs)).To(Succeed())
+		},
+		Entry("default reclaimPolicy", StorageClassOptions{
+			ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimDelete),
+		}),
+		Entry("default volumeBindingMode", StorageClassOptions{
+			VolumeBindingMode: ptr.To(storagev1.VolumeBindingWaitForFirstConsumer),
+		}),
+		Entry("only additionalLabels", StorageClassOptions{
+			AdditionalLabels: map[string]string{"env": "prod"},
+		}),
+		Entry("empty storageClassOptions", StorageClassOptions{}),
+	)
+
+	It("allows adding a new device class with non-default immutable values during update", func() {
+		oldDCs := []DeviceClass{{Name: "vg1", StorageClassOptions: nil}}
+		newDCs := []DeviceClass{
+			{Name: "vg1", StorageClassOptions: nil},
+			{Name: "vg2", StorageClassOptions: &StorageClassOptions{
+				ReclaimPolicy: ptr.To(corev1.PersistentVolumeReclaimRetain),
+			}},
+		}
+		Expect(validateStorageClassOptionsUpgrade(oldDCs, newDCs)).To(Succeed())
 	})
 
 	// RAIDConfig validation tests

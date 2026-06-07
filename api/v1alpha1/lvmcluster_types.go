@@ -240,6 +240,7 @@ type DeviceClass struct {
 
 	// StorageClassOptions allows customization of the StorageClass created for this device class.
 	// +optional
+	// +kubebuilder:default={}
 	StorageClassOptions *StorageClassOptions `json:"storageClassOptions,omitempty"`
 }
 
