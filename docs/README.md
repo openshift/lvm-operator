@@ -1,8 +1,7 @@
 # Contents
 
-1. [LVMS Architecture](architecture.md) — high-level design rationale, reconciliation lifecycle, and CRD relationships
-2. [Component Diagram](design/architecture.md) — component runners and deployment topology
-3. [The LVM Operator Manager](design/lvm-operator-manager.md)
+1. [LVMS Architecture](architecture.md) — design rationale, component diagram, reconciliation lifecycle, and CRD relationships
+2. [The LVM Operator Manager](design/lvm-operator-manager.md)
 4. [The Volume Group Manager](design/vg-manager.md)
 5. [Thin Provisioning](design/thin-provisioning.md)
 6. [Upstream Workflow: TopoLVM](upstream.md) — how we consume and contribute to upstream TopoLVM

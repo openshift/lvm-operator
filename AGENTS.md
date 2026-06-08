@@ -12,8 +12,7 @@ This is the LVM Operator, part of LVMS (Logical Volume Manager Storage) for Open
 
 | Document | Purpose |
 |----------|---------|
-| [docs/architecture.md](docs/architecture.md) | Design rationale, reconciliation lifecycle, CRD relationships, finalizer hierarchy |
-| [docs/design/architecture.md](docs/design/architecture.md) | Component diagram and runner table |
+| [docs/architecture.md](docs/architecture.md) | Design rationale, component diagram, reconciliation lifecycle, CRD relationships, finalizer hierarchy |
 | [docs/design/lvm-operator-manager.md](docs/design/lvm-operator-manager.md) | LVM Operator Manager internals |
 | [docs/design/vg-manager.md](docs/design/vg-manager.md) | Volume Group Manager design |
 | [docs/design/thin-provisioning.md](docs/design/thin-provisioning.md) | Thin provisioning design |
