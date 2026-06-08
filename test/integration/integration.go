@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	// Import the test packages
-	_ "github.com/openshift/lvm-operator/v4/test/integration/sno"
+	_ "github.com/openshift/lvm-operator/v4/test/integration/qe_tests"
 )
 
 func main() {
@@ -18,10 +18,18 @@ func main() {
 	ext := e.NewExtension("openshift", "payload", "lvm-operator")
 
 	suites := []e.Suite{
+		// SNO tests only
 		{
-			Name: "openshift/lvm-operator/test/integration/single-node",
+			Name: "openshift/lvm-operator/test/integration/qe_tests/sno",
 			Qualifiers: []string{
 				`labels.exists(l, l=="SNO")`,
+			},
+		},
+		// MNO tests only
+		{
+			Name: "openshift/lvm-operator/test/integration/qe_tests/mno",
+			Qualifiers: []string{
+				`labels.exists(l, l=="MNO")`,
 			},
 		},
 	}
