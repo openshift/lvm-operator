@@ -1,0 +1,21 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.16.11
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-16
+  snapshot: lvm-operator-4-16-20260608-094045-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be seen.
+
+        This erratum implements the following changes:
+
+        - Bumps gRPC-Go to 1.79.3 to address CVE-2026-33186 authorization bypass vulnerability
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
