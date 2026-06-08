@@ -1,0 +1,46 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: storage-pod-template
+objects:
+- kind: Pod
+  apiVersion: v1
+  metadata:
+    name: ${PODNAME}
+    namespace: ${PODNAMESPACE}
+  spec:
+    securityContext:
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+    - image: ${PODIMAGE}
+      name: test-container
+      command:
+      - /bin/sh
+      - -c
+      - sleep 3600
+      ${VOLUMETYPE}:
+      - name: test-volume
+        ${PATHTYPE}: ${PODMOUNTPATH}
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+    volumes:
+    - name: test-volume
+      persistentVolumeClaim:
+        claimName: ${PVCNAME}
+parameters:
+- name: PVCNAME
+- name: PODNAME
+- name: PODNAMESPACE
+- name: PODIMAGE
+  value: registry.redhat.io/rhel8/support-tools:latest
+- name: VOLUMETYPE
+  value: volumeMounts
+- name: PATHTYPE
+  value: mountPath
+- name: PODMOUNTPATH
+  value: /mnt/test
