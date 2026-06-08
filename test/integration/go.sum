@@ -89,8 +89,6 @@ github.com/openshift/api v0.0.0-20240423014330-2cb60a113ad1 h1:qo6vX1xwLILWL69tC
 github.com/openshift/api v0.0.0-20240423014330-2cb60a113ad1/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
 github.com/openshift/library-go v0.0.0-20240422143640-fad649cbbd63 h1:Cv1pmE4m2MJrytpTOk0HHJfaw7gvBOwAj8FJeGuffCg=
 github.com/openshift/library-go v0.0.0-20240422143640-fad649cbbd63/go.mod h1:m/HsttSi90vSixwoy5mPUBHcZid2YRw/QbsLErLxF9s=
-github.com/openshift/lvm-operator v0.0.0-20260605034543-7302e3d5d527 h1:44BEYOh9ybh4pzEr6TcSeqJohLdArbGC+DIzN0TB0E4=
-github.com/openshift/lvm-operator v0.0.0-20260605034543-7302e3d5d527/go.mod h1:jRjYpHwmD8GHDkHYkG+emOlzKkxzwaGeLVSFShylyrY=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241205171354-8006f302fd12 h1:AKx/w1qpS8We43bsRgf8Nll3CGlDHpr/WAXvuedTNZI=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241205171354-8006f302fd12/go.mod h1:7Du3c42kxCUegi0IImZ1wUQzMBVecgIHjR1C+NkhLQo=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
