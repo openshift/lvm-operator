@@ -1,6 +1,6 @@
 # Known Limitations
 
-### Dynamic Device Discovery
+## Dynamic Device Discovery
 
 When a `DeviceSelector` isn't configured for a device class, LVMS operates dynamically, continuously monitoring attached devices on the node and adding them to the volume group if they're unused and supported. However, this approach presents several potential issues:
 
@@ -10,7 +10,7 @@ When a `DeviceSelector` isn't configured for a device class, LVMS operates dynam
 
 Given these considerations, it's advised against using LVMS in dynamic discovery mode for production environments.
 
-### Unsupported Device Types
+## Unsupported Device Types
 
 Here is a list of the types of devices that are excluded by LVMS. To get more information about the devices on your machine and to check if they fall under any of these filters, run:
 
@@ -70,15 +70,15 @@ Devices meeting any of these conditions are filtered out for LVMS operations.
 
 _NOTE: It is strongly recommended to perform a thorough wipe of a device before using it within LVMS to proactively prevent unintended behaviors or potential issues._
 
-### Single LVMCluster Support
+## Single LVMCluster Support
 
 LVMS does not support the reconciliation of multiple LVMCluster custom resources simultaneously.
 
-### Upgrades from v 4.10 and v4.11
+## Upgrades from v 4.10 and v4.11
 
 It is not possible to upgrade from release-4.10 and release-4.11 to a newer version due to a breaking change that has been implemented. For further information on this matter, consult [the relevant documentation](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md).
 
-### Missing Native LVM RAID Configuration Support
+## Missing Native LVM RAID Configuration Support
 
 Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs.
 This is backed by an LVM Logical Volume of type `thin`, which is reflected in the LVM flags as an attribute.
@@ -96,7 +96,7 @@ Simply create a RAID array with `mdadm` and then use this in your `deviceSelecto
 
 _NOTE: Currently, RAID Arrays created with `mdraid` are not automatically recognized when not using any `deviceSelector`, thus they MUST be specified explicitly._
 
-### Missing LV-Level Encryption Support
+## Missing LV-Level Encryption Support
 
 Currently, LVM Operator does not have a native LV-level encryption support. Instead, you can encrypt the entire disk or partitions, and use them within LVMCluster. This way all LVs created by LVMS on this disk will be encrypted out-of-the-box.
 
@@ -155,7 +155,7 @@ For non-OpenShift clusters, you can encrypt a disk using LUKS with `cryptsetup`,
 
 3. You can now reference `/dev/mapper/encrypted` in the `deviceSelector`.
 
-### Snapshotting and Cloning in Multi-Node Topologies
+## Snapshotting and Cloning in Multi-Node Topologies
 
 In general, since LVMCluster does not ensure data replication, `VolumeSnapshots` and consumption of them is always limited to the original dataSource.
 Thus, snapshots must be created on the same node as the original data. Also, all pods relying on a PVC that is using the snapshot data will have to be scheduled
@@ -171,7 +171,7 @@ The easiest way to achieve this is to use precreated `PersistentVolumeClaims` an
 
 _NOTE: All of the above also applies for cloning the `PersistentVolumeClaims` directly by using the original `PersistentVolumeClaims` as data source instead of using a Snapshot._
 
-### Validation of `LVMCluster` CRs Outside the `openshift-lvm-storage` Namespace
+## Validation of `LVMCluster` CRs Outside the `openshift-lvm-storage` Namespace
 
 When creating an `LVMCluster` CR outside the `openshift-lvm-storage` namespace by installing it via `ClusterServiceVersion`, the Operator will not be able to validate the CR.
 This is because the `ValidatingWebhookConfiguration` is restricted to the `openshift-lvm-storage` namespace and does not have access to the `LVMCluster` CRs in other namespaces.
