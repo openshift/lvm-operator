@@ -428,6 +428,11 @@ func (in *LVMVolumeGroupSpec) DeepCopyInto(out *LVMVolumeGroupSpec) {
 		*out = new(ThinPoolConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RAIDConfig != nil {
+		in, out := &in.RAIDConfig, &out.RAIDConfig
+		*out = new(RAIDConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.DeviceDiscoveryPolicy != nil {
 		in, out := &in.DeviceDiscoveryPolicy, &out.DeviceDiscoveryPolicy
 		*out = new(DeviceDiscoveryPolicySpec)
