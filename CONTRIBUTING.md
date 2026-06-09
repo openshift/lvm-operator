@@ -27,6 +27,38 @@ pre-commit hooks contain all important verifications that are also checked by ou
 After installing `pre-commit`, navigate to the repository root and run `pre-commit install`. Now, whenever you commit, all pre-commit checks will be executed for you.
 Also, you can run `pre-commit run` to run the check with all currently staged files.
 
+### Local builds
+
+To build the Operator locally, install Docker or Podman and log into your registry.
+
+1. Set the following environment variables to the repository where you want to host your image:
+
+    ```bash
+    $ export IMAGE_REGISTRY=<quay/docker etc>
+    $ export REGISTRY_NAMESPACE=<registry-username>
+    $ export IMAGE_TAG=<some-tag>
+    ```
+
+2. Build and push the container image:
+
+    ```bash
+    $ make docker-build docker-push
+    ```
+
+3. (Optional) For OLM-based deployment, also build and push the bundle and catalog images:
+
+    ```bash
+    $ make bundle-build bundle-push
+    $ make catalog-build catalog-push
+    ```
+
+4. Deploy to a cluster:
+
+    ```bash
+    $ make deploy          # standard deployment
+    $ make deploy-with-olm # OLM-based deployment (requires bundle and catalog images)
+    ```
+
 ### Cluster builds
 In order to build on the cluster you need to first have your kubeconfig configured. Once configured you can run the following steps to build on the cluster:
 
@@ -219,3 +251,42 @@ Signed-off-by: First_Name Last_Name <email address>
 - Your commit must be signed-off.
 - *Recommendation*: A "Co-authored-by:" line should be added for each
   additional author.
+
+## AI-Assisted Contributions
+
+We welcome contributions that use AI coding tools. The following conventions ensure transparency and maintain code quality.
+
+### Attribution
+
+Commits that include AI-generated code must add a `Co-Authored-By:` trailer identifying the AI tool used:
+
+```
+component: commit title
+
+Description of the change.
+
+Signed-off-by: First_Name Last_Name <email address>
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### Pull Request Descriptions
+
+PRs that include AI-generated code should note this in the description. Describe what was human-directed versus AI-generated, and confirm that the changes were human-reviewed.
+
+### Testing Expectations
+
+AI-generated code changes must pass the same CI gates as any other contribution:
+
+- `make verify` — formatting and generated file checks
+- `make test` — unit tests
+- `make e2e` — end-to-end tests (when the change affects user-facing behavior)
+
+If modifying API types in `api/v1alpha1/`, always run `make generate && make manifests` to update generated code and CRD manifests.
+
+### Scope
+
+AI contributions should be focused, single-purpose changes. Avoid sweeping refactors, large-scale rewrites, or speculative cleanup without human direction. When in doubt, keep the change small and open a follow-up issue for broader work.
+
+### Code Review
+
+AI-generated PRs require the same human review and approval as any other PR. The contributor is responsible for understanding and being able to explain every change in the PR.
