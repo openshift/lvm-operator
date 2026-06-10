@@ -139,6 +139,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nodeStatus := r.getLVMVolumeGroupNodeStatus()
 	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("LVMVolumeGroupNodeStatus not yet created by LVMCluster controller, requeueing")
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("could not get LVMVolumeGroupNodeStatus: %w", err)
 	}
 
