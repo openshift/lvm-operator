@@ -1,16 +1,17 @@
-FROM golang:1.22 AS builder
+FROM golang:1.23 AS builder
 
-# Set working directory inside the builder container
-WORKDIR /workspace
+# Copy the entire repo to preserve directory structure for go.mod replace directives
+WORKDIR /go/src/github.com/openshift/lvm-operator
+COPY . .
 
-# Copy the integration test source code and go.mod
-COPY test/integration/ ./
+# Move into the integration test directory
+WORKDIR /go/src/github.com/openshift/lvm-operator/test/integration
 
 # Download all dependencies and verify
 RUN go mod download
 
 # Build the binary
-RUN GO_COMPLIANCE_POLICY="exempt_all" CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o integration-test .
+RUN GO_COMPLIANCE_POLICY="exempt_all" CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /tmp/integration-test .
 
 # ---- Stage 2: Runtime container ----
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -18,7 +19,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 WORKDIR /
 
 # Copy the built binary from the builder stage
-COPY --from=builder /workspace/integration-test .
+COPY --from=builder /tmp/integration-test .
 
 # Run the binary
 ENTRYPOINT ["./integration-test"]
