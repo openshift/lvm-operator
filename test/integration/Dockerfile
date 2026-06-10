@@ -16,4 +16,3 @@ WORKDIR /
 COPY --from=builder /tmp/integration-test .
 
 ENTRYPOINT ["./integration-test"]
-
