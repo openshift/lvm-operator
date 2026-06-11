@@ -1,6 +1,6 @@
 module github.com/openshift/lvm-operator/v4
 
-go 1.24.11
+go 1.24.13
 
 require (
 	github.com/aws/aws-sdk-go v1.55.6
