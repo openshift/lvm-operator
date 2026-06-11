@@ -1,6 +1,6 @@
 module github.com/openshift/lvm-operator/v4/test/integration
 
-go 1.24.11
+go 1.24.13
 
 require (
 	github.com/onsi/ginkgo/v2 v2.25.3
