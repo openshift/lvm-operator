@@ -6,12 +6,14 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -64,8 +66,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 		}
 
-		if err := r.removeWipeAnnotationsForNode(ctx, nodeStatus.GetName()); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to remove wipe annotations for Node %s: %w", nodeStatus.GetName(), err)
+		if err := r.cleanupVolumeGroupsForNode(ctx, nodeStatus.GetName()); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clean up VolumeGroups for Node %s: %w", nodeStatus.GetName(), err)
 		}
 
 		return ctrl.Result{}, nil
@@ -120,9 +122,13 @@ func removeDeleteProtectionFinalizer(status *lvmv1alpha1.LVMVolumeGroupNodeStatu
 	return false
 }
 
-// removeWipeAnnotationsForNode removes wipe annotations for the given node from all LVMVolumeGroup objects.
-func (r *Reconciler) removeWipeAnnotationsForNode(ctx context.Context, nodeName string) error {
+// cleanupVolumeGroupsForNode removes the node cleanup finalizer and wipe annotation
+// for the given node from all LVMVolumeGroup objects.
+// This prevents stale finalizers from blocking VolumeGroup deletion
+// after a node is removed from the cluster.
+func (r *Reconciler) cleanupVolumeGroupsForNode(ctx context.Context, nodeName string) error {
 	logger := log.FromContext(ctx)
+	finalizer := fmt.Sprintf("%s/%s", vgmanager.NodeCleanupFinalizer, nodeName)
 	annotationKey := constants.DevicesWipedAnnotationPrefix + nodeName
 
 	volumeGroups := &lvmv1alpha1.LVMVolumeGroupList{}
@@ -130,19 +136,20 @@ func (r *Reconciler) removeWipeAnnotationsForNode(ctx context.Context, nodeName 
 		return fmt.Errorf("failed to list LVMVolumeGroups: %w", err)
 	}
 
-	for i := range volumeGroups.Items {
-		vg := &volumeGroups.Items[i]
-		if vg.Annotations == nil {
+	for _, vg := range volumeGroups.Items {
+		needsUpdate := controllerutil.RemoveFinalizer(&vg, finalizer)
+
+		if _, exists := vg.Annotations[annotationKey]; exists {
+			delete(vg.Annotations, annotationKey)
+			needsUpdate = true
+		}
+
+		if !needsUpdate {
 			continue
 		}
 
-		if _, exists := vg.Annotations[annotationKey]; !exists {
-			continue
-		}
-
-		logger.Info("removing wipe annotation from LVMVolumeGroup", "lvmVolumeGroup", vg.Name, "node", nodeName)
-		delete(vg.Annotations, annotationKey)
-		if err := r.Update(ctx, vg); err != nil {
+		logger.Info("cleaning up LVMVolumeGroup for removed node", "lvmVolumeGroup", vg.Name, "node", nodeName)
+		if err := r.Update(ctx, &vg); err != nil {
 			return fmt.Errorf("failed to update LVMVolumeGroup %s: %w", vg.Name, err)
 		}
 	}
