@@ -28,6 +28,19 @@ Both versions should be API-compatible. The downstream fork exists to carry urge
 - **Upstream first**: Bug fixes and features that are not OpenShift-specific should be contributed to [topolvm/topolvm](https://github.com/topolvm/topolvm). Once merged and released upstream, update the dependency in lvm-operator.
 - **Downstream fork**: Use [openshift/topolvm](https://github.com/openshift/topolvm) only for critical fixes that need immediate remediation and cannot wait for an upstream release cycle. These patches should be upstreamed as soon as possible and the fork patch removed once the upstream release includes the fix.
 
+## How CSI Sidecars Are Consumed
+
+The same embedding pattern applies to the standard Kubernetes CSI sidecars. Rather than deploying separate sidecar containers alongside the driver, LVMS vendors them as Go libraries and compiles them directly into the operator and vg-manager binaries:
+
+| Sidecar | Go module | Embedded in |
+|---------|-----------|-------------|
+| external-provisioner | `github.com/kubernetes-csi/external-provisioner/v5` | operator (`internal/csi/provisioner.go`) |
+| external-resizer | `github.com/kubernetes-csi/external-resizer` | operator (`internal/csi/resizer.go`) |
+| external-snapshotter | `github.com/kubernetes-csi/external-snapshotter/v8` | operator (`internal/csi/snapshotter.go`) |
+| node-driver-registrar | — | vg-manager (`internal/csi/registrar.go`, implemented directly via kubelet plugin registration API) |
+
+This keeps the pod count low on edge/single-node clusters, consistent with the TopoLVM embedding decision. These dependencies are updated the same way as any other Go dependency — see [dependency-management.md](dependency-management.md).
+
 ## Updating the TopoLVM Dependency
 
 See [dependency-management.md](dependency-management.md) for the full dependency update procedure, including the TopoLVM-specific section on "Expected Replacement of TopoLVM."
