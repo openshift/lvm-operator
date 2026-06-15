@@ -74,10 +74,6 @@ _NOTE: It is strongly recommended to perform a thorough wipe of a device before 
 
 LVMS does not support the reconciliation of multiple LVMCluster custom resources simultaneously.
 
-## Upgrades from v 4.10 and v4.11
-
-It is not possible to upgrade from release-4.10 and release-4.11 to a newer version due to a breaking change that has been implemented. For further information on this matter, consult [the relevant documentation](https://github.com/topolvm/topolvm/blob/main/docs/proposals/rename-group.md).
-
 ## Missing Native LVM RAID Configuration Support
 
 Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs.
