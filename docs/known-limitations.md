@@ -165,7 +165,7 @@ It should be noted that snapshotting is based on Thin-Pool Snapshots from upstre
 This is because multi-node Kubernetes clusters have the scheduler figure out pod placement logically onto different nodes (with the node topology from the native Kubernetes Scheduler responsible for deciding the node where Pods should be deployed),
 and it cannot always be guaranteed that Snapshots are provisioned on the same node as the original data (which is based on the CSI topology, known by TopoLVM) if the `PersistentVolumeClaim` is not created upfront.
 
-If you are unsure what to make of this, always make sure that the original `PerstistentVolumeClaim` that you want to have Snapshots on is already created and `Bound`.
+If you are unsure what to make of this, always make sure that the original `PersistentVolumeClaim` that you want to have Snapshots on is already created and `Bound`.
 With these prerequisites it can be guaranteed that all follow-up `VolumeSnapshot` Objects as well as `PersistentVolumeClaim` objects depending on the original one are scheduled correctly.
 The easiest way to achieve this is to use precreated `PersistentVolumeClaims` and non-ephemeral `StatefulSet` for your workload.
 
