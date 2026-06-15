@@ -66,7 +66,7 @@ LVMCluster (user-facing, singleton per namespace)
 
 ## API Version: v1alpha1
 
-Despite the `v1alpha1` designation, this is the production API. The name is a historical artifact. Treat it as stable: new fields should be optional and backward-compatible, and breaking changes require migration support.
+Despite the `v1alpha1` designation, this is the production API. The name is a historical artifact — upgrading to `v1alpha2` or `v1beta1` would require a full CRD migration path, webhook updates, and a coordinated rollout across upstream and downstream consumers, and that cost has not been justified given the API's effective stability. Treat it as stable: new fields should be optional and backward-compatible, and breaking changes require migration support.
 
 ## Cleanup and Finalizer Hierarchy
 

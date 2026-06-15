@@ -74,23 +74,13 @@ _NOTE: It is strongly recommended to perform a thorough wipe of a device before 
 
 LVMS does not support the reconciliation of multiple LVMCluster custom resources simultaneously.
 
-## Missing Native LVM RAID Configuration Support
+## RAID and Thin Provisioning Are Mutually Exclusive
 
-Currently, LVM Operator forces all LVMClusters to work with a thinly provisioned volume in order to support Snapshotting and Cloning on PVCs.
-This is backed by an LVM Logical Volume of type `thin`, which is reflected in the LVM flags as an attribute.
-When trying to use LVM's inbuilt RAID capabilities, it conflicts with this `thin` attribute as the same flag is also indicative whether a volume is part of LVM RAID configurations (`r` or `R` flag).
-This means that the only way to support RAID configuration from within `LVM` would be to do a conversion from two RAID Arrays into a thinpool with `lvconvert`, after which the RAID is no longer recognized by LVM (due to said conflict in the volume attributes).
-While this would enable initial synchronization and redundancy, all repair and extend operations would not longer respect the RAID topology in the Volume Group, and operations like `lvconvert --repair` are not even supported anymore.
-This means that it would be quite a complex situation to recover from.
+LVMS supports native LVM RAID through the `raidConfig` field on a device class (RAID1, 4, 5, 6, and 10 are supported). When `raidConfig` is set, the device class uses **thick provisioning** — RAID and thin provisioning are mutually exclusive within a single device class.
 
-Instead of doing LVM based RAIDs, we recommend using the [`mdraid`](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#linux-raid-subsystems_managing-raid) subsystem in linux instead of the LVM RAID capabilities.
-Simply create a RAID array with `mdadm` and then use this in your `deviceSelector` within `LVMCluster`:
+This means **RAID device classes do not support snapshots or clones**. If you need both redundancy and snapshot/clone capability, use [`mdraid`](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#linux-raid-subsystems_managing-raid) at the OS level: create a RAID array with `mdadm`, then reference the resulting device (e.g. `/dev/md0`) in the `deviceSelector` of a thin-provisioned device class.
 
-1. For a simple RAID1, you could use `mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/sda1 /dev/sdc1`
-2. Then you can reference `/dev/md0` in the `deviceSelector` as normal
-3. Any recovery and syncing will then happen with `mdraid`: [Replacing Disks](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#replacing-a-failed-disk-in-raid_managing-raid) and [Repairing](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_storage_devices/managing-raid_managing-storage-devices#repairing-raid-disks_managing-raid) will work transparently of LVMS and can be covered by a sysadmin of the Node.
-
-_NOTE: Currently, RAID Arrays created with `mdraid` are not automatically recognized when not using any `deviceSelector`, thus they MUST be specified explicitly._
+_NOTE: `mdraid` devices are not automatically discovered — they must be listed explicitly in `deviceSelector`._
 
 ## Missing LV-Level Encryption Support
 

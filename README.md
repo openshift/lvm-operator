@@ -297,7 +297,7 @@ Be aware of these limitations when using LVMS. See the [full details](docs/known
 - **Unsupported device types** — read-only, suspended, ROM, LVM partitions, devices with children/bind mounts/reserved partition labels, and loop devices in use by Kubernetes are filtered out
 - **Single LVMCluster** — only one LVMCluster CR is supported per cluster
 - **No upgrades from 4.10/4.11** — breaking API changes prevent upgrades
-- **No native LVM RAID** — use mdraid instead for redundancy
+- **RAID supported via `raidConfig`** — but incompatible with thin provisioning; RAID device classes do not support snapshots or clones
 - **No LV-level encryption** — encrypt disks/partitions before adding to LVMCluster
 - **Snapshots/clones limited to single node** — must be on the same node as the source data
 - **Webhook validation scoped to operator namespace** — LVMCluster CRs outside `openshift-lvm-storage` are not validated
