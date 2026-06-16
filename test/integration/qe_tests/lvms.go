@@ -5395,6 +5395,184 @@ spec:
 		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 	})
+
+	g.It("Author:mmakwana-High-88799-[OTP][LVMS] Verify reclaimPolicy and volumeBindingMode combinations", g.Label("SNO", "MNO"), func() {
+
+		provisioner := "topolvm.io"
+
+		g.By("#. Create test namespace for OCP-88799")
+		testNs := "lvms-test-88799"
+		err := createNamespaceWithOC(testNs)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("namespace", testNs, "")
+
+		g.By("Scenario A: reclaimPolicy=Delete, volumeBindingMode=Immediate")
+
+		g.By("#. Create StorageClass with reclaimPolicy=Delete and volumeBindingMode=Immediate")
+		scDeleteImmediate := "lvms-88799-delete-immediate"
+		err = createStorageClassWithOC(storageClassConfig{
+			name:              scDeleteImmediate,
+			provisioner:       provisioner,
+			fsType:            "xfs",
+			deviceClass:       volumeGroup,
+			reclaimPolicy:     "Delete",
+			volumeBindingMode: "Immediate",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("storageclass", scDeleteImmediate, "")
+
+		g.By("#. Create PVC with no pod (Scenario A)")
+		pvcDeleteImmediate := "pvc-88799-delete-immediate"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcDeleteImmediate,
+			namespace:        testNs,
+			storageClassName: scDeleteImmediate,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify PVC is Bound immediately (no pod needed with Immediate binding)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcDeleteImmediate, "-n", testNs, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+
+		g.By("#. Note the PV name")
+		pvDeleteImmediate := getPVCVolumeName(testNs, pvcDeleteImmediate)
+		o.Expect(pvDeleteImmediate).NotTo(o.BeEmpty())
+
+		g.By("#. Verify PV exists")
+		out, err := exec.Command("oc", "get", "pv", pvDeleteImmediate, "-o", "jsonpath={.metadata.name}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(out))).To(o.Equal(pvDeleteImmediate))
+
+		g.By("#. Delete PVC")
+		deleteSpecifiedResource("pvc", pvcDeleteImmediate, testNs)
+
+		g.By("#. Verify PV is gone (reclaimPolicy=Delete)")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pv", pvDeleteImmediate, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking PV deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+
+		g.By("Scenario B: reclaimPolicy=Retain, volumeBindingMode=WaitForFirstConsumer")
+
+		g.By("#. Create StorageClass with reclaimPolicy=Retain and volumeBindingMode=WaitForFirstConsumer")
+		scRetainWFFC := "lvms-88799-retain-wffc"
+		err = createStorageClassWithOC(storageClassConfig{
+			name:              scRetainWFFC,
+			provisioner:       provisioner,
+			fsType:            "xfs",
+			deviceClass:       volumeGroup,
+			reclaimPolicy:     "Retain",
+			volumeBindingMode: "WaitForFirstConsumer",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("storageclass", scRetainWFFC, "")
+
+		g.By("#. Create PVC (should stay Pending with WaitForFirstConsumer)")
+		pvcRetainWFFC := "pvc-88799-retain-wffc"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcRetainWFFC,
+			namespace:        testNs,
+			storageClassName: scRetainWFFC,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify PVC stays in Pending state (WaitForFirstConsumer requires a consumer)")
+		o.Consistently(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcRetainWFFC, "-n", testNs, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, 10*time.Second, 2*time.Second).Should(o.Equal("Pending"))
+
+		g.By("#. Create Pod to consume the PVC")
+		podRetainWFFC := "pod-88799-retain-wffc"
+		err = createPodWithOC(podConfig{
+			name:      podRetainWFFC,
+			namespace: testNs,
+			pvcName:   pvcRetainWFFC,
+			mountPath: "/mnt/test",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify PVC transitions to Bound after Pod creation")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcRetainWFFC, "-n", testNs, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+
+		g.By("#. Get the PV name for cleanup")
+		pvRetainWFFC := getPVCVolumeName(testNs, pvcRetainWFFC)
+		o.Expect(pvRetainWFFC).NotTo(o.BeEmpty())
+		defer deleteSpecifiedResource("pv", pvRetainWFFC, "")
+
+		g.By("#. Delete Pod and PVC")
+		deleteSpecifiedResource("pod", podRetainWFFC, testNs)
+		deleteSpecifiedResource("pvc", pvcRetainWFFC, testNs)
+
+		g.By("#. Wait for PVC to be fully deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pvc", pvcRetainWFFC, "-n", testNs, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking PVC deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+
+		g.By("#. Verify PV exists with status Released (reclaimPolicy=Retain)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pv", pvRetainWFFC, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PV status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.Equal("Released"))
+
+		g.By("#. Delete orphaned PV")
+		deleteSpecifiedResource("pv", pvRetainWFFC, "")
+
+		g.By("#. Verify orphaned PV is deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pv", pvRetainWFFC, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking PV deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+
+		g.By("#. Cleanup LogicalVolume CR for retained PV")
+		cleanupLogicalVolumeByName(pvRetainWFFC)
+
+		g.By("#. Verify LogicalVolume CR is deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "logicalvolume", pvRetainWFFC, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking LogicalVolume deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+	})
 })
 
 func checkLvmsOperatorInstalled(tc *TestClient) {

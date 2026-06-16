@@ -1999,3 +1999,45 @@ func getPVCVolumeName(namespace string, pvcName string) string {
 	logf("The PVC %s in namespace %s is bound to volume %s\n", pvcName, namespace, volumeName)
 	return volumeName
 }
+
+// storageClassConfig holds configuration for creating a StorageClass via oc CLI
+type storageClassConfig struct {
+	name              string
+	provisioner       string
+	fsType            string
+	deviceClass       string
+	reclaimPolicy     string // "Delete" or "Retain"
+	volumeBindingMode string // "Immediate" or "WaitForFirstConsumer"
+}
+
+// createStorageClassWithOC creates a StorageClass using oc process + oc apply
+func createStorageClassWithOC(cfg storageClassConfig) error {
+	if cfg.provisioner == "" {
+		cfg.provisioner = "topolvm.io"
+	}
+	if cfg.fsType == "" {
+		cfg.fsType = "xfs"
+	}
+	if cfg.reclaimPolicy == "" {
+		cfg.reclaimPolicy = "Delete"
+	}
+	if cfg.volumeBindingMode == "" {
+		cfg.volumeBindingMode = "WaitForFirstConsumer"
+	}
+
+	err := applyResourceFromTemplate("storageclass-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "SCNAME="+cfg.name,
+		"-p", "PROVISIONER="+cfg.provisioner,
+		"-p", "FSTYPE="+cfg.fsType,
+		"-p", "DEVICECLASS="+cfg.deviceClass,
+		"-p", "RECLAIMPOLICY="+cfg.reclaimPolicy,
+		"-p", "ALLOWEXPANSION=true",
+		"-p", "VOLUMEBINDINGMODE="+cfg.volumeBindingMode,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create StorageClass %s: %w", cfg.name, err)
+	}
+	logf("Created StorageClass: %s\n", cfg.name)
+	return nil
+}
