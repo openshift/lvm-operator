@@ -132,13 +132,13 @@ export CATALOG_PACKAGE
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="{./cmd/...,./api/...,./internal/...}" output:crd:artifacts:config=config/crd/bases
 
 mocks: mockery ## Generate mocks for unit test code
 	$(shell $(MOCKERY) --log-level error)
 
 generate: controller-gen mocks ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations. Also retriggers mock generation
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="{./cmd/...,./api/...,./internal/...}"
 
 fmt: ## Run go fmt against code.
 	go fmt ./...
