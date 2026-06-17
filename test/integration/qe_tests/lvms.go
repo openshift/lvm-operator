@@ -983,7 +983,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 			return state
 		}, 120*time.Second, 5*time.Second).Should(o.Equal("Failed"))
 
-		errMsg := "there were no available devices to create it"
+		errMsg := "at least 1 valid device is required if DeviceSelector paths or optionalPaths are specified"
 		o.Eventually(func() string {
 			cmd := exec.Command("oc", "get", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace,
 				"-o=jsonpath={.status.deviceClassStatuses[*].nodeStatus[*].reason}")
