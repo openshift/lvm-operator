@@ -88,3 +88,4 @@ LABEL distribution-scope="public"
 
 # Additional labels for the bundle for use in the release process
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
+LABEL cpe="cpe:/a:redhat:lvms:${LVMS_TAGS#v}::el9"
