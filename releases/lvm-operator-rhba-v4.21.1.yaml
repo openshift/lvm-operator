@@ -20,3 +20,15 @@ spec:
         - Bumps gRPC-Go to 1.79.3 to address CVE-2026-33186 authorization bypass vulnerability
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        fixed:
+          - id: OCPBUGS-77655
+            source: issues.redhat.com
+          - id: OCPBUGS-76993
+            source: issues.redhat.com
+          - id: OCPBUGS-73786
+            source: issues.redhat.com
+          - id: OCPBUGS-69436
+            source: issues.redhat.com
+          - id: OCPBUGS-69442
+            source: issues.redhat.com
