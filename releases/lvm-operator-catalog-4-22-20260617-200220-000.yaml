@@ -1,0 +1,11 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-catalog-4-22-20260617-200220-000
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-catalog-production-releaseplan-4-22
+  snapshot: lvm-operator-catalog-4-22-20260617-200220-000
