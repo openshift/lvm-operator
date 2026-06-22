@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 )
@@ -214,6 +215,260 @@ func TestValidateRAIDDeviceCount(t *testing.T) {
 			}
 			if !tt.expectError && err != nil {
 				t.Errorf("expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+func TestComputeOverheadFactor(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      *lvmv1alpha1.RAIDConfig
+		deviceCount int
+		expected    float64
+	}{
+		{
+			name:        "raid1 default mirrors",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID1},
+			deviceCount: 2,
+			expected:    2.0,
+		},
+		{
+			name:        "raid1 mirrors=2",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID1, Mirrors: ptr.To(2)},
+			deviceCount: 3,
+			expected:    3.0,
+		},
+		{
+			name:        "raid5 stripes specified",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID5, Stripes: ptr.To(3)},
+			deviceCount: 4,
+			expected:    4.0 / 3.0,
+		},
+		{
+			name:        "raid5 stripes not specified 4 devices",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID5},
+			deviceCount: 4,
+			expected:    4.0 / 3.0,
+		},
+		{
+			name:        "raid4 stripes specified",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID4, Stripes: ptr.To(3)},
+			deviceCount: 4,
+			expected:    4.0 / 3.0,
+		},
+		{
+			name:        "raid4 stripes not specified 5 devices",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID4},
+			deviceCount: 5,
+			expected:    5.0 / 4.0,
+		},
+		{
+			name:        "raid6 stripes specified",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID6, Stripes: ptr.To(4)},
+			deviceCount: 6,
+			expected:    6.0 / 4.0,
+		},
+		{
+			name:        "raid6 stripes not specified 5 devices",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID6},
+			deviceCount: 5,
+			expected:    5.0 / 3.0,
+		},
+		{
+			name:        "raid10 default mirrors",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID10},
+			deviceCount: 4,
+			expected:    2.0,
+		},
+		{
+			name:        "raid10 mirrors=2",
+			config:      &lvmv1alpha1.RAIDConfig{Type: lvmv1alpha1.RAIDTypeRAID10, Mirrors: ptr.To(2)},
+			deviceCount: 6,
+			expected:    3.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeOverheadFactor(tt.config, tt.deviceCount)
+			if got != tt.expected {
+				t.Errorf("expected %f, got %f", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestBuildRAIDStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		lvs      []lvm.LogicalVolume
+		raidType lvmv1alpha1.RAIDType
+		expected *lvmv1alpha1.RAIDStatus
+	}{
+		{
+			name:     "no RAID LVs returns nil",
+			lvs:      []lvm.LogicalVolume{{Name: "thin-pool", LvAttr: "twi-a-t---"}},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: nil,
+		},
+		{
+			name: "all healthy",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+				{Name: "lv-pvc-abc_rimage_0", LvAttr: "iwi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
+				{Name: "lv-pvc-abc_rimage_1", LvAttr: "iwi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
+				{Name: "lv-pvc-abc_rmeta_0", LvAttr: "ewi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
+				{Name: "lv-pvc-abc_rmeta_1", LvAttr: "ewi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+				},
+			},
+		},
+		{
+			name: "syncing LV",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "42.50", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 42},
+				},
+			},
+		},
+		{
+			name: "single LV with partial health is failed",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusFailed,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
+				},
+			},
+		},
+		{
+			name: "multiple LVs mixed health",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+				{Name: "lv-pvc-def", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusDegraded,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
+				},
+			},
+		},
+		{
+			name: "all LVs unhealthy is failed",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
+				{Name: "lv-pvc-def", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusFailed,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
+					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
+				},
+			},
+		},
+		{
+			name: "RAID no initial sync volume type R",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "Rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+				},
+			},
+		},
+		{
+			name: "raid5 LV",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid5"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID5,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID5, SyncPercent: 100},
+				},
+			},
+		},
+		{
+			name: "partial flag without health status triggers degraded",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r-p-", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusDegraded,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+				},
+			},
+		},
+		{
+			name: "non-RAID LVs only",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-linear", LvAttr: "-wi-a-----", RAIDSyncPercent: "", LVHealthStatus: "", LVLayout: "linear"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: nil,
+		},
+		{
+			name: "empty sync percent defaults to 100",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildRAIDStatus(tt.lvs, tt.raidType)
+			if tt.expected == nil {
+				if got != nil {
+					t.Fatalf("expected nil, got %+v", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("expected %+v, got nil", tt.expected)
+			}
+			if got.Status != tt.expected.Status {
+				t.Errorf("status: expected %q, got %q", tt.expected.Status, got.Status)
+			}
+			if len(got.LVHealth) != len(tt.expected.LVHealth) {
+				t.Fatalf("lvHealth length: expected %d, got %d", len(tt.expected.LVHealth), len(got.LVHealth))
+			}
+			for i := range got.LVHealth {
+				if got.LVHealth[i] != tt.expected.LVHealth[i] {
+					t.Errorf("lvHealth[%d]: expected %+v, got %+v", i, tt.expected.LVHealth[i], got.LVHealth[i])
+				}
 			}
 		})
 	}

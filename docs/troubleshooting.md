@@ -438,3 +438,211 @@ LVMCluster and its node-daemon vg-manager periodically reconcile changes on the 
    ```
 
 2. Wait for the LVMCluster to reconcile the changes. The LVMCluster should now only contain the healthy node(s) and the failing node(s) should be removed from the LVMCluster. The LVMCluster should now be Ready again. Note that now pods using the deviceClass / StorageClass backed by the deviceClass will only be scheduled on the healthy node(s) and the failing node(s) will not be used / usable anymore. It is thus recommended to use a different deviceClass for the failing node(s) if you want to use them again in the future and move workloads over after recovering their data. If the node failure was temporary, you can use the same mechanism as described in the Recovery from disk failure without resetting LVMCluster section to re-enable the failing node(s) in the LVMCluster by changing the nodeSelector back to include the failing node(s) again.
+
+## Recovery from RAID device failure
+
+When a device in a RAID device class fails, the operator detects missing physical volumes in the volume group and reports the device class as `Degraded`. Existing PVCs remain usable as long as the RAID level provides sufficient redundancy (e.g., one mirror in raid1, one parity device in raid5). However, the array has reduced fault tolerance and a second failure may result in data loss.
+
+The operator does not perform any automated repair. All recovery operations must be performed by the cluster administrator directly on the node. After the node-level repair is complete, the administrator updates the `LVMCluster` CR to reflect the actual device state.
+
+### Diagnosing the failure
+
+1. Check the `LVMVolumeGroupNodeStatus` to identify the affected node and device class:
+
+    ```bash
+    oc get lvmvolumegroupnodestatus -A -o yaml
+    ```
+
+    Look for `status: Degraded` and the `raidStatus` field, which reports per-LV health details.
+
+2. Log in to the affected node and inspect the volume group:
+
+    ```bash
+    vgs <VG_NAME> -o vg_name,vg_attr,vg_size,vg_free,vg_missing_pv_count --reportformat json
+    ```
+
+    A `vg_missing_pv_count` greater than 0 confirms a missing device.
+
+3. Identify the missing physical volume:
+
+    ```bash
+    pvs -o pv_name,pv_uuid,vg_name,pv_attr,pv_size,pv_missing
+    ```
+
+    The missing PV appears as `[unknown]` in the output.
+
+4. Check the health of RAID logical volumes:
+
+    ```bash
+    lvs -a <VG_NAME> -o lv_name,lv_attr,lv_health_status,raid_sync_percent,lv_layout
+    ```
+
+    Degraded RAID LVs show `partial` in `lv_health_status` and have a `p` flag at position 9 of `lv_attr`.
+
+### Scenario A: Replace device at the same path
+
+Use this procedure when the replacement device is available at the same path as the failed one (e.g., hot-swapped disk in the same slot).
+
+1. Physically replace the failed device. The new device should appear at the same path (e.g., `/dev/sdb`).
+
+2. Recreate the physical volume with the original UUID from the VG backup:
+
+    ```bash
+    pvcreate --restorefile /etc/lvm/backup/<VG_NAME> --uuid <ORIGINAL_PV_UUID> /dev/sdb
+    ```
+
+    The PV UUID is available from the `pvs` output captured before the failure or from the LVM backup file at `/etc/lvm/backup/<VG_NAME>`.
+
+3. Restore the PV in the volume group:
+
+    ```bash
+    vgextend --restoremissing <VG_NAME> /dev/sdb
+    ```
+
+    LVM recognizes the restored PV by its original UUID. RAID LVs that had legs on this PV will automatically begin resynchronizing — no explicit `lvconvert --repair` is needed.
+
+4. Verify the repair:
+
+    ```bash
+    pvs -o pv_name,vg_name,pv_attr,pv_size
+    lvs -a <VG_NAME> -o lv_name,lv_attr,lv_health_status,raid_sync_percent
+    ```
+
+    All PVs should be present and RAID LVs should show `raid_sync_percent` progressing toward `100.00`.
+
+5. No `LVMCluster` CR update is needed since the device path has not changed. The VG Manager will detect the restored health on the next reconciliation and update the status to `Ready`.
+
+### Scenario B: Replace device at a different path
+
+Use this procedure when the replacement device is at a different path than the failed one (e.g., `/dev/sdc` replacing failed `/dev/sdb`).
+
+1. Physically install the replacement device.
+
+2. Initialize the new device as a physical volume:
+
+    ```bash
+    pvcreate /dev/sdc
+    ```
+
+3. Add the new device to the volume group:
+
+    ```bash
+    vgextend <VG_NAME> /dev/sdc
+    ```
+
+4. Repair each degraded RAID logical volume:
+
+    ```bash
+    lvconvert --repair <VG_NAME>/<LV_NAME>
+    ```
+
+    Repeat for each degraded LV. LVM allocates new RAID legs on the newly added PV, replacing the legs that were on the missing device.
+
+5. Remove the stale missing PV reference from the volume group:
+
+    ```bash
+    vgreduce --removemissing <VG_NAME>
+    ```
+
+    Since the RAID LVs have already been repaired, no LV segments remain on the missing PV, so `--force` is not needed.
+
+6. Verify the repair:
+
+    ```bash
+    pvs -o pv_name,vg_name,pv_attr,pv_size
+    lvs -a <VG_NAME> -o lv_name,lv_attr,lv_health_status,raid_sync_percent
+    ```
+
+7. Update the `LVMCluster` CR to reflect the new device path:
+
+    First, check whether the failed device is listed under `paths` or `optionalPaths` in the device class:
+
+    ```bash
+    oc get lvmcluster <LVMCLUSTER_NAME> -n openshift-lvm-storage -o jsonpath='{.spec.storage.deviceClasses[0].deviceSelector}'
+    ```
+
+    Then patch the correct field. If the device is in `paths`:
+
+    ```bash
+    oc patch lvmcluster <LVMCLUSTER_NAME> -n openshift-lvm-storage --type='json' \
+      -p='[{"op": "replace", "path": "/spec/storage/deviceClasses/0/deviceSelector/paths/1", "value": "/dev/sdc"}]'
+    ```
+
+    If the device is in `optionalPaths`:
+
+    ```bash
+    oc patch lvmcluster <LVMCLUSTER_NAME> -n openshift-lvm-storage --type='json' \
+      -p='[{"op": "replace", "path": "/spec/storage/deviceClasses/0/deviceSelector/optionalPaths/1", "value": "/dev/sdc"}]'
+    ```
+
+    Adjust the JSON path index to match the position of the replaced device in the array.
+
+    The VG Manager will detect the restored health and update the status to `Ready`.
+
+### Scenario C: Reduce VG without replacement
+
+Use this procedure when a replacement device is not available and you want to continue operating with reduced capacity and redundancy.
+
+> **Warning:** This permanently removes the failed device and any RAID legs that resided on it. For raid1 with 2 devices, this leaves existing LVs with no redundancy. For raid5 with the minimum number of devices, existing LVs lose all parity protection. New LVs cannot be created with RAID protection if the device count falls below the RAID minimum.
+
+1. Remove the missing PV and any partial LV legs:
+
+    ```bash
+    vgreduce --removemissing --force <VG_NAME>
+    ```
+
+    The `--force` flag is required here because RAID sub-LV legs still reference the missing PV. Without `--force`, LVM refuses to remove a PV that has LV segments on it. In Scenarios A and B, `--force` is avoided by repairing the RAID LVs first (moving legs off the missing PV), so that `vgreduce --removemissing` finds no remaining segments.
+
+2. Verify the volume group is consistent:
+
+    ```bash
+    vgs <VG_NAME> -o vg_name,vg_attr,vg_size,vg_free,vg_missing_pv_count
+    pvs -o pv_name,vg_name,pv_attr,pv_size
+    lvs -a <VG_NAME> -o lv_name,lv_attr,lv_health_status,raid_sync_percent
+    ```
+
+    `vg_missing_pv_count` should be 0.
+
+3. Update the `LVMCluster` CR to remove the failed device path:
+
+    First, check whether the failed device is listed under `paths` or `optionalPaths`:
+
+    ```bash
+    oc get lvmcluster <LVMCLUSTER_NAME> -n openshift-lvm-storage -o jsonpath='{.spec.storage.deviceClasses[0].deviceSelector}'
+    ```
+
+    Then patch the correct field. If the device is in `paths`:
+
+    ```bash
+    oc patch lvmcluster <LVMCLUSTER_NAME> -n openshift-lvm-storage --type='json' \
+      -p='[{"op": "remove", "path": "/spec/storage/deviceClasses/0/deviceSelector/paths/1"}]'
+    ```
+
+    If the device is in `optionalPaths`:
+
+    ```bash
+    oc patch lvmcluster <LVMCLUSTER_NAME> -n openshift-lvm-storage --type='json' \
+      -p='[{"op": "remove", "path": "/spec/storage/deviceClasses/0/deviceSelector/optionalPaths/1"}]'
+    ```
+
+    Adjust the JSON path index to match the position of the failed device in the array. At least one device must remain across `paths` and `optionalPaths` combined.
+
+    The VG Manager will detect the updated state and reconcile. Note that the device class now operates with reduced capacity and redundancy.
+
+### Monitoring resync progress
+
+After a repair, LVM resynchronizes data across the RAID legs. This process competes with normal I/O and may take a significant amount of time depending on the volume size and I/O load.
+
+Monitor resync progress from the node:
+
+```bash
+lvs <VG_NAME> -o lv_name,raid_sync_percent,raid_sync_action
+```
+
+Or check the `LVMVolumeGroupNodeStatus` CR:
+
+```bash
+oc get lvmvolumegroupnodestatus -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .spec.nodeStatus[*]}  {.name}: {.raidStatus.status}{"\n"}{range .raidStatus.lvHealth[*]}    {.name}: sync={.syncPercent}% health={.healthStatus}{"\n"}{end}{end}{end}'
+```
+
+The `RAIDSyncSlow` alert fires if any RAID LV has been resynchronizing for more than 30 minutes.

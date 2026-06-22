@@ -57,7 +57,7 @@ spec:
         severity: critical
     - alert: ThinPoolMetaDataUsageAtThresholdNearFull
       annotations:
-        description: Thin pool metadata utitlization in the VolumeGroup is nearing
+        description: Thin pool metadata utilization in the VolumeGroup is nearing
           full. Data deletion or thin pool expansion is required.
         message: Thin Pool metadata utilization in the VolumeGroup {{ $labels.device_class
           }} has crossed 75 % on node {{ $labels.node }}. Free up some space or expand
@@ -69,7 +69,7 @@ spec:
         severity: warning
     - alert: ThinPoolMetaDataUsageAtThresholdCritical
       annotations:
-        description: Thin pool metadata ultilization in the VolumeGroup is critically
+        description: Thin pool metadata utilization in the VolumeGroup is critically
           full. Data deletion or thin pool expansion is required.
         message: Thin Pool metadata utilization in the VolumeGroup {{ $labels.device_class
           }} has crossed 85 % on node {{ $labels.node }}. Free up some space or expand
@@ -79,3 +79,44 @@ spec:
       for: 5m
       labels:
         severity: critical
+  - name: raid-alert.rules
+    rules:
+    - alert: LVMSRAIDDegraded
+      annotations:
+        description: RAID array in device class {{ $labels.device_class }} on node
+          {{ $labels.node }} is degraded. One or more devices may have failed. Run
+          'lvs -o+sync_percent,lv_health_status' on the node to inspect and consult
+          the LVMS documentation for manual repair steps.
+        message: RAID array {{ $labels.device_class }} is degraded on node {{ $labels.node
+          }}.
+      expr: |
+        lvms_raid_health_status == 1
+      for: 1m
+      labels:
+        severity: critical
+    - alert: LVMSRAIDFailed
+      annotations:
+        description: RAID array in device class {{ $labels.device_class }} on node
+          {{ $labels.node }} has failed. Data may be at risk. Immediate manual intervention
+          is required. Run 'lvs -o+sync_percent,lv_health_status' on the node and
+          consult the LVMS documentation for recovery steps.
+        message: RAID array {{ $labels.device_class }} has failed on node {{ $labels.node
+          }}.
+      expr: |
+        lvms_raid_health_status == 2
+      for: 1m
+      labels:
+        severity: critical
+    - alert: LVMSRAIDSyncSlow
+      annotations:
+        description: RAID resynchronization in device class {{ $labels.device_class
+          }} on node {{ $labels.node }} has been running for more than 30m. This may
+          indicate a slow or failing device. Run 'lvs -o+sync_percent,raid_sync_action'
+          on the node to check progress.
+        message: RAID sync in {{ $labels.device_class }} on node {{ $labels.node }}
+          is taking longer than expected.
+      expr: |
+        lvms_raid_sync_in_progress == 1
+      for: 30m
+      labels:
+        severity: warning

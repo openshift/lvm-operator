@@ -43,6 +43,12 @@ func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lv
 		return false, err
 	}
 
+	if vg.Spec.RAIDConfig != nil {
+		if err := r.applyRAIDStatus(ctx, vg, status); err != nil {
+			return false, fmt.Errorf("failed to collect RAID status: %w", err)
+		}
+	}
+
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
@@ -52,9 +58,14 @@ func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alp
 		Status: lvmv1alpha1.VGStatusReady,
 	}
 
-	// Set devices for the VGStatus.
 	if _, err := r.setDevices(status, vgs, devices); err != nil {
 		return false, err
+	}
+
+	if vg.Spec.RAIDConfig != nil {
+		if err := r.applyRAIDStatus(ctx, vg, status); err != nil {
+			return false, fmt.Errorf("failed to collect RAID status: %w", err)
+		}
 	}
 
 	return r.setVolumeGroupStatus(ctx, vg, status)
@@ -67,12 +78,16 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 		Reason: err.Error(),
 	}
 
-	// Set devices for the VGStatus.
-	// If there is backing volume group, then set as degraded
 	if devicesExist, err := r.setDevices(status, vgs, devices); err != nil {
 		return false, fmt.Errorf("could not set devices in VGStatus: %w", err)
 	} else if devicesExist {
 		status.Status = lvmv1alpha1.VGStatusDegraded
+	}
+
+	if vg.Spec.RAIDConfig != nil {
+		if err := r.applyRAIDStatus(ctx, vg, status); err != nil {
+			return false, fmt.Errorf("failed to collect RAID status: %w", err)
+		}
 	}
 
 	return r.setVolumeGroupStatus(ctx, vg, status)
@@ -125,6 +140,10 @@ func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.L
 
 func (r *Reconciler) removeVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup) error {
 	logger := log.FromContext(ctx)
+
+	if vg.Spec.RAIDConfig != nil {
+		deleteRAIDMetrics(r.NodeName, vg.GetName())
+	}
 
 	// Get LVMVolumeGroupNodeStatus and remove the relevant VGStatus
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{
@@ -224,4 +243,28 @@ func (r *Reconciler) getLVMVolumeGroupNodeStatus() *lvmv1alpha1.LVMVolumeGroupNo
 			Namespace: r.Namespace,
 		},
 	}
+}
+
+// applyRAIDStatus queries logical volumes for the volume group and populates status with RAID health and metrics.
+func (r *Reconciler) applyRAIDStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) error {
+	lvReport, err := r.ListLVs(ctx, vg.GetName())
+	if err != nil {
+		return fmt.Errorf("failed to list logical volumes for RAID status: %w", err)
+	}
+
+	var allLVs []lvm.LogicalVolume
+	for _, report := range lvReport.Report {
+		allLVs = append(allLVs, report.Lv...)
+	}
+
+	raidStatus := buildRAIDStatus(allLVs, vg.Spec.RAIDConfig.Type)
+	if raidStatus != nil {
+		status.RAIDStatus = raidStatus
+		if raidStatus.Status == lvmv1alpha1.RAIDHealthStatusDegraded || raidStatus.Status == lvmv1alpha1.RAIDHealthStatusFailed {
+			status.Status = lvmv1alpha1.VGStatusDegraded
+		}
+	}
+
+	updateRAIDMetrics(r.NodeName, vg.GetName(), raidStatus)
+	return nil
 }

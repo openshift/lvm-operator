@@ -65,6 +65,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -193,6 +194,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	for _, c := range vgmanager.RAIDMetrics() {
+		ctrlmetrics.Registry.MustRegister(c)
 	}
 
 	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
