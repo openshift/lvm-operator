@@ -5428,7 +5428,10 @@ spec:
 		})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer func() {
-			pvName := getPVCVolumeName(testNamespace, pvcName)
+			// Get PV name before deleting PVC (only if PVC still exists)
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "-o=jsonpath={.spec.volumeName}", "--ignore-not-found")
+			output, _ := cmd.CombinedOutput()
+			pvName := strings.TrimSpace(string(output))
 			deleteSpecifiedResource("pvc", pvcName, testNamespace)
 			if pvName != "" {
 				cleanupLogicalVolumeByName(pvName)
