@@ -1,0 +1,28 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.22.0
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Minal Pradeep Makwana <mmakwana@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-22
+  snapshot: lvm-operator-4-22-20260620-091657-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
+
+        This erratum implements the following changes:
+
+        - Adds StorageClassOptions API to configure StorageClass parameters, labels, reclaimPolicy, and volumeBindingMode
+        - Adds Static and Dynamic device discovery modes for flexible device management
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        fixed:
+          - id: OCPSTRAT-2718
+            source: issues.redhat.com
+          - id: OCPSTRAT-1298
+            source: issues.redhat.com
