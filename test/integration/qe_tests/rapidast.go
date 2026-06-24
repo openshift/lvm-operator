@@ -67,6 +67,39 @@ func isARMCluster() bool {
 	return strings.Contains(archs, "arm64") || strings.Contains(archs, "aarch64")
 }
 
+func isDisconnectedCluster() bool {
+	// Get a node name to run the network probe
+	nodeCmd := exec.Command("oc", "get", "nodes", "-o=jsonpath={.items[0].metadata.name}")
+	nodeOutput, err := nodeCmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: failed to get node name: %v", err)
+		return false
+	}
+	nodeName := strings.TrimSpace(string(nodeOutput))
+	if nodeName == "" {
+		logf("Warning: no nodes found")
+		return false
+	}
+
+	// Network probe: curl an external URL from the node to check connectivity
+	probeCmd := exec.Command("oc", "debug", "node/"+nodeName, "--",
+		"chroot", "/host", "sh", "-c",
+		"curl -s --connect-timeout 5 https://fedoraproject.org/static/hotspot.txt &>/dev/null && echo Connected || echo Disconnected")
+	probeOutput, err := probeCmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: network probe failed: %v", err)
+		return false
+	}
+
+	result := strings.TrimSpace(string(probeOutput))
+	if strings.Contains(result, "Disconnected") {
+		logf("Detected disconnected cluster: network probe failed to reach external URL")
+		return true
+	}
+
+	return false
+}
+
 func createRapidastSA(ns string) error {
 	content, err := templateFS.ReadFile("testdata/rapidast_sa.yaml")
 	if err != nil {
@@ -395,6 +428,9 @@ func rapidastScan(ns, apiGroupName string) (bool, error) {
 var _ = g.Describe("[sig-storage] STORAGE", func() {
 
 	g.It("Author:mmakwana-[OTP][LVMS] lvm.topolvm.io API should pass RapiDAST security scan", g.Label("SNO", "MNO", "Serial"), func() {
+		if isDisconnectedCluster() {
+			g.Skip("RapiDAST requires internet access and cannot run on disconnected clusters")
+		}
 		if isARMCluster() {
 			g.Skip("RapiDAST image does not support ARM architecture")
 		}
