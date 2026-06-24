@@ -12,6 +12,9 @@ This is the LVM Operator, part of LVMS (Logical Volume Manager Storage) for Open
 
 | Document | Purpose |
 |----------|---------|
+| [docs/core-beliefs.md](docs/core-beliefs.md) | Non-negotiable design principles — read this first |
+| [docs/conventions/](docs/conventions/) | Implementation conventions enforced in review (split by area) |
+| [docs/decisions/](docs/decisions/index.md) | Architectural Decision Records (ADRs) — why the codebase looks the way it does |
 | [docs/architecture.md](docs/architecture.md) | Design rationale, component diagram, reconciliation lifecycle, CRD relationships, finalizer hierarchy |
 | [docs/design/lvm-operator-manager.md](docs/design/lvm-operator-manager.md) | LVM Operator Manager internals |
 | [docs/design/vg-manager.md](docs/design/vg-manager.md) | Volume Group Manager design |
@@ -55,7 +58,7 @@ Paths []string `json:"paths,omitempty"`
 
 ## Safety Considerations
 
-This operator manages physical storage and performs destructive LVM operations. Keep these in mind:
+This operator manages physical storage and performs destructive LVM operations. See [docs/core-beliefs.md](docs/core-beliefs.md) for non-negotiable invariants and [docs/conventions/](docs/conventions/) for implementation patterns.
 
 - **Data loss risk**: LVM operations can wipe disks. Verify device selectors carefully in tests.
 - **Idempotency**: controllers must handle partial states and retries safely. VG Manager reconciles every 30 seconds.
@@ -76,7 +79,7 @@ var _ = Describe("LVMCluster Controller", func() {
 })
 ```
 
-E2E tests are in `test/e2e/` and require a live cluster with available block devices. See [CONTRIBUTING.md](CONTRIBUTING.md) for build, deploy, and test commands.
+E2E tests are in `test/e2e/` and require a live cluster with available block devices. See [CONTRIBUTING.md](CONTRIBUTING.md) for build, deploy, and test commands. See [docs/conventions/testing.md](docs/conventions/testing.md) for testing conventions.
 
 ## Key Directories
 

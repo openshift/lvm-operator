@@ -189,6 +189,10 @@ Ideally the system should run for long periods of time in advance and then have 
 The test report will be generated in the working directory of the performance tests and will be a `.toml` file with broken down metrics on Pod and Container level.
 We include 90/95/99 Quantiles for Memory and CPU as our main metrics. Other metrics are not included in the tool and have to be manually fetched via prometheus.
 
+## Code Conventions
+
+See [docs/conventions/](docs/conventions/) for the full set of implementation conventions enforced in review, covering code style, reconciliation patterns, testing, device management, and build/CI.
+
 ## Commits Per Pull Request
 
 Pull requests should always represent a complete logical change. Where possible, pull requests should be composed of multiple commits that each make small but meaningful changes. Striking a balance between minimal commits and logically complete changes is an art as much as a science, but when it is possible and reasonable, divide your pull request into more commits.
