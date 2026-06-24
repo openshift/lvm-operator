@@ -5,4 +5,4 @@ GenerateMajorChannels: false
 GenerateMinorChannels: true
 Stable:
   Bundles:
-    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:7dfe7320f96cb7b2202d434524dd7c3545bb9c53ac2671e77f97f3e250bb4e35 # v4.21.0
+    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:142cf78fa4046592171d0433ad8be8fcff080e2a4ff7ea18c2bd750a55f99c6d # v4.21.0
