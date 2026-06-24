@@ -1,0 +1,36 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.21.1
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-21
+  snapshot: lvm-operator-4-21-20260623-150433-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
+
+        This erratum implements the following changes:
+
+        - Fixes stale LVMVolumeGroup node finalizers not being removed on node deletion
+        - Bumps gRPC-Go to 1.79.3 to address CVE-2026-33186 authorization bypass vulnerability
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        fixed:
+          - id: OCPBUGS-77655
+            source: issues.redhat.com
+          - id: OCPBUGS-76993
+            source: issues.redhat.com
+          - id: OCPBUGS-73786
+            source: issues.redhat.com
+          - id: OCPBUGS-69436
+            source: issues.redhat.com
+          - id: OCPBUGS-69442
+            source: issues.redhat.com
+          - id: OCPBUGS-30590
+            source: issues.redhat.com
