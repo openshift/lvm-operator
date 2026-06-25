@@ -75,6 +75,7 @@ const (
 	EventReasonErrorVGCreateOrExtendFailed       EventReasonError = "VGCreateOrExtendFailed"
 	EventReasonErrorThinPoolCreateOrExtendFailed EventReasonError = "ThinPoolCreateOrExtendFailed"
 	EventReasonErrorDevicePathCheckFailed        EventReasonError = "DevicePathCheckFailed"
+	EventReasonErrorRAIDHealthCheckFailed        EventReasonError = "RAIDHealthCheckFailed"
 	EventReasonErrorDeviceRemovalFailed          EventReasonError = "DeviceRemovalFailed"
 	EventReasonLVMDConfigMissing                 EventReasonInfo  = "LVMDConfigMissing"
 	EventReasonLVMDConfigUpdated                 EventReasonInfo  = "LVMDConfigUpdated"
@@ -169,6 +170,14 @@ func (r *Reconciler) reconcile(
 	vgs, err := r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
+	}
+
+	if err := r.checkRAIDVGHealth(vgs, volumeGroup); err != nil {
+		r.WarningEvent(ctx, volumeGroup, EventReasonErrorRAIDHealthCheckFailed, err)
+		if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
+			logger.Error(statusErr, "failed to set status to failed")
+		}
+		return reconcileAgain, nil
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
@@ -382,6 +391,12 @@ func (r *Reconciler) reconcile(
 }
 
 func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup, effectivePolicy lvmv1alpha1.DeviceDiscoveryPolicySpec) ctrl.Result {
+	// RAID device classes need periodic reconciliation to monitor health status,
+	// since disk failures are node-side events with no Kubernetes object change.
+	if volumeGroup.Spec.RAIDConfig != nil {
+		return reconcileAgain
+	}
+
 	// With explicit paths, no periodic requeue is needed — the paths define
 	// the exact set of devices. Changes to paths trigger reconciliation via
 	// the LVMVolumeGroup watch.
@@ -456,6 +471,7 @@ func (r *Reconciler) applyLVMDConfig(ctx context.Context, volumeGroup *lvmv1alph
 
 		if volumeGroup.Spec.RAIDConfig != nil {
 			dc.LVCreateOptions = buildRAIDLVCreateOptions(volumeGroup.Spec.RAIDConfig)
+			// TODO(OCPEDGE-2523): set dc.OverheadFactor once topolvm DeviceClass supports it
 		}
 
 		lvmdConfig.DeviceClasses = append(lvmdConfig.DeviceClasses, dc)
@@ -774,6 +790,28 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	return nil
 }
 
+// checkRAIDVGHealth returns an error if a RAID-configured volume group has missing physical volumes.
+func (r *Reconciler) checkRAIDVGHealth(
+	vgs []lvm.VolumeGroup,
+	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
+) error {
+	if volumeGroup.Spec.RAIDConfig == nil {
+		return nil
+	}
+
+	for _, vg := range vgs {
+		if vg.Name == volumeGroup.Name && vg.IsMissingDevices() {
+			return fmt.Errorf("RAID VG %s on node %s has missing physical volumes. "+
+				"Repair the volume group on the node (replace the failed device, run 'pvcreate' and 'vgextend' "+
+				"with the new device, then 'lvconvert --repair' for each degraded LV, and 'vgreduce --removemissing' "+
+				"to clean up), and update the LVMCluster CR with the correct device paths",
+				volumeGroup.Name, r.NodeName)
+		}
+	}
+
+	return nil
+}
+
 func (r *Reconciler) deleteRemovedDevices(
 	ctx context.Context,
 	currentVG *lvm.VolumeGroup,
@@ -829,8 +867,14 @@ func (r *Reconciler) deleteRemovedDevices(
 		return false, nil
 	}
 
-	if len(currentVG.PVs)-len(devicesToRemove) < 1 {
+	remainingCount := len(currentVG.PVs) - len(devicesToRemove)
+	if remainingCount < 1 {
 		return false, fmt.Errorf("devices can't be deleted from VG %s because after deletion there will be less than 1 device in VG", volumeGroup.Name)
+	}
+	if volumeGroup.Spec.RAIDConfig != nil {
+		if err := validateRAIDDeviceCount(volumeGroup.Spec.RAIDConfig, remainingCount); err != nil {
+			return false, fmt.Errorf("devices can't be deleted from VG %s: %w", volumeGroup.Name, err)
+		}
 	}
 
 	logger.Info("Detected devices to be removed", "devices", devicesToRemove)

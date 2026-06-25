@@ -17,5 +17,10 @@
 
     // alert durations
     thinPoolUsageThresholdAlertTime: '5m',
+
+    // RAID alert durations
+    raidDegradedAlertTime: '1m',
+    raidFailedAlertTime: '1m',
+    raidSyncSlowAlertTime: '30m',
   },
 }

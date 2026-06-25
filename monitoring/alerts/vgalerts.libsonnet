@@ -75,7 +75,7 @@
               severity: 'warning',
             },
             annotations: {
-              description: 'Thin pool metadata utitlization in the VolumeGroup is nearing full. Data deletion or thin pool expansion is required.',
+              description: 'Thin pool metadata utilization in the VolumeGroup is nearing full. Data deletion or thin pool expansion is required.',
               message: 'Thin Pool metadata utilization in the VolumeGroup {{ $labels.device_class }} has crossed %.0f %% on node {{ $labels.node }}. Free up some space or expand the thin pool.' % ($._config.thinPoolUsageThresholdNearFull),
             },
           },
@@ -89,7 +89,7 @@
               severity: 'critical',
             },
             annotations: {
-              description: 'Thin pool metadata ultilization in the VolumeGroup is critically full. Data deletion or thin pool expansion is required.',
+              description: 'Thin pool metadata utilization in the VolumeGroup is critically full. Data deletion or thin pool expansion is required.',
               message: 'Thin Pool metadata utilization in the VolumeGroup {{ $labels.device_class }} has crossed %.0f %% on node {{ $labels.node }}. Free up some space or expand the thin pool immediately.' % ($._config.thinPoolUsageThresholdCritical),
             },
           },

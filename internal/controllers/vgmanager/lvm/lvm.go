@@ -63,6 +63,10 @@ var (
 		"metadata_percent",
 		"chunk_size",
 		"lv_metadata_size",
+		"sync_percent",
+		"lv_health_status",
+		"lv_layout",
+		"raid_sync_action",
 	}
 )
 
@@ -102,6 +106,10 @@ type LogicalVolume struct {
 	MetadataPercent string `json:"metadata_percent"`
 	ChunkSize       string `json:"chunk_size"`
 	MetadataSize    string `json:"lv_metadata_size"`
+	RAIDSyncPercent string `json:"sync_percent"`
+	LVHealthStatus  string `json:"lv_health_status"`
+	LVLayout        string `json:"lv_layout"`
+	RAIDSyncAction  string `json:"raid_sync_action"`
 }
 
 type LVM interface {

@@ -271,6 +271,8 @@ Recovery from a failed device is a manual process. The operator does not perform
 
 During rebuild (steps 3–5), I/O performance degrades as the array resynchronizes data. The rebuild progress is visible in the `raidStatus.lvHealth[].syncPercent` field. LVM does not expose rebuild throttling controls — the resync competes with normal I/O.
 
+For detailed step-by-step recovery procedures with commands covering device replacement (same path and different path) and VG reduction without replacement, see the [RAID Recovery section in the Troubleshooting Guide](../troubleshooting.md#recovery-from-raid-device-failure).
+
 #### Initial Sync
 
 When a RAID logical volume is created, LVM performs an initial sync to establish parity or mirror consistency. This can be slow for large devices and affects initial provisioning latency. LVM supports a `--nosync` flag to skip this for raid1, raid4, raid5, and raid10 (not supported for raid6). This implementation does not expose `--nosync` — initial sync is always performed to ensure data integrity from the start. A future enhancement could expose this as an option for environments where devices are known-clean.
