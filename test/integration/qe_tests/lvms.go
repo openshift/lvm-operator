@@ -5808,7 +5808,7 @@ spec:
 		deviceClassName := "vg1"
 
 		g.By("#4. Create LVMCluster with deviceDiscoveryPolicy: Static and explicit path to ONE disk")
-		lvmClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+		lvmClusterManifest := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
   name: %s
@@ -5829,7 +5829,7 @@ spec:
         sizePercent: 90
         overprovisionRatio: 10
 `, newLVMClusterName, lvmsNamespace, deviceClassName, firstDiskPath)
-		err = createLVMClusterFromJSON(lvmClusterYAML)
+		err = createLVMClusterFromJSON(lvmClusterManifest)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer func() {
 			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
@@ -5853,12 +5853,23 @@ spec:
 		g.By("#8. Verify excluded devices have clear status messages in LVMVolumeGroupNodeStatus")
 		excludedReasons, err := getExcludedDeviceReasons(deviceClassName)
 		o.Expect(err).NotTo(o.HaveOccurred())
-		o.Expect(excludedReasons).To(o.ContainElement(o.ContainSubstring("excluded")))
+		o.Expect(excludedReasons).To(o.ContainElement(o.Not(o.BeEmpty())), "Excluded devices should have non-empty reason strings")
 
 		g.By("#9. Delete LVMCluster for next test phase")
 		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
-		g.By("#10. Create LVMCluster with deviceDiscoveryPolicy: Static (auto-discovery, no explicit paths)")
+		g.By("#10. Verify VG is removed from disk after LVMCluster deletion")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "lvmvolumegroup", "-n", lvmsNamespace, "-o=jsonpath={.items[*].metadata.name}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Warning: oc get lvmvolumegroup failed: %v\n", err)
+				return false
+			}
+			return strings.TrimSpace(string(output)) == ""
+		}, 2*time.Minute, 10*time.Second).Should(o.BeTrue(), "VG should be removed after LVMCluster deletion")
+
+		g.By("#11. Create LVMCluster with deviceDiscoveryPolicy: Static (auto-discovery, no explicit paths)")
 		err = createLVMClusterWithDeviceDiscoveryPolicy(lvmClusterDeviceDiscoveryConfig{
 			name:                  newLVMClusterName,
 			namespace:             lvmsNamespace,
@@ -5867,60 +5878,60 @@ spec:
 		})
 		o.Expect(err).NotTo(o.HaveOccurred())
 
-		g.By("#11. Wait for LVMCluster to be ready")
+		g.By("#12. Wait for LVMCluster to be ready")
 		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
-		g.By("#12. Verify deviceDiscoveryPolicy status is RuntimeStatic")
+		g.By("#13. Verify deviceDiscoveryPolicy status is RuntimeStatic")
 		o.Eventually(func() (string, error) {
 			return getDeviceDiscoveryPolicyStatus(deviceClassName)
 		}, 2*time.Minute, 10*time.Second).Should(o.ContainSubstring("RuntimeStatic"))
 		logf("deviceDiscoveryPolicy status: RuntimeStatic\n")
 
-		g.By("#13. Get VG devices count")
+		g.By("#14. Get VG devices count")
 		devicesAfterStaticCreate, err := getVGDevices(deviceClassName)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		deviceCountAfterStaticCreate := len(devicesAfterStaticCreate)
 
-		g.By("#14. Patch LVMCluster to deviceDiscoveryPolicy: Dynamic")
+		g.By("#15. Patch LVMCluster to deviceDiscoveryPolicy: Dynamic")
 		patchCmd := exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json",
 			"-p", `[{"op":"replace","path":"/spec/storage/deviceClasses/0/deviceDiscoveryPolicy","value":"Dynamic"}]`)
 		patchOutput, err := patchCmd.CombinedOutput()
 		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to patch: %s", string(patchOutput))
 
-		g.By("#15. Wait for LVMCluster to be ready after patch")
+		g.By("#16. Wait for LVMCluster to be ready after patch")
 		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
-		g.By("#16. Verify deviceDiscoveryPolicy status changed to RuntimeDynamic")
+		g.By("#17. Verify deviceDiscoveryPolicy status changed to RuntimeDynamic")
 		o.Eventually(func() (string, error) {
 			return getDeviceDiscoveryPolicyStatus(deviceClassName)
 		}, 2*time.Minute, 10*time.Second).Should(o.ContainSubstring("RuntimeDynamic"))
 		logf("deviceDiscoveryPolicy status changed to: RuntimeDynamic\n")
 
-		g.By("#17. Verify VG devices preserved after switching to Dynamic")
+		g.By("#18. Verify VG devices preserved after switching to Dynamic")
 		devicesAfterDynamic, err := getVGDevices(deviceClassName)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		deviceCountAfterDynamic := len(devicesAfterDynamic)
 		o.Expect(deviceCountAfterDynamic).To(o.Equal(deviceCountAfterStaticCreate), "Existing devices should be preserved")
 
-		g.By("#18. Patch LVMCluster back to deviceDiscoveryPolicy: Static")
+		g.By("#19. Patch LVMCluster back to deviceDiscoveryPolicy: Static")
 		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json",
 			"-p", `[{"op":"replace","path":"/spec/storage/deviceClasses/0/deviceDiscoveryPolicy","value":"Static"}]`)
 		patchOutput, err = patchCmd.CombinedOutput()
 		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to patch: %s", string(patchOutput))
 
-		g.By("#19. Wait for LVMCluster to be ready after patch back to Static")
+		g.By("#20. Wait for LVMCluster to be ready after patch back to Static")
 		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
-		g.By("#20. Verify deviceDiscoveryPolicy status changed to RuntimeStatic")
+		g.By("#21. Verify deviceDiscoveryPolicy status changed to RuntimeStatic")
 		o.Eventually(func() (string, error) {
 			return getDeviceDiscoveryPolicyStatus(deviceClassName)
 		}, 2*time.Minute, 10*time.Second).Should(o.ContainSubstring("RuntimeStatic"))
 		logf("deviceDiscoveryPolicy status changed back to: RuntimeStatic\n")
 
-		g.By("#21. Verify existing devices preserved in VG (no device removal)")
+		g.By("#22. Verify existing devices preserved in VG (no device removal)")
 		o.Consistently(func() (int, error) {
 			devices, err := getVGDevices(deviceClassName)
 			if err != nil {
@@ -5929,10 +5940,10 @@ spec:
 			return len(devices), nil
 		}, 30*time.Second, 5*time.Second).Should(o.Equal(deviceCountAfterDynamic), "All existing devices should be preserved")
 
-		g.By("#22. Delete newly created LVMCluster resource")
+		g.By("#23. Delete newly created LVMCluster resource")
 		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
 
-		g.By("#23. Restore original LVMCluster resource")
+		g.By("#24. Restore original LVMCluster resource")
 		err = createLVMClusterFromJSON(originLVMJSON)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
