@@ -14,11 +14,12 @@ MIRROR_MAP=(
 )
 
 usage() {
-    echo "Usage: $0 [--json] --bundle <image-ref> | --catalog <image-ref>"
+    echo "Usage: $0 [--json] --image <image-ref> | --bundle <image-ref> | --catalog <image-ref>"
     echo ""
     echo "Check Go toolchain version used to compile binaries in LVMS images."
     echo ""
     echo "Options:"
+    echo "  --image <ref>    Check Go version directly on a single container image"
     echo "  --bundle <ref>   Inspect a bundle image and check Go version on its related images"
     echo "  --catalog <ref>  Inspect a catalog image, extract the latest bundle, and check Go versions"
     echo "  --json           Output results as JSON"
@@ -200,6 +201,11 @@ get_related_images_from_catalog() {
 main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --image)
+                MODE="image"
+                IMAGE_REF="$2"
+                shift 2
+                ;;
             --bundle)
                 MODE="bundle"
                 IMAGE_REF="$2"
@@ -231,31 +237,44 @@ main() {
     check_tools
     WORK_DIR=$(mktemp -d)
 
-    local images=()
     local input_labels input_version input_commit
     input_labels=$(inspect_image_labels "${IMAGE_REF}")
     input_version=$(echo "${input_labels}" | cut -d'|' -f1)
     input_commit=$(echo "${input_labels}" | cut -d'|' -f2)
     echo >&2 "${MODE^} version: ${input_version} (commit: ${input_commit:0:12})"
-    echo >&2 "Extracting image references from ${MODE}: ${IMAGE_REF}"
 
-    if [[ "${MODE}" == "bundle" ]]; then
+    local images=()
+    if [[ "${MODE}" == "image" ]]; then
+        images+=("${IMAGE_REF}")
+    elif [[ "${MODE}" == "bundle" ]]; then
+        echo >&2 "Extracting image references from bundle: ${IMAGE_REF}"
         while IFS= read -r img; do
             images+=("${img}")
         done < <(get_related_images_from_bundle "${IMAGE_REF}")
+        if [[ ${#images[@]} -eq 0 ]]; then
+            echo >&2 "Error: no related images found. Is this really a bundle image?"
+            exit 1
+        fi
     else
+        echo >&2 "Extracting image references from catalog: ${IMAGE_REF}"
         while IFS= read -r img; do
             images+=("${img}")
         done < <(get_related_images_from_catalog "${IMAGE_REF}")
+        if [[ ${#images[@]} -eq 0 ]]; then
+            echo >&2 "Error: no related images found. Is this really a catalog image?"
+            exit 1
+        fi
     fi
 
     local results=()
     for img in "${images[@]}"; do
-        if ! is_lvms_image "${img}"; then
-            continue
-        fi
-        if [[ "${img}" == *"operator-bundle"* ]]; then
-            continue
+        if [[ "${MODE}" != "image" ]]; then
+            if ! is_lvms_image "${img}"; then
+                continue
+            fi
+            if [[ "${img}" == *"operator-bundle"* ]]; then
+                continue
+            fi
         fi
         echo >&2 "Checking: ${img}"
         while IFS= read -r result; do
