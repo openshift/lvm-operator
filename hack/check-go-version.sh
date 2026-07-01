@@ -3,6 +3,7 @@ set -euo pipefail
 
 WORK_DIR=""
 JSON_OUTPUT=false
+ALL_VERSIONS=false
 MODE=""
 IMAGE_REF=""
 
@@ -22,6 +23,7 @@ usage() {
     echo "  --image <ref>    Check Go version directly on a single container image"
     echo "  --bundle <ref>   Inspect a bundle image and check Go version on its related images"
     echo "  --catalog <ref>  Inspect a catalog image, extract the latest bundle, and check Go versions"
+    echo "  --all            With --catalog, check the latest bundle of each minor version"
     echo "  --json           Output results as JSON"
     echo "  --help           Show this help message"
     exit 1
@@ -170,7 +172,7 @@ get_related_images_from_bundle() {
     rm -rf "${manifests}"
 }
 
-get_related_images_from_catalog() {
+extract_catalog_json() {
     local image="$1"
     local pulled_ref
     pulled_ref=$(pull_image "${image}") || return 1
@@ -186,6 +188,13 @@ get_related_images_from_catalog() {
         echo >&2 "Error: catalog.json not found in image"
         return 1
     fi
+    echo "${catalog_json}"
+}
+
+get_related_images_from_catalog() {
+    local image="$1"
+    local catalog_json
+    catalog_json=$(extract_catalog_json "${image}") || return 1
 
     local latest_bundle
     latest_bundle=$(jq -s '[.[] | select(.schema == "olm.bundle")] | sort_by(.name | split(".v") | .[1] | split(".") | map(tonumber)) | last' "${catalog_json}")
@@ -195,6 +204,29 @@ get_related_images_from_catalog() {
     echo >&2 "Latest bundle: ${bundle_name}"
 
     echo "${latest_bundle}" | jq -r '.relatedImages[].image'
+    rm -f "${catalog_json}"
+}
+
+get_related_images_from_catalog_all() {
+    local image="$1"
+    local catalog_json
+    catalog_json=$(extract_catalog_json "${image}") || return 1
+
+    # Group bundles by minor version, pick the latest z-stream from each
+    local selected_bundles
+    selected_bundles=$(jq -s '
+        [.[] | select(.schema == "olm.bundle")]
+        | group_by(.name | split(".v") | .[1] | split(".") | .[0:2] | join("."))
+        | map(sort_by(.name | split(".v") | .[1] | split(".") | map(tonumber)) | last)
+    ' "${catalog_json}")
+
+    local bundle_names
+    bundle_names=$(echo "${selected_bundles}" | jq -r '.[].name')
+    echo >&2 "Selected bundles (latest per minor version):"
+    echo "${bundle_names}" | while read -r name; do echo >&2 "  ${name}"; done
+
+    # Collect all unique related images across selected bundles
+    echo "${selected_bundles}" | jq -r '[.[].relatedImages[].image] | unique[]'
     rm -f "${catalog_json}"
 }
 
@@ -215,6 +247,10 @@ main() {
                 MODE="catalog"
                 IMAGE_REF="$2"
                 shift 2
+                ;;
+            --all)
+                ALL_VERSIONS=true
+                shift
                 ;;
             --json)
                 JSON_OUTPUT=true
@@ -257,9 +293,15 @@ main() {
         fi
     else
         echo >&2 "Extracting image references from catalog: ${IMAGE_REF}"
-        while IFS= read -r img; do
-            images+=("${img}")
-        done < <(get_related_images_from_catalog "${IMAGE_REF}")
+        if [[ "${ALL_VERSIONS}" == "true" ]]; then
+            while IFS= read -r img; do
+                images+=("${img}")
+            done < <(get_related_images_from_catalog_all "${IMAGE_REF}")
+        else
+            while IFS= read -r img; do
+                images+=("${img}")
+            done < <(get_related_images_from_catalog "${IMAGE_REF}")
+        fi
         if [[ ${#images[@]} -eq 0 ]]; then
             echo >&2 "Error: no related images found. Is this really a catalog image?"
             exit 1
