@@ -199,9 +199,6 @@ func (lvm *lvmCluster) deleteSafely() {
 }
 
 func (lvm *lvmCluster) createWithMultiDeviceClasses() error {
-	// Creates LVMCluster with vg1 as thin provisioning and vg2 as thick provisioning
-	// vg1: has thinPoolConfig (supports snapshots)
-	// vg2: NO thinPoolConfig (thick provisioning, no snapshot support)
 	lvmClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
@@ -222,6 +219,10 @@ spec:
         forceWipeDevicesAndDestroyAllData: true
     - name: %s
       fstype: %s
+      thinPoolConfig:
+        name: thin-pool-2
+        sizePercent: 90
+        overprovisionRatio: 10
       deviceSelector:
         paths:
         - %s
