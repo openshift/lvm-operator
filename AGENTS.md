@@ -14,6 +14,8 @@ This is the LVM Operator, part of LVMS (Logical Volume Manager Storage) for Open
 |----------|---------|
 | [docs/core-beliefs.md](docs/core-beliefs.md) | Non-negotiable design principles — read this first |
 | [docs/conventions/](docs/conventions/) | Implementation conventions enforced in review (split by area) |
+| [docs/domain/glossary.md](docs/domain/glossary.md) | LVMS terminology — canonical definitions matching Go types and CRD fields |
+| [docs/domain/concepts.md](docs/domain/concepts.md) | How LVMS concepts relate — resource flow, filter chain, reconciliation, deletion |
 | [docs/decisions/](docs/decisions/index.md) | Architectural Decision Records (ADRs) — why the codebase looks the way it does |
 | [docs/architecture.md](docs/architecture.md) | Design rationale, component diagram, reconciliation lifecycle, CRD relationships, finalizer hierarchy |
 | [docs/design/lvm-operator-manager.md](docs/design/lvm-operator-manager.md) | LVM Operator Manager internals |
