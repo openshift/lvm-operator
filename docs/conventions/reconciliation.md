@@ -11,7 +11,7 @@ For design principles, see [core-beliefs.md](../core-beliefs.md). For architectu
 - Rely on Kubernetes optimistic concurrency (`resourceVersion` conflicts) for concurrent status updates from multiple VG Manager pods. (#72)
 - Don't use `errgroup` — it cancels context on first error. Use raw goroutines with a results channel and `errors.Join`. (#391)
 - After wiping devices, return early. Let the next reconcile re-list — immediate re-listing returns stale data. (#778)
-- Both controllers currently requeue periodically on success (LVMCluster at 1min, VGManager at 30s). This was debated in PR #898 — qJkee objected to unconditional requeue but it remains as a safety net for missed watch events. (#898)
+- LVMCluster requeues every 1 minute unconditionally on success. VG Manager requeue is conditional: RAID device classes requeue every 30s (health monitoring), Dynamic discovery requeues every 30s, and explicit paths with Static policy do not periodically requeue. (#898)
 - Don't fail-fast on multi-node operations. Continue for healthy nodes, aggregate errors. Defer error checks past loops when early failure would penalize healthy nodes. (#898)
 - Platform detection (OpenShift vs K8s) runs once at startup by checking the Infrastructure API (`internal/cluster/type.go`). MicroShift is detected via the `microshift-version` ConfigMap if Infrastructure API is unavailable. `IsNotFound`/`IsNoMatchError` are non-fatal; other detection errors are fatal at startup. (#38, #399)
 - RBAC must include `watch`+`list` verbs even when not explicitly watching — controller-runtime informer cache requires them. (#45)
