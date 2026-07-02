@@ -6,6 +6,7 @@ JSON_OUTPUT=false
 ALL_VERSIONS=false
 MODE=""
 IMAGE_REF=""
+CONTAINER_IDS=()
 
 MIRROR_MAP=(
     "registry.redhat.io/lvms4/lvms-rhel9-operator=quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator"
@@ -30,6 +31,9 @@ usage() {
 }
 
 cleanup() {
+    for cid in "${CONTAINER_IDS[@]}"; do
+        podman rm "${cid}" >/dev/null 2>&1 || true
+    done
     if [[ -n "${WORK_DIR}" && -d "${WORK_DIR}" ]]; then
         rm -rf "${WORK_DIR}"
     fi
@@ -78,7 +82,7 @@ inspect_image_labels() {
     fi
     local version commit
     version=$(echo "${labels}" | jq -r '."konflux.additional-tags" // .version // "unknown"')
-    commit=$(echo "${labels}" | jq -r '."vcs-ref" // ."org.opencontainers.image.revision" // "unknown"')
+    commit=$(echo "${labels}" | jq -r '."vcs-ref" // ."upstream-vcs-ref" // ."org.opencontainers.image.revision" // "unknown"')
     echo "${version}|${commit}"
 }
 
@@ -116,6 +120,7 @@ check_go_version_in_image() {
         echo >&2 "  Error: failed to create container from ${pulled_ref}"
         return 1
     }
+    CONTAINER_IDS+=("${cid}")
 
     local bindir="${WORK_DIR}/bins"
     mkdir -p "${bindir}"
@@ -136,7 +141,6 @@ check_go_version_in_image() {
     done
 
     rm -rf "${bindir}"
-    podman rm "${cid}" >/dev/null 2>&1 || true
 
     if [[ "${found}" == "false" ]]; then
         echo "${image}|(none)|(no Go binaries found)|${img_version}|${img_commit}"
@@ -154,12 +158,15 @@ get_related_images_from_bundle() {
     pulled_ref=$(pull_image "${image}") || return 1
 
     local cid
-    cid=$(podman create "${pulled_ref}" 2>/dev/null)
+    cid=$(podman create "${pulled_ref}" 2>/dev/null) || {
+        echo >&2 "  Error: failed to create container from ${pulled_ref}"
+        return 1
+    }
+    CONTAINER_IDS+=("${cid}")
 
     local manifests="${WORK_DIR}/manifests"
     mkdir -p "${manifests}"
     podman cp "${cid}:/manifests" "${manifests}/" 2>/dev/null
-    podman rm "${cid}" >/dev/null 2>&1
 
     local csv
     csv=$(find "${manifests}" -name "*.clusterserviceversion.yaml" | head -1)
@@ -178,11 +185,14 @@ extract_catalog_json() {
     pulled_ref=$(pull_image "${image}") || return 1
 
     local cid
-    cid=$(podman create "${pulled_ref}" 2>/dev/null)
+    cid=$(podman create "${pulled_ref}" 2>/dev/null) || {
+        echo >&2 "  Error: failed to create container from ${pulled_ref}"
+        return 1
+    }
+    CONTAINER_IDS+=("${cid}")
 
     local catalog_json="${WORK_DIR}/catalog.json"
     podman cp "${cid}:/configs/lvms-operator/catalog.json" "${catalog_json}" 2>/dev/null
-    podman rm "${cid}" >/dev/null 2>&1
 
     if [[ ! -f "${catalog_json}" ]]; then
         echo >&2 "Error: catalog.json not found in image"
@@ -197,7 +207,7 @@ get_related_images_from_catalog() {
     catalog_json=$(extract_catalog_json "${image}") || return 1
 
     local latest_bundle
-    latest_bundle=$(jq -s '[.[] | select(.schema == "olm.bundle")] | sort_by(.name | split(".v") | .[1] | split(".") | map(tonumber)) | last' "${catalog_json}")
+    latest_bundle=$(jq -s '[.[] | select(.schema == "olm.bundle")] | sort_by(.name | split(".v") | .[1] | split(".") | map(split("-") | .[0] | tonumber)) | last' "${catalog_json}")
 
     local bundle_name
     bundle_name=$(echo "${latest_bundle}" | jq -r '.name')
@@ -217,7 +227,7 @@ get_related_images_from_catalog_all() {
     selected_bundles=$(jq -s '
         [.[] | select(.schema == "olm.bundle")]
         | group_by(.name | split(".v") | .[1] | split(".") | .[0:2] | join("."))
-        | map(sort_by(.name | split(".v") | .[1] | split(".") | map(tonumber)) | last)
+        | map(sort_by(.name | split(".v") | .[1] | split(".") | map(split("-") | .[0] | tonumber)) | last)
     ' "${catalog_json}")
 
     local bundle_names
@@ -234,16 +244,19 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --image)
+                [[ $# -ge 2 ]] || usage
                 MODE="image"
                 IMAGE_REF="$2"
                 shift 2
                 ;;
             --bundle)
+                [[ $# -ge 2 ]] || usage
                 MODE="bundle"
                 IMAGE_REF="$2"
                 shift 2
                 ;;
             --catalog)
+                [[ $# -ge 2 ]] || usage
                 MODE="catalog"
                 IMAGE_REF="$2"
                 shift 2
@@ -270,6 +283,10 @@ main() {
         usage
     fi
 
+    if [[ "${ALL_VERSIONS}" == "true" && "${MODE}" != "catalog" ]]; then
+        echo >&2 "Warning: --all only applies to --catalog mode"
+    fi
+
     check_tools
     WORK_DIR=$(mktemp -d)
 
@@ -285,6 +302,7 @@ main() {
     elif [[ "${MODE}" == "bundle" ]]; then
         echo >&2 "Extracting image references from bundle: ${IMAGE_REF}"
         while IFS= read -r img; do
+            [[ -z "${img}" ]] && continue
             images+=("${img}")
         done < <(get_related_images_from_bundle "${IMAGE_REF}")
         if [[ ${#images[@]} -eq 0 ]]; then
@@ -295,10 +313,12 @@ main() {
         echo >&2 "Extracting image references from catalog: ${IMAGE_REF}"
         if [[ "${ALL_VERSIONS}" == "true" ]]; then
             while IFS= read -r img; do
+                [[ -z "${img}" ]] && continue
                 images+=("${img}")
             done < <(get_related_images_from_catalog_all "${IMAGE_REF}")
         else
             while IFS= read -r img; do
+                [[ -z "${img}" ]] && continue
                 images+=("${img}")
             done < <(get_related_images_from_catalog "${IMAGE_REF}")
         fi
