@@ -1,0 +1,93 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(**/zz_generated*)",
+      "Write(**/zz_generated*)",
+      "Edit(config/crd/bases/**)",
+      "Write(config/crd/bases/**)",
+      "Edit(vendor/**)",
+      "Write(vendor/**)",
+      "Bash(wipefs *)",
+      "Bash(* wipefs *)",
+      "Bash(vgremove *)",
+      "Bash(* vgremove *)",
+      "Bash(pvremove *)",
+      "Bash(* pvremove *)",
+      "Bash(lvremove *)",
+      "Bash(* lvremove *)",
+      "Bash(mkfs *)",
+      "Bash(* mkfs *)",
+      "Bash(dd *)",
+      "Bash(* dd if=*)",
+      "Bash(* dd of=*)",
+      "Bash(rm -rf *)",
+      "Bash(* rm -rf *)"
+    ],
+    "allow": [
+      "Read(*)",
+      "Bash(make generate)",
+      "Bash(make manifests)",
+      "Bash(make mocks)",
+      "Bash(make bundle)",
+      "Bash(make catalog)",
+      "Bash(make build)",
+      "Bash(make test *)",
+      "Bash(make test)",
+      "Bash(make docker-test *)",
+      "Bash(make docker-test)",
+      "Bash(make e2e *)",
+      "Bash(make e2e)",
+      "Bash(make lint)",
+      "Bash(make verify)",
+      "Bash(make fmt)",
+      "Bash(make vet)",
+      "Bash(go test ./...)",
+      "Bash(go test -v ./...)",
+      "Bash(go test -count=* ./...)",
+      "Bash(go test -run * ./...)",
+      "Bash(go test -v -run * ./...)",
+      "Bash(go test -v -count=* ./...)",
+      "Bash(go test -count=* -run * ./...)",
+      "Bash(go test -v -count=* -run * ./...)",
+      "Bash(go vet ./...)",
+      "Bash(go build ./...)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.content // .tool_input.new_string // empty' < /dev/stdin | grep -qE '(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN .*PRIVATE KEY-----)' && echo '🚫 Possible secret detected in edit. Review before proceeding.' >&2 && exit 2 || exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '⚠ API types modified. Run: make generate && make manifests && make bundle && make catalog'",
+            "if": "Edit(api/v1alpha1/*_types.go)"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FPATH=$(jq -r '.tool_input.file_path // empty' < /dev/stdin) && [ -n \"$FPATH\" ] && PKG=$(realpath --relative-to=. \"$(dirname \"$FPATH\")\" 2>/dev/null) && [ -n \"$PKG\" ] && go vet ./$PKG",
+            "if": "Edit({internal,api,cmd}/**/*.go)",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
