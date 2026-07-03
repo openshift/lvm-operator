@@ -49,7 +49,7 @@ $ lsblk --paths --json -o NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL
 6. **Devices with Bind Mounts:**
     - *Condition:* Devices with bind mounts are unsupported.
     - *Why:* Managing logical volumes becomes more complex when dealing with devices that have bind mounts, potentially causing conflicts or difficulties in maintaining the integrity of the logical volume setup.
-    - *Filter:* `cat /proc/1/mountinfo | grep <device-name>` returns mount points for the device in the 4th or 10th field.
+    - *Note:* No automated filter exists for bind mounts in the current filter chain. Users must avoid specifying bind-mounted devices in their DeviceSelector.
 
 7. **ROM Devices:**
     - *Condition:* Devices of type `rom` are unsupported.

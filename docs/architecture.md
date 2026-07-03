@@ -40,7 +40,7 @@ When a user creates an `LVMCluster` CR, the operator drives the system through t
 2. **VG Manager** (running as a privileged DaemonSet on each matching node) watches for `LVMVolumeGroup` CRs, discovers block devices matching the device selector, creates LVM physical volumes and volume groups, and optionally provisions thin pools.
 3. **Status reporting**: each VG Manager instance creates or updates an `LVMVolumeGroupNodeStatus` CR reflecting the volume group state on its node. The LVMCluster controller aggregates these to set the cluster-level status.
 
-The VG Manager reconciles every 30 seconds, making device discovery and volume group management eventually consistent.
+VG Manager periodic reconciliation depends on the configuration: RAID device classes requeue every 30 seconds for health monitoring, Dynamic discovery policy requeues every 30 seconds for device discovery, and explicit device paths with Static policy do not periodically requeue. The LVMCluster controller requeues every 1 minute unconditionally.
 
 ## Data Flow: PVC to Logical Volume
 
@@ -57,12 +57,12 @@ When a workload requests storage via a `PersistentVolumeClaim` using an LVMS `St
 ```
 LVMCluster (user-facing, singleton per namespace)
  └── LVMVolumeGroup (internal, one per device class)
-      └── LVMVolumeGroupNodeStatus (internal, one per node per device class)
+      └── LVMVolumeGroupNodeStatus (internal, one per node, contains per-VG status entries)
 ```
 
 - **LVMCluster**: the only CR users create directly. Defines device classes, device selectors, thin pool configuration, and node selectors. Only one LVMCluster is supported per cluster.
 - **LVMVolumeGroup**: created and managed by the LVMCluster controller. Represents a single volume group definition. Users do not create these directly.
-- **LVMVolumeGroupNodeStatus**: created by VG Manager on each node. Reports the actual state of the volume group including device list, excluded devices, and (if configured) RAID health status.
+- **LVMVolumeGroupNodeStatus**: created by VG Manager on each node (named after the node). Contains a list of `VGStatus` entries — one per volume group on that node — reporting device list, excluded devices, and (if configured) RAID health status. Note: the status data is in `.Spec.LVMVGStatus`, not `.Status`.
 
 ## API Version: v1alpha1
 
@@ -95,7 +95,7 @@ Due to OLM constraints, the webhook is scoped to the operator namespace (`opensh
 
 - **DaemonSet for node operations**: VG Manager runs as a privileged DaemonSet rather than using a Job-based model. This allows continuous device monitoring and idempotent reconciliation without scheduling overhead.
 - **Thin provisioning by default**: all volume groups use thin pools to enable snapshot and clone support. This introduces the thin/RAID flag conflict that prevents native LVM RAID (see README Known Limitations).
-- **Embedded lvmd**: the lvmd gRPC daemon from TopoLVM runs in-process within VG Manager, configured via a `lvmd.yaml` ConfigMap that VG Manager watches for changes.
+- **Embedded lvmd**: the lvmd gRPC daemon from TopoLVM runs in-process within VG Manager, configured via a file-based config at `/etc/topolvm/lvmd.yaml` on the host filesystem (a ConfigMap approach was tried and reverted — see [ADR-0009](decisions/0009-configmap-for-lvmd-config.md)).
 - **Node removal controller**: a dedicated controller watches for node deletions and cleans up orphaned `LVMVolumeGroupNodeStatus` resources, preventing stale status from accumulating.
 
 ## Further Reading

@@ -18,7 +18,7 @@ The previous StorageClass reconciliation used `CreateOrUpdate` with a mutate fun
 
 * Users must be able to set additional StorageClass parameters and labels without LVMS overwriting them.
 * LVMS must maintain ownership of critical parameters (`topolvm.io/device-class`, `csi.storage.k8s.io/fstype`) and managed labels — user values must never override these.
-* Day-2 changes (adding/removing parameters, toggling default SC annotation) must reconcile without requiring StorageClass deletion and recreation.
+* Day-2 changes (modifying `AdditionalLabels`, toggling default SC annotation) must reconcile without requiring StorageClass deletion and recreation. Note: `AdditionalParameters` is immutable after creation (CEL); only `AdditionalLabels` can be changed day-2.
 * Immutability of critical fields (reclaimPolicy, volumeBindingMode, fstype) must be enforced at the API level.
 
 ## Considered Options

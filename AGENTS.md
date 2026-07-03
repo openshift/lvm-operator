@@ -63,7 +63,7 @@ Paths []string `json:"paths,omitempty"`
 This operator manages physical storage and performs destructive LVM operations. See [docs/core-beliefs.md](docs/core-beliefs.md) for non-negotiable invariants and [docs/conventions/](docs/conventions/) for implementation patterns.
 
 - **Data loss risk**: LVM operations can wipe disks. Verify device selectors carefully in tests.
-- **Idempotency**: controllers must handle partial states and retries safely. VG Manager reconciles every 30 seconds.
+- **Idempotency**: controllers must handle partial states and retries safely. VG Manager requeue interval depends on configuration (RAID/Dynamic: 30s periodic; Static with explicit paths: no periodic requeue).
 - **Finalizers**: LVMS uses a three-level finalizer hierarchy to prevent orphaned storage. Never skip finalizer logic. See [docs/architecture.md](docs/architecture.md) for details.
 - **Privileged operations**: VG Manager runs as a privileged DaemonSet and executes LVM commands (`vgcreate`, `vgextend`, `lvcreate`, `wipefs`) directly on nodes.
 
@@ -89,7 +89,7 @@ E2E tests are in `test/e2e/` and require a live cluster with available block dev
 |------|----------|
 | `api/v1alpha1/` | CRD type definitions and webhook validation |
 | `cmd/` | Binary entrypoints (operator and vgmanager subcommands) |
-| `internal/controllers/` | Reconcilers: lvmcluster, vgmanager, persistent-volume, node removal |
+| `internal/controllers/` | Reconcilers: lvmcluster, vgmanager, persistent-volume, persistent-volume-claim, node removal |
 | `internal/controllers/lvmcluster/resource/` | Resource managers (DaemonSet, StorageClass, CSIDriver, etc.) |
 | `config/` | Kustomize overlays, CRD manifests, RBAC, samples |
 | `test/e2e/` | End-to-end test suite |
