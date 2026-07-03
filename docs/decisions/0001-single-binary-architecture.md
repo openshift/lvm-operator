@@ -1,9 +1,9 @@
 ---
-status: draft
-date: Pre-2023
-decision-makers: LVMS team
-consulted:
-informed:
+status: accepted
+date: 2022-07-01
+decision-makers: Bulat Zamalutdinov
+consulted: LVMS team
+informed: OpenShift storage team
 ---
 
 # Single Binary Architecture for Edge Deployment
@@ -20,16 +20,27 @@ LVMS depends on TopoLVM and several CSI sidecar components. The standard Kuberne
 
 ## Considered Options
 
-<!-- LVMS team: please fill in the alternatives that were discussed when this decision was made. Was multi-container deployment ever seriously evaluated? What made the team rule it out? -->
-
-1. TBD — requires LVMS team input on what alternatives were discussed
-2. Single binary with embedded TopoLVM and CSI sidecars
+1. **Multi-container deployment** — run TopoLVM controller, CSI sidecars, and the operator as separate Deployments/DaemonSets, each with its own container image.
+2. **Single binary with embedded TopoLVM and CSI sidecars** — compile TopoLVM controllers directly into the operator and vg-manager binaries using Go's `replace` directive.
 
 ## Decision Outcome
 
-Chosen option: single binary. See [architecture.md](../architecture.md) for full rationale.
+Chosen option: "Single binary with embedded TopoLVM and CSI sidecars", because:
+
+- Fewer pods reduce resource overhead on constrained edge nodes.
+- Startup is faster with no inter-deployment dependency chain.
+- A single binary simplifies upgrades and rollback — one image to build, test, and ship.
+- Version skew between TopoLVM and the operator is eliminated at compile time.
+
+### Consequences
+
+* Good, because edge clusters use fewer resources and start faster.
+* Good, because there is no version skew between operator and CSI driver.
+* Bad, because upstream TopoLVM changes require a downstream fork (`github.com/openshift/topolvm`) with a `replace` directive, adding merge overhead.
+* Bad, because debugging requires understanding that `cmd/main.go` multiplexes `operator` and `vgmanager` subcommands into one cobra root.
 
 ## More Information
 
 * [docs/architecture.md](../architecture.md) — "Why LVMS Embeds TopoLVM" section
+* [docs/upstream.md](../upstream.md) — upstream contribution workflow
 * `cmd/main.go` — single cobra root with `operator` and `vgmanager` subcommands
