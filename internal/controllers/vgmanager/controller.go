@@ -39,11 +39,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	corev1helper "k8s.io/component-helpers/scheduling/corev1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,7 +72,6 @@ const (
 	EventReasonErrorVGCreateOrExtendFailed       EventReasonError = "VGCreateOrExtendFailed"
 	EventReasonErrorThinPoolCreateOrExtendFailed EventReasonError = "ThinPoolCreateOrExtendFailed"
 	EventReasonErrorDevicePathCheckFailed        EventReasonError = "DevicePathCheckFailed"
-	EventReasonErrorRAIDHealthCheckFailed        EventReasonError = "RAIDHealthCheckFailed"
 	EventReasonErrorDeviceRemovalFailed          EventReasonError = "DeviceRemovalFailed"
 	EventReasonLVMDConfigMissing                 EventReasonInfo  = "LVMDConfigMissing"
 	EventReasonLVMDConfigUpdated                 EventReasonInfo  = "LVMDConfigUpdated"
@@ -170,14 +166,6 @@ func (r *Reconciler) reconcile(
 	vgs, err := r.ListVGs(ctx, true)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list volume groups: %w", err)
-	}
-
-	if err := r.checkRAIDVGHealth(vgs, volumeGroup); err != nil {
-		r.WarningEvent(ctx, volumeGroup, EventReasonErrorRAIDHealthCheckFailed, err)
-		if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
-			logger.Error(statusErr, "failed to set status to failed")
-		}
-		return reconcileAgain, nil
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
@@ -391,12 +379,6 @@ func (r *Reconciler) reconcile(
 }
 
 func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolumeGroup, effectivePolicy lvmv1alpha1.DeviceDiscoveryPolicySpec) ctrl.Result {
-	// RAID device classes need periodic reconciliation to monitor health status,
-	// since disk failures are node-side events with no Kubernetes object change.
-	if volumeGroup.Spec.RAIDConfig != nil {
-		return reconcileAgain
-	}
-
 	// With explicit paths, no periodic requeue is needed — the paths define
 	// the exact set of devices. Changes to paths trigger reconciliation via
 	// the LVMVolumeGroup watch.
@@ -790,28 +772,6 @@ func (r *Reconciler) addThinPoolToVG(ctx context.Context, vgName string, config 
 	return nil
 }
 
-// checkRAIDVGHealth returns an error if a RAID-configured volume group has missing physical volumes.
-func (r *Reconciler) checkRAIDVGHealth(
-	vgs []lvm.VolumeGroup,
-	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
-) error {
-	if volumeGroup.Spec.RAIDConfig == nil {
-		return nil
-	}
-
-	for _, vg := range vgs {
-		if vg.Name == volumeGroup.Name && vg.IsMissingDevices() {
-			return fmt.Errorf("RAID VG %s on node %s has missing physical volumes. "+
-				"Repair the volume group on the node (replace the failed device, run 'pvcreate' and 'vgextend' "+
-				"with the new device, then 'lvconvert --repair' for each degraded LV, and 'vgreduce --removemissing' "+
-				"to clean up), and update the LVMCluster CR with the correct device paths",
-				volumeGroup.Name, r.NodeName)
-		}
-	}
-
-	return nil
-}
-
 func (r *Reconciler) deleteRemovedDevices(
 	ctx context.Context,
 	currentVG *lvm.VolumeGroup,
@@ -980,66 +940,20 @@ func (r *Reconciler) verifyMetadataSize(ctx context.Context, vgName, lvName stri
 }
 
 func (r *Reconciler) matchesThisNode(ctx context.Context, selector *corev1.NodeSelector) (bool, error) {
-	node := &corev1.Node{}
-	err := r.Get(ctx, types.NamespacedName{Name: r.NodeName}, node)
-	if err != nil {
-		return false, err
-	}
-	if selector == nil {
-		return true, nil
-	}
-
-	matches, err := corev1helper.MatchNodeSelectorTerms(node, selector)
-	return matches, err
+	return matchesNode(ctx, r.Client, r.NodeName, selector)
 }
 
-// WarningEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
 func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonError, errMsg error) {
-	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
-	nodeStatus.SetName(r.NodeName)
-	nodeStatus.SetNamespace(r.Namespace)
-	// even if the get does not succeed we can still issue an event, just without UUID / resourceVersion
-	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err == nil {
-		r.Eventf(nodeStatus, nil, corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup", errMsg.Error())
-	}
-	for _, ref := range obj.GetOwnerReferences() {
-		owner := &v1.PartialObjectMetadata{}
-		owner.SetName(ref.Name)
-		owner.SetNamespace(obj.GetNamespace())
-		owner.SetUID(ref.UID)
-		owner.SetGroupVersionKind(schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind))
-		r.Eventf(owner, nil, corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup",
-			fmt.Errorf("error on node %s in volume group %s: %w",
-				client.ObjectKeyFromObject(nodeStatus), client.ObjectKeyFromObject(obj), errMsg).Error())
-	}
-	r.Eventf(obj, nil, corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup",
-		fmt.Errorf("error on node %s: %w", client.ObjectKeyFromObject(nodeStatus), errMsg).Error())
+	emitEventToVGAndOwners(ctx, r.Client, r.EventRecorder, r.NodeName, r.Namespace, obj,
+		corev1.EventTypeWarning, string(reason), "ReconcileVolumeGroup", errMsg.Error())
 }
 
-// NormalEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
 func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonInfo, message string) {
 	if !log.FromContext(ctx).V(1).Enabled() {
 		return
 	}
-	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
-	nodeStatus.SetName(r.NodeName)
-	nodeStatus.SetNamespace(r.Namespace)
-	// even if the get does not succeed we can still issue an event, just without UUID / resourceVersion
-	if err := r.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus); err == nil {
-		r.Eventf(nodeStatus, nil, corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup", message)
-	}
-	for _, ref := range obj.GetOwnerReferences() {
-		owner := &v1.PartialObjectMetadata{}
-		owner.SetName(ref.Name)
-		owner.SetNamespace(obj.GetNamespace())
-		owner.SetUID(ref.UID)
-		owner.SetGroupVersionKind(schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind))
-		r.Eventf(owner, nil, corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup",
-			fmt.Sprintf("update on node %s in volume group %s: %s",
-				client.ObjectKeyFromObject(nodeStatus), client.ObjectKeyFromObject(obj), message))
-	}
-	r.Eventf(obj, nil, corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup",
-		fmt.Sprintf("update on node %s: %s", client.ObjectKeyFromObject(nodeStatus), message))
+	emitEventToVGAndOwners(ctx, r.Client, r.EventRecorder, r.NodeName, r.Namespace, obj,
+		corev1.EventTypeNormal, string(reason), "ReconcileVolumeGroup", message)
 }
 
 func verifyChunkSizeForPolicy(config *lvmv1alpha1.ThinPoolConfig, lv lvm.LogicalVolume) error {

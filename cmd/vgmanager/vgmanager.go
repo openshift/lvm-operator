@@ -280,6 +280,17 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to create controller VGManager: %w", err)
 	}
 
+	if err = (&vgmanager.RAIDMonitorReconciler{
+		Client:        mgr.GetClient(),
+		EventRecorder: mgr.GetEventRecorder(vgmanager.RAIDMonitorName),
+		Scheme:        mgr.GetScheme(),
+		LVM:           lvm.NewDefaultHostLVM(),
+		NodeName:      nodeName,
+		Namespace:     operatorNamespace,
+	}).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create controller RAIDMonitor: %w", err)
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}

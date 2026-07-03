@@ -81,14 +81,8 @@ var _ = Describe("vgmanager controller", func() {
 		It("RAID volume group with insufficient devices", func(ctx SpecContext) {
 			testRAIDVGInsufficientDevices(ctx)
 		})
-		It("RAID volume group should error when VG has missing PVs", func(ctx SpecContext) {
-			testRAIDMissingPVsReturnsError(ctx)
-		})
-		It("RAID volume group should reconcile to Ready after admin repair", func(ctx SpecContext) {
-			testRAIDHealthyAfterRepair(ctx)
-		})
-		It("RAID volume group should periodically requeue for health monitoring", func(ctx SpecContext) {
-			testRAIDRequeuesForHealthMonitoring(ctx)
+		It("RAID volume group should not requeue for health monitoring", func(ctx SpecContext) {
+			testRAIDNoLongerRequeuesForHealthMonitoring(ctx)
 		})
 		Context("edge cases during reconciliation", func() {
 			Context("failure in LVM or LSBLK", func() {
@@ -1260,7 +1254,7 @@ func testLVMDConfigChange(ctx context.Context) {
 	Expect(cfg.DeviceClasses[0].ThinPoolConfig.OverprovisionRatio).To(Equal(float64(1)))
 }
 
-func testRAIDRequeuesForHealthMonitoring(ctx context.Context) {
+func testRAIDNoLongerRequeuesForHealthMonitoring(ctx context.Context) {
 	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	ctx = log.IntoContext(ctx, logger)
 
@@ -1330,11 +1324,10 @@ func testRAIDRequeuesForHealthMonitoring(ctx context.Context) {
 		blockDevice1.KName: {IsUsableLoopDev: false},
 		blockDevice2.KName: {IsUsableLoopDev: false},
 	}, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Once()
 
 	res, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred(), "reconciliation of healthy RAID VG should not return an error")
-	Expect(res).To(Equal(reconcileAgain), "RAID VG should requeue periodically for health monitoring")
+	Expect(res).To(Equal(ctrl.Result{}), "RAID VG with explicit paths should not requeue since RAID monitor handles health checks")
 }
 
 func testStaticModeExcludesNewDevices(ctx context.Context) {
@@ -1681,7 +1674,6 @@ func testRAIDVGWithLocalDevices(ctx context.Context) {
 	instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice1, blockDevice2}, nil).Once()
 	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(bdi, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Once()
 	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1707,7 +1699,6 @@ func testRAIDVGWithLocalDevices(ctx context.Context) {
 		PVs:    []lvm.PhysicalVolume{lvmPV1, lvmPV2},
 	}
 	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{createdVG}, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Twice()
 
 	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred())
@@ -1809,7 +1800,6 @@ func testRAIDVGInsufficientDevices(ctx context.Context) {
 	instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(bdi, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Once()
 	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1830,7 +1820,6 @@ func testRAIDVGInsufficientDevices(ctx context.Context) {
 	instances.LVM.EXPECT().ListPVs(ctx, "").Return(nil, nil).Once()
 	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice}, nil).Once()
 	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(bdi, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Twice()
 	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).To(HaveOccurred())
 	Expect(err.Error()).To(ContainSubstring("raid1 requires at least 2 devices, got 1"))
@@ -1847,162 +1836,3 @@ func testRAIDVGInsufficientDevices(ctx context.Context) {
 	Expect(found).To(BeTrue(), "VG status should exist and be failed")
 }
 
-func testRAIDMissingPVsReturnsError(ctx context.Context) {
-	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
-	ctx = log.IntoContext(ctx, logger)
-
-	instances := setupInstances()
-
-	tmpDir := GinkgoT().TempDir()
-	device1Path := filepath.Join(tmpDir, "mock0")
-	device2Path := filepath.Join(tmpDir, "mock1")
-	device1 := getKNameFromDevice(device1Path)
-	device2 := getKNameFromDevice(device2Path)
-
-	_, err := os.Create(device1.Unresolved())
-	Expect(err).To(Succeed(), "should create mock device file %s", device1.Unresolved())
-	_, err = os.Create(device2.Unresolved())
-	Expect(err).To(Succeed(), "should create mock device file %s", device2.Unresolved())
-
-	vg := &lvmv1alpha1.LVMVolumeGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vg1",
-			Namespace: instances.namespace.GetName(),
-		},
-		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
-			RAIDConfig: &lvmv1alpha1.RAIDConfig{
-				Type: lvmv1alpha1.RAIDTypeRAID1,
-			},
-			DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				Paths: []lvmv1alpha1.DevicePath{device1, device2},
-			},
-			NodeSelector: instances.nodeSelector.DeepCopy(),
-		},
-	}
-
-	By("creating the LVMVolumeGroup and NodeStatus")
-	Expect(instances.client.Create(ctx, vg)).To(Succeed(), "should create LVMVolumeGroup")
-	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
-	nodeStatus.SetName(instances.node.GetName())
-	nodeStatus.SetNamespace(instances.namespace.GetName())
-	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed(), "should create LVMVolumeGroupNodeStatus")
-
-	By("triggering reconciliation to add finalizer")
-	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-	Expect(err).ToNot(HaveOccurred(), "finalizer reconciliation should succeed")
-
-	By("simulating a VG with missing PVs (disk failure)")
-	vgWithMissing := lvm.VolumeGroup{
-		Name:   vg.GetName(),
-		VgSize: "2.0G",
-		PVs: []lvm.PhysicalVolume{
-			{PvName: device1.Unresolved(), UUID: "pv-uuid-1"},
-			{PvName: "[unknown]", UUID: "missing-pv-uuid", PvMissing: "missing"},
-		},
-	}
-
-	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return(nil, nil).Once()
-	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{vgWithMissing}, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Once()
-
-	result, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-	Expect(err).ToNot(HaveOccurred(), "reconciler should not return error for missing PVs (it requeues instead)")
-	Expect(result.RequeueAfter).To(Equal(30*time.Second), "should requeue after 30s when RAID VG has missing PVs")
-}
-
-func testRAIDHealthyAfterRepair(ctx context.Context) {
-	logger := zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
-	ctx = log.IntoContext(ctx, logger)
-
-	instances := setupInstances()
-
-	tmpDir := GinkgoT().TempDir()
-	device1Path := filepath.Join(tmpDir, "mock0")
-	device2Path := filepath.Join(tmpDir, "mock1")
-	device1 := getKNameFromDevice(device1Path)
-	device2 := getKNameFromDevice(device2Path)
-
-	_, err := os.Create(device1.Unresolved())
-	Expect(err).To(Succeed(), "should create mock device file %s", device1.Unresolved())
-	_, err = os.Create(device2.Unresolved())
-	Expect(err).To(Succeed(), "should create mock device file %s", device2.Unresolved())
-
-	blockDevice1 := createMockedBlockDevice(device1.Unresolved())
-	blockDevice2 := lsblk.BlockDevice{
-		Name:   "mock1",
-		KName:  device2.Unresolved(),
-		Type:   "mocked",
-		Model:  "mocked",
-		Vendor: "mocked",
-		State:  "live",
-		FSType: "LVM2_member",
-		Size:   "1G",
-		Serial: "MOCK2",
-	}
-	blockDevice1.FSType = "LVM2_member"
-
-	vg := &lvmv1alpha1.LVMVolumeGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vg1",
-			Namespace: instances.namespace.GetName(),
-		},
-		Spec: lvmv1alpha1.LVMVolumeGroupSpec{
-			RAIDConfig: &lvmv1alpha1.RAIDConfig{
-				Type: lvmv1alpha1.RAIDTypeRAID1,
-			},
-			DeviceSelector: &lvmv1alpha1.DeviceSelector{
-				Paths: []lvmv1alpha1.DevicePath{device1, device2},
-			},
-			NodeSelector: instances.nodeSelector.DeepCopy(),
-		},
-	}
-
-	By("creating the LVMVolumeGroup and NodeStatus")
-	Expect(instances.client.Create(ctx, vg)).To(Succeed(), "should create LVMVolumeGroup")
-	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
-	nodeStatus.SetName(instances.node.GetName())
-	nodeStatus.SetNamespace(instances.namespace.GetName())
-	Expect(instances.client.Create(ctx, nodeStatus)).To(Succeed(), "should create LVMVolumeGroupNodeStatus")
-
-	By("triggering reconciliation to add finalizer")
-	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-	Expect(err).ToNot(HaveOccurred(), "finalizer reconciliation should succeed")
-
-	bdi := lsblk.BlockDeviceInfos{
-		blockDevice1.KName: {IsUsableLoopDev: false},
-		blockDevice2.KName: {IsUsableLoopDev: false},
-	}
-
-	By("simulating a healthy VG after admin repair (no missing PVs)")
-	healthyVG := lvm.VolumeGroup{
-		Name:   vg.GetName(),
-		VgSize: "2.0G",
-		PVs: []lvm.PhysicalVolume{
-			{PvName: device1.Unresolved(), UUID: "pv-uuid-1"},
-			{PvName: device2.Unresolved(), UUID: "pv-uuid-2"},
-		},
-	}
-
-	instances.LSBLK.EXPECT().ListBlockDevices(ctx).Return([]lsblk.BlockDevice{blockDevice1, blockDevice2}, nil).Once()
-	instances.LVM.EXPECT().ListVGs(ctx, true).Return([]lvm.VolumeGroup{healthyVG}, nil).Once()
-	instances.LVM.EXPECT().ListPVs(ctx, "").Return([]lvm.PhysicalVolume{
-		{PvName: device1.Unresolved(), UUID: "pv-uuid-1", VgName: vg.GetName()},
-		{PvName: device2.Unresolved(), UUID: "pv-uuid-2", VgName: vg.GetName()},
-	}, nil).Once()
-	instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Return(bdi, nil).Once()
-	instances.LVM.EXPECT().ListLVs(ctx, vg.GetName()).Return(&lvm.LVReport{Report: []lvm.LVReportItem{}}, nil).Once()
-
-	_, err = instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
-	Expect(err).ToNot(HaveOccurred(), "reconciliation of repaired RAID VG should succeed")
-
-	By("verifying the VGStatus is Ready")
-	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed(), "should fetch LVMVolumeGroupNodeStatus")
-	found := false
-	for _, status := range nodeStatus.Spec.LVMVGStatus {
-		if status.Name == vg.GetName() {
-			found = true
-			Expect(status.Status).To(Equal(lvmv1alpha1.VGStatusReady), "VG status should be Ready after repair")
-		}
-	}
-	Expect(found).To(BeTrue(), "VG status should exist and be ready")
-}
