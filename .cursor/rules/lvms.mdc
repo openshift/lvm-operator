@@ -1,0 +1,43 @@
+# Derived from AGENTS.md — keep in sync
+
+## Project
+
+LVM Operator (LVMS) — Kubernetes operator managing LVM volume groups for OpenShift.
+Single binary embedding TopoLVM CSI driver. Go, controller-runtime, OLM.
+
+## Safety Rules
+
+- Never edit generated files: `zz_generated*.go`, `config/crd/bases/`, `vendor/`
+- Never run destructive LVM commands: `wipefs`, `vgremove`, `pvremove`, `lvremove`, `mkfs`, `dd`
+- Always run `make generate && make manifests` after changing `api/v1alpha1/` types
+- Always run `make bundle && make catalog` after any change that affects CRDs, RBAC, config, or monitoring
+- Never skip finalizer logic — three-level hierarchy prevents orphaned storage
+
+## Build Commands
+
+- `make build` — compile
+- `make test` — unit tests
+- `make lint` — linters
+- `make verify` — formatting and generated file checks
+- `make generate` — update deepcopy after API changes
+- `make manifests` — regenerate CRD YAML and RBAC after API changes
+- `make bundle` — regenerate OLM bundle manifests
+- `make catalog` — regenerate OLM catalog
+
+## Key Conventions
+
+- Use MutateFn for mutable fields in CreateOrUpdate
+- Don't use errgroup — use raw goroutines with errors.Join
+- New optional fields: nil means "upgraded" — default to backward-compatible behavior
+- Conservative device filtering: better to miss a device than wipe data
+- Test descriptions describe outcomes, not CRUD operations
+
+## Key Directories
+
+- `api/v1alpha1/` — CRD types and webhook validation
+- `internal/controllers/` — reconcilers
+- `config/` — Kustomize overlays, CRD manifests, RBAC
+- `test/e2e/` — end-to-end tests
+- `docs/` — architecture, conventions, ADRs
+
+Full docs: see AGENTS.md

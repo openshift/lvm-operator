@@ -100,21 +100,38 @@ This operator manages physical storage. Mistakes destroy data. See [docs/core-be
 - VG Manager requeue interval depends on configuration (RAID/Dynamic: 30s periodic; Static with explicit paths: no periodic requeue) — controllers must handle partial states and retries safely (idempotency)
 - Data loss from incorrect device selection is unrecoverable — verify device selectors carefully in tests
 
+## Path-Scoped Guidance
+
+Claude Code loads context-specific rules when you touch files in these areas:
+
+| Rule File | Triggered By | Content |
+|-----------|-------------|---------|
+| `.claude/rules/api-types.md` | `api/v1alpha1/**` | CRD workflow, validation markers, API version policy, CEL nil-bypass gotcha |
+| `.claude/rules/vgmanager.md` | `internal/controllers/vgmanager/**` | LVM command safety, filter chain, wipe eligibility |
+| `.claude/rules/reconciliation.md` | `internal/controllers/**` | MutateFn convention, ownership/finalizer rules, requeue patterns |
+| `.claude/rules/testing.md` | `test/**, **/*_test.go` | Ginkgo/Gomega conventions, E2E patterns, cleanup, envtest vs fakeclient |
+
+## Agent Skills
+
+Reusable multi-step workflows invocable as slash commands:
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| CRD Modification | `/modify-crd` | Full CRD change workflow: types → markers → generate → manifests → bundle → controller → tests |
+| E2E Testing | `/run-e2e` | E2E test execution with cluster verification, loop devices, and cleanup |
+| New ADR | `/new-adr` | Create a new Architectural Decision Record from template |
+
+## Cross-Tool Compatibility
+
+This repo provides instruction files for multiple AI coding tools:
+
+- **Claude Code**: `CLAUDE.md` → `AGENTS.md`, `.claude/settings.json`, `.claude/rules/`, `.claude/commands/`
+- **GitHub Copilot**: `.github/copilot-instructions.md`, `.github/instructions/`
+- **Cursor**: `.cursor/rules/lvms.mdc`
+
 ## Testing
 
-Unit tests use Ginkgo/Gomega and are located alongside source files:
-
-```go
-var _ = Describe("LVMCluster Controller", func() {
-    Context("When reconciling a new LVMCluster", func() {
-        It("Should create the TopoLVM deployment", func() {
-            // Test implementation
-        })
-    })
-})
-```
-
-E2E tests are in `test/e2e/` and require a live cluster with available block devices. See [CONTRIBUTING.md](CONTRIBUTING.md) for build, deploy, and test commands. See [docs/conventions/testing.md](docs/conventions/testing.md) for testing conventions.
+Unit tests use Ginkgo/Gomega and are located alongside source files. E2E tests are in `test/e2e/` and require a live cluster with available block devices. See [CONTRIBUTING.md](CONTRIBUTING.md) for build, deploy, and test commands. See [docs/conventions/testing.md](docs/conventions/testing.md) for testing conventions.
 
 ## Key Directories
 
