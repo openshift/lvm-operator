@@ -28,7 +28,7 @@ Controls whether VG Manager continuously discovers new devices or locks to insta
 
 **Status values:** `Preconfigured` (explicit DeviceSelector paths override policy), `RuntimeStatic`, `RuntimeDynamic`.
 
-**Gotcha — known inconsistency:** The controller defaults nil to Dynamic (`ptr.Deref(policy, Dynamic)`), but the API godoc and webhook warning text say "new volume groups will default to Static mode." The controller behavior (Dynamic) is what actually executes; the godoc/webhook describe unimplemented or intended-but-missing logic. RAID overrides to Static regardless of spec. In Static mode, if the VG already exists, newly discovered devices are excluded. With explicit device paths, the spec policy is ignored — status always reports Preconfigured. Set the policy explicitly to avoid ambiguity.
+**Gotcha:** For new clusters, the webhook defaults nil to Static on CREATE. Upgraded clusters (created before this field existed) keep nil, which the controller treats as Dynamic for backward compatibility. RAID overrides to Static regardless of spec. In Static mode, if the VG already exists, newly discovered devices are excluded. With explicit device paths, the spec policy is ignored — status always reports Preconfigured.
 
 ## VolumeGroup (LVM concept)
 
