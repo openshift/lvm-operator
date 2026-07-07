@@ -301,25 +301,33 @@ func TestComputeOverheadFactor(t *testing.T) {
 
 func TestBuildRAIDStatus(t *testing.T) {
 	tests := []struct {
-		name     string
-		lvs      []lvm.LogicalVolume
-		raidType lvmv1alpha1.RAIDType
-		expected *lvmv1alpha1.RAIDStatus
+		name                   string
+		lvs                    []lvm.LogicalVolume
+		pvs                    []lvm.PhysicalVolume
+		raidType               lvmv1alpha1.RAIDType
+		expected               *lvmv1alpha1.RAIDStatus
+		expectedMemberCount    int
+		expectedDegradedCount  int
+		expectedMinSyncPercent *int
 	}{
 		{
-			name:     "no RAID LVs returns nil",
+			name:     "no RAID LVs and no PVs returns nil",
 			lvs:      []lvm.LogicalVolume{{Name: "thin-pool", LvAttr: "twi-a-t---"}},
 			raidType: lvmv1alpha1.RAIDTypeRAID1,
 			expected: nil,
 		},
 		{
-			name: "all healthy",
+			name: "all healthy with PVs",
 			lvs: []lvm.LogicalVolume{
 				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
 				{Name: "lv-pvc-abc_rimage_0", LvAttr: "iwi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
 				{Name: "lv-pvc-abc_rimage_1", LvAttr: "iwi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
 				{Name: "lv-pvc-abc_rmeta_0", LvAttr: "ewi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
 				{Name: "lv-pvc-abc_rmeta_1", LvAttr: "ewi-aor---", RAIDSyncPercent: "", LVLayout: "linear"},
+			},
+			pvs: []lvm.PhysicalVolume{
+				{PvName: "/dev/sda"},
+				{PvName: "/dev/sdb"},
 			},
 			raidType: lvmv1alpha1.RAIDTypeRAID1,
 			expected: &lvmv1alpha1.RAIDStatus{
@@ -328,11 +336,17 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
 				},
 			},
+			expectedMemberCount:    2,
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
 			name: "syncing LV",
 			lvs: []lvm.LogicalVolume{
 				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "42.50", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			pvs: []lvm.PhysicalVolume{
+				{PvName: "/dev/sda"},
+				{PvName: "/dev/sdb"},
 			},
 			raidType: lvmv1alpha1.RAIDTypeRAID1,
 			expected: &lvmv1alpha1.RAIDStatus{
@@ -341,6 +355,8 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 42},
 				},
 			},
+			expectedMemberCount:    2,
+			expectedMinSyncPercent: ptr.To(42),
 		},
 		{
 			name: "single LV with partial health is failed",
@@ -354,6 +370,7 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
 			name: "multiple LVs mixed health",
@@ -369,6 +386,7 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
 			name: "all LVs unhealthy is failed",
@@ -384,6 +402,7 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
 			name: "RAID no initial sync volume type R",
@@ -397,6 +416,7 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
 			name: "raid5 LV",
@@ -410,6 +430,7 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID5, SyncPercent: 100},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
 			name: "partial flag without health status triggers degraded",
@@ -423,9 +444,10 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
-			name: "non-RAID LVs only",
+			name: "non-RAID LVs only and no PVs",
 			lvs: []lvm.LogicalVolume{
 				{Name: "lv-linear", LvAttr: "-wi-a-----", RAIDSyncPercent: "", LVHealthStatus: "", LVLayout: "linear"},
 			},
@@ -444,12 +466,68 @@ func TestBuildRAIDStatus(t *testing.T) {
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
 				},
 			},
+			expectedMinSyncPercent: ptr.To(100),
+		},
+		{
+			name: "PVs with one missing escalates to degraded",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			pvs: []lvm.PhysicalVolume{
+				{PvName: "/dev/sda"},
+				{PvName: "/dev/sdb", PvMissing: "missing"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusDegraded,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+				},
+			},
+			expectedMemberCount:    2,
+			expectedDegradedCount:  1,
+			expectedMinSyncPercent: ptr.To(100),
+		},
+		{
+			name: "no RAID LVs but PVs exist returns status with member counts",
+			pvs: []lvm.PhysicalVolume{
+				{PvName: "/dev/sda"},
+				{PvName: "/dev/sdb"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+			},
+			expectedMemberCount: 2,
+		},
+		{
+			name: "multiple LVs with different sync percents picks minimum",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+				{Name: "lv-pvc-def", LvAttr: "rwi-a-r---", RAIDSyncPercent: "55.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+				{Name: "lv-pvc-ghi", LvAttr: "rwi-a-r---", RAIDSyncPercent: "78.00", LVHealthStatus: "", LVLayout: "raid,raid1"},
+			},
+			pvs: []lvm.PhysicalVolume{
+				{PvName: "/dev/sda"},
+				{PvName: "/dev/sdb"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusHealthy,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100},
+					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 55},
+					{Name: "lv-pvc-ghi", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 78},
+				},
+			},
+			expectedMemberCount:    2,
+			expectedMinSyncPercent: ptr.To(55),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := buildRAIDStatus(tt.lvs, tt.raidType)
+			got := buildRAIDStatus(tt.lvs, tt.pvs, tt.raidType)
 			if tt.expected == nil {
 				if got != nil {
 					t.Fatalf("expected nil, got %+v", got)
@@ -468,6 +546,23 @@ func TestBuildRAIDStatus(t *testing.T) {
 			for i := range got.LVHealth {
 				if got.LVHealth[i] != tt.expected.LVHealth[i] {
 					t.Errorf("lvHealth[%d]: expected %+v, got %+v", i, tt.expected.LVHealth[i], got.LVHealth[i])
+				}
+			}
+			if got.MemberCount != tt.expectedMemberCount {
+				t.Errorf("memberCount: expected %d, got %d", tt.expectedMemberCount, got.MemberCount)
+			}
+			if got.DegradedMemberCount != tt.expectedDegradedCount {
+				t.Errorf("degradedMemberCount: expected %d, got %d", tt.expectedDegradedCount, got.DegradedMemberCount)
+			}
+			if tt.expectedMinSyncPercent == nil {
+				if got.MinSyncPercent != nil {
+					t.Errorf("minSyncPercent: expected nil, got %d", *got.MinSyncPercent)
+				}
+			} else {
+				if got.MinSyncPercent == nil {
+					t.Errorf("minSyncPercent: expected %d, got nil", *tt.expectedMinSyncPercent)
+				} else if *got.MinSyncPercent != *tt.expectedMinSyncPercent {
+					t.Errorf("minSyncPercent: expected %d, got %d", *tt.expectedMinSyncPercent, *got.MinSyncPercent)
 				}
 			}
 		})

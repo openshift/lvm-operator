@@ -87,8 +87,9 @@ func computeOverheadFactor(rc *lvmv1alpha1.RAIDConfig, deviceCount int) float64 
 	}
 }
 
-// buildRAIDStatus inspects logical volumes and returns an aggregate RAIDStatus, or nil if no RAID LVs exist.
-func buildRAIDStatus(lvs []lvm.LogicalVolume, raidType lvmv1alpha1.RAIDType) *lvmv1alpha1.RAIDStatus {
+// buildRAIDStatus inspects logical volumes and physical volumes to build an aggregate RAIDStatus.
+// Returns nil only when both lvs and pvs are empty.
+func buildRAIDStatus(lvs []lvm.LogicalVolume, pvs []lvm.PhysicalVolume, raidType lvmv1alpha1.RAIDType) *lvmv1alpha1.RAIDStatus {
 	var lvHealth []lvmv1alpha1.RAIDLVHealth
 
 	for _, lv := range lvs {
@@ -118,7 +119,7 @@ func buildRAIDStatus(lvs []lvm.LogicalVolume, raidType lvmv1alpha1.RAIDType) *lv
 		})
 	}
 
-	if len(lvHealth) == 0 {
+	if len(lvHealth) == 0 && len(pvs) == 0 {
 		return nil
 	}
 
@@ -130,10 +131,12 @@ func buildRAIDStatus(lvs []lvm.LogicalVolume, raidType lvmv1alpha1.RAIDType) *lv
 	}
 
 	overallStatus := lvmv1alpha1.RAIDHealthStatusHealthy
-	if unhealthyCount == len(lvHealth) {
-		overallStatus = lvmv1alpha1.RAIDHealthStatusFailed
-	} else if unhealthyCount > 0 {
-		overallStatus = lvmv1alpha1.RAIDHealthStatusDegraded
+	if len(lvHealth) > 0 {
+		if unhealthyCount == len(lvHealth) {
+			overallStatus = lvmv1alpha1.RAIDHealthStatusFailed
+		} else if unhealthyCount > 0 {
+			overallStatus = lvmv1alpha1.RAIDHealthStatusDegraded
+		}
 	}
 
 	if overallStatus == lvmv1alpha1.RAIDHealthStatusHealthy {
@@ -152,8 +155,33 @@ func buildRAIDStatus(lvs []lvm.LogicalVolume, raidType lvmv1alpha1.RAIDType) *lv
 		}
 	}
 
+	degradedMemberCount := 0
+	for _, pv := range pvs {
+		if pv.PvMissing != "" {
+			degradedMemberCount++
+		}
+	}
+
+	if degradedMemberCount > 0 && overallStatus == lvmv1alpha1.RAIDHealthStatusHealthy {
+		overallStatus = lvmv1alpha1.RAIDHealthStatusDegraded
+	}
+
+	var minSyncPercent *int
+	if len(lvHealth) > 0 {
+		minSync := 100
+		for _, h := range lvHealth {
+			if h.SyncPercent < minSync {
+				minSync = h.SyncPercent
+			}
+		}
+		minSyncPercent = &minSync
+	}
+
 	return &lvmv1alpha1.RAIDStatus{
-		Status:   overallStatus,
-		LVHealth: lvHealth,
+		Status:              overallStatus,
+		MemberCount:         len(pvs),
+		DegradedMemberCount: degradedMemberCount,
+		MinSyncPercent:      minSyncPercent,
+		LVHealth:            lvHealth,
 	}
 }

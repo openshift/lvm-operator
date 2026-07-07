@@ -21,18 +21,51 @@ var (
 		},
 		[]string{"node", "device_class"},
 	)
+
+	raidMemberCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "lvms_raid_member_count",
+			Help: "Total number of physical volumes in the RAID volume group.",
+		},
+		[]string{"node", "device_class"},
+	)
+
+	raidDegradedCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "lvms_raid_degraded_count",
+			Help: "Number of missing or degraded physical volumes in the RAID volume group.",
+		},
+		[]string{"node", "device_class"},
+	)
+
+	raidSyncPercent = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "lvms_raid_sync_percent",
+			Help: "Minimum resynchronization percentage across all RAID LVs in the device class (0-100).",
+		},
+		[]string{"node", "device_class"},
+	)
 )
 
-// RAIDMetrics returns the Prometheus collectors for RAID health and sync status.
+// RAIDMetrics returns the Prometheus collectors for RAID health, sync, and member status.
 func RAIDMetrics() []prometheus.Collector {
-	return []prometheus.Collector{raidHealthStatus, raidSyncInProgress}
+	return []prometheus.Collector{
+		raidHealthStatus,
+		raidSyncInProgress,
+		raidMemberCount,
+		raidDegradedCount,
+		raidSyncPercent,
+	}
 }
 
-// updateRAIDMetrics sets the RAID health and sync-in-progress gauges for a device class on a node.
+// updateRAIDMetrics sets all RAID gauges for a device class on a node.
 func updateRAIDMetrics(nodeName, deviceClassName string, raidStatus *lvmv1alpha1.RAIDStatus) {
 	if raidStatus == nil {
 		raidHealthStatus.WithLabelValues(nodeName, deviceClassName).Set(0)
 		raidSyncInProgress.WithLabelValues(nodeName, deviceClassName).Set(0)
+		raidMemberCount.WithLabelValues(nodeName, deviceClassName).Set(0)
+		raidDegradedCount.WithLabelValues(nodeName, deviceClassName).Set(0)
+		raidSyncPercent.WithLabelValues(nodeName, deviceClassName).Set(100)
 		return
 	}
 
@@ -55,10 +88,22 @@ func updateRAIDMetrics(nodeName, deviceClassName string, raidStatus *lvmv1alpha1
 		}
 	}
 	raidSyncInProgress.WithLabelValues(nodeName, deviceClassName).Set(syncing)
+
+	raidMemberCount.WithLabelValues(nodeName, deviceClassName).Set(float64(raidStatus.MemberCount))
+	raidDegradedCount.WithLabelValues(nodeName, deviceClassName).Set(float64(raidStatus.DegradedMemberCount))
+
+	syncPct := float64(100)
+	if raidStatus.MinSyncPercent != nil {
+		syncPct = float64(*raidStatus.MinSyncPercent)
+	}
+	raidSyncPercent.WithLabelValues(nodeName, deviceClassName).Set(syncPct)
 }
 
-// deleteRAIDMetrics removes the RAID metric series for a device class on a node.
+// deleteRAIDMetrics removes all RAID metric series for a device class on a node.
 func deleteRAIDMetrics(nodeName, deviceClassName string) {
 	raidHealthStatus.DeleteLabelValues(nodeName, deviceClassName)
 	raidSyncInProgress.DeleteLabelValues(nodeName, deviceClassName)
+	raidMemberCount.DeleteLabelValues(nodeName, deviceClassName)
+	raidDegradedCount.DeleteLabelValues(nodeName, deviceClassName)
+	raidSyncPercent.DeleteLabelValues(nodeName, deviceClassName)
 }

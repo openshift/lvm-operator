@@ -56,6 +56,7 @@ import (
 const (
 	ControllerName            = "vg-manager"
 	reconcileInterval         = 30 * time.Second
+	raidReconcileInterval     = 60 * time.Second
 	metadataWarningPercentage = 95
 
 	// NodeCleanupFinalizer should be set on a LVMVolumeGroup for every Node matching that LVMVolumeGroup.
@@ -177,7 +178,7 @@ func (r *Reconciler) reconcile(
 		if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
 			logger.Error(statusErr, "failed to set status to failed")
 		}
-		return reconcileAgain, nil
+		return ctrl.Result{RequeueAfter: raidReconcileInterval}, nil
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
@@ -394,7 +395,7 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 	// RAID device classes need periodic reconciliation to monitor health status,
 	// since disk failures are node-side events with no Kubernetes object change.
 	if volumeGroup.Spec.RAIDConfig != nil {
-		return reconcileAgain
+		return ctrl.Result{RequeueAfter: raidReconcileInterval}
 	}
 
 	// With explicit paths, no periodic requeue is needed — the paths define

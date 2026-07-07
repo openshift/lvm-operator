@@ -1334,7 +1334,7 @@ func testRAIDRequeuesForHealthMonitoring(ctx context.Context) {
 
 	res, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred(), "reconciliation of healthy RAID VG should not return an error")
-	Expect(res).To(Equal(reconcileAgain), "RAID VG should requeue periodically for health monitoring")
+	Expect(res.RequeueAfter).To(Equal(raidReconcileInterval), "RAID VG should requeue at the RAID monitoring interval")
 }
 
 func testStaticModeExcludesNewDevices(ctx context.Context) {
@@ -1725,7 +1725,7 @@ func testRAIDVGWithLocalDevices(ctx context.Context) {
 		LVCreateOptions: []string{"--type", "raid1", "-m", "1"},
 	}))
 
-	By("verifying the VGStatus is Ready")
+	By("verifying the VGStatus is Ready with RAID member info")
 	Expect(instances.client.Get(ctx, client.ObjectKeyFromObject(nodeStatus), nodeStatus)).To(Succeed())
 	Expect(nodeStatus.Spec.LVMVGStatus).ToNot(BeEmpty())
 	Expect(nodeStatus.Spec.LVMVGStatus).To(ContainElement(lvmv1alpha1.VGStatus{
@@ -1733,6 +1733,10 @@ func testRAIDVGWithLocalDevices(ctx context.Context) {
 		Status:                lvmv1alpha1.VGStatusReady,
 		Devices:               []string{device1.Unresolved(), device2.Unresolved()},
 		DeviceDiscoveryPolicy: lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured,
+		RAIDStatus: &lvmv1alpha1.RAIDStatus{
+			Status:      lvmv1alpha1.RAIDHealthStatusHealthy,
+			MemberCount: 2,
+		},
 	}))
 
 	By("triggering the delete of the RAID VolumeGroup")
@@ -1907,7 +1911,7 @@ func testRAIDMissingPVsReturnsError(ctx context.Context) {
 
 	result, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 	Expect(err).ToNot(HaveOccurred(), "reconciler should not return error for missing PVs (it requeues instead)")
-	Expect(result.RequeueAfter).To(Equal(30*time.Second), "should requeue after 30s when RAID VG has missing PVs")
+	Expect(result.RequeueAfter).To(Equal(60*time.Second), "should requeue after 60s when RAID VG has missing PVs")
 }
 
 func testRAIDHealthyAfterRepair(ctx context.Context) {
