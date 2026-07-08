@@ -87,6 +87,17 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OLD=$(jq -r '.tool_input.old_string // empty' < /dev/stdin) && [ -n \"$OLD\" ] && SYMS=$(echo \"$OLD\" | grep -oE '[A-Z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*' | sort -u) && for s in $SYMS; do if grep -rql \"$s\" docs/ 2>/dev/null; then echo \"⚠ docs/ references $s — update if renamed\"; fi; done; exit 0",
+            "if": "Edit({internal,api,cmd}/**/*.go)",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
