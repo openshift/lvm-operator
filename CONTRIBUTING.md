@@ -260,11 +260,43 @@ Signed-off-by: First_Name Last_Name <email address>
 
 We welcome contributions that use AI coding tools. The following conventions ensure transparency and maintain code quality.
 
+### Supported Tools
+
+This repo provides instruction files for multiple AI coding tools:
+
+| Tool | Instruction File | Scope |
+|------|-----------------|-------|
+| Claude Code | `CLAUDE.md` → `AGENTS.md` | Full guidance, safety rules, documentation index |
+| Claude Code | `.claude/settings.json` | Deny rules, allow rules, PostToolUse hooks |
+| Claude Code | `.claude/rules/` | Path-scoped rules (auto-loaded per file area) |
+| Claude Code | `.claude/commands/` | Reusable workflows: `/modify-crd`, `/run-e2e`, `/new-adr` |
+| GitHub Copilot | `.github/copilot-instructions.md` | Project overview, build commands, safety rules |
+| GitHub Copilot | `.github/instructions/` | Path-specific guidance for API types |
+| Cursor | `.cursor/rules/lvms.mdc` | Project overview, conventions, safety rules |
+All cross-tool files are derived from `AGENTS.md` (the single source of truth) and include a sync header.
+
+### Path-Scoped Rules (Claude Code)
+
+When you edit files in specific areas, Claude Code auto-loads relevant rules:
+
+- `api/v1alpha1/**` → CRD workflow, validation markers, CEL gotchas
+- `internal/controllers/vgmanager/**` → LVM command safety, device filtering
+- `internal/controllers/**` → MutateFn convention, ownership, finalizers
+- `test/**`, `**/*_test.go` → Ginkgo/Gomega conventions, E2E patterns
+
+### Agent Skills (Claude Code)
+
+Invoke these multi-step workflows as slash commands:
+
+- `/modify-crd` — full CRD change workflow from types through tests
+- `/run-e2e` — E2E test execution with cluster verification and cleanup
+- `/new-adr` — create a new Architectural Decision Record from template
+
 ### Attribution
 
 Commits that include AI-generated code must add a `Co-Authored-By:` trailer identifying the AI tool used:
 
-```
+```text
 component: commit title
 
 Description of the change.
