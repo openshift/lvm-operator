@@ -47,6 +47,10 @@ type lvmClusterValidator struct {
 
 var _ admission.Validator[*LVMCluster] = &lvmClusterValidator{}
 
+type lvmClusterDefaulter struct{}
+
+var _ admission.Defaulter[*LVMCluster] = &lvmClusterDefaulter{}
+
 var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
 	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
@@ -63,12 +67,26 @@ var (
 	ErrForceWipeOptionCannotBeChanged                        = errors.New("ForceWipeDevicesAndDestroyAllData can not be changed")
 )
 
+//+kubebuilder:webhook:path=/mutate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create,versions=v1alpha1,name=mlvmcluster.kb.io,admissionReviewVersions=v1
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
 
 func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, l).
+		WithDefaulter(&lvmClusterDefaulter{}).
 		WithValidator(&lvmClusterValidator{Client: mgr.GetClient()}).
 		Complete()
+}
+
+func (d *lvmClusterDefaulter) Default(_ context.Context, l *LVMCluster) error {
+	lvmclusterlog.Info("defaulting", "name", l.Name)
+	for i := range l.Spec.Storage.DeviceClasses {
+		dc := &l.Spec.Storage.DeviceClasses[i]
+		if dc.DeviceDiscoveryPolicy == nil && !dc.HasExplicitPaths() {
+			static := DeviceDiscoveryPolicyStatic
+			dc.DeviceDiscoveryPolicy = &static
+		}
+	}
+	return nil
 }
 
 // ValidateCreate implements admission.Validator so a webhook will be registered for the type
@@ -559,13 +577,11 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admission.Warnings {
 	var warnings admission.Warnings
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
-		hasExplicitPaths := deviceClass.DeviceSelector != nil &&
-			(len(deviceClass.DeviceSelector.Paths) > 0 || len(deviceClass.DeviceSelector.OptionalPaths) > 0)
-
-		if deviceClass.DeviceDiscoveryPolicy == nil && !hasExplicitPaths {
+		if deviceClass.DeviceDiscoveryPolicy != nil && *deviceClass.DeviceDiscoveryPolicy == DeviceDiscoveryPolicyDynamic && !deviceClass.HasExplicitPaths() {
 			warnings = append(warnings, fmt.Sprintf(
-				"deviceDiscoveryPolicy is not set for device class %q; new volume groups will default to Static mode "+
-					"(devices discovered at creation time only). Set deviceDiscoveryPolicy explicitly to avoid ambiguity.",
+				"deviceDiscoveryPolicy is set to Dynamic for device class %q without explicit device paths. "+
+					"LVMS will continuously discover and add new devices. "+
+					"This is not recommended for production environments.",
 				deviceClass.Name))
 		}
 	}

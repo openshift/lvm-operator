@@ -14,6 +14,7 @@ import (
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func generateUniqueNameForTestCase(ctx SpecContext) string {
@@ -66,6 +67,47 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSizeCalculationPolicy).
 			To(Equal(ChunkSizeCalculationPolicyStatic))
 		Expect(resource.Spec.Storage.DeviceClasses[0].ThinPoolConfig.ChunkSize).To(BeNil())
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("nil DeviceDiscoveryPolicy defaults to Static on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		Expect(resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).To(BeNil())
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		created := &LVMCluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), created)).To(Succeed())
+		Expect(created.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).ToNot(BeNil())
+		Expect(*created.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).To(Equal(DeviceDiscoveryPolicyStatic))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("explicit DeviceDiscoveryPolicy is not overridden on create", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		dynamicPolicy := DeviceDiscoveryPolicyDynamic
+		resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy = &dynamicPolicy
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		created := &LVMCluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), created)).To(Succeed())
+		Expect(*created.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).To(Equal(DeviceDiscoveryPolicyDynamic))
+
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("nil DeviceDiscoveryPolicy with explicit paths is not defaulted", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths: []DevicePath{"/dev/sda"},
+		}
+		Expect(resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).To(BeNil())
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+		created := &LVMCluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(resource), created)).To(Succeed())
+		Expect(created.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).To(BeNil())
 
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
