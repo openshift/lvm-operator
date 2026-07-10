@@ -546,6 +546,10 @@ spec:
                             description: RAIDStatus reports the RAID health for this
                               device class. Only set when the device class uses RAIDConfig.
                             properties:
+                              degradedMemberCount:
+                                description: DegradedMemberCount is the number of
+                                  physical volumes that are missing or degraded.
+                                type: integer
                               lvHealth:
                                 description: LVHealth contains per-logical-volume
                                   RAID health details.
@@ -581,6 +585,15 @@ spec:
                                   - syncPercent
                                   type: object
                                 type: array
+                              memberCount:
+                                description: MemberCount is the total number of physical
+                                  volumes in the RAID volume group.
+                                type: integer
+                              minSyncPercent:
+                                description: |-
+                                  MinSyncPercent is the minimum resynchronization progress across all RAID logical volumes (0-100).
+                                  100 means all LVs are fully synced. Nil when no RAID LVs exist.
+                                type: integer
                               status:
                                 description: Status is the overall RAID health.
                                 enum:

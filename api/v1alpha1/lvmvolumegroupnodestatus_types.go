@@ -119,6 +119,16 @@ type RAIDLVHealth struct {
 type RAIDStatus struct {
 	// Status is the overall RAID health.
 	Status RAIDHealthStatus `json:"status"`
+	// MemberCount is the total number of physical volumes in the RAID volume group.
+	// +optional
+	MemberCount int `json:"memberCount"`
+	// DegradedMemberCount is the number of physical volumes that are missing or degraded.
+	// +optional
+	DegradedMemberCount int `json:"degradedMemberCount"`
+	// MinSyncPercent is the minimum resynchronization progress across all RAID logical volumes (0-100).
+	// 100 means all LVs are fully synced. Nil when no RAID LVs exist.
+	// +optional
+	MinSyncPercent *int `json:"minSyncPercent,omitempty"`
 	// LVHealth contains per-logical-volume RAID health details.
 	// +optional
 	LVHealth []RAIDLVHealth `json:"lvHealth,omitempty"`

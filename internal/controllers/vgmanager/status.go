@@ -44,7 +44,7 @@ func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lv
 	}
 
 	if vg.Spec.RAIDConfig != nil {
-		if err := r.applyRAIDStatus(ctx, vg, status); err != nil {
+		if err := r.applyRAIDStatus(ctx, vg, vgs, status); err != nil {
 			return false, fmt.Errorf("failed to collect RAID status: %w", err)
 		}
 	}
@@ -63,7 +63,7 @@ func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alp
 	}
 
 	if vg.Spec.RAIDConfig != nil {
-		if err := r.applyRAIDStatus(ctx, vg, status); err != nil {
+		if err := r.applyRAIDStatus(ctx, vg, vgs, status); err != nil {
 			return false, fmt.Errorf("failed to collect RAID status: %w", err)
 		}
 	}
@@ -85,7 +85,7 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 	}
 
 	if vg.Spec.RAIDConfig != nil {
-		if err := r.applyRAIDStatus(ctx, vg, status); err != nil {
+		if err := r.applyRAIDStatus(ctx, vg, vgs, status); err != nil {
 			return false, fmt.Errorf("failed to collect RAID status: %w", err)
 		}
 	}
@@ -245,8 +245,8 @@ func (r *Reconciler) getLVMVolumeGroupNodeStatus() *lvmv1alpha1.LVMVolumeGroupNo
 	}
 }
 
-// applyRAIDStatus queries logical volumes for the volume group and populates status with RAID health and metrics.
-func (r *Reconciler) applyRAIDStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) error {
+// applyRAIDStatus queries logical volumes and physical volumes to populate RAID health status and metrics.
+func (r *Reconciler) applyRAIDStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, status *lvmv1alpha1.VGStatus) error {
 	lvReport, err := r.ListLVs(ctx, vg.GetName())
 	if err != nil {
 		return fmt.Errorf("failed to list logical volumes for RAID status: %w", err)
@@ -257,7 +257,15 @@ func (r *Reconciler) applyRAIDStatus(ctx context.Context, vg *lvmv1alpha1.LVMVol
 		allLVs = append(allLVs, report.Lv...)
 	}
 
-	raidStatus := buildRAIDStatus(allLVs, vg.Spec.RAIDConfig.Type)
+	var pvs []lvm.PhysicalVolume
+	for _, existingVG := range vgs {
+		if existingVG.Name == vg.GetName() {
+			pvs = existingVG.PVs
+			break
+		}
+	}
+
+	raidStatus := buildRAIDStatus(allLVs, pvs, vg.Spec.RAIDConfig.Type)
 	if raidStatus != nil {
 		status.RAIDStatus = raidStatus
 		if raidStatus.Status == lvmv1alpha1.RAIDHealthStatusDegraded || raidStatus.Status == lvmv1alpha1.RAIDHealthStatusFailed {
