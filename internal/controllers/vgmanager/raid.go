@@ -123,18 +123,24 @@ func buildRAIDStatus(lvs []lvm.LogicalVolume, pvs []lvm.PhysicalVolume, raidType
 		return nil
 	}
 
-	unhealthyCount := 0
+	failedCount := 0
+	degradedCount := 0
 	for _, h := range lvHealth {
-		if h.HealthStatus != "" {
-			unhealthyCount++
+		switch h.HealthStatus {
+		case "":
+			// healthy
+		case "partial":
+			degradedCount++
+		default:
+			failedCount++
 		}
 	}
 
 	overallStatus := lvmv1alpha1.RAIDHealthStatusHealthy
 	if len(lvHealth) > 0 {
-		if unhealthyCount == len(lvHealth) {
+		if failedCount == len(lvHealth) {
 			overallStatus = lvmv1alpha1.RAIDHealthStatusFailed
-		} else if unhealthyCount > 0 {
+		} else if failedCount > 0 || degradedCount > 0 {
 			overallStatus = lvmv1alpha1.RAIDHealthStatusDegraded
 		}
 	}
