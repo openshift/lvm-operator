@@ -359,13 +359,13 @@ func TestBuildRAIDStatus(t *testing.T) {
 			expectedMinSyncPercent: ptr.To(42),
 		},
 		{
-			name: "single LV with partial health is failed",
+			name: "single LV with partial health is degraded",
 			lvs: []lvm.LogicalVolume{
 				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
 			},
 			raidType: lvmv1alpha1.RAIDTypeRAID1,
 			expected: &lvmv1alpha1.RAIDStatus{
-				Status: lvmv1alpha1.RAIDHealthStatusFailed,
+				Status: lvmv1alpha1.RAIDHealthStatusDegraded,
 				LVHealth: []lvmv1alpha1.RAIDLVHealth{
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
 				},
@@ -389,16 +389,46 @@ func TestBuildRAIDStatus(t *testing.T) {
 			expectedMinSyncPercent: ptr.To(100),
 		},
 		{
-			name: "all LVs unhealthy is failed",
+			name: "all LVs partial is degraded not failed",
 			lvs: []lvm.LogicalVolume{
 				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
 				{Name: "lv-pvc-def", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
 			},
 			raidType: lvmv1alpha1.RAIDTypeRAID1,
 			expected: &lvmv1alpha1.RAIDStatus{
-				Status: lvmv1alpha1.RAIDHealthStatusFailed,
+				Status: lvmv1alpha1.RAIDHealthStatusDegraded,
 				LVHealth: []lvmv1alpha1.RAIDLVHealth{
 					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
+					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
+				},
+			},
+			expectedMinSyncPercent: ptr.To(100),
+		},
+		{
+			name: "all LVs with non-partial health status is failed",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "refresh needed", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusFailed,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "refresh needed"},
+				},
+			},
+			expectedMinSyncPercent: ptr.To(100),
+		},
+		{
+			name: "mixed failed and partial is degraded not failed",
+			lvs: []lvm.LogicalVolume{
+				{Name: "lv-pvc-abc", LvAttr: "rwi-a-r---", RAIDSyncPercent: "100.00", LVHealthStatus: "refresh needed", LVLayout: "raid,raid1"},
+				{Name: "lv-pvc-def", LvAttr: "rwi-a-r--p", RAIDSyncPercent: "100.00", LVHealthStatus: "partial", LVLayout: "raid,raid1"},
+			},
+			raidType: lvmv1alpha1.RAIDTypeRAID1,
+			expected: &lvmv1alpha1.RAIDStatus{
+				Status: lvmv1alpha1.RAIDHealthStatusDegraded,
+				LVHealth: []lvmv1alpha1.RAIDLVHealth{
+					{Name: "lv-pvc-abc", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "refresh needed"},
 					{Name: "lv-pvc-def", RAIDType: lvmv1alpha1.RAIDTypeRAID1, SyncPercent: 100, HealthStatus: "partial"},
 				},
 			},
