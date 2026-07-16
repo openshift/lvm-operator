@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-readonly TEMP_DIR="/tmp/get-related-images-$$"
+readonly TEMP_DIR="$(mktemp -d -t get-related-images.XXXXXX)"
 
 usage() {
     cat <<EOF
@@ -42,7 +42,7 @@ trap cleanup EXIT
 check_dependencies() {
     local missing=()
 
-    for tool in skopeo jq yq tar; do
+    for tool in skopeo jq tar; do
         if ! command -v "$tool" >/dev/null 2>&1; then
             missing+=("$tool")
         fi
@@ -56,13 +56,13 @@ check_dependencies() {
 
 get_image_sha(){
 	local image_ref="${1}"
-	image_ref=${image_ref#*@} # Drop anything before the 'sha:'
-	echo ${image_ref%\"} # Remove the trailing quote
+	image_ref="${image_ref#*@}" # Drop anything before the 'sha:'
+	echo "${image_ref%\"}" # Remove the trailing quote
 }
 
 get_image_git_ref(){
 	local image_ref="${1}"
-	echo $(skopeo inspect --config docker://${image_ref} | jq -r '.config.Labels."vcs-ref"')
+	skopeo inspect --config "docker://${image_ref}" | jq -r '.config.Labels."vcs-ref"'
 }
 
 # Copies the bundle image locally and extracts its layers, leaving the
@@ -123,13 +123,13 @@ main() {
     check_dependencies
 
 	# Get the needed data for the bundle
-    VERSION=$(skopeo inspect --config docker://${bundle_image} | jq -r '.config.Labels.version')
+    VERSION=$(skopeo inspect --config "docker://${bundle_image}" | jq -r '.config.Labels.version')
     X="${VERSION%%.*}"
     Y="${VERSION#*.}"
     Y="${Y%.*}"
     Z="${VERSION##*.}"
 
-    BUNDLE_GIT_REF=$(get_image_git_ref ${bundle_image})
+    BUNDLE_GIT_REF=$(get_image_git_ref "${bundle_image}")
 
 	# Extract the manifests so we can get the needed info for the related images
     extract_bundle_manifests "$bundle_image"
@@ -145,9 +145,9 @@ main() {
     related_images=$(extract_related_images "$csv_file")
 
 	# Get the related image refs
-	OPERAND_SHA=$(get_image_sha $(echo "${related_images}" | jq -r '."lvms-operator"'))
-	MUST_GATHER_SHA=$(get_image_sha $(echo "${related_images}" | jq -r '."lvms-must-gather"'))
-	TOPOLVM_SHA=$(get_image_sha $(echo "${related_images}" | jq -r '."topolvm-csi"'))
+	OPERAND_SHA=$(get_image_sha "$(echo "${related_images}" | jq -r '."lvms-operator"')")
+	MUST_GATHER_SHA=$(get_image_sha "$(echo "${related_images}" | jq -r '."lvms-must-gather"')")
+	TOPOLVM_SHA=$(get_image_sha "$(echo "${related_images}" | jq -r '."topolvm-csi"')")
 
 	SKIP_TOPOLVM=0
 	if [[ -z "${TOPOLVM_SHA}" || "${TOPOLVM_SHA}" == "null" ]] ; then
@@ -199,21 +199,13 @@ EOF
 		TOPOLVM_IMG="${IMAGE_BASE_URL}/topolvm@${TOPOLVM_SHA}"
 		TOPOLVM_GIT_REF=$(get_image_git_ref "${TOPOLVM_IMG}")
 
-		topolvm_obj=$(cat <<-EOF
-		{
-		  "name": "topolvm-${X}-${Y}",
-		  "containerImage": "${TOPOLVM_IMG}",
-		  "source": {
-		    "git": {
-		      "url": "https://github.com/openshift/topolvm",
-		      "revision": "${TOPOLVM_GIT_REF}"
-		    }
-		  }
-		}
-		EOF
-		)
-
-		output_yaml=$(echo "${output_yaml}" | yq ".spec.components += [${topolvm_obj}]")
+		output_yaml="${output_yaml}
+    - name: topolvm-${X}-${Y}
+      containerImage: ${TOPOLVM_IMG}
+      source:
+        git:
+          url: https://github.com/openshift/topolvm
+          revision: ${TOPOLVM_GIT_REF}"
 	fi
 
 	echo "${output_yaml}"
