@@ -193,6 +193,17 @@ We include 90/95/99 Quantiles for Memory and CPU as our main metrics. Other metr
 
 See [docs/conventions/](docs/conventions/) for the full set of implementation conventions enforced in review, covering code style, reconciliation patterns, testing, device management, and build/CI.
 
+## Maintaining Agentic Harness Docs
+
+When your PR changes a Go symbol, file path, or constant that is referenced in `docs/`, update the doc reference. Run `./hack/verify-docs.sh` to check for stale references — it runs automatically in CI via `make verify`. Claude Code users get an automatic warning via a PostToolUse hook when editing Go files that contain symbols referenced in docs.
+
+Each convention in `docs/conventions/` is marked with a status:
+- `[E]` **Enforced** — a linter, CI check, webhook, or kubebuilder marker catches violations
+- `[F]` **Followed** — team practice, consistently applied but not automated
+- `[A]` **Aspirational** — documented but not consistently followed in current code
+
+When adding a new convention, include the appropriate status marker. When enforcing a previously aspirational convention (e.g., adding a lint rule), update the marker from `[A]` to `[E]`.
+
 ## Commits Per Pull Request
 
 Pull requests should always represent a complete logical change. Where possible, pull requests should be composed of multiple commits that each make small but meaningful changes. Striking a balance between minimal commits and logically complete changes is an art as much as a science, but when it is possible and reasonable, divide your pull request into more commits.
