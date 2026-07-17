@@ -1,9 +1,9 @@
 #!/bin/bash
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
-#quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
-lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
+lvms_all_tags="$(skopeo list-tags docker://${quay_bundle_path})"
 lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
 all_y_streams=($(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
 template="""
@@ -16,7 +16,7 @@ staging_versions=$(echo "${lvms_all_tags}" | yq '{"staging": [.Tags[] | select(t
 released_versions=$(echo "${lvms_released_tags}" | yq '{"released": [.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$"))]}')
 
 # Filter out the already released versions
-candidate_versions=$((yq ea '. as $item ireduce ({}; . * $item )' <(echo "${staging_versions}") <(echo "${released_versions}")) | yq '.staging - .released')
+candidate_versions=$( (yq ea '. as $item ireduce ({}; . * $item )' <(echo "${staging_versions}") <(echo "${released_versions}") ) | yq '.staging - .released')
 
 # Cache the digests so we don't need to double the quay calls
 declare -A digests
@@ -78,7 +78,7 @@ for i in "${!all_y_streams[@]}"; do
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
         for ver in "${catalog_versions[@]}"; do
             if ! [[ -n "${digests["${ver}"]}" ]]; then
-                digests["${ver}"]=$(skopeo inspect "docker://${staging_bundle_path}:${ver}" --format "{{.Digest}}")
+                digests["${ver}"]=$(skopeo inspect "docker://${quay_bundle_path}:${ver}" --format "{{.Digest}}")
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
