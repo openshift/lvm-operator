@@ -1,0 +1,278 @@
+# .tekton/catalog-candidate-update-staging-final-pipeline.yaml
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: catalog-candidate-update-staging-final-pipeline
+  annotations:
+    description: |
+      Final pipeline triggered by Konflux after the lvm-operator-bundle
+      component releases to staging. Regenerates both catalog templates via
+      release/hack/generate_catalog_template.sh (through
+      `make -f release/konflux.make catalog-template`) and, if anything
+      changed, opens or updates a persistent PR with the result. This is the
+      only pipeline that runs the catalog-template generation script -
+      operator-version-bump-production-final-pipeline only bumps the
+      operator version and relies on the resulting build cascade
+      (operator rebuild -> bundle rebuild -> bundle staging release) to
+      reach this pipeline.
+
+      Commits are created via the GitHub GraphQL API (createCommitOnBranch)
+      so they are signed/verified by GitHub - no local git push or signing
+      key required. A real git clone is still used to actually execute the
+      Makefile/script against a checked-out tree.
+spec:
+  params:
+    - name: snapshot
+      description: Snapshot reference from Konflux release
+      type: string
+    - name: release
+      description: Release reference from Konflux release
+      type: string
+    - name: releasePlan
+      description: ReleasePlan reference from Konflux release
+      type: string
+    - name: release-branch
+      description: "Release branch to update (e.g. release-5.0)"
+      type: string
+    - name: git-url
+      description: Repository URL
+      type: string
+      default: https://github.com/openshift/lvm-operator
+    - name: y-stream
+      description: "Y-stream to regenerate catalog templates for (e.g. v5.0)"
+      type: string
+      default: v5.0
+
+  results:
+    - name: PR_URL
+      description: URL of the candidate catalog template PR (empty if no changes)
+      value: $(tasks.update-candidate-and-pr.results.PR_URL)
+    - name: CHANGED
+      description: "\"true\" if a commit/PR was created or updated, \"false\" if no changes were found"
+      value: $(tasks.update-candidate-and-pr.results.CHANGED)
+
+  tasks:
+    - name: update-candidate-and-pr
+      taskSpec:
+        params:
+          - name: release-branch
+          - name: git-url
+          - name: y-stream
+        results:
+          - name: PR_URL
+            description: URL of the created/reused pull request, empty if no changes
+          - name: CHANGED
+            description: "\"true\" or \"false\""
+        volumes:
+          - name: github-app-credentials
+            secret:
+              secretName: github-app-credentials
+          - name: registry-redhat-io-docker
+            secret:
+              secretName: registry-redhat-io-docker
+          - name: components-namespace-pull
+            secret:
+              secretName: components-namespace-pull
+        steps:
+          # ── Step 1: Install tools ──
+          - name: install-tools
+            image: quay.io/konflux-ci/appstudio-utils:latest@sha256:32cda04122ee0a5d5b4307e121d192d1265c3bff727c9d894f36b6772da53d8c
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              TOOL_DIR="/workspace/tools"
+              mkdir -p "$TOOL_DIR"
+
+              command -v jq >/dev/null || (microdnf install -y jq || dnf install -y jq)
+
+              echo "Installing skopeo..."
+              curl -sL "https://github.com/lework/skopeo-binary/releases/download/v1.17.0/skopeo-linux-amd64" \
+                -o "$TOOL_DIR/skopeo"
+              chmod +x "$TOOL_DIR/skopeo"
+
+              echo "Installing yq..."
+              YQ_VER=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest \
+                | grep -oP '"tag_name": "\K[^"]+')
+              curl -sL "https://github.com/mikefarah/yq/releases/download/${YQ_VER}/yq_linux_amd64" \
+                -o "$TOOL_DIR/yq"
+              chmod +x "$TOOL_DIR/yq"
+
+              echo "Tools installed to $TOOL_DIR"
+              ls -la "$TOOL_DIR"
+
+          # ── Step 2: Clone, regenerate, diff-check, push via API, PR ──
+          - name: update-and-pr
+            image: quay.io/konflux-ci/appstudio-utils:latest@sha256:32cda04122ee0a5d5b4307e121d192d1265c3bff727c9d894f36b6772da53d8c
+            workingDir: /workspace
+            volumeMounts:
+              - name: github-app-credentials
+                mountPath: /secrets/github-app
+                readOnly: true
+              - name: registry-redhat-io-docker
+                mountPath: /secrets/registry-redhat-io
+                readOnly: true
+              - name: components-namespace-pull
+                mountPath: /secrets/components-namespace-pull
+                readOnly: true
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+              export PATH="/workspace/tools:$PATH"
+
+              command -v jq >/dev/null || (microdnf install -y jq || dnf install -y jq)
+
+              # generate_catalog_template.sh queries both registry.redhat.io
+              # (released-version discovery) and the private
+              # quay.io/redhat-user-workloads tenant repo (candidate digests)
+              # in the same run. REGISTRY_AUTH_FILE only accepts one file, so
+              # merge both dockerconfigjson secrets' auths into one.
+              jq -s '{auths: (.[0].auths + .[1].auths)}' \
+                /secrets/registry-redhat-io/.dockerconfigjson \
+                /secrets/components-namespace-pull/.dockerconfigjson \
+                > /tmp/merged-registry-auth.json
+              export REGISTRY_AUTH_FILE=/tmp/merged-registry-auth.json
+
+              RELEASE_BRANCH="$(params.release-branch)"
+              GIT_URL="$(params.git-url)"
+              Y_STREAM="$(params.y-stream)"
+
+              OWNER_REPO="${GIT_URL#https://github.com/}"
+              OWNER_REPO="${OWNER_REPO%.git}"
+              OWNER="${OWNER_REPO%%/*}"
+              REPO="${OWNER_REPO##*/}"
+              API="https://api.github.com/repos/${OWNER}/${REPO}"
+
+              # ── Clone (public repo, no auth needed for read/clone) ──
+              echo "=== Cloning ${GIT_URL} @ ${RELEASE_BRANCH} ==="
+              git clone --branch "$RELEASE_BRANCH" "$GIT_URL" repo
+              cd repo
+              BASE_SHA=$(git rev-parse HEAD)
+
+              # ── Regenerate catalog templates ──
+              echo "=== Running make catalog-template (Y_STREAM=${Y_STREAM}) ==="
+              make -f release/konflux.make catalog-template Y_STREAM="${Y_STREAM}"
+
+              CHANGED_FILES=$(git status --porcelain -- release/catalog/ | awk '{print $2}')
+              if [ -z "$CHANGED_FILES" ]; then
+                echo "No candidate/catalog changes detected, skipping."
+                echo -n "false" > $(results.CHANGED.path)
+                echo -n "" > $(results.PR_URL.path)
+                exit 0
+              fi
+
+              echo "Changed files:"
+              echo "$CHANGED_FILES"
+
+              # ── Generate GitHub App installation token ──
+              APP_ID=$(cat /secrets/github-app/app-id)
+              INSTALLATION_ID=$(cat /secrets/github-app/installation-id)
+
+              NOW=$(date +%s)
+              IAT=$((NOW - 60))
+              EXP=$((NOW + 540))
+
+              HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              PAYLOAD=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$IAT" "$EXP" "$APP_ID" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              SIG=$(printf '%s' "${HEADER}.${PAYLOAD}" \
+                | openssl dgst -sha256 -sign /secrets/github-app/private-key -binary \
+                | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              JWT="${HEADER}.${PAYLOAD}.${SIG}"
+
+              GITHUB_TOKEN=$(curl -sS -X POST \
+                -H "Authorization: Bearer ${JWT}" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens" \
+                | jq -r '.token')
+
+              AUTH_HEADER="Authorization: Bearer ${GITHUB_TOKEN}"
+
+              # ── Create or reset the persistent candidate-update branch to release-branch HEAD ──
+              PR_BRANCH="catalog-candidate-update-${Y_STREAM}"
+              REF_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -H "$AUTH_HEADER" \
+                "${API}/git/ref/heads/${PR_BRANCH}")
+              if [ "$REF_STATUS" = "200" ]; then
+                curl -sS -X PATCH -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                  "${API}/git/refs/heads/${PR_BRANCH}" \
+                  -d "{\"sha\":\"${BASE_SHA}\",\"force\":true}" > /dev/null
+              else
+                curl -sS -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                  "${API}/git/refs" \
+                  -d "{\"ref\":\"refs/heads/${PR_BRANCH}\",\"sha\":\"${BASE_SHA}\"}" > /dev/null
+              fi
+
+              # ── Build the fileChanges additions array from the changed files on disk ──
+              ADDITIONS="[]"
+              for f in $CHANGED_FILES; do
+                CONTENT_B64=$(base64 -w0 "$f")
+                ADDITIONS=$(echo "$ADDITIONS" | jq --arg path "$f" --arg contents "$CONTENT_B64" '. + [{path: $path, contents: $contents}]')
+              done
+
+              # ── Create a signed commit via GraphQL (GitHub signs this server-side) ──
+              echo "=== Creating signed commit updating candidate catalog template(s) ==="
+              GRAPHQL_PAYLOAD=$(jq -n \
+                --arg repo "${OWNER}/${REPO}" \
+                --arg branch "$PR_BRANCH" \
+                --arg headline "chore: update candidate catalog template for ${Y_STREAM}" \
+                --arg oid "$BASE_SHA" \
+                --argjson additions "$ADDITIONS" \
+                '{
+                  query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url oid } } }",
+                  variables: {
+                    input: {
+                      branch: { repositoryNameWithOwner: $repo, branchName: $branch },
+                      message: { headline: $headline },
+                      expectedHeadOid: $oid,
+                      fileChanges: { additions: $additions }
+                    }
+                  }
+                }')
+
+              COMMIT_RESULT=$(curl -sS -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                https://api.github.com/graphql -d "$GRAPHQL_PAYLOAD")
+              COMMIT_URL=$(echo "$COMMIT_RESULT" | jq -r '.data.createCommitOnBranch.commit.url // empty')
+              if [ -z "$COMMIT_URL" ]; then
+                echo "ERROR: commit creation failed: $COMMIT_RESULT" >&2
+                exit 1
+              fi
+              echo "Created signed commit: $COMMIT_URL"
+
+              # ── Reuse an existing open PR on this branch, or create a new one ──
+              EXISTING_PR_JSON=$(curl -sS -H "$AUTH_HEADER" \
+                "${API}/pulls?head=${OWNER}:${PR_BRANCH}&base=${RELEASE_BRANCH}&state=open")
+              EXISTING_PR=$(echo "$EXISTING_PR_JSON" | jq -r '.[0].html_url // empty')
+              EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_JSON" | jq -r '.[0].number // empty')
+
+              if [ -n "$EXISTING_PR" ]; then
+                PR_URL="$EXISTING_PR"
+                PR_NUMBER="$EXISTING_PR_NUMBER"
+                echo "Reusing existing PR: $PR_URL"
+              else
+                PR_BODY=$(printf '## Candidate Catalog Template Update\n\nAutomatically generated by the Konflux staging final pipeline after a lvm-operator-bundle staging release.\n\n### Changes\nRegenerated via `make -f release/konflux.make catalog-template Y_STREAM=%s`.\n\nFiles changed:\n%s\n' \
+                  "$Y_STREAM" "$CHANGED_FILES")
+                PR_JSON=$(jq -n \
+                  --arg title "NO-JIRA: chore: Update candidate catalog template for ${Y_STREAM}" \
+                  --arg head "$PR_BRANCH" \
+                  --arg base "$RELEASE_BRANCH" \
+                  --arg body "$PR_BODY" \
+                  '{title:$title, head:$head, base:$base, body:$body}')
+                PR_RESPONSE=$(curl -sS -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" "${API}/pulls" -d "$PR_JSON")
+                PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url')
+                PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number')
+                echo "Created PR: $PR_URL"
+              fi
+
+              # ── Apply labels (idempotent - safe to re-apply on a reused PR) ──
+              curl -sS -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                "${API}/issues/${PR_NUMBER}/labels" \
+                -d '{"labels":["approved","lgtm"]}' > /dev/null
+
+              echo -n "true" > $(results.CHANGED.path)
+              echo -n "$PR_URL" > $(results.PR_URL.path)
+      params:
+        - name: release-branch
+          value: $(params.release-branch)
+        - name: git-url
+          value: $(params.git-url)
+        - name: y-stream
+          value: $(params.y-stream)
