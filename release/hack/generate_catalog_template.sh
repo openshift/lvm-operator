@@ -1,10 +1,17 @@
 #!/bin/bash
+set -euo pipefail
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
 quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
-lvms_all_tags="$(skopeo list-tags docker://${quay_bundle_path})"
-lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
+if ! lvms_all_tags="$(skopeo list-tags "docker://${quay_bundle_path}")" || [[ -z "${lvms_all_tags}" ]]; then
+    echo "Failed to list candidate bundle tags from ${quay_bundle_path}" >&2
+    exit 1
+fi
+if ! lvms_released_tags="$(skopeo list-tags "docker://${bundle_path}")" || [[ -z "${lvms_released_tags}" ]]; then
+    echo "Failed to list released bundle tags from ${bundle_path}" >&2
+    exit 1
+fi
 all_y_streams=($(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
 template="""
 Schema: olm.semver
@@ -49,12 +56,9 @@ for i in "${!all_y_streams[@]}"; do
 
     for ver in "${catalog_versions[@]}"; do
         if ! [[ -n "${digests["${ver}"]}" ]]; then
-            digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}")
-
-            while ! [ $? -eq 0 ]; do
+            until digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}"); do
                 echo "Trying again..."
                 sleep 5s
-                digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}")
             done
 
             digests["${ver}"]=$digest
@@ -78,7 +82,11 @@ for i in "${!all_y_streams[@]}"; do
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
         for ver in "${catalog_versions[@]}"; do
             if ! [[ -n "${digests["${ver}"]}" ]]; then
-                digests["${ver}"]=$(skopeo inspect "docker://${quay_bundle_path}:${ver}" --format "{{.Digest}}")
+                if ! digest=$(skopeo inspect "docker://${quay_bundle_path}:${ver}" --format "{{.Digest}}") || [[ -z "${digest}" ]]; then
+                    echo "Failed to resolve candidate digest for ${ver}" >&2
+                    exit 1
+                fi
+                digests["${ver}"]="${digest}"
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
