@@ -42,8 +42,11 @@ lsblk --json discovers all block devices
 │
 ├─ onlyValidFilesystemSignatures
 │    ├─ No FSType → pass
-│    ├─ LVM2_member → pass if: same VG name, OR orphaned PV with free capacity
-│    └─ Any other FSType → reject
+│    ├─ LVM2_member + same VG → already configured (skip, not a new candidate)
+│    ├─ LVM2_member + orphaned PV with free capacity → pass (eligible for reuse)
+│    ├─ LVM2_member + no PV record in LVM → pass (reclaimable via vgcreate)
+│    ├─ LVM2_member + different VG → reject (belongs to another volume group)
+│    └─ Any other FSType (e.g. swap, xfs, ext4) → reject
 │
 ├─ noChildren ───────────── Has no child block devices?
 │
@@ -76,7 +79,7 @@ Two reconciliation loops run independently:
 5. Compute state: Failed > Degraded > Progressing > Ready > Unknown (only Ready when ALL expected VGs on ALL valid nodes are Ready)
 ```
 
-### VG Manager (DaemonSet, one per node, requeues every 30s)
+### VG Manager (DaemonSet, one per node, requeue interval varies)
 
 ```text
 1. List LVMVolumeGroup CRs matching this node
@@ -92,9 +95,10 @@ Two reconciliation loops run independently:
    i. Handle device removal: detect removed paths, call vgreduce/pvremove
    j. Validate existing logical volumes (thin pool health, metadata %)
    k. Update LVMVolumeGroupNodeStatus with current state
-3. Determine requeue:
-   - Explicit device paths + Static policy → no periodic requeue
-   - Dynamic policy → requeue in 30s
+3. Determine requeue (in precedence order):
+   - RAID device class → requeue in 60s (health monitoring)
+   - Explicit device paths (any policy) or Static → no periodic requeue
+   - Dynamic policy without explicit paths → requeue in 30s
    - After VG creation/extension → always requeue (verification step)
 ```
 

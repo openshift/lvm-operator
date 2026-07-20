@@ -61,7 +61,12 @@ $ lsblk --paths --json -o NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL
     - *Why:* These partitions are already dedicated to LVM and are managed as part of an existing volume group.
     - *Filter:* `type` is set to `lvm`.
 
-9. **Loop Devices:**
+9. **Swap Devices:**
+    - *Condition:* Devices with filesystem type `swap` are unsupported.
+    - *Why:* Swap partitions are actively used by the operating system for memory management. Adding them to a volume group would destroy the swap space and potentially destabilize the node.
+    - *Filter:* Rejected by the filesystem-signature filter (see condition 4) because `fstype` is set to `swap`, which is not a valid signature for LVMS.
+
+10. **Loop Devices:**
     - *Condition:* Loop Devices must not be used if they are already in use by Kubernetes.
     - *Why:* When loop devices are utilized by Kubernetes, they are likely configured for specific tasks or processes managed by the Kubernetes environment. Integrating loop devices that are already in use by Kubernetes into LVMS can lead to potential conflicts and interference with the Kubernetes system.
     - *Filter:* `type` is set to `loop`, and `losetup <loop-device> -O BACK-FILE --json` returns a `back-file` which contains `plugins/kubernetes.io`.
