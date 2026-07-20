@@ -42,7 +42,7 @@ for i in "${!all_y_streams[@]}"; do
     fi
 
     # Filter out unsupported versions
-    if [[ -n "${TARGET_VERSIONS[*]+set}" ]] && ! [[ " ${TARGET_VERSIONS[*]} " =~ " ${maxVersion} " ]]; then
+    if [[ -n "${TARGET_VERSIONS[*]+set}" ]] && [[ " ${TARGET_VERSIONS[*]} " != *" ${maxVersion} "* ]]; then
         continue
     fi
 
