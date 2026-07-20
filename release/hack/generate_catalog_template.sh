@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+MAX_RETRIES=5
+
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
 quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
@@ -40,7 +42,7 @@ for i in "${!all_y_streams[@]}"; do
     fi
 
     # Filter out unsupported versions
-    if ! [[ " ${TARGET_VERSIONS[*]} " =~ " ${maxVersion} " ]]; then
+    if [[ -n "${TARGET_VERSIONS[*]+set}" ]] && ! [[ " ${TARGET_VERSIONS[*]} " =~ " ${maxVersion} " ]]; then
         continue
     fi
 
@@ -55,9 +57,15 @@ for i in "${!all_y_streams[@]}"; do
     fi
 
     for ver in "${catalog_versions[@]}"; do
-        if ! [[ -n "${digests["${ver}"]}" ]]; then
+        if ! [[ -n "${digests["${ver}"]+set}" ]]; then
+            retries=0
             until digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}"); do
-                echo "Trying again..."
+                retries=$((retries + 1))
+                if [ "${retries}" -ge "${MAX_RETRIES}" ]; then
+                    echo "ERROR: Failed to inspect ${bundle_path}:${ver} after ${MAX_RETRIES} attempts" >&2
+                    exit 1
+                fi
+                echo "Trying again (attempt $((retries + 1))/${MAX_RETRIES})..."
                 sleep 5s
             done
 
@@ -81,7 +89,7 @@ for i in "${!all_y_streams[@]}"; do
     # Check for and add any candidates if SKIP_CANDIDATES was not specified
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
         for ver in "${catalog_versions[@]}"; do
-            if ! [[ -n "${digests["${ver}"]}" ]]; then
+            if ! [[ -n "${digests["${ver}"]+set}" ]]; then
                 if ! digest=$(skopeo inspect "docker://${quay_bundle_path}:${ver}" --format "{{.Digest}}") || [[ -z "${digest}" ]]; then
                     echo "Failed to resolve candidate digest for ${ver}" >&2
                     exit 1
