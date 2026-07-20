@@ -70,7 +70,7 @@ spec:
   snapshot: lvm-operator-catalog-{x-y}-{snapshot-id}
 ```
 
-Catalog releases have no `data` section — they carry no advisory or release notes since the catalog is a delivery mechanism, not a user-facing artifact. The released catalog gets merged into the offical OpenShift operator catalog.
+Catalog releases have no `data` section — they carry no advisory or release notes since the catalog is a delivery mechanism, not a user-facing artifact. The released catalog gets merged into the official OpenShift operator catalog.
 
 ### Release Automation (`manage-release.sh`)
 

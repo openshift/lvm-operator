@@ -1,4 +1,4 @@
-# Konflux Based Build and Release Management
+# Konflux-Based Build and Release Management
 
 This and the linked documents describe the Konflux CI/CD system that builds, tests, and
 releases the LVMS container images. All build pipelines are defined as Tekton resources in
@@ -228,7 +228,7 @@ make rpm-lock
 ### `konflux.make`
 
 There are several Make targets specifically for Konflux. These are pulled
-into the top level LVM Operator `Makefile` and should be run from the
+into the top-level LVM Operator `Makefile` and should be run from the
 repository root.
 
 | Target                     | Description                                                |

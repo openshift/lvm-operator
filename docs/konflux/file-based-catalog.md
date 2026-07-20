@@ -2,7 +2,7 @@
 
 ## File Base Catalog
 
-Prior to the introduction of Konflux, the catalog was built and maintained automatically by the build and release systems. When onboarding to konflux, it was required that the LVM Operator implement and maintain an operator specific [file-based catalog](https://olm.operatorframework.io/docs/reference/file-based-catalogs/). The resulting catalog would then be built by the catalog pipelines from the Operator repositor and integrated automatically into the official OpenShift operator catalog after release.
+Prior to the introduction of Konflux, the catalog was built and maintained automatically by the build and release systems. When onboarding to Konflux, it was required that the LVM Operator implement and maintain an operator-specific [file-based catalog](https://olm.operatorframework.io/docs/reference/file-based-catalogs/). The resulting catalog would then be built by the catalog pipelines from the Operator repository and integrated automatically into the official OpenShift operator catalog after release.
 
 ## FBC Builds and Tooling
 
@@ -35,49 +35,49 @@ sequenceDiagram
 
 #### New Bundle SHA (no version change)
 
-When the operator or must-gather images are rebuilt (e.g. a dependency update or bug fix) without a version bump, a new bundle is built referencing the updated image digests. After this bundle reaches staging, Mintmaker automatically opens a nudge PR to update the candidate template digest. No manual action is required.
+When the operator or must-gather images are rebuilt (e.g. a dependency update or bug fix) without a version bump, a new bundle is built referencing the updated image digests. After this bundle reaches staging, the staging final pipeline (`catalog-candidate-update-staging-final-pipeline`) automatically runs `make -f release/konflux.make catalog-template` and, if the candidate template changed, creates or updates a persistent PR with the regenerated templates. No manual action is required.
 
 ```mermaid
 sequenceDiagram
     participant Dep as Dependency Update
     participant Konflux as Konflux CI
     participant Staging as Staging Registry
-    participant MM as Mintmaker
+    participant Pipeline as Staging Final Pipeline
     participant Repo as Repository
 
     Dep->>Konflux: Operator/must-gather image rebuilt
     Konflux->>Konflux: Bundle rebuilt with new digests
     Konflux->>Staging: Bundle released to staging
-    MM->>Repo: Opens nudge PR updating<br/>candidate-template.yaml digest
+    Pipeline->>Pipeline: make catalog-template
+    Pipeline->>Repo: Creates/updates persistent PR<br/>with regenerated templates
     Note over Repo: Auto-merged with approved + lgtm
     Repo->>Konflux: Catalog rebuilt with updated bundle
 ```
 
 #### After a Y-Stream Production Release
 
-After releasing a new Y-stream operator version to production (e.g. `v4.22.0`), the released bundle moves from the candidate template to the released template. A new z+1 candidate must also be prepared. This requires updates to both the release branch and `main`.
+After releasing a new Y-stream operator version to production (e.g. `v4.22.0`), the released bundle moves from the candidate template to the released template. A new z+1 candidate must also be prepared. The release-branch side is automated by the final pipelines; `main` still needs a manual update.
 
-1. On the **release branch**: bump `OPERATOR_VERSION` in `release/container-build.args` (e.g. `4.22.0` → `4.22.1`) and wait for the new bundle to reach staging
-2. Run `make catalog-template` on the release branch to regenerate both template files
-3. Open a PR to the release branch with the updated templates and get it merged
-4. On **`main`**: run `make catalog-template` to regenerate `lvm-operator-catalog-template.yaml` (the released template picks up the newly released bundle; both files may receive updates)
-5. Open a PR to `main` and get it merged
+1. On the **release branch**: the production final pipeline (`operator-version-bump-production-final-pipeline`) automatically bumps `OPERATOR_VERSION` in `release/container-build.args` (e.g. `4.22.0` → `4.22.1`) and opens a PR
+2. Merging that PR triggers the operator/bundle rebuild cascade; once the new bundle reaches staging, the staging final pipeline (`catalog-candidate-update-staging-final-pipeline`) automatically runs `make catalog-template` and creates or updates a persistent PR with the regenerated templates
+3. On **`main`**: run `make catalog-template` to regenerate `lvm-operator-catalog-template.yaml` (the released template picks up the newly released bundle; both files may receive updates)
+4. Open a PR to `main` and get it merged
 
 ```mermaid
 sequenceDiagram
-    participant Dev as Developer
+    participant Pipeline as Final Pipelines
     participant RelBranch as release-x.y branch
+    participant Dev as Developer
     participant Main as main branch
     participant Staging as Staging Registry
     participant Konflux as Konflux CI
 
-    Note over Dev,Konflux: Operator v4.22.0 released to production
-    Dev->>RelBranch: Bump OPERATOR_VERSION to 4.22.1
+    Note over Pipeline,Konflux: Operator v4.22.0 released to production
+    Pipeline->>RelBranch: Auto-bump OPERATOR_VERSION to 4.22.1, open PR
+    RelBranch->>Konflux: Merge triggers rebuild cascade
     Konflux->>Staging: New z+1 bundle released to staging
-
-    Dev->>Dev: make catalog-template (on release branch)
-    Note over Dev: released template: adds v4.22.0<br/>candidate template: points to v4.22.1
-    Dev->>RelBranch: PR with updated templates → merge
+    Pipeline->>Pipeline: make catalog-template
+    Pipeline->>RelBranch: Creates/updates persistent PR<br/>with regenerated templates
 
     Dev->>Dev: make catalog-template (on main)
     Note over Dev: released template: picks up v4.22.0
@@ -86,28 +86,27 @@ sequenceDiagram
 
 #### After a Z-Stream Production Release
 
-After releasing a z-stream update (e.g. `v4.22.1`), the process is similar to the Y-stream case but the `main` branch update targets the next y-stream's release branch instead.
+After releasing a z-stream update (e.g. `v4.22.1`), the process is similar to the Y-stream case but the `main` branch update targets the next y-stream's release branch instead. The release-branch side is automated by the final pipelines; the next y-stream release branch still needs a manual update.
 
-1. On the **release branch**: bump `OPERATOR_VERSION` in `release/container-build.args` (e.g. `4.22.1` → `4.22.2`) and wait for the new bundle to reach staging
-2. Run `make catalog-template` on the release branch to regenerate both template files
-3. Open a PR to the release branch with the updated templates and get it merged
-4. On the **next y-stream release branch**: run `make catalog-template` to regenerate `lvm-operator-catalog-template.yaml` (the released bundle flows into the next version's released template since catalogs carry bundles from x.y and x.y-1)
+1. On the **release branch**: the production final pipeline (`operator-version-bump-production-final-pipeline`) automatically bumps `OPERATOR_VERSION` in `release/container-build.args` (e.g. `4.22.1` → `4.22.2`) and opens a PR
+2. Merging that PR triggers the operator/bundle rebuild cascade; once the new bundle reaches staging, the staging final pipeline (`catalog-candidate-update-staging-final-pipeline`) automatically runs `make catalog-template` and creates or updates a persistent PR with the regenerated templates
+3. On the **next y-stream release branch**: run `make catalog-template` to regenerate `lvm-operator-catalog-template.yaml` (the released bundle flows into the next version's released template since catalogs carry bundles from x.y and x.y-1)
 
 ```mermaid
 sequenceDiagram
-    participant Dev as Developer
+    participant Pipeline as Final Pipelines
     participant CurBranch as release-x.y branch
+    participant Dev as Developer
     participant NextBranch as release-x.(y+1) branch
     participant Staging as Staging Registry
     participant Konflux as Konflux CI
 
-    Note over Dev,Konflux: Operator v4.22.1 released to production
-    Dev->>CurBranch: Bump OPERATOR_VERSION to 4.22.2
+    Note over Pipeline,Konflux: Operator v4.22.1 released to production
+    Pipeline->>CurBranch: Auto-bump OPERATOR_VERSION to 4.22.2, open PR
+    CurBranch->>Konflux: Merge triggers rebuild cascade
     Konflux->>Staging: New z+1 bundle released to staging
-
-    Dev->>Dev: make catalog-template (on release-x.y)
-    Note over Dev: released template: adds v4.22.1<br/>candidate template: points to v4.22.2
-    Dev->>CurBranch: PR with updated templates → merge
+    Pipeline->>Pipeline: make catalog-template
+    Pipeline->>CurBranch: Creates/updates persistent PR<br/>with regenerated templates
 
     Dev->>Dev: make catalog-template (on release-x.(y+1))
     Note over Dev: released template: picks up v4.22.1<br/>(catalogs carry x.y and x.y-1 bundles)
@@ -141,7 +140,7 @@ The helper scripts will merge those two files at build time into one cohesive te
 
 ### `.tekton/catalog-patching-build-pipeline.yaml`
 
-The pipeline contains the implementation of a custom build pipeline for the LVM Operator catlaogs.
+The pipeline contains the implementation of a custom build pipeline for the LVM Operator catalogs.
 This pipeline extends the basic FBC pipeline with pre- and post-processing steps to merge candidate bundle entries (staging) with released (production) bundle entries and patch the rendered catalog.
 
 **Task execution flow:**
@@ -188,10 +187,10 @@ Builds the File-Based Catalog image:
 
 The catalog build involves three scripts that work together:
 
-1. **`release/hack/generate_catalog_template.sh`** (offline, run via `make catalog-template`):
-   - Queries staging and production registries for all bundle tags using `skopeo list-tags`
+1. **`release/hack/generate_catalog_template.sh`** (run via `make catalog-template`, either locally or from the staging final pipeline):
+   - Lists released bundle tags from `registry.redhat.io` and candidate bundle tags/digests from the private Konflux Quay tenant repo (`quay.io/redhat-user-workloads/.../lvm-operator-bundle`) using `skopeo list-tags`/`skopeo inspect`
    - Resolves digests for each semver-tagged bundle
-   - Writes `lvm-operator-catalog-template.yaml` (released bundles from `registry.redhat.io`) and `lvm-operator-catalog-candidate-template.yaml` (pre-release bundles from `registry.stage.redhat.io`)
+   - Writes `lvm-operator-catalog-template.yaml` (released bundles from `registry.redhat.io`) and `lvm-operator-catalog-candidate-template.yaml` (candidate entries pinned to the digest resolved from the Quay tenant, referenced under the `registry.stage.redhat.io` staging pullspec)
 
 2. **`release/hack/prepare-catalog.sh`** (runs as pipeline `catalog-template-merge` task):
    - Rewrites staging bundle paths in the candidate template to use the Konflux quay.io paths
