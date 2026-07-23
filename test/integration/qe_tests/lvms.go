@@ -4249,6 +4249,10 @@ spec:
 			logf("Created PVC %s and Deployment %s on node %s\n", pvcName, depName, workerName)
 		}
 
+		g.By("#. Get CSIStorageCapacity before decreasing overprovision ratio")
+		capacityBeforeDecrease := getCurrentTotalLvmStorageCapacityByStorageClass(storageClassName)
+		logf("CSIStorageCapacity before ratio decrease: %d\n", capacityBeforeDecrease)
+
 		g.By("#. Decrease overprovision ratio value to 1")
 		err = patchOverprovisionRatio(newLVMClusterName, lvmsNamespace, "1")
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -4260,6 +4264,13 @@ spec:
 			deviceClassName: deviceClassName,
 		}
 		checkLVMClusterAndVGManagerPodReady(tc, lvmClusterObj)
+
+		g.By("#. Wait for CSIStorageCapacity to be updated after ratio decrease")
+		o.Eventually(func() int {
+			capacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClassName)
+			logf("Current CSIStorageCapacity: %d (was: %d)\n", capacity, capacityBeforeDecrease)
+			return capacity
+		}, 3*time.Minute, 5*time.Second).Should(o.BeNumerically("<", capacityBeforeDecrease))
 
 		g.By("#. Create pvc2")
 		pvc2Name := "test-pvc-final-76425"
