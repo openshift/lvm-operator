@@ -41,6 +41,7 @@ This is the LVM Operator, part of LVMS (Logical Volume Manager Storage) for Open
 | [docs/loop-devices.md](docs/loop-devices.md) | Using loop devices for testing and development |
 | [docs/security.md](docs/security.md) | Snyk vulnerability scanning |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Troubleshooting guide |
+| [docs/playbooks/](docs/playbooks/) | Step-by-step implementation guides for common tasks |
 
 ## Modifying CRDs
 
@@ -97,7 +98,7 @@ This operator manages physical storage. Mistakes destroy data. See [docs/core-be
 
 **Key architecture facts:**
 - VG Manager runs as a privileged DaemonSet and executes LVM commands (`vgcreate`, `vgextend`, `lvcreate`, `wipefs`) directly on nodes
-- VG Manager requeue interval depends on configuration (RAID/Dynamic: 30s periodic; Static with explicit paths: no periodic requeue) — controllers must handle partial states and retries safely (idempotency)
+- VG Manager requeue interval depends on configuration, in precedence order: RAID: 60s for health monitoring; explicit device paths (any policy) or Static: no periodic requeue; Dynamic discovery without explicit paths: 30s; after VG creation/extension: always requeue (verification step). See `determineFinishedRequeue` in `internal/controllers/vgmanager/controller.go`. Controllers must handle partial states and retries safely (idempotency)
 - Data loss from incorrect device selection is unrecoverable — verify device selectors carefully in tests
 
 ## Path-Scoped Guidance
