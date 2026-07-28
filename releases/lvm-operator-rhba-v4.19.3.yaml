@@ -18,6 +18,7 @@ spec:
 
         - Adds rate limiting to file lock controller to prevent excessive log generation
         - Bumps gRPC-Go to 1.79.3 to address CVE-2026-33186 authorization bypass vulnerability
+        - Golang version bump to address CVE-2026-25679 and CVE-2025-61726
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
       issues:
