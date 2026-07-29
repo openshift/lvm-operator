@@ -188,7 +188,7 @@ Builds the File-Based Catalog image:
 The catalog build involves three scripts that work together:
 
 1. **`release/hack/generate_catalog_template.sh`** (run via `make catalog-template`, either locally or from the staging final pipeline):
-   - Lists released bundle tags from `registry.redhat.io` and candidate bundle tags/digests from the private Konflux Quay tenant repo (`quay.io/redhat-user-workloads/.../lvm-operator-bundle`) using `skopeo list-tags`/`skopeo inspect`
+   - Lists released bundle tags from `registry.redhat.io` and candidate bundle tags/digests from the public Konflux Quay tenant repo (`quay.io/redhat-user-workloads/.../lvm-operator-bundle`) using `skopeo list-tags`/`skopeo inspect`
    - Resolves digests for each semver-tagged bundle
    - Writes `lvm-operator-catalog-template.yaml` (released bundles from `registry.redhat.io`) and `lvm-operator-catalog-candidate-template.yaml` (candidate entries pinned to the digest resolved from the Quay tenant, referenced under the `registry.stage.redhat.io` staging pullspec)
 

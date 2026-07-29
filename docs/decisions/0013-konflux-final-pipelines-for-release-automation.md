@@ -1,7 +1,7 @@
 ---
 status: Proposed
 date: 2026-07-20
-decision-makers: Jeff Roche (jeroche), Pablo Acevedo Montserrat (pacevedom)
+decision-makers: Jeff Roche (jeroche), Pablo Acevedo Montserrat (pacevedom), Kasturi Narra (kasturinarra)
 consulted: LVMS team
 informed: OpenShift Edge team
 ---
@@ -153,7 +153,7 @@ rather than silently producing incomplete results.
   the pipelines cannot be unit-tested in isolation.
 * Neutral, because pipeline B requires registry credentials for both
   `registry.redhat.io` and the private Quay tenant repo, adding two
-  more secrets to manage. Both secrets already exist in the konflux 
+  more secrets to manage. Both secrets already exist in the konflux
   tenant we use and can be reused.
 
 ## More Information

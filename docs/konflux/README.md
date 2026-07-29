@@ -59,24 +59,31 @@ and flow through the Red Hat release pipeline to their production locations unde
 
 ```text
 .tekton/
-├── multi-arch-build-pipeline.yaml              # Pipeline: multi-arch builds (operator, must-gather)
-├── single-arch-build-pipeline.yaml             # Pipeline: single-arch builds (bundle)
-├── catalog-patching-build-pipeline.yaml        # Pipeline: FBC build with pre/post patching (catalog)
-├── lvm-operator-5-0-push.yaml                  # PipelineRun: operator on push to main
-├── lvm-operator-5-0-pull-request.yaml          # PipelineRun: operator on PR to main
-├── lvm-operator-bundle-5-0-push.yaml           # PipelineRun: bundle on push to main
-├── lvm-operator-bundle-5-0-pull-request.yaml   # PipelineRun: bundle on PR to main
-├── lvm-operator-catalog-5-0-push.yaml          # PipelineRun: catalog on push to main
-├── lvm-operator-catalog-5-0-pull-request.yaml  # PipelineRun: catalog on PR to main
-├── lvms-must-gather-5-0-push.yaml              # PipelineRun: must-gather on push to main
-├── lvms-must-gather-5-0-pull-request.yaml      # PipelineRun: must-gather on PR to main
-├── lvm-operator-integration-tests.yaml         # Pipeline: unit test runner for Konflux ITs
-└── images-mirror-set.yaml                      # ImageDigestMirrorSet for FIPS/pullspec resolution
+├── multi-arch-build-pipeline.yaml                          # Pipeline: multi-arch builds (operator, must-gather)
+├── single-arch-build-pipeline.yaml                         # Pipeline: single-arch builds (bundle)
+├── catalog-patching-build-pipeline.yaml                    # Pipeline: FBC build with pre/post patching (catalog)
+├── operator-version-bump-production-final-pipeline.yaml    # Pipeline: bumps OPERATOR_VERSION after a production release (final pipeline)
+├── catalog-candidate-update-staging-final-pipeline.yaml    # Pipeline: regenerates catalog templates after a staging release (final pipeline)
+├── lvm-operator-5-0-push.yaml                              # PipelineRun: operator on push to main
+├── lvm-operator-5-0-pull-request.yaml                      # PipelineRun: operator on PR to main
+├── lvm-operator-bundle-5-0-push.yaml                       # PipelineRun: bundle on push to main
+├── lvm-operator-bundle-5-0-pull-request.yaml               # PipelineRun: bundle on PR to main
+├── lvm-operator-catalog-5-0-push.yaml                      # PipelineRun: catalog on push to main
+├── lvm-operator-catalog-5-0-pull-request.yaml              # PipelineRun: catalog on PR to main
+├── lvms-must-gather-5-0-push.yaml                          # PipelineRun: must-gather on push to main
+├── lvms-must-gather-5-0-pull-request.yaml                  # PipelineRun: must-gather on PR to main
+├── lvm-operator-integration-tests.yaml                     # Pipeline: unit test runner for Konflux ITs
+└── images-mirror-set.yaml                                  # ImageDigestMirrorSet for FIPS/pullspec resolution
 ```
 
 There are three kinds of resources:
 
-- **Pipeline definitions** (3): reusable pipeline templates
+- **Pipeline definitions** (5): 3 reusable build pipeline templates
+  instantiated by separate PipelineRun files, plus 2 standalone final
+  pipelines (`operator-version-bump-production-final-pipeline`,
+  `catalog-candidate-update-staging-final-pipeline`) referenced directly by
+  Konflux `ReleasePlanAdmission` post-release hooks - see
+  [file-based-catalog.md](./file-based-catalog.md) for what they automate
 - **PipelineRun definitions** (8): per-component, per-event triggers that
   Pipelines as Code instantiates
 - **Supporting config** (2): the integration test pipeline and the IDMS
