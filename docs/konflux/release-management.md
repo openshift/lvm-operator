@@ -5,7 +5,7 @@
 Konflux uses `ReleasePlan` resources to define how images flow from CI to staging and production. Each y-stream version has two release plans per application:
 
 - **Staging** (`auto-release: true`): Triggered automatically when a snapshot passes integration tests and Enterprise Contract policy. Pushes images to `registry.stage.redhat.io`.
-- **Production** (`auto-release: false`): Triggered manually by applying a `Release` CR to the Konflux cluster. Pushes images to `registry.redhat.io` via an advisory (errata).
+- **Production** (`auto-release: false`): Triggered manually by applying a `Release` CR to the Konflux cluster. Pushes images to `registry.redhat.io` via an advisory .
 
 The operator and catalog are released sequentially — the operator must be released first, then the catalog (which references the released operator bundle).
 
