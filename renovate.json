@@ -39,6 +39,11 @@
   "prConcurrentLimit": 0,
   "pruneBranchAfterAutomerge": true,
   "pruneStaleBranches": true,
+  "rpm-lockfile": {
+    "lockFileMaintenance": {
+      "enabled": true
+    }
+  },
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
   "tekton": {
