@@ -299,7 +299,6 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	}
 
 	grpcServer := grpc.NewServer(
-		grpc.SharedWriteBuffer(true),
 		grpc.MaxConcurrentStreams(1),
 		grpc.NumStreamWorkers(1))
 	identityServer := driver.NewIdentityServer(func() (bool, error) {

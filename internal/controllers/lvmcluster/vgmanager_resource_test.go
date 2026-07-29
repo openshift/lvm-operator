@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -43,8 +44,9 @@ const (
 )
 
 func newFakeReconciler(t *testing.T, objs ...client.Object) *Reconciler {
-	scheme, err := lvmv1alpha1.SchemeBuilder.Build()
-	assert.NilError(t, err, "creating scheme")
+	scheme := runtime.NewScheme()
+	err := lvmv1alpha1.AddToScheme(scheme)
+	assert.NilError(t, err, "adding lvmv1alpha1 to scheme")
 
 	err = corev1.AddToScheme(scheme)
 	assert.NilError(t, err, "adding corev1 to scheme")

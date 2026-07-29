@@ -74,25 +74,37 @@ func (s serviceMonitorManager) EnsureCreated(r Reconciler, ctx context.Context, 
 				{
 					Path:            "/metrics",
 					Port:            "https",
-					Scheme:          "https",
+					Scheme:          ptr.To(monitoringv1.SchemeHTTPS),
 					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-					TLSConfig: &monitoringv1.TLSConfig{
-						SafeTLSConfig: monitoringv1.SafeTLSConfig{
-							ServerName: ptr.To(fmt.Sprintf("lvms-operator-metrics-service.%s.svc", r.GetNamespace())),
+					HTTPConfigWithProxyAndTLSFiles: monitoringv1.HTTPConfigWithProxyAndTLSFiles{
+						HTTPConfigWithTLSFiles: monitoringv1.HTTPConfigWithTLSFiles{
+							TLSConfig: &monitoringv1.TLSConfig{
+								SafeTLSConfig: monitoringv1.SafeTLSConfig{
+									ServerName: ptr.To(fmt.Sprintf("lvms-operator-metrics-service.%s.svc", r.GetNamespace())),
+								},
+								TLSFilesConfig: monitoringv1.TLSFilesConfig{
+									CAFile: "/etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt",
+								},
+							},
 						},
-						CAFile: "/etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt",
 					},
 				},
 				{
 					Path:            "/metrics",
 					Port:            "vg-manager-https",
-					Scheme:          "https",
+					Scheme:          ptr.To(monitoringv1.SchemeHTTPS),
 					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-					TLSConfig: &monitoringv1.TLSConfig{
-						SafeTLSConfig: monitoringv1.SafeTLSConfig{
-							ServerName: ptr.To(fmt.Sprintf("vg-manager-metrics-service.%s.svc", r.GetNamespace())),
+					HTTPConfigWithProxyAndTLSFiles: monitoringv1.HTTPConfigWithProxyAndTLSFiles{
+						HTTPConfigWithTLSFiles: monitoringv1.HTTPConfigWithTLSFiles{
+							TLSConfig: &monitoringv1.TLSConfig{
+								SafeTLSConfig: monitoringv1.SafeTLSConfig{
+									ServerName: ptr.To(fmt.Sprintf("vg-manager-metrics-service.%s.svc", r.GetNamespace())),
+								},
+								TLSFilesConfig: monitoringv1.TLSFilesConfig{
+									CAFile: "/etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt",
+								},
+							},
 						},
-						CAFile: "/etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt",
 					},
 				},
 			},

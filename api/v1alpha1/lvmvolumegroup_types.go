@@ -81,7 +81,3 @@ type LVMVolumeGroupList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []LVMVolumeGroup `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&LVMVolumeGroup{}, &LVMVolumeGroupList{})
-}

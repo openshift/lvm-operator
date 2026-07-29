@@ -23,21 +23,19 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-
 	"github.com/go-logr/logr"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsCfg "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type AWSDiskManager struct {
-	ec2                    *ec2.EC2
+	ec2                    *ec2.Client
 	log                    logr.Logger
 	createTimeout          time.Duration
 	createPollingInterval  time.Duration
@@ -66,9 +64,9 @@ const (
 	labelNodeRoleWorker = "node-role.kubernetes.io/worker"
 )
 
-func NewAWSDiskManager(ec2 *ec2.EC2, log logr.Logger) *AWSDiskManager {
+func NewAWSDiskManager(ec2Client *ec2.Client, log logr.Logger) *AWSDiskManager {
 	return &AWSDiskManager{
-		ec2:                    ec2,
+		ec2:                    ec2Client,
 		log:                    log,
 		createTimeout:          4 * time.Minute,
 		createPollingInterval:  5 * time.Second,
@@ -111,79 +109,64 @@ func (m *AWSDiskManager) CreateAndAttachAWSVolumes(ctx context.Context, disks []
 
 func (m *AWSDiskManager) createAndAttachAWSVolumesForNode(ctx context.Context, nodeEntry NodeDisks) error {
 	log := m.log.WithValues("node", nodeEntry.Node)
-	volumes := make([]*ec2.Volume, len(nodeEntry.Disks))
 	volumeLetters := []string{"g", "h"}
-	volumeIDs := make([]*string, 0)
+	volumeIDs := make([]string, 0)
 
-	// create ec2 volumes
 	for i, disk := range nodeEntry.Disks {
-		diskSize := disk.Size
 		diskName := fmt.Sprintf("sd%s", volumeLetters[i])
 		createInput := &ec2.CreateVolumeInput{
 			AvailabilityZone: aws.String(nodeEntry.Zone),
-			Size:             aws.Int64(int64(diskSize)),
-			VolumeType:       aws.String("gp2"),
-			TagSpecifications: []*ec2.TagSpecification{
+			Size:             aws.Int32(int32(disk.Size)),
+			VolumeType:       ec2types.VolumeTypeGp2,
+			TagSpecifications: []ec2types.TagSpecification{
 				{
-					ResourceType: aws.String("volume"),
-					Tags: []*ec2.Tag{
-						{
-							Key:   aws.String("Name"),
-							Value: aws.String(diskName),
-						},
-						{
-							Key:   aws.String("purpose"),
-							Value: aws.String(awsPurposeTag),
-						},
-						{
-							Key:   aws.String("chosen-instanceID"),
-							Value: aws.String(nodeEntry.InstanceID),
-						},
+					ResourceType: ec2types.ResourceTypeVolume,
+					Tags: []ec2types.Tag{
+						{Key: aws.String("Name"), Value: aws.String(diskName)},
+						{Key: aws.String("purpose"), Value: aws.String(awsPurposeTag)},
+						{Key: aws.String("chosen-instanceID"), Value: aws.String(nodeEntry.InstanceID)},
 					},
 				},
 			},
 		}
-		volume, err := m.ec2.CreateVolumeWithContext(ctx, createInput)
+		volume, err := m.ec2.CreateVolume(ctx, createInput)
 		if err != nil {
 			return fmt.Errorf("failed to create and attach aws Disks for Node %s with %v: %w",
 				nodeEntry.Node, createInput, err)
 		}
 		log.Info("creating volume", "size", volume.Size, "id", volume.VolumeId)
-		volumes[i] = volume
-		volumeIDs = append(volumeIDs, volume.VolumeId)
+		volumeIDs = append(volumeIDs, *volume.VolumeId)
 	}
-	// attach and poll for attachment to complete
+
 	err := wait.PollUntilContextTimeout(ctx, m.createPollingInterval, m.createTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			describeVolumeInput := &ec2.DescribeVolumesInput{
+			describedVolumes, err := m.ec2.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
 				VolumeIds: volumeIDs,
-			}
-			describedVolumes, err := m.ec2.DescribeVolumesWithContext(ctx, describeVolumeInput)
+			})
 			if err != nil {
 				return false, fmt.Errorf("failed to describe volumes to determine attachment completion: %w", err)
 			}
 			allAttached := true
 			for i, volume := range describedVolumes.Volumes {
 				log := log.WithValues("size", volume.Size, "id", volume.VolumeId)
-				if *volume.State == ec2.VolumeStateInUse {
+				if volume.State == ec2types.VolumeStateInUse {
 					log.Info("volume attachment complete")
 					continue
 				}
 				allAttached = false
-				if *volume.State == ec2.VolumeStateAvailable {
+				if volume.State == ec2types.VolumeStateAvailable {
 					log.Info("volume attachment starting")
 					attachInput := &ec2.AttachVolumeInput{
 						VolumeId:   volume.VolumeId,
 						InstanceId: aws.String(nodeEntry.InstanceID),
 						Device:     aws.String(fmt.Sprintf("/dev/sd%s", volumeLetters[i])),
 					}
-					if _, err = m.ec2.AttachVolumeWithContext(ctx, attachInput); err != nil {
-						return false, fmt.Errorf("could not attach volume %s: %w", attachInput, err)
+					if _, err = m.ec2.AttachVolume(ctx, attachInput); err != nil {
+						return false, fmt.Errorf("could not attach volume %s: %w", *volume.VolumeId, err)
 					}
 				}
 			}
 			return allAttached, nil
-
 		})
 	if err != nil {
 		return fmt.Errorf("failed to wait for volume attachment to complete for node %s: %w",
@@ -192,21 +175,17 @@ func (m *AWSDiskManager) createAndAttachAWSVolumesForNode(ctx context.Context, n
 	return nil
 }
 
-func getEC2Client(region string) (*ec2.EC2, error) {
-	// Create AWS session using custom credentials file path
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewSharedCredentials(os.Getenv("CLUSTER_PROFILE_DIR")+"/.awscred", ""),
-		Logger: aws.LoggerFunc(func(args ...interface{}) {
-			GinkgoLogr.Info(fmt.Sprint(args), "source", "aws")
+func getEC2Client(region string) (*ec2.Client, error) {
+	cfg, err := awsCfg.LoadDefaultConfig(context.Background(),
+		awsCfg.WithRegion(region),
+		awsCfg.WithSharedCredentialsFiles([]string{
+			os.Getenv("CLUSTER_PROFILE_DIR") + "/.awscred",
 		}),
-	})
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create session for ec2: %w", err)
+		return nil, fmt.Errorf("could not load AWS config for ec2: %w", err)
 	}
-
-	// initialize client
-	return ec2.New(sess), nil
+	return ec2.NewFromConfig(cfg), nil
 }
 
 func (m *AWSDiskManager) cleanupAWSDisks(ctx context.Context) error {
@@ -216,27 +195,27 @@ func (m *AWSDiskManager) cleanupAWSDisks(ctx context.Context) error {
 			return false, fmt.Errorf("failed to list AWS volumes for cleanup (deletion): %+v", err)
 		}
 		for _, volume := range volumes {
-			if volume.State == nil {
+			if volume.State == "" {
 				m.log.Info("volume did not have a state", "id", volume.VolumeId)
 				return false, nil
 			}
 
-			if *volume.State == ec2.VolumeStateInUse {
+			if volume.State == ec2types.VolumeStateInUse {
 				m.log.Info("detaching AWS Volume", "size", volume.Size, "id", volume.VolumeId)
-				if attachment, err := m.ec2.DetachVolumeWithContext(ctx, &ec2.DetachVolumeInput{VolumeId: volume.VolumeId}); err != nil {
-					m.log.Error(err, "could not detach volume", "volume_attachment", attachment)
+				if _, err := m.ec2.DetachVolume(ctx, &ec2.DetachVolumeInput{VolumeId: volume.VolumeId}); err != nil {
+					m.log.Error(err, "could not detach volume")
 				}
 				return false, nil
 			}
 
-			if *volume.State != ec2.VolumeStateAvailable {
-				m.log.Info("waiting for volume to become available after detach", "desiredState", ec2.VolumeStateAvailable, "currentState", volume.State, "id", volume.VolumeId)
+			if volume.State != ec2types.VolumeStateAvailable {
+				m.log.Info("waiting for volume to become available after detach", "desiredState", ec2types.VolumeStateAvailable, "currentState", volume.State, "id", volume.VolumeId)
 				return false, nil
 			}
 
 			m.log.Info("deleting AWS Volume", "size", volume.Size, "id", volume.VolumeId)
-			if deleteOut, err := m.ec2.DeleteVolumeWithContext(ctx, &ec2.DeleteVolumeInput{VolumeId: volume.VolumeId}); err != nil {
-				m.log.Error(err, "could not delete volume", "delete_out", deleteOut)
+			if _, err := m.ec2.DeleteVolume(ctx, &ec2.DeleteVolumeInput{VolumeId: volume.VolumeId}); err != nil {
+				m.log.Error(err, "could not delete volume")
 				return false, nil
 			}
 		}
@@ -248,16 +227,17 @@ func (m *AWSDiskManager) cleanupAWSDisks(ctx context.Context) error {
 	return nil
 }
 
-func (m *AWSDiskManager) getAWSTestVolumes(ctx context.Context) ([]*ec2.Volume, error) {
-	output, err := m.ec2.DescribeVolumesWithContext(ctx, &ec2.DescribeVolumesInput{
-		Filters: []*ec2.Filter{
+func (m *AWSDiskManager) getAWSTestVolumes(ctx context.Context) ([]ec2types.Volume, error) {
+	output, err := m.ec2.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String("tag:purpose"),
-				Values: []*string{aws.String(awsPurposeTag)},
+				Values: []string{awsPurposeTag},
 			},
 		},
 	})
-
-	return output.Volumes, err
-
+	if err != nil {
+		return nil, err
+	}
+	return output.Volumes, nil
 }
