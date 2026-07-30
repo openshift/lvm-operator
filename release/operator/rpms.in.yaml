@@ -58,8 +58,6 @@ packages:
   - util-linux
   - xfsprogs
   - e2fsprogs
-
-upgradePackages:
   - glibc
 
 arches:
