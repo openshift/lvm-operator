@@ -17,5 +17,6 @@ spec:
         This erratum implements the following changes:
 
         - Bumps gRPC-Go to 1.79.3 to address CVE-2026-33186 authorization bypass vulnerability
+        - Bumps golang to 1.21.13-16 to address CVE-2026-25679. 
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
