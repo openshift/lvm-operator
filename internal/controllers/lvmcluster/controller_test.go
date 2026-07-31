@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -39,8 +40,8 @@ import (
 )
 
 func newGinkgoReconciler(objs ...client.Object) *Reconciler {
-	scheme, err := lvmv1alpha1.SchemeBuilder.Build()
-	Expect(err).NotTo(HaveOccurred())
+	scheme := runtime.NewScheme()
+	Expect(lvmv1alpha1.AddToScheme(scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(scheme)).To(Succeed())
 	Expect(appsv1.AddToScheme(scheme)).To(Succeed())
 	Expect(storagev1.AddToScheme(scheme)).To(Succeed())

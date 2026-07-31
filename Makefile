@@ -172,7 +172,7 @@ docker-test: ## Run unit tests inside a Linux container (useful for non-Linux ho
 		-w /workspace \
 		-e NON_ROOT=true \
 		-e GOFLAGS=-buildvcs=false \
-		golang:1.25 \
+		golang:1.26 \
 		bash -c '\
 			go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH) && \
 			KUBEBUILDER_ASSETS=$$(setup-envtest use $(ENVTEST_K8S_VERSION) -p path) \

@@ -94,8 +94,8 @@ func (s *Snapshotter) Start(ctx context.Context) error {
 		false,
 		rateLimiter,
 		false,
-		factory.Groupsnapshot().V1beta2().VolumeGroupSnapshotContents(),
-		factory.Groupsnapshot().V1beta2().VolumeGroupSnapshotClasses(),
+		factory.Groupsnapshot().V1().VolumeGroupSnapshotContents(),
+		factory.Groupsnapshot().V1().VolumeGroupSnapshotClasses(),
 		rateLimiter,
 	)
 

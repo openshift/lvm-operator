@@ -59,9 +59,9 @@ func (f *fakeReconciler) Scheme() *runtime.Scheme { return f.scheme }
 
 func newTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
-	scheme, err := lvmv1alpha1.SchemeBuilder.Build()
-	if err != nil {
-		t.Fatalf("building scheme: %v", err)
+	scheme := runtime.NewScheme()
+	if err := lvmv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding lvmv1alpha1 to scheme: %v", err)
 	}
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("adding corev1 to scheme: %v", err)
