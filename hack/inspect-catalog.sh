@@ -11,10 +11,11 @@ Arguments:
   CATALOG_IMAGE    Catalog image reference (tag or digest)
 
 Options:
-  --json           Output as JSON array
+  --json           Output as JSON array (includes commit IDs)
   --arch ARCH      Platform architecture (default: amd64)
   --package NAME   Filter to a specific package
   --version VER    Filter to a specific version (e.g., 4.19.3 or v4.19.3)
+  --no-commits     Skip fetching commit IDs (faster)
   -h, --help       Show this help
 
 Examples:
@@ -30,6 +31,7 @@ ARCH="amd64"
 PACKAGE_FILTER=""
 VERSION_FILTER=""
 CATALOG_IMAGE=""
+FETCH_COMMITS=true
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -48,6 +50,10 @@ while [[ $# -gt 0 ]]; do
         --version)
             VERSION_FILTER="${2#v}"
             shift 2
+            ;;
+        --no-commits)
+            FETCH_COMMITS=false
+            shift
             ;;
         -h|--help)
             usage 0
@@ -94,8 +100,10 @@ resolve_arch_digest() {
             local digest
             digest=$(echo "${raw}" | jq -r \
                 --arg arch "${arch}" \
-                '.manifests[] | select(.platform.architecture == $arch) | .digest' \
-                2>/dev/null | head -1)
+                '[.manifests[] |
+                    select(.platform.architecture == $arch) |
+                    .digest] | first' \
+                2>/dev/null)
             if [[ -z "${digest}" ]]; then
                 echo "Error: no manifest for arch ${arch}" >&2
                 exit 1
@@ -172,6 +180,7 @@ channel_entries as $channels |
     {
         package: .package,
         name: .name,
+        version: $bv,
         image: .image,
         channels: ([($channels[] |
             select(.bundle == $bundle.name) | .channel)] | unique),
@@ -180,9 +189,7 @@ channel_entries as $channels |
             {channel: .channel, replaces: .replaces,
              skips: .skips, skipRange: .skipRange})],
         relatedImages: [(.relatedImages // [])[] |
-            {name: .name, image: .image}],
-        properties: [(.properties // [])[] |
-            select(.type == "olm.package") | .value]
+            {name: .name, image: .image}]
     }
 ] | sort_by(.package, .name)
 JQEOF
@@ -200,31 +207,126 @@ echo "Extracting bundle information..." >&2
 
 RESULT=$(build_output "${PACKAGE_FILTER}" "${VERSION_FILTER}")
 
+# Collect all unique images and fetch commit IDs in parallel
+COMMITS_FILE="${TMPDIR}/commits.json"
+
+if [[ "${FETCH_COMMITS}" == "true" ]]; then
+    IMAGES_FILE="${TMPDIR}/all_images.txt"
+    echo "${RESULT}" | jq -r \
+        '([.[].image] + [.[].relatedImages[].image]) | unique | .[]' \
+        > "${IMAGES_FILE}"
+
+    IMAGE_COUNT=$(wc -l < "${IMAGES_FILE}")
+    echo "Fetching commit IDs for ${IMAGE_COUNT} images..." >&2
+
+    COMMITS_RAW="${TMPDIR}/commits_raw.txt"
+    : > "${COMMITS_RAW}"
+
+    fetch_commit() {
+        local image="$1"
+        local output_file="$2"
+        local commit
+        commit=$(skopeo inspect "docker://${image}" 2>/dev/null | \
+            jq -r '.Labels["vcs-ref"] // empty' 2>/dev/null || true)
+        if [[ -n "${commit}" ]]; then
+            echo "${image} ${commit}" >> "${output_file}"
+        fi
+    }
+    export -f fetch_commit
+
+    xargs -a "${IMAGES_FILE}" -P 8 -I {} \
+        bash -c 'fetch_commit "$@"' _ {} "${COMMITS_RAW}"
+
+    # Build JSON lookup from raw results
+    jq -Rn '[inputs | split(" ") | {(.[0]): .[1]}] | add // {}' \
+        "${COMMITS_RAW}" > "${COMMITS_FILE}"
+
+    echo "Done." >&2
+else
+    echo '{}' > "${COMMITS_FILE}"
+fi
+
+# Merge commit IDs into result
+RESULT_WITH_COMMITS=$(jq --slurpfile commits "${COMMITS_FILE}" '
+    ($commits[0] // {}) as $cm |
+    [.[] | . + {
+        commit: ($cm[.image] // null),
+        relatedImages: [.relatedImages[] | . + {
+            commit: ($cm[.image] // null)
+        }]
+    }]
+' <<< "${RESULT}")
+
 if [[ "${OUTPUT_JSON}" == "true" ]]; then
-    echo "${RESULT}" | jq '.'
+    echo "${RESULT_WITH_COMMITS}" | jq '.'
     exit 0
 fi
 
-TABLE_FORMAT_FILE="${TMPDIR}/table.jq"
-cat > "${TABLE_FORMAT_FILE}" << 'JQEOF'
-.[] |
-"=" * 80,
-"Package:  \(.package)",
-"Bundle:   \(.name)",
-"Image:    \(.image)",
-"Channels: \(.channels | join(", "))",
-"",
-(if (.upgrade_info | length) > 0 then
-    (.upgrade_info[] |
-        "  Channel \(.channel):" +
-        (if .replaces then "\n    Replaces:  \(.replaces)" else "" end) +
-        (if (.skips | length) > 0 then "\n    Skips:     \(.skips | join(", "))" else "" end) +
-        (if .skipRange then "\n    SkipRange: \(.skipRange)" else "" end))
-else "" end),
-"",
-"Related Images:",
-(.relatedImages[] | "  \(if .name != "" then "[\(.name)] " else "" end)\(.image)"),
-""
-JQEOF
+# Compact human-readable output grouped by package > channel > bundle
+echo ""
+echo "${RESULT_WITH_COMMITS}" | jq -r '
+def short_sha:
+    if . then
+        split("@sha256:") |
+        if length > 1 then .[1][:12] else .[0] end
+    else "------------" end;
 
-echo "${RESULT}" | jq -r -f "${TABLE_FORMAT_FILE}"
+def short_commit:
+    if . then .[:12] else "------------" end;
+
+def strip_prefix:
+    ltrimstr("lvms-operator.");
+
+def pad($n):
+    . + (" " * ([$n - length, 0] | max));
+
+def format_upgrade:
+    [
+        (if .replaces then
+            "replaces " + (.replaces | strip_prefix)
+        else null end),
+        (if (.skips | length) > 0 then
+            "skips " + ([.skips[] |
+                strip_prefix] | join(","))
+        else null end),
+        (if .skipRange then
+            "range " + .skipRange
+        else null end)
+    ] | map(select(. != null)) | join("  ");
+
+def bundle_line:
+    .image as $sha | .commit as $c |
+    "  [bundle] \(.name | pad(28)) " +
+    "\($sha | short_sha)  " +
+    "commit:\($c | short_commit)";
+
+def related_line:
+    "    \(.name | pad(20)) " +
+    "\(.image | short_sha)  " +
+    "commit:\(.commit | short_commit)";
+
+group_by(.package)[] |
+    .[0].package as $pkg |
+    "Package: \($pkg)",
+    (group_by(.channels[0])[] |
+        .[0].channels[0] as $chan |
+        "",
+        "  Channel: \($chan)",
+        "  \("-" * 70)",
+        (sort_by(.version |
+            split(".") | map(tonumber? // 0))[] |
+            .image as $bundle_img |
+            (.upgrade_info[0] |
+                format_upgrade) as $ug |
+            bundle_line +
+            (if ($ug | length) > 0 then
+                "\n    \($ug)"
+            else "" end),
+            (.relatedImages[] |
+                select(.image != $bundle_img) |
+                related_line
+            )
+        )
+    ),
+    ""
+'
