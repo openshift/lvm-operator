@@ -16,6 +16,6 @@ spec:
 
         This erratum implements the following changes:
 
-        - Bumps golang to 1.24.13-5 to fix CVEs CVE-2025-68121 and CVE-2026-25679.
+        - Bumps golang to 1.24.13-5 to fix CVEs CVE-2025-68121, CVE-2026-25679 and CVE-2025-61726.
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
