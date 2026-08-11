@@ -1,0 +1,36 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: storageclass-template
+objects:
+- apiVersion: storage.k8s.io/v1
+  kind: StorageClass
+  metadata:
+    name: ${SCNAME}
+  provisioner: ${PROVISIONER}
+  parameters:
+    csi.storage.k8s.io/fstype: ${FSTYPE}
+    topolvm.io/device-class: ${DEVICECLASS}
+  reclaimPolicy: ${RECLAIMPOLICY}
+  allowVolumeExpansion: ${{ALLOWEXPANSION}}
+  volumeBindingMode: ${VOLUMEBINDINGMODE}
+parameters:
+- name: SCNAME
+  required: true
+- name: PROVISIONER
+  required: true
+  value: "topolvm.io"
+- name: FSTYPE
+  required: true
+  value: "xfs"
+- name: DEVICECLASS
+  required: true
+- name: RECLAIMPOLICY
+  required: true
+  value: "Delete"
+- name: ALLOWEXPANSION
+  required: true
+  value: "true"
+- name: VOLUMEBINDINGMODE
+  required: true
+  value: "WaitForFirstConsumer"

@@ -190,6 +190,12 @@ func (r *RAIDConfig) EffectiveMirrors() int {
 	return 1
 }
 
+// HasExplicitPaths returns true if the device class has explicit device paths configured.
+func (dc *DeviceClass) HasExplicitPaths() bool {
+	return dc.DeviceSelector != nil &&
+		(len(dc.DeviceSelector.Paths) > 0 || len(dc.DeviceSelector.OptionalPaths) > 0)
+}
+
 type DeviceClass struct {
 	// Name specifies a name for the device class
 	// +kubebuilder:validation:MaxLength=245
@@ -233,13 +239,17 @@ type DeviceClass struct {
 	// DeviceDiscoveryPolicy specifies the policy for discovering devices for this device class.
 	// Static means the volume group is created with devices found at install time; new devices are ignored.
 	// Dynamic means devices are continuously discovered and added to the volume group.
-	// When not set, new volume groups default to Static and existing volume groups default to Dynamic for backward compatibility.
+	// When not set on new clusters without explicit device paths, the webhook defaults this to Static.
+	// When explicit device paths are configured, the policy is left unset (paths override the policy
+	// and status reports Preconfigured). Existing clusters upgraded from before this field was
+	// introduced keep nil, which the controller treats as Dynamic for backward compatibility.
 	// +kubebuilder:validation:Enum=Static;Dynamic
 	// +optional
 	DeviceDiscoveryPolicy *DeviceDiscoveryPolicySpec `json:"deviceDiscoveryPolicy,omitempty"`
 
 	// StorageClassOptions allows customization of the StorageClass created for this device class.
 	// +optional
+	// +kubebuilder:default={}
 	StorageClassOptions *StorageClassOptions `json:"storageClassOptions,omitempty"`
 }
 
@@ -394,8 +404,4 @@ type LVMClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []LVMCluster `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&LVMCluster{}, &LVMClusterList{})
 }

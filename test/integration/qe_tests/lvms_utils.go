@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-//go:embed testdata/*.yaml
+//go:embed testdata/*.yaml testdata/*.policy
 var templateFS embed.FS
 
 func logf(format string, args ...interface{}) {
@@ -38,6 +38,37 @@ func getRandomString() string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func isDisconnectedCluster() bool {
+	nodeCmd := exec.Command("oc", "get", "nodes", "-o=jsonpath={.items[0].metadata.name}")
+	nodeOutput, err := nodeCmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: failed to get node name: %v", err)
+		return true
+	}
+	nodeName := strings.TrimSpace(string(nodeOutput))
+	if nodeName == "" {
+		logf("Warning: no nodes found")
+		return true
+	}
+
+	probeCmd := exec.Command("oc", "debug", "node/"+nodeName, "--",
+		"chroot", "/host", "sh", "-c",
+		"curl -s --connect-timeout 5 https://fedoraproject.org/static/hotspot.txt &>/dev/null && echo Connected || echo Disconnected")
+	probeOutput, err := probeCmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: network probe failed: %v", err)
+		return true
+	}
+
+	result := strings.TrimSpace(string(probeOutput))
+	if strings.Contains(result, "Connected") {
+		return false
+	}
+
+	logf("Detected disconnected cluster: network probe failed to reach external URL")
+	return true
 }
 
 type lvmCluster struct {
@@ -1998,4 +2029,122 @@ func getPVCVolumeName(namespace string, pvcName string) string {
 	volumeName := strings.TrimSpace(string(output))
 	logf("The PVC %s in namespace %s is bound to volume %s\n", pvcName, namespace, volumeName)
 	return volumeName
+}
+
+// storageClassConfig holds configuration for creating a StorageClass via oc CLI
+type storageClassConfig struct {
+	name              string
+	provisioner       string
+	fsType            string
+	deviceClass       string
+	reclaimPolicy     string // "Delete" or "Retain"
+	volumeBindingMode string // "Immediate" or "WaitForFirstConsumer"
+}
+
+// createStorageClassWithOC creates a StorageClass using oc process + oc apply
+func createStorageClassWithOC(cfg storageClassConfig) error {
+	if cfg.provisioner == "" {
+		cfg.provisioner = "topolvm.io"
+	}
+	if cfg.fsType == "" {
+		cfg.fsType = "xfs"
+	}
+	if cfg.reclaimPolicy == "" {
+		cfg.reclaimPolicy = "Delete"
+	}
+	if cfg.volumeBindingMode == "" {
+		cfg.volumeBindingMode = "WaitForFirstConsumer"
+	}
+
+	err := applyResourceFromTemplate("storageclass-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "SCNAME="+cfg.name,
+		"-p", "PROVISIONER="+cfg.provisioner,
+		"-p", "FSTYPE="+cfg.fsType,
+		"-p", "DEVICECLASS="+cfg.deviceClass,
+		"-p", "RECLAIMPOLICY="+cfg.reclaimPolicy,
+		"-p", "ALLOWEXPANSION=true",
+		"-p", "VOLUMEBINDINGMODE="+cfg.volumeBindingMode,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create StorageClass %s: %w", cfg.name, err)
+	}
+	logf("Created StorageClass: %s\n", cfg.name)
+	return nil
+}
+
+func getVGDevices(deviceClassName string) ([]string, error) {
+	cmd := exec.Command("oc", "get", "lvmvolumegroupnodestatus", "-n", lvmsNamespace,
+		"-o=jsonpath={.items[*].spec.nodeStatus[?(@.name==\""+deviceClassName+"\")].devices[*]}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("get lvmvolumegroupnodestatus devices failed: %w: %s", err, string(output))
+	}
+	return strings.Fields(strings.TrimSpace(string(output))), nil
+}
+
+func getDeviceDiscoveryPolicyStatus(deviceClassName string) (string, error) {
+	cmd := exec.Command("oc", "get", "lvmvolumegroupnodestatus", "-n", lvmsNamespace,
+		"-o=jsonpath={.items[*].spec.nodeStatus[?(@.name==\""+deviceClassName+"\")].deviceDiscoveryPolicy}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("get lvmvolumegroupnodestatus deviceDiscoveryPolicy failed: %w: %s", err, string(output))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func getExcludedDevices(deviceClassName string) ([]string, error) {
+	cmd := exec.Command("oc", "get", "lvmvolumegroupnodestatus", "-n", lvmsNamespace,
+		"-o=jsonpath={.items[*].spec.nodeStatus[?(@.name==\""+deviceClassName+"\")].excluded[*].name}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("get lvmvolumegroupnodestatus excluded devices failed: %w: %s", err, string(output))
+	}
+	return strings.Fields(strings.TrimSpace(string(output))), nil
+}
+
+func getExcludedDeviceReasons(deviceClassName string) ([]string, error) {
+	cmd := exec.Command("oc", "get", "lvmvolumegroupnodestatus", "-n", lvmsNamespace,
+		"-o=jsonpath={.items[*].spec.nodeStatus[?(@.name==\""+deviceClassName+"\")].excluded[*].reasons[*]}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("get lvmvolumegroupnodestatus excluded device reasons failed: %w: %s", err, string(output))
+	}
+	return strings.Fields(strings.TrimSpace(string(output))), nil
+}
+
+type lvmClusterDeviceDiscoveryConfig struct {
+	name                  string
+	namespace             string
+	deviceClass           string
+	deviceDiscoveryPolicy string
+	fsType                string
+}
+
+func createLVMClusterWithDeviceDiscoveryPolicy(cfg lvmClusterDeviceDiscoveryConfig) error {
+	if cfg.namespace == "" {
+		cfg.namespace = lvmsNamespace
+	}
+	if cfg.deviceClass == "" {
+		cfg.deviceClass = "vg1"
+	}
+	if cfg.deviceDiscoveryPolicy == "" {
+		cfg.deviceDiscoveryPolicy = "Static"
+	}
+	if cfg.fsType == "" {
+		cfg.fsType = "xfs"
+	}
+
+	err := applyResourceFromTemplate("lvmcluster-devicediscovery-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "NAME="+cfg.name,
+		"-p", "NAMESPACE="+cfg.namespace,
+		"-p", "DEVICECLASS="+cfg.deviceClass,
+		"-p", "DEVICE_DISCOVERY_POLICY="+cfg.deviceDiscoveryPolicy,
+		"-p", "FSTYPE="+cfg.fsType,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create LVMCluster %s: %w", cfg.name, err)
+	}
+	return nil
 }

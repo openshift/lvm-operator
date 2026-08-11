@@ -670,6 +670,25 @@ spec:
     containerPort: 443
     deploymentName: lvms-operator
     failurePolicy: Fail
+    generateName: mlvmcluster.kb.io
+    rules:
+    - apiGroups:
+      - lvm.topolvm.io
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      resources:
+      - lvmclusters
+    sideEffects: None
+    targetPort: 9443
+    type: MutatingAdmissionWebhook
+    webhookPath: /mutate-lvm-topolvm-io-v1alpha1-lvmcluster
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: lvms-operator
+    failurePolicy: Fail
     generateName: vlvmcluster.kb.io
     rules:
     - apiGroups:
