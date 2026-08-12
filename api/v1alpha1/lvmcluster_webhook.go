@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +47,10 @@ type lvmClusterValidator struct {
 }
 
 var _ admission.Validator[*LVMCluster] = &lvmClusterValidator{}
+
+type lvmClusterDefaulter struct{}
+
+var _ admission.Defaulter[*LVMCluster] = &lvmClusterDefaulter{}
 
 var (
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
@@ -71,12 +76,26 @@ var (
 	ErrRAIDConfigNotSet                                      = errors.New("RAIDConfig is not set for the DeviceClass")
 )
 
+//+kubebuilder:webhook:path=/mutate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create,versions=v1alpha1,name=mlvmcluster.kb.io,admissionReviewVersions=v1
 //+kubebuilder:webhook:path=/validate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create;update,versions=v1alpha1,name=vlvmcluster.kb.io,admissionReviewVersions=v1
 
 func (l *LVMCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, l).
+		WithDefaulter(&lvmClusterDefaulter{}).
 		WithValidator(&lvmClusterValidator{Client: mgr.GetClient()}).
 		Complete()
+}
+
+func (d *lvmClusterDefaulter) Default(_ context.Context, l *LVMCluster) error {
+	lvmclusterlog.Info("defaulting", "name", l.Name)
+	for i := range l.Spec.Storage.DeviceClasses {
+		dc := &l.Spec.Storage.DeviceClasses[i]
+		if dc.DeviceDiscoveryPolicy == nil && !dc.HasExplicitPaths() {
+			static := DeviceDiscoveryPolicyStatic
+			dc.DeviceDiscoveryPolicy = &static
+		}
+	}
+	return nil
 }
 
 // ValidateCreate implements admission.Validator so a webhook will be registered for the type
@@ -198,6 +217,10 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, oldLVMCluster, l
 	warnings = append(warnings, scOptionWarnings...)
 	if err != nil {
 		return warnings, err
+	}
+
+	if err := validateStorageClassOptionsUpgrade(oldLVMCluster.Spec.Storage.DeviceClasses, l.Spec.Storage.DeviceClasses); err != nil {
+		return warnings, fmt.Errorf("storageClassOptions upgrade validation failed: %w", err)
 	}
 
 	// Validate device class removal follows the business rules
@@ -592,13 +615,11 @@ func (v *lvmClusterValidator) verifyMetadataSize(l *LVMCluster) ([]string, error
 func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admission.Warnings {
 	var warnings admission.Warnings
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
-		hasExplicitPaths := deviceClass.DeviceSelector != nil &&
-			(len(deviceClass.DeviceSelector.Paths) > 0 || len(deviceClass.DeviceSelector.OptionalPaths) > 0)
-
-		if deviceClass.DeviceDiscoveryPolicy == nil && !hasExplicitPaths {
+		if deviceClass.DeviceDiscoveryPolicy != nil && *deviceClass.DeviceDiscoveryPolicy == DeviceDiscoveryPolicyDynamic && !deviceClass.HasExplicitPaths() {
 			warnings = append(warnings, fmt.Sprintf(
-				"deviceDiscoveryPolicy is not set for device class %q; new volume groups will default to Static mode "+
-					"(devices discovered at creation time only). Set deviceDiscoveryPolicy explicitly to avoid ambiguity.",
+				"deviceDiscoveryPolicy is set to Dynamic for device class %q without explicit device paths. "+
+					"LVMS will continuously discover and add new devices. "+
+					"This is not recommended for production environments.",
 				deviceClass.Name))
 		}
 	}
@@ -718,4 +739,38 @@ func (v *lvmClusterValidator) getRAIDConfigOfDeviceClass(l *LVMCluster, deviceCl
 		}
 	}
 	return nil, ErrDeviceClassNotFound
+}
+
+// validateStorageClassOptionsUpgrade guards against the nil→non-nil storageClassOptions
+// transition on upgrade. Existing LVMCluster CRs created before the +kubebuilder:default={}
+// marker may still have storageClassOptions == nil. The CRD XValidation transition rules
+// (oldSelf == self) do not fire when the parent transitions from nil to non-nil, so this
+// webhook check covers that gap until the CR is re-saved with defaults populated.
+func validateStorageClassOptionsUpgrade(oldDeviceClasses, newDeviceClasses []DeviceClass) error {
+	oldMap := make(map[string]*StorageClassOptions, len(oldDeviceClasses))
+	for i := range oldDeviceClasses {
+		oldMap[oldDeviceClasses[i].Name] = oldDeviceClasses[i].StorageClassOptions
+	}
+	for _, dc := range newDeviceClasses {
+		if dc.StorageClassOptions == nil {
+			continue
+		}
+		oldOpts, found := oldMap[dc.Name]
+		if !found {
+			continue // new device class, no existing SC to conflict with
+		}
+		if oldOpts != nil {
+			continue // both exist, XValidation handles it
+		}
+		if dc.StorageClassOptions.ReclaimPolicy != nil && *dc.StorageClassOptions.ReclaimPolicy != corev1.PersistentVolumeReclaimDelete {
+			return fmt.Errorf("device class %q: reclaimPolicy is immutable once set", dc.Name)
+		}
+		if dc.StorageClassOptions.VolumeBindingMode != nil && *dc.StorageClassOptions.VolumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
+			return fmt.Errorf("device class %q: volumeBindingMode is immutable once set", dc.Name)
+		}
+		if len(dc.StorageClassOptions.AdditionalParameters) > 0 {
+			return fmt.Errorf("device class %q: additionalParameters is immutable once set", dc.Name)
+		}
+	}
+	return nil
 }

@@ -135,13 +135,13 @@ export CATALOG_PACKAGE
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="{./cmd/...,./api/...,./internal/...}" output:crd:artifacts:config=config/crd/bases
 
 mocks: mockery ## Generate mocks for unit test code
 	$(shell $(MOCKERY) --log-level error)
 
 generate: controller-gen mocks ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations. Also retriggers mock generation
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="{./cmd/...,./api/...,./internal/...}"
 
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -158,6 +158,7 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-bundle.sh
 	hack/verify-catalog.sh
 	hack/verify-generated.sh
+	hack/verify-docs.sh
 
 test: envtest godeps-update ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -p 2 -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
@@ -171,7 +172,7 @@ docker-test: ## Run unit tests inside a Linux container (useful for non-Linux ho
 		-w /workspace \
 		-e NON_ROOT=true \
 		-e GOFLAGS=-buildvcs=false \
-		golang:1.25 \
+		golang:1.26 \
 		bash -c '\
 			go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_BRANCH) && \
 			KUBEBUILDER_ASSETS=$$(setup-envtest use $(ENVTEST_K8S_VERSION) -p path) \

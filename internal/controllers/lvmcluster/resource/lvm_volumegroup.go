@@ -141,6 +141,7 @@ func lvmVolumeGroups(namespace string, deviceClasses []lvmv1alpha1.DeviceClass) 
 				NodeSelector:          deviceClass.NodeSelector,
 				DeviceSelector:        deviceClass.DeviceSelector,
 				ThinPoolConfig:        deviceClass.ThinPoolConfig,
+				RAIDConfig:            deviceClass.RAIDConfig,
 				Default:               len(deviceClasses) == 1 || deviceClass.Default, // True if there is only one device class or default is explicitly set.
 				DeviceDiscoveryPolicy: deviceClass.DeviceDiscoveryPolicy,
 			},

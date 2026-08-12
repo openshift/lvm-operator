@@ -4,5 +4,6 @@ namespace: openshift-lvm-storage
 namePrefix: lvms-
 
 resources:
+- mutating_webhook_config.yaml
 - validating_webhook_config.yaml
 - service.yaml

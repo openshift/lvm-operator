@@ -4249,6 +4249,11 @@ spec:
 			logf("Created PVC %s and Deployment %s on node %s\n", pvcName, depName, workerName)
 		}
 
+		g.By("#. Get CSIStorageCapacity before decreasing overprovision ratio")
+		capacityBeforeDecrease := getCurrentTotalLvmStorageCapacityByStorageClass(storageClassName)
+		logf("CSIStorageCapacity before ratio decrease: %d\n", capacityBeforeDecrease)
+		o.Expect(capacityBeforeDecrease).To(o.BeNumerically(">", 0), "CSIStorageCapacity before ratio decrease must be positive")
+
 		g.By("#. Decrease overprovision ratio value to 1")
 		err = patchOverprovisionRatio(newLVMClusterName, lvmsNamespace, "1")
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -4260,6 +4265,13 @@ spec:
 			deviceClassName: deviceClassName,
 		}
 		checkLVMClusterAndVGManagerPodReady(tc, lvmClusterObj)
+
+		g.By("#. Wait for CSIStorageCapacity to be updated after ratio decrease")
+		o.Eventually(func() int {
+			capacity := getCurrentTotalLvmStorageCapacityByStorageClass(storageClassName)
+			logf("Current CSIStorageCapacity: %d (was: %d)\n", capacity, capacityBeforeDecrease)
+			return capacity
+		}, 3*time.Minute, 5*time.Second).Should(o.BeNumerically("<", capacityBeforeDecrease))
 
 		g.By("#. Create pvc2")
 		pvc2Name := "test-pvc-final-76425"
@@ -5036,6 +5048,918 @@ spec:
 		output2 := execCommandInPod(tc, testNs, podRestoreName, "test-container", readCmd)
 		o.Expect(output2).To(o.ContainSubstring("new-data-after-restore"))
 		logf("Successfully read new data from restored volume\n")
+	})
+
+	g.It("Author:mmakwana-High-88797-[OTP][LVMS] Verify StorageClassOptions reclaimPolicy and volumeBindingMode are applied to StorageClass [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		g.By("#1. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Original LVMCluster saved: %s\n", originLVMClusterName)
+
+		g.By("#2. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		newLVMClusterName := "lvmcluster-88797"
+		defer func() {
+			// Delete the test LVMCluster if it exists
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup)
+
+			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			if !exists {
+				logf("Restoring original LVMCluster from saved JSON...\n")
+				// Delete the StorageClass so operator can recreate with original settings
+				defaultSCName := "lvms-" + volumeGroup
+				deleteSpecifiedResource("storageclass", defaultSCName, "")
+
+				if err := createLVMClusterFromJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		// Wait for operator to settle and StorageClass to be cleaned up
+		defaultSCName := "lvms-" + volumeGroup
+		o.Eventually(func() bool {
+			exists, _ := resourceExists("storageclass", defaultSCName, "")
+			return !exists
+		}, 2*time.Minute, 5*time.Second).Should(o.BeTrue(), "StorageClass should be deleted by operator after LVMCluster deletion")
+
+		g.By("#3. Create new LVMCluster with storageClassOptions (reclaimPolicy: Retain, volumeBindingMode: Immediate)")
+		newLVMClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+    - name: %s
+      default: true
+      fstype: xfs
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+      storageClassOptions:
+        reclaimPolicy: Retain
+        volumeBindingMode: Immediate
+`, newLVMClusterName, lvmsNamespace, volumeGroup)
+
+		err = createLVMClusterFromJSON(newLVMClusterYAML)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Created new LVMCluster with storageClassOptions\n")
+
+		g.By("#4. Wait for LVMCluster to become Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("LVMCluster %s is Ready\n", newLVMClusterName)
+
+		g.By("#5. Get the created StorageClass and verify reclaimPolicy is Retain")
+		cmd := exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.reclaimPolicy}")
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Retain"))
+		logf("StorageClass %s has reclaimPolicy: Retain as expected\n", defaultSCName)
+
+		g.By("#6. Verify StorageClass volumeBindingMode is Immediate")
+		cmd = exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.volumeBindingMode}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Immediate"))
+		logf("StorageClass %s has volumeBindingMode: Immediate as expected\n", defaultSCName)
+
+		g.By("#7. Create a PVC using the StorageClass (without creating a pod)")
+		pvcName := "test-pvc-88797"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcName,
+			namespace:        testNamespace,
+			storageClassName: defaultSCName,
+			storage:          "2Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#8. Verify PVC binds immediately without a pod (proves Immediate binding works)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Sprintf("oc error: %v: %s", err, string(output))
+			}
+			return strings.TrimSpace(string(output))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+		logf("PVC %s is Bound immediately without a pod - volumeBindingMode: Immediate works\n", pvcName)
+
+		g.By("#9. Get the bound PV and verify its reclaim policy is Retain")
+		pvName := getPVCVolumeName(testNamespace, pvcName)
+		o.Expect(pvName).NotTo(o.BeEmpty())
+
+		cmd = exec.Command("oc", "get", "pv", pvName, "-o=jsonpath={.spec.persistentVolumeReclaimPolicy}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Retain"))
+		logf("PV %s has persistentVolumeReclaimPolicy: Retain as expected\n", pvName)
+
+		g.By("#10. Delete PVC")
+		deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#11. Verify PV still exists after PVC deletion with status Released (proves Retain policy works)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pv", pvName, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Sprintf("oc error: %v: %s", err, string(output))
+			}
+			return strings.TrimSpace(string(output))
+		}, 2*time.Minute, 5*time.Second).Should(o.Equal("Released"))
+		logf("PV %s has status Released after PVC deletion - reclaimPolicy: Retain works\n", pvName)
+
+		g.By("#12. Verify CEL rejects reclaimPolicy change (immutability test)")
+		patchJSON := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/reclaimPolicy","value":"Delete"}]`
+		cmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace,
+			"--type=json", "-p", patchJSON)
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred())
+		o.Expect(string(output)).To(o.ContainSubstring("reclaimPolicy is immutable"))
+		logf("CEL validation correctly rejected reclaimPolicy change: %s\n", string(output))
+
+		g.By("#13. Delete the orphaned PV and its LogicalVolume CR")
+		deleteSpecifiedResource("pv", pvName, "")
+		cleanupLogicalVolumeByName(pvName)
+
+		g.By("#14. Verify orphaned PV is deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pv", pvName, "--ignore-not-found", "-o=jsonpath={.metadata.name}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("oc error checking PV deletion: %v: %s\n", err, string(output))
+				return false
+			}
+			return strings.TrimSpace(string(output)) == ""
+		}, 2*time.Minute, 5*time.Second).Should(o.BeTrue())
+		logf("Orphaned PV %s deleted successfully\n", pvName)
+
+		g.By("#15. Delete newly created LVMCluster resource")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup)
+
+		g.By("#16. Create original LVMCluster resource")
+		// Delete the StorageClass so operator can recreate with original settings
+		deleteSpecifiedResource("storageclass", defaultSCName, "")
+		err = createLVMClusterFromJSON(originLVMJSON)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Original LVMCluster restored\n")
+
+		g.By("#17. Verify restored StorageClass has default storageClassOptions")
+		cmd = exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.reclaimPolicy}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("Delete"))
+		logf("Restored StorageClass %s has default reclaimPolicy: Delete\n", defaultSCName)
+
+		cmd = exec.Command("oc", "get", "storageclass", defaultSCName, "-o=jsonpath={.volumeBindingMode}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("WaitForFirstConsumer"))
+		logf("Restored StorageClass %s has default volumeBindingMode: WaitForFirstConsumer\n", defaultSCName)
+	})
+
+	g.It("Author:mmakwana-High-88798-[OTP][LVMS] Verify StorageClassOptions additionalParameters and additionalLabels are applied to StorageClass [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		g.By("#. Get list of available block devices/disks attached to all worker nodes")
+		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		if len(freeDiskNameCountMap) < 1 {
+			g.Skip("Skipped: Cluster's Worker nodes does not have minimum required free block devices/disks attached")
+		}
+
+		workerNodes, err := getWorkersList()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		workerNodeCount := len(workerNodes)
+
+		var diskName string
+		isDiskFound := false
+		for disk, count := range freeDiskNameCountMap {
+			if count == int64(workerNodeCount) {
+				diskName = disk
+				isDiskFound = true
+				delete(freeDiskNameCountMap, diskName)
+				break
+			}
+		}
+		if !isDiskFound {
+			g.Skip("Skipped: All Worker nodes does not have a free block device/disk with same name attached")
+		}
+
+		g.By("#. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		logf("Original LVMCluster saved: %s\n", originLVMClusterName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		defer func() {
+			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			if !exists {
+				logf("Restoring original LVMCluster from saved JSON...\n")
+				if err := createLVMClusterFromJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		g.By("#. Test topolvm.io/device-class parameter rejection at creation time")
+		newLVMClusterName := "test-lvmcluster-88798"
+		deviceClassName := "vg1"
+		diskPath := "/dev/" + diskName
+
+		invalidParamClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+    - name: %s
+      fstype: xfs
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+      deviceSelector:
+        paths:
+        - %s
+      storageClassOptions:
+        additionalParameters:
+          topolvm.io/device-class: custom-value
+`, newLVMClusterName, lvmsNamespace, deviceClassName, diskPath)
+
+		err = createLVMClusterFromJSON(invalidParamClusterYAML)
+		o.Expect(err).To(o.HaveOccurred(), "LVMCluster with reserved topolvm.io/device-class param should be rejected")
+		o.Expect(err.Error()).To(o.ContainSubstring("managed by LVMS"), "Error should mention the key is managed by LVMS")
+		logf("topolvm.io/device-class parameter rejected at creation time as expected\n")
+
+		g.By("#. Test csi.storage.k8s.io/fstype parameter rejection at creation time")
+		invalidFstypeClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+    - name: %s
+      fstype: xfs
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+      deviceSelector:
+        paths:
+        - %s
+      storageClassOptions:
+        additionalParameters:
+          csi.storage.k8s.io/fstype: btrfs
+`, newLVMClusterName, lvmsNamespace, deviceClassName, diskPath)
+
+		err = createLVMClusterFromJSON(invalidFstypeClusterYAML)
+		o.Expect(err).To(o.HaveOccurred(), "LVMCluster with reserved csi.storage.k8s.io/fstype param should be rejected")
+		o.Expect(err.Error()).To(o.ContainSubstring("managed by LVMS"), "Error should mention the key is managed by LVMS")
+		logf("csi.storage.k8s.io/fstype parameter rejected at creation time as expected\n")
+
+		g.By("#. Create LVMCluster with storageClassOptions.additionalParameters and storageClassOptions.additionalLabels")
+		storageClassName := "lvms-" + deviceClassName
+
+		lvmClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+    - name: %s
+      fstype: xfs
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+      deviceSelector:
+        paths:
+        - %s
+      storageClassOptions:
+        additionalParameters:
+          custom.parameter/key1: value1
+          custom.parameter/key2: value2
+        additionalLabels:
+          team: storage-team
+          environment: test
+`, newLVMClusterName, lvmsNamespace, deviceClassName, diskPath)
+
+		err = createLVMClusterFromJSON(lvmClusterYAML)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Created LVMCluster %s with storageClassOptions\n", newLVMClusterName)
+
+		defer func() {
+			logf("Cleaning up test LVMCluster %s...\n", newLVMClusterName)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+		}()
+
+		g.By("#. Wait for LVMCluster to become Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Get StorageClass and verify custom parameters exist")
+		cmd := exec.Command("oc", "get", "storageclass", storageClassName, "-o=jsonpath={.parameters}")
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		scParams := string(output)
+		o.Expect(scParams).To(o.ContainSubstring("custom.parameter/key1"))
+		o.Expect(scParams).To(o.ContainSubstring("value1"))
+		o.Expect(scParams).To(o.ContainSubstring("custom.parameter/key2"))
+		o.Expect(scParams).To(o.ContainSubstring("value2"))
+		o.Expect(scParams).To(o.ContainSubstring("topolvm.io/device-class"))
+		o.Expect(scParams).To(o.ContainSubstring("csi.storage.k8s.io/fstype"))
+		logf("StorageClass %s has custom parameters as expected\n", storageClassName)
+
+		g.By("#. Verify custom labels exist on StorageClass")
+		cmd = exec.Command("oc", "get", "storageclass", storageClassName, "-o=jsonpath={.metadata.labels}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		scLabels := string(output)
+		o.Expect(scLabels).To(o.ContainSubstring("team"))
+		o.Expect(scLabels).To(o.ContainSubstring("storage-team"))
+		o.Expect(scLabels).To(o.ContainSubstring("environment"))
+		o.Expect(scLabels).To(o.ContainSubstring("test"))
+		o.Expect(scLabels).To(o.ContainSubstring("owned-by.topolvm.io/name"))
+		logf("StorageClass %s has custom labels as expected\n", storageClassName)
+
+		g.By("#. Verify StorageClass can be retrieved by additionalLabels")
+		cmd = exec.Command("oc", "get", "storageclass", "-l", "team=storage-team", "-o=jsonpath={.items[*].metadata.name}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.Fields(string(output))).To(o.ContainElement(storageClassName), "Expected StorageClass %s in label selector results", storageClassName)
+		logf("Found StorageClass %s with label team=storage-team\n", storageClassName)
+
+		cmd = exec.Command("oc", "get", "storageclass", "-l", "environment=test", "-o=jsonpath={.items[*].metadata.name}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.Fields(string(output))).To(o.ContainElement(storageClassName), "Expected StorageClass %s in label selector results", storageClassName)
+		logf("Found StorageClass %s with label environment=test\n", storageClassName)
+
+		g.By("#. Test additionalParameters immutability")
+		patchCmd := exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace,
+			"--type=json", "-p", `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalParameters/custom.parameter~1key1","value":"value2"}]`)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred(), "additionalParameters should be immutable")
+		o.Expect(string(output)).To(o.ContainSubstring("immutable"))
+		logf("additionalParameters immutability verified - patch rejected as expected\n")
+
+		g.By("#. Create a PVC using the StorageClass")
+		pvcName := "test-pvc-88798"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcName,
+			namespace:        testNamespace,
+			storageClassName: storageClassName,
+			storage:          "2Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer func() {
+			// Get PV name before deleting PVC (only if PVC still exists)
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "-o=jsonpath={.spec.volumeName}", "--ignore-not-found")
+			output, _ := cmd.CombinedOutput()
+			pvName := strings.TrimSpace(string(output))
+			deleteSpecifiedResource("pvc", pvcName, testNamespace)
+			if pvName != "" {
+				cleanupLogicalVolumeByName(pvName)
+			}
+		}()
+
+		g.By("#. Create a Pod that mounts the PVC")
+		podName := "test-pod-88798"
+		mountPath := "/mnt/storage"
+		err = createPodWithOC(podConfig{
+			name:      podName,
+			namespace: testNamespace,
+			pvcName:   pvcName,
+			mountPath: mountPath,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer func() {
+			deleteSpecifiedResource("pod", podName, testNamespace)
+		}()
+
+		g.By("#. Wait for PVC to be bound")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(output))
+			}
+			return strings.TrimSpace(string(output))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+		logf("PVC %s is Bound\n", pvcName)
+
+		g.By("#. Wait for Pod to be Running")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pod", podName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting Pod status: %v, output: %s\n", err, string(output))
+			}
+			return strings.TrimSpace(string(output))
+		}, PodReadyTimeout, 5*time.Second).Should(o.Equal("Running"))
+		logf("Pod %s is Running\n", podName)
+
+		g.By("#. Write test data to the volume")
+		testData := "Hello LVMS custom params test"
+		writeCmd := fmt.Sprintf("echo '%s' > %s/testfile.txt && sync", testData, mountPath)
+		execCommandInPod(tc, testNamespace, podName, "test-container", writeCmd)
+		logf("Data written successfully\n")
+
+		g.By("#. Read test data from the volume")
+		readCmd := fmt.Sprintf("cat %s/testfile.txt", mountPath)
+		readOutput := execCommandInPod(tc, testNamespace, podName, "test-container", readCmd)
+		o.Expect(readOutput).To(o.ContainSubstring(testData))
+		logf("Data read matches written data\n")
+
+		g.By("#. Day-2 Operation: Update additionalLabels")
+		updateLabelsPatch := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalLabels","value":{"team":"updated-team","environment":"production"}}]`
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", updateLabelsPatch)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "additionalLabels should be mutable, output: %s", string(output))
+		logf("additionalLabels updated successfully\n")
+
+		g.By("#. Verify StorageClass reflects updated labels")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "storageclass", storageClassName, "-o=jsonpath={.metadata.labels.team}")
+			output, _ := cmd.CombinedOutput()
+			teamLabel := strings.TrimSpace(string(output))
+			cmd2 := exec.Command("oc", "get", "storageclass", storageClassName, "-o=jsonpath={.metadata.labels.environment}")
+			output2, _ := cmd2.CombinedOutput()
+			envLabel := strings.TrimSpace(string(output2))
+			return teamLabel == "updated-team" && envLabel == "production"
+		}, LVMClusterReadyTimeout, 5*time.Second).Should(o.BeTrue())
+		logf("StorageClass labels updated as expected\n")
+
+		g.By("#. Verify StorageClass by updated additionalLabels")
+		cmd = exec.Command("oc", "get", "storageclass", "-l", "team=updated-team", "-o=jsonpath={.items[*].metadata.name}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.Fields(string(output))).To(o.ContainElement(storageClassName), "Expected StorageClass %s in label selector results", storageClassName)
+		logf("Found StorageClass %s with label team=updated-team\n", storageClassName)
+
+		cmd = exec.Command("oc", "get", "storageclass", "-l", "environment=production", "-o=jsonpath={.items[*].metadata.name}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.Fields(string(output))).To(o.ContainElement(storageClassName), "Expected StorageClass %s in label selector results", storageClassName)
+		logf("Found StorageClass %s with label environment=production\n", storageClassName)
+
+		g.By("#. Test day-2 additionalLabel removal (SSA pruning)")
+		removeLabelPatch := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalLabels","value":{"team":"updated-team"}}]`
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", removeLabelPatch)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "label removal should succeed, output: %s", string(output))
+
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "storageclass", storageClassName, "-o=jsonpath={.metadata.labels.team}")
+			output, _ := cmd.CombinedOutput()
+			teamLabel := strings.TrimSpace(string(output))
+			cmd2 := exec.Command("oc", "get", "storageclass", storageClassName, "-o=jsonpath={.metadata.labels.environment}")
+			output2, _ := cmd2.CombinedOutput()
+			envLabel := strings.TrimSpace(string(output2))
+			return teamLabel == "updated-team" && envLabel == ""
+		}, LVMClusterReadyTimeout, 5*time.Second).Should(o.BeTrue())
+		logf("StorageClass label 'environment' pruned as expected\n")
+
+		g.By("#. Verify invalid label keys are rejected")
+		invalidLabelPatch := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalLabels","value":{"-starts-with-hyphen":"value1"}}]`
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", invalidLabelPatch)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred(), "invalid label key should be rejected")
+		o.Expect(string(output)).To(o.ContainSubstring("additionalLabels key"))
+		logf("Invalid label key '-starts-with-hyphen' rejected as expected\n")
+
+		invalidLabelPatch2 := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalLabels","value":{"too/many/slashes/in/key":"value2"}}]`
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", invalidLabelPatch2)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred(), "invalid label key with too many slashes should be rejected")
+		o.Expect(string(output)).To(o.ContainSubstring("additionalLabels key"))
+		logf("Invalid label key 'too/many/slashes/in/key' rejected as expected\n")
+
+		g.By("#. Test owned-by.topolvm.io/ prefix rejection")
+		reservedPrefixPatch := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalLabels","value":{"owned-by.topolvm.io/custom":"value"}}]`
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", reservedPrefixPatch)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred(), "owned-by.topolvm.io/ prefix should be rejected")
+		o.Expect(string(output)).To(o.ContainSubstring("operator-reserved"))
+		logf("owned-by.topolvm.io/ prefix rejected as expected\n")
+
+		g.By("#. Test app.kubernetes.io/ reserved labels rejection")
+		appK8sPatch := `[{"op":"replace","path":"/spec/storage/deviceClasses/0/storageClassOptions/additionalLabels","value":{"app.kubernetes.io/name":"my-app"}}]`
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", appK8sPatch)
+		output, err = patchCmd.CombinedOutput()
+		o.Expect(err).To(o.HaveOccurred(), "app.kubernetes.io/ labels should be rejected")
+		o.Expect(string(output)).To(o.ContainSubstring("operator-reserved"))
+		logf("app.kubernetes.io/ reserved label rejected as expected\n")
+
+		g.By("#. Delete Pod and PVC resources")
+		deleteSpecifiedResource("pod", podName, testNamespace)
+		deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#. Delete newly created LVMCluster resource")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+
+		g.By("#. Create original LVMCluster resource")
+		err = createLVMClusterFromJSON(originLVMJSON)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+	})
+
+	g.It("Author:mmakwana-High-88799-[OTP][LVMS] Verify reclaimPolicy and volumeBindingMode combinations", g.Label("SNO", "MNO"), func() {
+
+		provisioner := "topolvm.io"
+
+		g.By("#. Create test namespace for OCP-88799")
+		testNs := "lvms-test-88799"
+		err := createNamespaceWithOC(testNs)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("namespace", testNs, "")
+
+		g.By("Scenario A: reclaimPolicy=Delete, volumeBindingMode=Immediate")
+
+		g.By("#. Create StorageClass with reclaimPolicy=Delete and volumeBindingMode=Immediate")
+		scDeleteImmediate := "lvms-88799-delete-immediate"
+		err = createStorageClassWithOC(storageClassConfig{
+			name:              scDeleteImmediate,
+			provisioner:       provisioner,
+			fsType:            "xfs",
+			deviceClass:       volumeGroup,
+			reclaimPolicy:     "Delete",
+			volumeBindingMode: "Immediate",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("storageclass", scDeleteImmediate, "")
+
+		g.By("#. Create PVC with no pod (Scenario A)")
+		pvcDeleteImmediate := "pvc-88799-delete-immediate"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcDeleteImmediate,
+			namespace:        testNs,
+			storageClassName: scDeleteImmediate,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify PVC is Bound immediately (no pod needed with Immediate binding)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcDeleteImmediate, "-n", testNs, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+
+		g.By("#. Note the PV name")
+		pvDeleteImmediate := getPVCVolumeName(testNs, pvcDeleteImmediate)
+		o.Expect(pvDeleteImmediate).NotTo(o.BeEmpty())
+
+		g.By("#. Verify PV exists")
+		out, err := exec.Command("oc", "get", "pv", pvDeleteImmediate, "-o", "jsonpath={.metadata.name}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(out))).To(o.Equal(pvDeleteImmediate))
+
+		g.By("#. Delete PVC")
+		deleteSpecifiedResource("pvc", pvcDeleteImmediate, testNs)
+
+		g.By("#. Verify PV is gone (reclaimPolicy=Delete)")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pv", pvDeleteImmediate, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking PV deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+
+		g.By("Scenario B: reclaimPolicy=Retain, volumeBindingMode=WaitForFirstConsumer")
+
+		g.By("#. Create StorageClass with reclaimPolicy=Retain and volumeBindingMode=WaitForFirstConsumer")
+		scRetainWFFC := "lvms-88799-retain-wffc"
+		err = createStorageClassWithOC(storageClassConfig{
+			name:              scRetainWFFC,
+			provisioner:       provisioner,
+			fsType:            "xfs",
+			deviceClass:       volumeGroup,
+			reclaimPolicy:     "Retain",
+			volumeBindingMode: "WaitForFirstConsumer",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("storageclass", scRetainWFFC, "")
+
+		g.By("#. Create PVC (should stay Pending with WaitForFirstConsumer)")
+		pvcRetainWFFC := "pvc-88799-retain-wffc"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcRetainWFFC,
+			namespace:        testNs,
+			storageClassName: scRetainWFFC,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify PVC stays in Pending state (WaitForFirstConsumer requires a consumer)")
+		o.Consistently(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcRetainWFFC, "-n", testNs, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, 10*time.Second, 2*time.Second).Should(o.Equal("Pending"))
+
+		g.By("#. Create Pod to consume the PVC")
+		podRetainWFFC := "pod-88799-retain-wffc"
+		err = createPodWithOC(podConfig{
+			name:      podRetainWFFC,
+			namespace: testNs,
+			pvcName:   pvcRetainWFFC,
+			mountPath: "/mnt/test",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify PVC transitions to Bound after Pod creation")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcRetainWFFC, "-n", testNs, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PVC status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+
+		g.By("#. Get the PV name for cleanup")
+		pvRetainWFFC := getPVCVolumeName(testNs, pvcRetainWFFC)
+		o.Expect(pvRetainWFFC).NotTo(o.BeEmpty())
+		defer deleteSpecifiedResource("pv", pvRetainWFFC, "")
+
+		g.By("#. Delete Pod and PVC")
+		deleteSpecifiedResource("pod", podRetainWFFC, testNs)
+		deleteSpecifiedResource("pvc", pvcRetainWFFC, testNs)
+
+		g.By("#. Wait for PVC to be fully deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pvc", pvcRetainWFFC, "-n", testNs, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking PVC deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+
+		g.By("#. Verify PV exists with status Released (reclaimPolicy=Retain)")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pv", pvRetainWFFC, "-o", "jsonpath={.status.phase}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error getting PV status: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out))
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.Equal("Released"))
+
+		g.By("#. Delete orphaned PV")
+		deleteSpecifiedResource("pv", pvRetainWFFC, "")
+
+		g.By("#. Verify orphaned PV is deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "pv", pvRetainWFFC, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking PV deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+
+		g.By("#. Cleanup LogicalVolume CR for retained PV")
+		cleanupLogicalVolumeByName(pvRetainWFFC)
+
+		g.By("#. Verify LogicalVolume CR is deleted")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "logicalvolume", pvRetainWFFC, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Error checking LogicalVolume deletion: %v, output: %s\n", err, string(out))
+			}
+			return strings.TrimSpace(string(out)) == ""
+		}, ResourceDeleteTimeout, 5*time.Second).Should(o.BeTrue())
+	})
+
+	g.It("Author:mmakwana-High-89594-[LVMS] Verify LVMCluster deviceDiscoveryPolicy is configurable [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		g.By("#1. Get list of available block devices/disks attached to all worker nodes")
+		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		if len(freeDiskNameCountMap) < 2 {
+			g.Skip("Skipped: Need at least 2 free disks available on all worker nodes to test deviceDiscoveryPolicy")
+		}
+
+		workerNodes, err := getWorkersList()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		workerNodeCount := len(workerNodes)
+
+		var firstDiskName string
+		for disk, count := range freeDiskNameCountMap {
+			if count == int64(workerNodeCount) {
+				firstDiskName = disk
+				break
+			}
+		}
+		if firstDiskName == "" {
+			g.Skip("Skipped: No disk available on all worker nodes")
+		}
+		firstDiskPath := "/dev/" + firstDiskName
+
+		g.By("#2. Copy and save existing LVMCluster configuration in JSON format")
+		cmd := exec.Command("oc", "get", "lvmcluster", "-n", lvmsNamespace, "-o=jsonpath={.items[0].metadata.name}")
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMClusterName := strings.TrimSpace(string(output))
+
+		cmd = exec.Command("oc", "get", "lvmcluster", originLVMClusterName, "-n", lvmsNamespace, "-o", "json")
+		outputJSON, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON := string(outputJSON)
+
+		g.By("#3. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+		defer func() {
+			cmd := exec.Command("oc", "get", "lvmcluster", originLVMClusterName, "-n", lvmsNamespace)
+			if err := cmd.Run(); err != nil {
+				o.Expect(createLVMClusterFromJSON(originLVMJSON)).NotTo(o.HaveOccurred())
+			}
+			o.Expect(waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)).NotTo(o.HaveOccurred())
+		}()
+
+		newLVMClusterName := "test-lvmcluster-89594"
+		deviceClassName := "vg1"
+
+		g.By("#4. Create LVMCluster with deviceDiscoveryPolicy: Static and explicit path to ONE disk")
+		lvmClusterManifest := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+    - name: %s
+      default: true
+      deviceDiscoveryPolicy: Static
+      fstype: xfs
+      deviceSelector:
+        paths:
+        - %s
+        forceWipeDevicesAndDestroyAllData: true
+      thinPoolConfig:
+        name: thin-pool-1
+        sizePercent: 90
+        overprovisionRatio: 10
+`, newLVMClusterName, lvmsNamespace, deviceClassName, firstDiskPath)
+		err = createLVMClusterFromJSON(lvmClusterManifest)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer func() {
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+		}()
+
+		g.By("#5. Wait for LVMCluster to be ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#6. Verify VG contains only the specified disk")
+		initialDevices, err := getVGDevices(deviceClassName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		initialDeviceCount := len(initialDevices)
+		o.Expect(initialDeviceCount).To(o.Equal(workerNodeCount), "Expected only %d device(s) in VG (one per worker node)", workerNodeCount)
+
+		g.By("#7. Verify other free disks are in excluded list (Static mode behavior)")
+		excludedDevices, err := getExcludedDevices(deviceClassName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(len(excludedDevices)).To(o.BeNumerically(">", 0), "Static mode should have excluded devices")
+
+		g.By("#8. Verify excluded devices have clear status messages in LVMVolumeGroupNodeStatus")
+		excludedReasons, err := getExcludedDeviceReasons(deviceClassName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(excludedReasons).To(o.ContainElement(o.Not(o.BeEmpty())), "Excluded devices should have non-empty reason strings")
+
+		g.By("#9. Delete LVMCluster for next test phase")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+
+		g.By("#10. Verify VG is removed from disk after LVMCluster deletion")
+		o.Eventually(func() bool {
+			cmd := exec.Command("oc", "get", "lvmvolumegroup", "-n", lvmsNamespace, "-o=jsonpath={.items[*].metadata.name}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Warning: oc get lvmvolumegroup failed: %v\n", err)
+				return false
+			}
+			return strings.TrimSpace(string(output)) == ""
+		}, 2*time.Minute, 10*time.Second).Should(o.BeTrue(), "VG should be removed after LVMCluster deletion")
+
+		g.By("#11. Create LVMCluster with deviceDiscoveryPolicy: Static (auto-discovery, no explicit paths)")
+		err = createLVMClusterWithDeviceDiscoveryPolicy(lvmClusterDeviceDiscoveryConfig{
+			name:                  newLVMClusterName,
+			namespace:             lvmsNamespace,
+			deviceClass:           deviceClassName,
+			deviceDiscoveryPolicy: "Static",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#12. Wait for LVMCluster to be ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#13. Verify deviceDiscoveryPolicy status is RuntimeStatic")
+		o.Eventually(func() (string, error) {
+			return getDeviceDiscoveryPolicyStatus(deviceClassName)
+		}, 2*time.Minute, 10*time.Second).Should(o.ContainSubstring("RuntimeStatic"))
+		logf("deviceDiscoveryPolicy status: RuntimeStatic\n")
+
+		g.By("#14. Get VG devices count")
+		devicesAfterStaticCreate, err := getVGDevices(deviceClassName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		deviceCountAfterStaticCreate := len(devicesAfterStaticCreate)
+
+		g.By("#15. Patch LVMCluster to deviceDiscoveryPolicy: Dynamic")
+		patchCmd := exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json",
+			"-p", `[{"op":"replace","path":"/spec/storage/deviceClasses/0/deviceDiscoveryPolicy","value":"Dynamic"}]`)
+		patchOutput, err := patchCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to patch: %s", string(patchOutput))
+
+		g.By("#16. Wait for LVMCluster to be ready after patch")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#17. Verify deviceDiscoveryPolicy status changed to RuntimeDynamic")
+		o.Eventually(func() (string, error) {
+			return getDeviceDiscoveryPolicyStatus(deviceClassName)
+		}, 2*time.Minute, 10*time.Second).Should(o.ContainSubstring("RuntimeDynamic"))
+		logf("deviceDiscoveryPolicy status changed to: RuntimeDynamic\n")
+
+		g.By("#18. Verify VG devices preserved after switching to Dynamic")
+		devicesAfterDynamic, err := getVGDevices(deviceClassName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		deviceCountAfterDynamic := len(devicesAfterDynamic)
+		o.Expect(deviceCountAfterDynamic).To(o.Equal(deviceCountAfterStaticCreate), "Existing devices should be preserved")
+
+		g.By("#19. Patch LVMCluster back to deviceDiscoveryPolicy: Static")
+		patchCmd = exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json",
+			"-p", `[{"op":"replace","path":"/spec/storage/deviceClasses/0/deviceDiscoveryPolicy","value":"Static"}]`)
+		patchOutput, err = patchCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to patch: %s", string(patchOutput))
+
+		g.By("#20. Wait for LVMCluster to be ready after patch back to Static")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#21. Verify deviceDiscoveryPolicy status changed to RuntimeStatic")
+		o.Eventually(func() (string, error) {
+			return getDeviceDiscoveryPolicyStatus(deviceClassName)
+		}, 2*time.Minute, 10*time.Second).Should(o.ContainSubstring("RuntimeStatic"))
+		logf("deviceDiscoveryPolicy status changed back to: RuntimeStatic\n")
+
+		g.By("#22. Verify existing devices preserved in VG (no device removal)")
+		o.Consistently(func() (int, error) {
+			devices, err := getVGDevices(deviceClassName)
+			if err != nil {
+				return 0, err
+			}
+			return len(devices), nil
+		}, 30*time.Second, 5*time.Second).Should(o.Equal(deviceCountAfterDynamic), "All existing devices should be preserved")
+
+		g.By("#23. Delete newly created LVMCluster resource")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+
+		g.By("#24. Restore original LVMCluster resource")
+		err = createLVMClusterFromJSON(originLVMJSON)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
 	})
 })
 

@@ -65,6 +65,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -193,6 +194,10 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	for _, c := range vgmanager.RAIDMetrics() {
+		ctrlmetrics.Registry.MustRegister(c)
 	}
 
 	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
@@ -432,14 +437,12 @@ func readyCheck(
 
 // newGRPCServer returns a new grpc.Server with the following settings:
 // UnaryInterceptor: ErrorLoggingInterceptor, to log errors on grpc calls
-// SharedWriteBuffer: true, to share write buffer between all connections, saving memory
 // 2 streams for one core each (vgmanager is optimized for 1 hyperthreaded core)
 // 2 workers for one core each (vgmanager is optimized for 1 hyperthreaded core)
 // We technically could use 1 worker / 1 stream, but that would make the goroutine
 // switch threads more often, which is less efficient.
 func newGRPCServer() *grpc.Server {
 	return grpc.NewServer(grpc.UnaryInterceptor(ErrorLoggingInterceptor),
-		grpc.SharedWriteBuffer(true),
 		grpc.MaxConcurrentStreams(2),
 		grpc.NumStreamWorkers(2),
 	)
