@@ -144,6 +144,32 @@ func getDiscoveredDevices(ctx context.Context, cluster *v1alpha1.LVMCluster) []s
 	return vgStatus.Devices
 }
 
+// getDiscoveredDevicesAllNodes returns the sorted union of devices discovered
+// across all nodes' VG statuses. Unlike getDiscoveredDevices (single node), this
+// is used when a device selector must cover a cluster whose device names differ
+// per node, such as RAID which requires explicit paths.
+func getDiscoveredDevicesAllNodes(ctx context.Context, cluster *v1alpha1.LVMCluster) []string {
+	currentCluster := &v1alpha1.LVMCluster{}
+	Expect(crClient.Get(ctx, client.ObjectKeyFromObject(cluster), currentCluster)).To(Succeed())
+
+	deviceSet := make(map[string]struct{})
+	for _, dcStatus := range currentCluster.Status.DeviceClassStatuses {
+		for _, nodeStatus := range dcStatus.NodeStatus {
+			for _, device := range nodeStatus.Devices {
+				deviceSet[device] = struct{}{}
+			}
+		}
+	}
+	Expect(deviceSet).NotTo(BeEmpty(), "cluster should have discovered devices on at least one node")
+
+	devices := make([]string, 0, len(deviceSet))
+	for device := range deviceSet {
+		devices = append(devices, device)
+	}
+	sort.Strings(devices)
+	return devices
+}
+
 // classifyDevicesBySize returns (smaller, larger) device by alphabetical order.
 // The disk setup creates a 10GB disk before a 30GB disk, and AWS attaches them
 // in order, so the first alphabetically is expected to be the smaller one.
