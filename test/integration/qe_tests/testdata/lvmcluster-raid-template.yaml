@@ -1,0 +1,36 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: lvmcluster-raid-template
+objects:
+- apiVersion: lvm.topolvm.io/v1alpha1
+  kind: LVMCluster
+  metadata:
+    name: ${CLUSTERNAME}
+    namespace: ${CLUSTERNAMESPACE}
+  spec:
+    storage:
+      deviceClasses:
+        - name: ${DEVICECLASSNAME}
+          deviceSelector:
+            paths:
+              - ${DISKPATH1}
+              - ${DISKPATH2}
+          raidConfig:
+            type: ${RAIDTYPE}
+            mirrors: ${MIRRORS}
+parameters:
+- name: CLUSTERNAME
+  value: test-raid1
+- name: CLUSTERNAMESPACE
+  value: openshift-lvm-storage
+- name: DEVICECLASSNAME
+  value: raid1-class
+- name: DISKPATH1
+  value: /dev/sdb
+- name: DISKPATH2
+  value: /dev/sdc
+- name: RAIDTYPE
+  value: raid1
+- name: MIRRORS
+  value: "1"

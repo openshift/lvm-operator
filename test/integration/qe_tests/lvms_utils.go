@@ -2148,3 +2148,97 @@ func createLVMClusterWithDeviceDiscoveryPolicy(cfg lvmClusterDeviceDiscoveryConf
 	}
 	return nil
 }
+
+func createLVMClusterWithRAID1(name, namespace, deviceClassName, diskPath1, diskPath2 string) error {
+	yamlContent := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+      - name: %s
+        deviceSelector:
+          paths:
+            - %s
+            - %s
+        raidConfig:
+          type: raid1
+          mirrors: 1
+`, name, namespace, deviceClassName, diskPath1, diskPath2)
+
+	cmd := exec.Command("oc", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(yamlContent)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logf("Error creating RAID1 LVMCluster: %v\n%s\n", err, string(output))
+		return err
+	}
+	logf("RAID1 LVMCluster creation output: %s\n", string(output))
+	return nil
+}
+
+func createLVMClusterWithRAIDAndThinPool(name, namespace, deviceClassName, diskPath1, diskPath2 string) error {
+	yamlContent := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+      - name: %s
+        deviceSelector:
+          paths:
+            - %s
+            - %s
+        thinPoolConfig:
+          name: thin-pool
+          sizePercent: 90
+          overprovisionRatio: 10
+        raidConfig:
+          type: raid1
+          mirrors: 1
+`, name, namespace, deviceClassName, diskPath1, diskPath2)
+
+	cmd := exec.Command("oc", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(yamlContent)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logf("Error creating RAID + thinPool LVMCluster (expected): %v\n%s\n", err, string(output))
+		return fmt.Errorf("oc apply failed: %w: %s", err, string(output))
+	}
+	logf("RAID + thinPool LVMCluster created (may have validation error)\n")
+	return nil
+}
+
+func createLVMClusterWithRAID5(name, namespace, deviceClassName, diskPath1, diskPath2 string) error {
+	yamlContent := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  storage:
+    deviceClasses:
+      - name: %s
+        deviceSelector:
+          paths:
+            - %s
+            - %s
+        raidConfig:
+          type: raid5
+          stripes: 2
+`, name, namespace, deviceClassName, diskPath1, diskPath2)
+
+	cmd := exec.Command("oc", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(yamlContent)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logf("Error creating RAID5 LVMCluster (expected): %v\n%s\n", err, string(output))
+		return fmt.Errorf("oc apply failed: %w: %s", err, string(output))
+	}
+	logf("RAID5 LVMCluster created (may have validation error)\n")
+	return nil
+}
