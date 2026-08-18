@@ -60,7 +60,14 @@ spec:
   - name: catalog-patch-image
     value: quay.io/konflux-ci/yq@sha256:41aee71bcaa8a759073e00d6acea358fbc4013ad6e28554729451606c0c35591
   pipelineRef:
-    name: catalog-patching-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/catalog-patching-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-catalog-4-23
   workspaces:
