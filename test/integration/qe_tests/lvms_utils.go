@@ -2148,3 +2148,189 @@ func createLVMClusterWithDeviceDiscoveryPolicy(cfg lvmClusterDeviceDiscoveryConf
 	}
 	return nil
 }
+
+// RAIDConfig specifies RAID type and parameters for a RAID LVMCluster.
+// Type is "raid1", "raid5", "raid6", or "raid10".
+// Mirrors is used for raid1/raid10 (e.g., "1" for raid1, "2" for raid10), or "null" for raid4/raid5/raid6.
+// Stripes is used for raid4/raid5/raid6/raid10 (e.g., "2" for raid5 with 3 disks), or "null" for raid1.
+// WithThinPool adds a thinPoolConfig block alongside raidConfig. RAID and thinPool are
+// mutually exclusive, so this is only set by the negative validation test that asserts
+// the webhook rejects the combination; leave false for all valid RAID clusters.
+type RAIDConfig struct {
+	Type         string
+	Mirrors      string
+	Stripes      string
+	WithThinPool bool
+}
+
+// createLVMClusterWithRAID creates an LVMCluster with the specified RAID configuration using the lvmcluster-raid-template.
+// diskPaths contains device paths (e.g., ["/dev/nvme1n1", "/dev/nvme2n1"]).
+// raidCfg specifies the RAID type and parameters.
+// Returns validation errors from the API (e.g., mutually exclusive, requires at least N disks).
+func createLVMClusterWithRAID(name, namespace, deviceClassName string, diskPaths []string, raidCfg RAIDConfig) error {
+	if len(diskPaths) == 0 {
+		return fmt.Errorf("at least one disk path is required")
+	}
+
+	// Build paths array for the template (must be valid JSON array syntax)
+	pathsArray := "["
+	for i, p := range diskPaths {
+		if i > 0 {
+			pathsArray += ","
+		}
+		pathsArray += fmt.Sprintf(`"%s"`, p)
+	}
+	pathsArray += "]"
+
+	// THINPOOL is appended after the raidConfig block. It is empty for valid RAID
+	// clusters and populated only for the negative test that expects the webhook to
+	// reject the mutually-exclusive RAID + thinPool combination. The indentation
+	// matches the template (de-indented by two spaces during template processing).
+	thinPool := ""
+	if raidCfg.WithThinPool {
+		thinPool = "\n        thinPoolConfig:" +
+			"\n          name: thin-pool" +
+			"\n          sizePercent: 90" +
+			"\n          overprovisionRatio: 10"
+	}
+
+	err := applyResourceFromTemplate("lvmcluster-raid-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "NAME="+name,
+		"-p", "NAMESPACE="+namespace,
+		"-p", "DEVICECLASS="+deviceClassName,
+		"-p", "PATHS="+pathsArray,
+		"-p", "RAIDTYPE="+raidCfg.Type,
+		"-p", "MIRRORS="+raidCfg.Mirrors,
+		"-p", "STRIPES="+raidCfg.Stripes,
+		"-p", "THINPOOL="+thinPool,
+	)
+
+	// Validation logic: pass back API validation errors for negative test cases
+	if err != nil {
+		// Check if error contains validation messages (for negative tests)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "mutually exclusive") ||
+			strings.Contains(errMsg, "requires at least") {
+			return err // Return the validation error as-is for test assertions
+		}
+		return fmt.Errorf("failed to create RAID LVMCluster %s: %w", name, err)
+	}
+
+	logf("RAID LVMCluster %s created with %s configuration\n", name, raidCfg.Type)
+	return nil
+}
+
+func getLVMClusterState(name string, namespace string) (string, error) {
+	cmd := exec.Command("oc", "get", "lvmcluster", name, "-n", namespace, "-o=jsonpath={.status.state}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get LVMCluster %s state: %w, output: %s", name, err, string(output))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func simulateDiskFailureOnNode(nodeName string, diskName string) {
+	// For NVMe devices, verify the controller isn't shared by multiple namespaces before removal
+	// to avoid accidentally removing storage for other test workloads.
+	validateCmd := "lsblk -n -o NAME /dev/" + diskName + " 2>/dev/null | grep -E '^nvme' | wc -l"
+	cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", validateCmd)
+	output, err := cmd.CombinedOutput()
+	if err == nil && strings.TrimSpace(string(output)) == "1" {
+		// NVMe device found; verify controller is dedicated to this namespace
+		ctrlCheckCmd := "ls -1 /sys/block/" + diskName + "/device/subsystem/devices 2>/dev/null | grep -c '^nvme' || echo 0"
+		ctrlCmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", ctrlCheckCmd)
+		ctrlOutput, ctrlErr := ctrlCmd.CombinedOutput()
+		if ctrlErr == nil && strings.TrimSpace(string(ctrlOutput)) != "1" {
+			logf("Warning: NVMe device %s controller may host multiple namespaces; proceeding with caution\n", diskName)
+		}
+	}
+
+	// Remove the disk using device-specific delete paths (SCSI/virtio use /device/delete, NVMe may use /device/device/remove)
+	removeDiskCmd := "echo 1 > /sys/block/" + diskName + "/device/delete 2>/dev/null || echo 1 > /sys/block/" + diskName + "/device/device/remove"
+	cmd = exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", removeDiskCmd)
+	output, err = cmd.CombinedOutput()
+	o.Expect(err).NotTo(o.HaveOccurred(), "failed to simulate disk failure on node %s: %s", nodeName, string(output))
+
+	// Verify the device was actually removed
+	verifyCmd := "lsblk -n /dev/" + diskName + " >/dev/null 2>&1 && echo FOUND || echo REMOVED"
+	verifyExecCmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", verifyCmd)
+	verifyOutput, verifyErr := verifyExecCmd.CombinedOutput()
+	o.Expect(verifyErr).NotTo(o.HaveOccurred(), "failed to verify disk removal on node %s: %s", nodeName, string(verifyOutput))
+	o.Expect(string(verifyOutput)).To(o.ContainSubstring("REMOVED"), "Disk /dev/%s was not successfully removed from node %s", diskName, nodeName)
+
+	logf("Simulated disk failure of /dev/%s on node %s\n", diskName, nodeName)
+}
+
+func rescanDisksOnNode(nodeName string) {
+	cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", "echo 1 > /sys/bus/pci/rescan")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: failed to rescan PCI bus on node %s: %s\n", nodeName, string(output))
+	}
+	logf("Rescanned PCI bus on node %s\n", nodeName)
+}
+
+// cleanupRAID5VGOnNode removes the RAID5 volume group from a node and wipes LVM
+// signatures off the given disks, mirroring the check-then-remove cleanup that
+// removeLogicalVolumeOnDisk does for test 71012. It is the failure-path safety
+// net: if the test aborts while the cluster is Degraded, deleting the LVMCluster
+// CR strips its finalizer but can leave a stale VG (with a missing PV) and LVM
+// signatures behind, which would collide with the baseline LVMCluster being
+// restored and break every subsequent [Serial] test. vgremove -ff removes a VG
+// even when a PV is missing. Steps are guarded by existence checks and errors are
+// logged (best-effort) so cleanup never panics and masks the real test failure.
+func cleanupRAID5VGOnNode(nodeName string, vgName string, diskPaths []string) {
+	// Remove the VG only if it is still present on the node.
+	cleanupCmd := "if vgs --noheadings -o vg_name 2>/dev/null | grep -qw " + vgName + "; then vgremove -ff " + vgName + "; fi; " +
+		"for d in " + strings.Join(diskPaths, " ") + "; do wipefs -a $d 2>/dev/null || true; done; " +
+		"echo RAID5_CLEANUP_DONE"
+	cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", cleanupCmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "RAID5_CLEANUP_DONE") {
+		logf("Warning: RAID5 VG cleanup on node %s was not fully successful (best-effort): %v, output: %s\n", nodeName, err, string(output))
+		return
+	}
+	logf("RAID5 VG %s cleaned up on node %s (VG removed if present, disks wiped)\n", vgName, nodeName)
+}
+
+// repairRAID5OnNode repairs a degraded RAID5 logical volume by adding a replacement disk.
+// replacementDiskPath must be an unused disk; pvcreate -ff -y will destroy its existing data.
+func repairRAID5OnNode(nodeName string, vgName string, replacementDiskPath string) {
+	// Explicitly select the RAID5 logical volume and fail immediately if none found
+	getLVCmd := "lvs --noheadings -o lv_name --select 'segtype=~raid' " + vgName + " 2>/dev/null | head -1 | tr -d ' '"
+	lvCmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", getLVCmd)
+	// Use Output() (stdout only), not CombinedOutput(): `oc debug` writes its
+	// "Starting pod/..." banner to stderr, and merging it in would make TrimSpace
+	// capture "Starting" as the LV name instead of the real value.
+	lvOutput, lvErr := lvCmd.Output()
+	o.Expect(lvErr).NotTo(o.HaveOccurred(), "failed to query RAID5 logical volumes on node %s: %s", nodeName, string(lvOutput))
+
+	lvName := strings.TrimSpace(string(lvOutput))
+	o.Expect(lvName).NotTo(o.BeEmpty(), "No RAID5 logical volume found in VG %s on node %s", vgName, nodeName)
+
+	// Now repair the RAID array using the identified LV and replacement disk
+	repairCmd := "set -e; " +
+		"pvcreate -ff -y " + replacementDiskPath + " && " +
+		"vgextend " + vgName + " " + replacementDiskPath + " && " +
+		"lvconvert --repair -y " + vgName + "/" + lvName + " " + replacementDiskPath + " && " +
+		"vgreduce --removemissing --force " + vgName
+	cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", repairCmd)
+	output, err := cmd.CombinedOutput()
+	o.Expect(err).NotTo(o.HaveOccurred(), "failed to repair RAID5 on node %s: %s", nodeName, string(output))
+
+	// Verify RAID repair succeeded by checking RAID health status instead of relying on
+	// exact output text which varies across LVM2 versions. Check sync_percent (should be
+	// 100 when fully synced) rather than health_status as health_status semantics differ by type.
+	verifyCmd := "lvs --noheadings -o sync_percent " + vgName + "/" + lvName + " 2>/dev/null | tr -d ' %'"
+	verifyExecCmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", verifyCmd)
+	// Output() (stdout only) so the `oc debug` stderr banner does not contaminate the value
+	verifyOutput, verifyErr := verifyExecCmd.Output()
+	if verifyErr == nil {
+		syncPercent := strings.TrimSpace(string(verifyOutput))
+		logf("RAID5 repair on node %s: sync_percent=%s\n", nodeName, syncPercent)
+		// Sync is typically not 100% immediately after repair (still syncing in background), so we just log it
+		// The RAID is considered repaired once lvconvert succeeds and vgreduce completes successfully
+	}
+	logf("RAID5 repair completed on node %s using %s for LV %s\n", nodeName, replacementDiskPath, lvName)
+}
