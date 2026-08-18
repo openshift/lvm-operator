@@ -1,0 +1,42 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: lvmcluster-raid-template
+objects:
+- apiVersion: lvm.topolvm.io/v1alpha1
+  kind: LVMCluster
+  metadata:
+    name: ${NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    storage:
+      deviceClasses:
+      - name: ${DEVICECLASS}
+        deviceSelector:
+          paths: ${{PATHS}}
+        raidConfig:
+          type: ${RAIDTYPE}
+          ${RAIDPARAM}
+parameters:
+- name: NAME
+  required: true
+  value: "test-raid"
+- name: NAMESPACE
+  required: true
+  value: "openshift-lvm-storage"
+- name: DEVICECLASS
+  required: true
+  value: "raid-class"
+# PATHS is a YAML/JSON flow list of device paths, e.g. ["/dev/nvme1n1","/dev/nvme2n1"].
+# Using a flow list keeps a single template usable for raid1 (2 disks), raid5 (3 disks), etc.
+- name: PATHS
+  required: true
+  value: '["/dev/nvme1n1","/dev/nvme2n1"]'
+- name: RAIDTYPE
+  required: true
+  value: "raid1"
+# RAIDPARAM is the single mutually-exclusive raidConfig field for the chosen type:
+# "mirrors: 1" for raid1/raid10, or "stripes: 2" for raid4/raid5/raid6/raid10.
+- name: RAIDPARAM
+  required: true
+  value: "mirrors: 1"
