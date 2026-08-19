@@ -3857,6 +3857,7 @@ spec:
 
 	g.It("Author:mmakwana-High-76425-[OTP][LVMS] Make thin pool overprovisionRatio editable in LVMS [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
 
+		g.Skip("Temporarily disabled - OCPEDGE-2938: OverProvisionRatio propagation race condition")
 		volumeGroup := "vg1"
 		storageClassName := "lvms-" + volumeGroup
 		thinPoolName := "thin-pool-1"
