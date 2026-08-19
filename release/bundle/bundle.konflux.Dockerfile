@@ -1,7 +1,7 @@
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9:v4.18 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
 
-ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:e0ebe6eba71170b2cfb97264b6ee8f810819048d1a1623ff89bf3b06c8d949d7
+ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:538804da08398f797446bf0732235663c3c5ae6f725b9a5e359eeeaff65859dd
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:a780573a1ea56aea51f40b4af11497ad6598048eb0d72b931ca084fb132f1801
 
