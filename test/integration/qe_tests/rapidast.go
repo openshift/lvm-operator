@@ -399,6 +399,10 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 			g.Skip("RapiDAST image does not support ARM architecture")
 		}
 
+		if isDisconnectedCluster() {
+			g.Skip("RapiDAST requires internet access and cannot run on disconnected clusters")
+		}
+
 		setupRapidastTest()
 		g.DeferCleanup(cleanupRapidastTest)
 
