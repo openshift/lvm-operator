@@ -240,7 +240,6 @@ func (r *Reconciler) reconcile(ctx context.Context, instance *lvmv1alpha1.LVMClu
 	}
 
 	resources := []resource.Manager{
-		resource.NetworkPolicies(),
 		resource.CSIDriver(),
 		resource.VGManager(r.ClusterType),
 		resource.LVMVGs(),
@@ -532,7 +531,6 @@ func (r *Reconciler) processDelete(ctx context.Context, instance *lvmv1alpha1.LV
 			resource.CSIDriver(),
 			resource.CSINode(),
 			resource.ServiceMonitor(),
-			resource.NetworkPolicies(),
 		}
 
 		if r.ClusterType == cluster.TypeOCP {
