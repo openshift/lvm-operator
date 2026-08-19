@@ -39,24 +39,31 @@ generated from the other, so a past edit to one sample (adding
 
 ## Fix
 
-Manually sync the `initialization-resource` annotation to match
-`config/samples/lvm_v1alpha1_lvmcluster.yaml` exactly:
+The bug report is specifically about the name mismatch, not about the two
+samples' other fields. Change only `metadata.name` in the
+`initialization-resource` annotation:
 
-- Change `metadata.name` from `test-lvmcluster` to `my-lvmcluster`.
-- Add `"default": true` and `"fstype": "xfs"` to the `deviceClasses[0]` entry.
-- Add `"overprovisionRatio": 10` and `"sizePercent": 90` to `thinPoolConfig`.
+- `test-lvmcluster` → `my-lvmcluster`.
 
-This is a content edit only in
-`config/manifests/bases/lvms-operator.clusterserviceversion.yaml` — no Go code,
-no controller logic, no build tooling changes.
+Leave `deviceClasses[0]` and `thinPoolConfig` exactly as they are today (no
+`default`, no `fstype`, no `overprovisionRatio`/`sizePercent`). Adding those
+would change the actual default storage configuration Console presents in the
+initialization-resource quick-create flow — a real behavior change beyond
+what was reported, not just a display fix. This is a single-line rename in
+`config/manifests/bases/lvms-operator.clusterserviceversion.yaml` — no Go
+code, no controller logic, no build tooling changes.
 
 Add a short note near the annotation (as close as the YAML/JSON structure
-allows without polluting the rendered CSV) stating that this sample must be
-kept in sync with `config/samples/lvm_v1alpha1_lvmcluster.yaml`, so the next
-person editing either sample knows to update both.
+allows without polluting the rendered CSV) stating that the `metadata.name`
+here must be kept in sync with `config/samples/lvm_v1alpha1_lvmcluster.yaml`,
+so the next person editing either sample's name remembers to update both.
 
 ### Explicitly out of scope
 
+- Not syncing `default`/`fstype`/`overprovisionRatio`/`sizePercent` or any
+  other spec fields between the two samples — only the reported name
+  mismatch is being fixed. The two samples remain intentionally free to
+  differ in content; only their name must match.
 - Not restructuring the build to generate `initialization-resource` from the
   sample file automatically (that's a heavier, build-pipeline-touching fix —
   worth a follow-up issue if this class of bug recurs, but disproportionate
@@ -74,8 +81,9 @@ make catalog
 ```
 
 This updates `bundle/manifests/lvms-operator.clusterserviceversion.yaml` and
-the catalog so both `alm-examples` and `initialization-resource` contain
-identical `LVMCluster` specs (name `my-lvmcluster`, same fields). Confirm via:
+the catalog so both `alm-examples` and `initialization-resource` reference an
+`LVMCluster` named `my-lvmcluster` (their other spec fields remain
+intentionally different). Confirm via:
 
 ```bash
 git diff bundle/manifests/lvms-operator.clusterserviceversion.yaml
@@ -90,5 +98,5 @@ committed.
 This is a manifest-only fix with no controller or reconciliation behavior
 change, so no new unit tests are required. Verification is the `make verify`
 gate above, plus a manual check (or e2e, if desired) that both Console
-"Create LVMCluster" entry points now show `my-lvmcluster` with identical spec
-fields.
+"Create LVMCluster" entry points now show the same default name,
+`my-lvmcluster`.
