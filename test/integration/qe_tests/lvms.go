@@ -2715,7 +2715,7 @@ spec:
 	})
 
 	g.It("Author:rdeore-High-73363-[OTP][LVMS] Check hot reload of lvmd configuration is working [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
-
+		g.Skip("Temporarily disabled - OCPEDGE-2936: CSIStorageCapacity stale after recreation")
 		var (
 			storageCapacity    int
 			lvmdConfigFilePath = "/etc/topolvm/lvmd.yaml"
@@ -5773,6 +5773,7 @@ spec:
 	g.It("Author:mmakwana-High-89594-[LVMS] Verify LVMCluster deviceDiscoveryPolicy is configurable [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
 
 		g.By("#1. Get list of available block devices/disks attached to all worker nodes")
+		g.Skip("Temporarily disabled - OCPEDGE-2935: LVMS: Admission webhook rejects DeviceSelector without paths, blocking auto-discovery mode")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		if len(freeDiskNameCountMap) < 2 {
