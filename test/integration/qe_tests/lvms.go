@@ -798,6 +798,7 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 	g.It("Author:rdeore-High-67002-[OTP][LVMS] Check deviceSelector logic works with only optional paths [Disruptive]", g.Label("MNO", "Serial"), func() {
 
 		g.By("Get list of available block devices/disks attached to all worker nodes")
+		g.Skip("Temporarily disabled - OCPEDGE-2937: vg-manager retains stale devices after recreation")
 		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
