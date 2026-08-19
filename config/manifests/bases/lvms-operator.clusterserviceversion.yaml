@@ -9,12 +9,13 @@ metadata:
     operators.openshift.io/must-gather-image: quay.io/lvms_dev/lvms-must-gather:latest
     description: Logical volume manager storage provides dynamically provisioned local storage for container workloads
     operatorframework.io/cluster-monitoring: "true"
+    # metadata.name must match config/samples/lvm_v1alpha1_lvmcluster.yaml (OCPBUGS-86002)
     operatorframework.io/initialization-resource: |-
       {
           "apiVersion": "lvm.topolvm.io/v1alpha1",
           "kind": "LVMCluster",
           "metadata": {
-            "name": "test-lvmcluster"
+            "name": "my-lvmcluster"
           },
           "spec": {
             "storage": {
