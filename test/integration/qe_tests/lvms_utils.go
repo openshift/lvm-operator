@@ -2000,3 +2000,34 @@ func getPVCVolumeName(namespace string, pvcName string) string {
 	logf("The PVC %s in namespace %s is bound to volume %s\n", pvcName, namespace, volumeName)
 	return volumeName
 }
+
+func isDisconnectedCluster() bool {
+	nodeCmd := exec.Command("oc", "get", "nodes", "-o=jsonpath={.items[0].metadata.name}")
+	nodeOutput, err := nodeCmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: failed to get node name: %v", err)
+		return true
+	}
+	nodeName := strings.TrimSpace(string(nodeOutput))
+	if nodeName == "" {
+		logf("Warning: no nodes found")
+		return true
+	}
+
+	probeCmd := exec.Command("oc", "debug", "node/"+nodeName, "--",
+		"chroot", "/host", "sh", "-c",
+		"curl -s --connect-timeout 5 https://fedoraproject.org/static/hotspot.txt &>/dev/null 2>&1 && echo Connected || echo Disconnected")
+	probeOutput, err := probeCmd.CombinedOutput()
+	if err != nil {
+		logf("Warning: network probe failed: %v", err)
+		return true
+	}
+
+	result := strings.TrimSpace(string(probeOutput))
+	if strings.Contains(result, "Connected") {
+		return false
+	}
+
+	logf("Detected disconnected cluster: network probe failed to reach external URL")
+	return true
+}
