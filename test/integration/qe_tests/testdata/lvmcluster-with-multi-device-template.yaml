@@ -1,0 +1,48 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: lvmcluster-with-multi-device-template
+objects:
+- apiVersion: lvm.topolvm.io/v1alpha1
+  kind: LVMCluster
+  metadata:
+    name: ${NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    storage:
+      deviceClasses:
+      - name: ${DEVICECLASSNAME1}
+        default: true
+        fstype: ${FSTYPE1}
+        thinPoolConfig:
+          name: thin-pool-1
+          sizePercent: 90
+          overprovisionRatio: 10
+        deviceSelector:
+          paths:
+          - ${PATH1}
+          forceWipeDevicesAndDestroyAllData: true
+      - name: ${DEVICECLASSNAME2}
+        default: false
+        fstype: ${FSTYPE2}
+        thinPoolConfig:
+          name: thin-pool-2
+          sizePercent: 90
+          overprovisionRatio: 10
+        deviceSelector:
+          paths:
+          - ${PATH2}
+          forceWipeDevicesAndDestroyAllData: true
+parameters:
+- name: NAME
+- name: NAMESPACE
+- name: DEVICECLASSNAME1
+  value: vg1
+- name: DEVICECLASSNAME2
+  value: vg2
+- name: FSTYPE1
+  value: xfs
+- name: FSTYPE2
+  value: ext4
+- name: PATH1
+- name: PATH2
