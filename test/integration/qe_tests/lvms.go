@@ -5962,6 +5962,201 @@ spec:
 		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 	})
+
+	g.It("Author:mmakwana-High-90162-[OTP][LVMS] Verify LVMS RAID5 survives disk failure and can be repaired with replacement disk [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		g.By("#. Get list of available block devices/disks attached to all worker nodes")
+		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		workerNodes, err := getWorkersList()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		workerNodeCount := len(workerNodes)
+
+		// RAID5 needs 3 disks; a 4th disk is required as the replacement/spare.
+		// All 4 must exist with the same name on every worker node so the RAID5
+		// device class can be created and repaired regardless of pod placement.
+		var disks []string
+		for diskName, count := range freeDiskNameCountMap {
+			if count == int64(workerNodeCount) {
+				disks = append(disks, diskName)
+			}
+			if len(disks) == 4 {
+				break
+			}
+		}
+		if len(disks) < 4 {
+			g.Skip("Skipped: RAID5 disk-failure test needs at least 4 free block devices/disks with the same name on all worker nodes (3 for RAID5 + 1 replacement)")
+		}
+
+		diskPath1 := "/dev/" + disks[0]
+		diskPath2 := "/dev/" + disks[1]
+		diskPath3 := "/dev/" + disks[2]
+		spareDisk := disks[3]
+		spareDiskPath := "/dev/" + spareDisk
+		logf("RAID5 disks: %s, %s, %s | replacement disk: %s\n", diskPath1, diskPath2, diskPath3, spareDiskPath)
+
+		g.By("#. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Original LVMCluster saved: %s\n", originLVMClusterName)
+
+		g.By("#. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		defer func() {
+			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			if !exists {
+				logf("Restoring original LVMCluster from saved JSON...\n")
+				if err := createLVMClusterFromJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		g.By("#. Create LVMCluster with RAID5 configuration")
+		newLVMClusterName := "test-raid5"
+		deviceClassName := "raid5-class"
+		err = createLVMClusterWithRAID5(newLVMClusterName, lvmsNamespace, deviceClassName, diskPath1, diskPath2, diskPath3)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		defer func() {
+			logf("Cleaning up test LVMCluster %s...\n", newLVMClusterName)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+		}()
+
+		g.By("#. Wait for RAID5 LVMCluster to be Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterForceWipeReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("RAID5 LVMCluster created successfully\n")
+
+		g.By("#. Create PVC with RAID5 storage class")
+		storageClassName := "lvms-" + deviceClassName
+		pvcName := "raid5-pvc"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcName,
+			namespace:        testNamespace,
+			storageClassName: storageClassName,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("PVC created: %s\n", pvcName)
+
+		defer func() {
+			deleteSpecifiedResource("pvc", pvcName, testNamespace)
+		}()
+
+		g.By("#. Create Pod with PVC")
+		podName := "raid5-pod"
+		err = createPodWithOC(podConfig{
+			name:      podName,
+			namespace: testNamespace,
+			pvcName:   pvcName,
+			mountPath: "/mnt/data",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Pod created: %s\n", podName)
+
+		defer func() {
+			deleteSpecifiedResource("pod", podName, testNamespace)
+		}()
+
+		g.By("#. Wait for PVC to be bound")
+		waitForPVCBoundWithOC(testNamespace, pvcName)
+
+		g.By("#. Wait for Pod to be running")
+		waitForPodRunningWithOC(testNamespace, podName)
+
+		g.By("#. Determine the node hosting the RAID5 volume")
+		targetNode := getNodeNameByPod(testNamespace, podName)
+		o.Expect(targetNode).NotTo(o.BeEmpty(), "Pod is not scheduled to any node")
+		logf("RAID5 volume is hosted on node: %s\n", targetNode)
+
+		g.By("#. Write test data to the volume")
+		testData := "RAID5 test data"
+		writeCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", "test-container", "--", "/bin/sh", "-c",
+			fmt.Sprintf("echo '%s' > /mnt/data/testfile && sync", testData))
+		writeOutput, err := writeCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to write data to pod: %s", string(writeOutput))
+		logf("Test data written to volume\n")
+
+		g.By("#. Read and verify test data")
+		readCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", "test-container", "--", "/bin/sh", "-c", "cat /mnt/data/testfile")
+		readOutput, err := readCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to read data from pod: %s", string(readOutput))
+		o.Expect(strings.TrimSpace(string(readOutput))).To(o.Equal(testData))
+		logf("Data verified: %s\n", strings.TrimSpace(string(readOutput)))
+
+		g.By("#. Simulate disk failure - remove one RAID5 disk from the node")
+		// Best-effort restore of the node's disk topology for subsequent tests
+		// and baseline restoration, even if the test fails part-way through.
+		defer rescanDisksOnNode(tc, targetNode)
+		simulateDiskFailureOnNode(tc, targetNode, disks[2])
+
+		g.By("#. Verify LVMCluster enters Degraded state")
+		o.Eventually(func() string {
+			state, err := getLVMClusterState(newLVMClusterName, lvmsNamespace)
+			if err != nil {
+				logf("Warning: failed to get LVMCluster state: %v\n", err)
+				return ""
+			}
+			logf("LVMCluster %s state: %s\n", newLVMClusterName, state)
+			return state
+		}, 5*time.Minute, 10*time.Second).Should(o.Equal("Degraded"), "LVMCluster should report Degraded after disk failure")
+		logf("LVMCluster is Degraded after disk failure - verified\n")
+
+		g.By("#. Verify data still accessible during degraded state")
+		readDegradedCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", "test-container", "--", "/bin/sh", "-c", "cat /mnt/data/testfile")
+		readOutput, err = readDegradedCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to read data during degraded state: %s", string(readOutput))
+		o.Expect(string(readOutput)).To(o.ContainSubstring(testData), "Data should remain readable while RAID5 is degraded")
+		logf("Data still accessible during degraded state: %s\n", strings.TrimSpace(string(readOutput)))
+
+		g.By("#. Verify writes work during degraded state")
+		degradedData := "Written during degraded"
+		writeDegradedCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", "test-container", "--", "/bin/sh", "-c",
+			fmt.Sprintf("echo '%s' >> /mnt/data/testfile && sync", degradedData))
+		writeDegradedOutput, err := writeDegradedCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to write data during degraded state: %s", string(writeDegradedOutput))
+		logf("Data written during degraded state\n")
+
+		g.By("#. Repair RAID5 on the node using the replacement disk")
+		repairRAID5OnNode(tc, targetNode, deviceClassName, spareDiskPath)
+		logf("RAID5 repair completed using replacement disk %s\n", spareDiskPath)
+
+		g.By("#. Update LVMCluster CR with the replacement device path")
+		newPaths := fmt.Sprintf(`[{"op":"replace","path":"/spec/storage/deviceClasses/0/deviceSelector/paths","value":["%s","%s","%s"]}]`, diskPath1, diskPath2, spareDiskPath)
+		patchCmd := exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace, "--type=json", "-p", newPaths)
+		patchOutput, err := patchCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to patch LVMCluster device paths: %s", string(patchOutput))
+		logf("LVMCluster device paths patched to use replacement disk\n")
+
+		g.By("#. Wait for LVMCluster to return to Ready after repair")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterForceWipeReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("LVMCluster is Ready after RAID5 repair\n")
+
+		g.By("#. Verify all data intact after recovery")
+		readFinalCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", "test-container", "--", "/bin/sh", "-c", "cat /mnt/data/testfile")
+		readOutput, err = readFinalCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to read data after recovery: %s", string(readOutput))
+		o.Expect(string(readOutput)).To(o.ContainSubstring(testData), "Original data should survive RAID5 recovery")
+		o.Expect(string(readOutput)).To(o.ContainSubstring(degradedData), "Data written during degraded state should survive recovery")
+		logf("All data intact after recovery: %s\n", strings.TrimSpace(string(readOutput)))
+
+		g.By("#. Delete Pod, PVC and LVMCluster")
+		deleteSpecifiedResource("pod", podName, testNamespace)
+		deleteSpecifiedResource("pvc", pvcName, testNamespace)
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+
+		g.By("#. Test completed successfully - RAID5 disk failure and repair verified")
+		logf("RAID5 disk-failure survival and repair test passed\n")
+	})
 })
 
 func checkLvmsOperatorInstalled(tc *TestClient) {

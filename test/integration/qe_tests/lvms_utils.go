@@ -2148,3 +2148,93 @@ func createLVMClusterWithDeviceDiscoveryPolicy(cfg lvmClusterDeviceDiscoveryConf
 	}
 	return nil
 }
+
+// createLVMClusterWithRAID5 creates a valid RAID5 LVMCluster using three
+// explicit device paths (the minimum for raid5 with stripes:2 + parity) via the
+// shared lvmcluster-raid-template.yaml template.
+func createLVMClusterWithRAID5(name, namespace, deviceClassName, diskPath1, diskPath2, diskPath3 string) error {
+	paths := fmt.Sprintf(`["%s","%s","%s"]`, diskPath1, diskPath2, diskPath3)
+	err := applyResourceFromTemplate("lvmcluster-raid-template.yaml",
+		"--ignore-unknown-parameters=true",
+		"-p", "NAME="+name,
+		"-p", "NAMESPACE="+namespace,
+		"-p", "DEVICECLASS="+deviceClassName,
+		"-p", "PATHS="+paths,
+		"-p", "RAIDTYPE=raid5",
+		"-p", "RAIDPARAM=stripes: 2",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create RAID5 LVMCluster %s: %w", name, err)
+	}
+	logf("RAID5 LVMCluster %s created\n", name)
+	return nil
+}
+
+// getLVMClusterState returns the current .status.state of an LVMCluster
+// (e.g. "Ready", "Progressing", "Degraded", "Failed").
+func getLVMClusterState(name, namespace string) (string, error) {
+	cmd := exec.Command("oc", "get", "lvmcluster", name, "-n", namespace, "-o=jsonpath={.status.state}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get LVMCluster %s state: %w, output: %s", name, err, string(output))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// simulateDiskFailureOnNode simulates a physical disk failure/detach on a node
+// by hot-removing the block device through sysfs. It handles both SCSI/virtio
+// devices (device/delete) and NVMe devices (PCI hot-remove of the backing
+// controller), which is the disk type used on AWS. This mirrors the manual
+// "detach disk from AWS Console" step without requiring cloud credentials.
+func simulateDiskFailureOnNode(tc *TestClient, nodeName, diskName string) {
+	removeCmd := fmt.Sprintf(`set -x
+DEV=%s
+if [ -e /sys/block/$DEV/device/delete ]; then
+  echo 1 > /sys/block/$DEV/device/delete
+elif [ -e /sys/block/$DEV/device/device/remove ]; then
+  echo 1 > /sys/block/$DEV/device/device/remove
+else
+  echo "no known hot-remove path for $DEV" >&2
+  exit 1
+fi
+sleep 3
+lsblk -d -o NAME | grep -q "^$DEV$" && echo "STILL_PRESENT" || echo "REMOVED"`, diskName)
+
+	output := execCommandInNode(tc, nodeName, removeCmd)
+	logf("Simulated disk failure of /dev/%s on node %s:\n%s\n", diskName, nodeName, output)
+	o.Expect(output).To(o.ContainSubstring("REMOVED"),
+		fmt.Sprintf("disk /dev/%s was not removed from node %s", diskName, nodeName))
+}
+
+// rescanDisksOnNode triggers a PCI bus rescan on a node so that a previously
+// hot-removed device reappears. Best-effort cleanup used to restore the node to
+// its original disk topology after a simulated failure.
+func rescanDisksOnNode(tc *TestClient, nodeName string) {
+	rescanCmd := "echo 1 > /sys/bus/pci/rescan; sleep 5; lsblk -d -o NAME"
+	output := execCommandInNode(tc, nodeName, rescanCmd)
+	logf("Rescanned PCI bus on node %s:\n%s\n", nodeName, output)
+}
+
+// repairRAID5OnNode performs the manual administrator recovery for a degraded
+// RAID5 device class: it registers the replacement disk as a new PV, extends the
+// volume group with it, repairs the RAID logical volume onto the replacement,
+// and drops the missing device from the VG.
+func repairRAID5OnNode(tc *TestClient, nodeName, vgName, replacementDiskPath string) {
+	repairCmd := fmt.Sprintf(`set -e
+LV_NAME=$(lvs --noheadings -o lv_name %s | tr -d ' ' | head -1)
+echo "Repairing LV: $LV_NAME in VG %s using %s"
+pvcreate -ff -y %s
+vgextend %s %s
+lvconvert --repair -y %s/$LV_NAME %s
+vgreduce --removemissing --force %s
+lvs -a -o lv_name,raid_sync_action,sync_percent %s`,
+		vgName, vgName, replacementDiskPath,
+		replacementDiskPath,
+		vgName, replacementDiskPath,
+		vgName, replacementDiskPath,
+		vgName,
+		vgName)
+
+	output := execCommandInNode(tc, nodeName, repairCmd)
+	logf("RAID5 repair on node %s:\n%s\n", nodeName, output)
+}
