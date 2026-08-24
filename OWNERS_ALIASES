@@ -1,14 +1,14 @@
 aliases:
   edge-enablement-reviewers:
-  - jerpeter1
   - eggfoobar
   - jeff-roche
   - suleymanakbas91
   - qJkee
   - jaypoulz
   - pacevedom
+  - kasturinarra
+  - mmakwana30
   edge-enablement-approvers:
-  - jerpeter1
   - eggfoobar
   - jeff-roche
   - suleymanakbas91
@@ -16,3 +16,5 @@ aliases:
   - qJkee
   - jaypoulz
   - pacevedom
+  - kasturinarra
+  - mmakwana30
