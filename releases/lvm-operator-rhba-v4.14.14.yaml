@@ -2,13 +2,13 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-rhba-v4.14.14-2
+  name: lvm-operator-rhba-v4.14.14-3
   namespace: logical-volume-manag-tenant
   labels:
     release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
 spec:
   releasePlan: lvm-operator-production-releaseplan-4-14
-  snapshot: lvm-operator-4-14-20260825-130508-000
+  snapshot: lvm-operator-4-14-20260826-161109-000
   data:
     releaseNotes:
       description: |
