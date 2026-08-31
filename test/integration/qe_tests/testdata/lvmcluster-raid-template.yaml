@@ -1,0 +1,54 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: lvmcluster-raid-template
+objects:
+- apiVersion: lvm.topolvm.io/v1alpha1
+  kind: LVMCluster
+  metadata:
+    name: ${NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    storage:
+      deviceClasses:
+      - name: ${DEVICECLASS}
+        deviceSelector:
+          paths: ${{PATHS}}
+        raidConfig:
+          type: ${RAIDTYPE}
+          mirrors: ${MIRRORS}
+          stripes: ${STRIPES}${THINPOOL}
+parameters:
+- name: NAME
+  required: true
+  value: "test-raid"
+- name: NAMESPACE
+  required: true
+  value: "openshift-lvm-storage"
+- name: DEVICECLASS
+  required: true
+  value: "raid-class"
+# PATHS is a JSON array of device paths, e.g. ["/dev/nvme1n1","/dev/nvme2n1"]
+- name: PATHS
+  required: true
+  value: '["/dev/nvme1n1","/dev/nvme2n1"]'
+- name: RAIDTYPE
+  required: true
+  value: "raid1"
+# MIRRORS is used for raid1/raid10 (e.g., 1 for raid1, 2 for raid10).
+# Leave empty or "null" for raid4/raid5/raid6.
+- name: MIRRORS
+  required: false
+  value: "1"
+# STRIPES is used for raid4/raid5/raid6/raid10 (e.g., 2 for raid5 with 3 disks).
+# Leave empty or "null" for raid1.
+- name: STRIPES
+  required: false
+  value: "null"
+# THINPOOL injects an optional thinPoolConfig block appended to the deviceClass.
+# It is empty for valid RAID clusters (RAID and thinPool are mutually exclusive)
+# and is only populated by the negative validation test that asserts the webhook
+# rejects the RAID + thinPool combination.
+- name: THINPOOL
+  required: false
+  value: ""
