@@ -199,38 +199,17 @@ func (lvm *lvmCluster) deleteSafely() {
 }
 
 func (lvm *lvmCluster) createWithMultiDeviceClasses() error {
-	lvmClusterYAML := fmt.Sprintf(`apiVersion: lvm.topolvm.io/v1alpha1
-kind: LVMCluster
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  storage:
-    deviceClasses:
-    - name: %s
-      fstype: %s
-      thinPoolConfig:
-        name: thin-pool-1
-        sizePercent: 90
-        overprovisionRatio: 10
-      deviceSelector:
-        paths:
-        - %s
-        forceWipeDevicesAndDestroyAllData: true
-    - name: %s
-      fstype: %s
-      thinPoolConfig:
-        name: thin-pool-2
-        sizePercent: 90
-        overprovisionRatio: 10
-      deviceSelector:
-        paths:
-        - %s
-        forceWipeDevicesAndDestroyAllData: true
-`, lvm.name, lvm.namespace, lvm.deviceClassName, lvm.fsType, lvm.paths[0], lvm.deviceClassName2, lvm.fsType2, lvm.paths[1])
-
-	logf("Creating LVMCluster with YAML:\n%s\n", lvmClusterYAML)
-	return createLVMClusterFromJSON(lvmClusterYAML)
+	logf("Creating LVMCluster %s with multiple device classes via template\n", lvm.name)
+	return applyResourceFromTemplate("lvmcluster-with-multi-device-template.yaml",
+		"-p", "NAME="+lvm.name,
+		"-p", "NAMESPACE="+lvm.namespace,
+		"-p", "DEVICECLASSNAME1="+lvm.deviceClassName,
+		"-p", "DEVICECLASSNAME2="+lvm.deviceClassName2,
+		"-p", "FSTYPE1="+lvm.fsType,
+		"-p", "FSTYPE2="+lvm.fsType2,
+		"-p", "PATH1="+lvm.paths[0],
+		"-p", "PATH2="+lvm.paths[1],
+	)
 }
 
 func (lvm *lvmCluster) createWithTwoDeviceClasses() error {
