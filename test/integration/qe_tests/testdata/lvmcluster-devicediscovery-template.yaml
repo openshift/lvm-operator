@@ -15,8 +15,6 @@ objects:
         default: true
         deviceDiscoveryPolicy: ${DEVICE_DISCOVERY_POLICY}
         fstype: ${FSTYPE}
-        deviceSelector:
-          forceWipeDevicesAndDestroyAllData: true
         thinPoolConfig:
           name: thin-pool-1
           sizePercent: 90
