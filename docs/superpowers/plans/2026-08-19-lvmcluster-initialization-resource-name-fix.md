@@ -33,7 +33,7 @@ Run:
 grep -n '"name": "my-lvmcluster"\|"name": "test-lvmcluster"' bundle/manifests/lvms-operator.clusterserviceversion.yaml
 ```
 Expected output (two different names, confirming the bug):
-```
+```text
 11:            "name": "my-lvmcluster"
 53:            "name": "test-lvmcluster"
 ```
@@ -88,7 +88,7 @@ Then confirm both annotations now agree:
 grep -n '"name": "my-lvmcluster"\|"name": "test-lvmcluster"' bundle/manifests/lvms-operator.clusterserviceversion.yaml
 ```
 Expected output (both `my-lvmcluster`, no `test-lvmcluster` left):
-```
+```text
 11:            "name": "my-lvmcluster"
 53:            "name": "my-lvmcluster"
 ```
