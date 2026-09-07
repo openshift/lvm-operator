@@ -1,0 +1,265 @@
+# .tekton/operator-version-bump-production-final-pipeline.yaml
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: operator-version-bump-production-final-pipeline
+  annotations:
+    description: |
+      Final pipeline triggered by Konflux after a successful production
+      release of the LVM operator. Bumps OPERATOR_VERSION in
+      release/container-build.args for the next development cycle and opens
+      a PR. Does not touch catalog templates - merging this PR triggers the
+      normal build cascade (operator rebuild, then bundle rebuild), which
+      eventually reaches the bundle's staging release and, in turn,
+      catalog-candidate-update-staging-final-pipeline keeps the catalog
+      templates current.
+
+      Commits are created via the GitHub GraphQL API (createCommitOnBranch)
+      so they are signed/verified by GitHub - no local git clone, push, or
+      signing key required.
+spec:
+  params:
+    - name: snapshot
+      description: Snapshot reference from Konflux release
+      type: string
+    - name: release
+      description: Release reference from Konflux release
+      type: string
+    - name: releasePlan
+      description: ReleasePlan reference from Konflux release
+      type: string
+    - name: release-branch
+      description: "Release branch to bump the version on (e.g. release-5.0)"
+      type: string
+    - name: git-url
+      description: Repository URL
+      type: string
+      default: https://github.com/openshift/lvm-operator
+    - name: next-version
+      description: >-
+        Next operator version to bump to. If empty, auto-increments
+        the patch version from container-build.args.
+      type: string
+      default: ""
+
+  results:
+    - name: PR_URL
+      description: URL of the version-bump PR
+      value: $(tasks.bump-and-create-pr.results.PR_URL)
+    - name: CURRENT_VERSION
+      description: The version that was just released
+      value: $(tasks.bump-and-create-pr.results.CURRENT_VERSION)
+    - name: NEXT_VERSION
+      description: The version bumped to
+      value: $(tasks.bump-and-create-pr.results.NEXT_VERSION)
+
+  tasks:
+    - name: bump-and-create-pr
+      taskSpec:
+        params:
+          - name: release-branch
+          - name: git-url
+          - name: next-version
+        results:
+          - name: PR_URL
+            description: URL of the created (or reused) pull request
+          - name: CURRENT_VERSION
+            description: The version that was just released
+          - name: NEXT_VERSION
+            description: The version bumped to
+        volumes:
+          - name: github-app-credentials
+            secret:
+              secretName: github-app-credentials
+        steps:
+          - name: bump-and-pr
+            image: quay.io/konflux-ci/appstudio-utils:latest@sha256:32cda04122ee0a5d5b4307e121d192d1265c3bff727c9d894f36b6772da53d8c
+            volumeMounts:
+              - name: github-app-credentials
+                mountPath: /secrets/github-app
+                readOnly: true
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              command -v jq >/dev/null || (microdnf install -y jq || dnf install -y jq)
+
+              RELEASE_BRANCH="$(params.release-branch)"
+              GIT_URL="$(params.git-url)"
+              NEXT_VERSION_PARAM="$(params.next-version)"
+              FILE_PATH="release/container-build.args"
+
+              OWNER_REPO="${GIT_URL#https://github.com/}"
+              OWNER_REPO="${OWNER_REPO%.git}"
+              OWNER="${OWNER_REPO%%/*}"
+              REPO="${OWNER_REPO##*/}"
+              API="https://api.github.com/repos/${OWNER}/${REPO}"
+
+              # ── Generate GitHub App installation token ──
+              APP_ID=$(cat /secrets/github-app/app-id)
+              INSTALLATION_ID=$(cat /secrets/github-app/installation-id)
+
+              NOW=$(date +%s)
+              IAT=$((NOW - 60))
+              EXP=$((NOW + 540))
+
+              HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              PAYLOAD=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$IAT" "$EXP" "$APP_ID" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              SIG=$(printf '%s' "${HEADER}.${PAYLOAD}" \
+                | openssl dgst -sha256 -sign /secrets/github-app/private-key -binary \
+                | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              JWT="${HEADER}.${PAYLOAD}.${SIG}"
+
+              GITHUB_TOKEN=$(curl -sS -f -X POST \
+                -H "Authorization: Bearer ${JWT}" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens" \
+                | jq -r '.token // empty')
+              if [ -z "$GITHUB_TOKEN" ]; then
+                echo "ERROR: failed to obtain GitHub App installation token" >&2
+                exit 1
+              fi
+
+              AUTH_HEADER="Authorization: Bearer ${GITHUB_TOKEN}"
+
+              # ── Read current OPERATOR_VERSION and the release branch's HEAD sha ──
+              echo "=== Reading ${FILE_PATH} from ${RELEASE_BRANCH} ==="
+              BRANCH_SHA=$(curl -sS -f -H "$AUTH_HEADER" \
+                "${API}/git/ref/heads/${RELEASE_BRANCH}" | jq -r '.object.sha')
+
+              FILE_CONTENT=$(curl -sS -f -H "$AUTH_HEADER" \
+                "${API}/contents/${FILE_PATH}?ref=${RELEASE_BRANCH}" \
+                | jq -r '.content' | base64 -d)
+
+              CURRENT_VERSION=$(echo "$FILE_CONTENT" | grep '^OPERATOR_VERSION=' | cut -d= -f2)
+              echo "Current version: $CURRENT_VERSION"
+              echo -n "$CURRENT_VERSION" > $(results.CURRENT_VERSION.path)
+
+              # ── Determine next version ──
+              NEXT_VERSION="$NEXT_VERSION_PARAM"
+              if [ -z "$NEXT_VERSION" ]; then
+                IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+                NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+                echo "Auto-incremented to: $NEXT_VERSION"
+              fi
+              echo "Next version: $NEXT_VERSION"
+
+              # ── Validate the next version is well-formed and a strict upgrade ──
+              if ! [[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "ERROR: next-version '${NEXT_VERSION}' is not a valid X.Y.Z semantic version" >&2
+                exit 1
+              fi
+              IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$CURRENT_VERSION"
+              IFS='.' read -r NEXT_MAJOR NEXT_MINOR NEXT_PATCH <<< "$NEXT_VERSION"
+              CUR_NUM=$((CUR_MAJOR * 1000000 + CUR_MINOR * 1000 + CUR_PATCH))
+              NEXT_NUM=$((NEXT_MAJOR * 1000000 + NEXT_MINOR * 1000 + NEXT_PATCH))
+              if [ "$NEXT_NUM" -le "$CUR_NUM" ]; then
+                echo "ERROR: next-version (${NEXT_VERSION}) must be strictly greater than the current version (${CURRENT_VERSION})" >&2
+                exit 1
+              fi
+
+              echo -n "$NEXT_VERSION" > $(results.NEXT_VERSION.path)
+
+              NEW_CONTENT=$(echo "$FILE_CONTENT" | sed "s/^OPERATOR_VERSION=.*/OPERATOR_VERSION=${NEXT_VERSION}/")
+              # $(...) strips trailing newlines, so re-add the one the original file had
+              NEW_CONTENT_B64=$(printf '%s\n' "$NEW_CONTENT" | base64 -w0)
+
+              PR_BRANCH="bump-operator-version-${NEXT_VERSION}"
+
+              # ── Look up any existing open PR for this branch before touching the ref,
+              #    so a pre-existing branch can be confirmed to belong to this automation ──
+              EXISTING_PR_JSON=$(curl -sS -f -H "$AUTH_HEADER" \
+                "${API}/pulls?head=${OWNER}:${PR_BRANCH}&base=${RELEASE_BRANCH}&state=open")
+              EXISTING_PR=$(echo "$EXISTING_PR_JSON" | jq -r '.[0].html_url // empty')
+              EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_JSON" | jq -r '.[0].number // empty')
+
+              # ── Create the PR branch, or reset it only if it belongs to this automation ──
+              REF_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -H "$AUTH_HEADER" \
+                "${API}/git/ref/heads/${PR_BRANCH}")
+              if [ "$REF_STATUS" = "200" ]; then
+                if [ -z "$EXISTING_PR" ]; then
+                  echo "ERROR: branch ${PR_BRANCH} already exists but has no matching open PR; refusing to force-reset a branch that may not belong to this automation" >&2
+                  exit 1
+                fi
+                curl -sS -f -X PATCH -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                  "${API}/git/refs/heads/${PR_BRANCH}" \
+                  -d "{\"sha\":\"${BRANCH_SHA}\",\"force\":true}" > /dev/null
+              elif [ "$REF_STATUS" = "404" ]; then
+                curl -sS -f -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                  "${API}/git/refs" \
+                  -d "{\"ref\":\"refs/heads/${PR_BRANCH}\",\"sha\":\"${BRANCH_SHA}\"}" > /dev/null
+              else
+                echo "ERROR: unexpected status ${REF_STATUS} checking for branch ${PR_BRANCH}" >&2
+                exit 1
+              fi
+
+              # ── Create a signed commit via GraphQL (GitHub signs this server-side) ──
+              echo "=== Creating signed commit bumping OPERATOR_VERSION to ${NEXT_VERSION} ==="
+              COMMIT_BODY=$(printf 'Bump OPERATOR_VERSION from %s to %s for the next development cycle.\n\nSigned-off-by: LVM Operator Release Automation <lvms-release-automation@redhat.com>\n' \
+                "$CURRENT_VERSION" "$NEXT_VERSION")
+              GRAPHQL_PAYLOAD=$(jq -n \
+                --arg repo "${OWNER}/${REPO}" \
+                --arg branch "$PR_BRANCH" \
+                --arg headline "chore: bump OPERATOR_VERSION to ${NEXT_VERSION}" \
+                --arg body "$COMMIT_BODY" \
+                --arg oid "$BRANCH_SHA" \
+                --arg path "$FILE_PATH" \
+                --arg contents "$NEW_CONTENT_B64" \
+                '{
+                  query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url oid } } }",
+                  variables: {
+                    input: {
+                      branch: { repositoryNameWithOwner: $repo, branchName: $branch },
+                      message: { headline: $headline, body: $body },
+                      expectedHeadOid: $oid,
+                      fileChanges: { additions: [ { path: $path, contents: $contents } ] }
+                    }
+                  }
+                }')
+
+              COMMIT_RESULT=$(curl -sS -f -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                https://api.github.com/graphql -d "$GRAPHQL_PAYLOAD")
+              COMMIT_URL=$(echo "$COMMIT_RESULT" | jq -r '.data.createCommitOnBranch.commit.url // empty')
+              if [ -z "$COMMIT_URL" ]; then
+                echo "ERROR: commit creation failed: $COMMIT_RESULT" >&2
+                exit 1
+              fi
+              echo "Created signed commit: $COMMIT_URL"
+
+              # ── Reuse the existing open PR found earlier, or create a new one ──
+              if [ -n "$EXISTING_PR" ]; then
+                PR_URL="$EXISTING_PR"
+                PR_NUMBER="$EXISTING_PR_NUMBER"
+                echo "Reusing existing PR: $PR_URL"
+              else
+                PR_BODY=$(printf '## Post-Release Version Bump\n\nAutomatically generated by the Konflux production final pipeline after v%s was released.\n\n### Changes\n- **Version bump**: `OPERATOR_VERSION=%s` -> `%s`\n\nMerging this PR triggers the operator and bundle build pipelines for the next development cycle.\n' \
+                  "$CURRENT_VERSION" "$CURRENT_VERSION" "$NEXT_VERSION")
+                PR_JSON=$(jq -n \
+                  --arg title "NO-JIRA: chore: Bump OPERATOR_VERSION to ${NEXT_VERSION}" \
+                  --arg head "$PR_BRANCH" \
+                  --arg base "$RELEASE_BRANCH" \
+                  --arg body "$PR_BODY" \
+                  '{title:$title, head:$head, base:$base, body:$body}')
+                PR_RESPONSE=$(curl -sS -f -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" "${API}/pulls" -d "$PR_JSON")
+                PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // empty')
+                PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number // empty')
+                if [ -z "$PR_URL" ] || [ -z "$PR_NUMBER" ]; then
+                  echo "ERROR: PR creation failed or returned an incomplete response: $PR_RESPONSE" >&2
+                  exit 1
+                fi
+                echo "Created PR: $PR_URL"
+              fi
+
+              # ── Apply labels (idempotent - safe to re-apply on a reused PR) ──
+              curl -sS -f -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+                "${API}/issues/${PR_NUMBER}/labels" \
+                -d '{"labels":["approved","lgtm"]}' > /dev/null
+
+              echo -n "$PR_URL" > $(results.PR_URL.path)
+      params:
+        - name: release-branch
+          value: $(params.release-branch)
+        - name: git-url
+          value: $(params.git-url)
+        - name: next-version
+          value: $(params.next-version)
