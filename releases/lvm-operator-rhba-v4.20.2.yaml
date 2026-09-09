@@ -8,7 +8,7 @@ metadata:
     release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
 spec:
   releasePlan: lvm-operator-production-releaseplan-4-20
-  snapshot: lvm-operator-4-20-20260804-151615-000
+  snapshot: lvm-operator-4-20-20260909-121055-000
   data:
     releaseNotes:
       description: |
