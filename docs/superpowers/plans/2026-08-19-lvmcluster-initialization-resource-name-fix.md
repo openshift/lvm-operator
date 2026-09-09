@@ -22,7 +22,7 @@
 **Files:**
 - Modify: `config/manifests/bases/lvms-operator.clusterserviceversion.yaml:12-33` (the `operatorframework.io/initialization-resource` annotation)
 - Regenerate (via `make bundle`): `bundle/manifests/lvms-operator.clusterserviceversion.yaml`
-- Regenerate (via `make catalog`): `catalog/lvms-operator/v0.0.0.yaml` (filename varies with `$(OPERATOR_VERSION)` — check `catalog/lvms-operator/` after running the command)
+- Regenerate (via `make catalog`): `catalog/lvms-operator/v0.0.1.yaml` (filename varies with `$(OPERATOR_VERSION)` — check `catalog/lvms-operator/` after running the command)
 
 **Interfaces:** N/A — this is a manifest-only change with no Go functions, types, or CLI flags produced or consumed.
 
