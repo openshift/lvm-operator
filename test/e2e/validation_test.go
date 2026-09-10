@@ -17,11 +17,16 @@ limitations under the License.
 package e2e
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
+	"slices"
+	"strconv"
+	"strings"
+	"testing"
 	"time"
 
 	snapapi "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -127,6 +132,23 @@ func validateCSIDriver(ctx context.Context) bool {
 	}, timeout, interval).WithContext(ctx).Should(Succeed())
 }
 
+// validateCSIDriverSELinuxMount waits for the reconciler to converge spec.seLinuxMount to
+// true. Kubelet only passes "-o context" to a driver that advertises the capability.
+func validateCSIDriverSELinuxMount(ctx context.Context) bool {
+	GinkgoHelper()
+	By("validating the CSIDriver advertises seLinuxMount")
+	return Eventually(func(ctx context.Context) error {
+		driver := &storagev1.CSIDriver{}
+		if err := crClient.Get(ctx, types.NamespacedName{Name: csiDriverName}, driver); err != nil {
+			return err
+		}
+		if driver.Spec.SELinuxMount == nil || !*driver.Spec.SELinuxMount {
+			return fmt.Errorf("spec.seLinuxMount is %v, want true", driver.Spec.SELinuxMount)
+		}
+		return nil
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
+}
+
 // function to validate vg manager resource.
 func validateVGManager(ctx context.Context) bool {
 	GinkgoHelper()
@@ -193,6 +215,58 @@ func validatePodData(ctx context.Context, pod *k8sv1.Pod, expectedData string, c
 		return err
 	}).WithContext(ctx).Should(Succeed())
 	return Expect(actualData).To(Equal(expectedData))
+}
+
+// validateMountSELinuxContext asserts the volume was mounted with "-o context" carrying the
+// level the Pod asked for. /proc/mounts is read directly because the test image has no
+// SELinux aware tooling, and a recursive relabel leaves no "context=" option behind at all,
+// so its presence is what distinguishes the two.
+func validateMountSELinuxContext(ctx context.Context, pod *k8sv1.Pod, level string) {
+	GinkgoHelper()
+	By(fmt.Sprintf("validating the mount of Pod %q carries the SELinux level %q",
+		client.ObjectKeyFromObject(pod), level))
+	var mount string
+	Eventually(func(ctx context.Context) error {
+		var err error
+		mount, _, err = contentTester.ExecShellCommand(ctx, pod.GetName(), ContainerNameForPVCTests,
+			pod.GetNamespace(), fmt.Sprintf("grep ' %s ' /proc/mounts", MountPathForPVCTests))
+		return err
+	}, timeout, interval).WithContext(ctx).Should(Succeed())
+
+	Expect(mount).To(ContainSubstring("context="), "volume was not mounted with an SELinux context")
+	Expect(mount).To(ContainSubstring(sortMCSCategories(level)),
+		"mount context does not carry the requested MCS level")
+}
+
+// sortMCSCategories orders the categories of an MCS level numerically, the way the kernel
+// renders them in a context, so a namespace allocation of "s0:c27,c24" compares against the
+// "s0:c24,c27" that shows up in /proc/mounts.
+func sortMCSCategories(level string) string {
+	sensitivity, categories, found := strings.Cut(level, ":")
+	if !found {
+		return level
+	}
+	num := func(category string) int {
+		n, _ := strconv.Atoi(strings.TrimPrefix(category, "c"))
+		return n
+	}
+	sorted := strings.Split(categories, ",")
+	slices.SortFunc(sorted, func(a, b string) int { return cmp.Compare(num(a), num(b)) })
+	return sensitivity + ":" + strings.Join(sorted, ",")
+}
+
+func TestSortMCSCategories(t *testing.T) {
+	for level, want := range map[string]string{
+		"s0:c27,c24": "s0:c24,c27",
+		"s0:c24,c27": "s0:c24,c27",
+		"s0:c2,c10":  "s0:c2,c10", // numeric, not lexical
+		"s0:c0":      "s0:c0",
+		"s0":         "s0",
+	} {
+		if got := sortMCSCategories(level); got != want {
+			t.Errorf("sortMCSCategories(%q) = %q, want %q", level, got, want)
+		}
+	}
 }
 
 func validateCSINodeInfo(ctx context.Context, lvmCluster *v1alpha1.LVMCluster, shouldBePresent bool) bool {

@@ -166,8 +166,14 @@ ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
 endif
 
+# Host architecture: envtest's etcd segfaults under cross-arch emulation, so the
+# test container must match the host, not the amd64 default used for release builds.
+# GOHOSTARCH, not GOARCH: the latter honours a GOARCH override and would reintroduce
+# the emulation it is meant to avoid. Override TEST_ARCH explicitly if you want that.
+TEST_ARCH ?= $(shell go env GOHOSTARCH)
+
 docker-test: ## Run unit tests inside a Linux container (useful for non-Linux hosts).
-	$(IMAGE_BUILD_CMD) run --rm --platform=linux/$(ARCH) \
+	$(IMAGE_BUILD_CMD) run --rm --platform=linux/$(TEST_ARCH) \
 		-v $(shell pwd):/workspace$(MOUNT_LABEL) \
 		-w /workspace \
 		-e NON_ROOT=true \

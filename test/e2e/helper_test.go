@@ -181,6 +181,20 @@ func createNamespace(ctx context.Context, namespace string) {
 	CreateResource(ctx, ns)
 }
 
+// namespaceMCSLevel returns the MCS level OpenShift allocated to the namespace. A Pod that
+// requests an SELinux level explicitly has to ask for this one, otherwise the restricted-v2
+// SCC rejects it for not matching the namespace allocation.
+func namespaceMCSLevel(ctx context.Context, namespace string) string {
+	GinkgoHelper()
+	ns := &k8sv1.Namespace{}
+	Expect(crClient.Get(ctx, types.NamespacedName{Name: namespace}, ns)).To(Succeed())
+	level := ns.GetAnnotations()["openshift.io/sa.scc.mcs"]
+	if level == "" {
+		Skip(fmt.Sprintf("namespace %q has no MCS level allocated, the cluster does not run SELinux", namespace))
+	}
+	return level
+}
+
 // DeleteResources in concurrent rows with sequential elements in each row
 // for 3 rows with 3 objects each there will be 3 goroutines running deletions for
 // 3 elements each
