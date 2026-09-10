@@ -34,6 +34,7 @@ spec:
   - name: build-args
     value:
     - CATALOG_VERSION=v5.0
+    - BASE_IMAGE=registry.redhat.io/openshift5/ose-operator-registry-rhel9
   - name: hermetic
     value: "true"
   - name: skip-additional-tags
