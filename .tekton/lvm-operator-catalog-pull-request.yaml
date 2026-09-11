@@ -26,14 +26,14 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v5.0-on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v5.1-on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
     value: release/catalog/catalog.konflux.Dockerfile
   - name: build-args
     value:
-    - CATALOG_VERSION=v5.0
+    - CATALOG_VERSION=v5.1
   - name: hermetic
     value: "true"
   - name: skip-additional-tags
