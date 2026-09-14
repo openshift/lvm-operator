@@ -5,6 +5,7 @@ FROM ${BASE_IMAGE}:${CATALOG_VERSION}
 ARG CATALOG_VERSION
 
 COPY release/catalog/lvm-operator-catalog.json /configs/lvms-operator/catalog.json
+COPY release/catalog/lvms-operator /configs/lvms-operator
 
 RUN ["/bin/opm", "validate", "/configs/lvms-operator"]
 

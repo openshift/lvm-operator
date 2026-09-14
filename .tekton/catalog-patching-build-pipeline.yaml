@@ -457,7 +457,7 @@ spec:
       - name: name
         value: fbc-inject-lifecycle-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-fbc-inject-lifecycle-oci-ta:0.1@sha256:d9d2e6f4b7661518f42d3f778527518c13a93f4090cd84d60cec2295fb8ff7c3
+        value: quay.io/konflux-ci/tekton-catalog/task-fbc-inject-lifecycle-oci-ta:0.1@sha256:8160f098d374c18d98acce888b20c3df70f5ce0fc5f4f530c509786557dec5f6
     params:
     - name: DOCKERFILE
       value: $(params.dockerfile)
@@ -469,6 +469,9 @@ spec:
       value: $(params.output-image).lifecycle
     - name: ociArtifactExpiresAfter
       value: $(params.image-expires-after)
+    - name: BUILD_ARGS
+      value:
+        - $(params.build-args[*])
     runAfter:
     - clone-repository
   workspaces:
