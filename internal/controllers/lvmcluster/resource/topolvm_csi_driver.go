@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	cutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -54,10 +55,14 @@ func (c csiDriver) GetName() string {
 func (c csiDriver) EnsureCreated(r Reconciler, ctx context.Context, cluster *lvmv1alpha1.LVMCluster) error {
 	logger := log.FromContext(ctx).WithValues("resourceManager", c.GetName())
 	csiDriverResource := getCSIDriverResource()
+	seLinuxMount := csiDriverResource.Spec.SELinuxMount
 
 	result, err := cutil.CreateOrUpdate(ctx, r, csiDriverResource, func() error {
 		labels.SetManagedLabels(r.Scheme(), csiDriverResource, cluster)
-		// no need to mutate any field
+		// seLinuxMount is the only mutable field of this spec. CreateOrUpdate replaces the
+		// constructed spec with the live one for an existing driver, so set it here as well,
+		// otherwise clusters upgraded from a release that predates it never get it.
+		csiDriverResource.Spec.SELinuxMount = seLinuxMount
 		return nil
 	})
 
@@ -115,6 +120,11 @@ func getCSIDriverResource() *storagev1.CSIDriver {
 			PodInfoOnMount:       &podInfoOnMount,
 			StorageCapacity:      &storageCapacity,
 			VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{storagev1.VolumeLifecyclePersistent},
+			// each topolvm volume is a filesystem on its own logical volume, so every volume
+			// can be mounted with its own "-o context" option. This lets kubelet mount
+			// ReadWriteOncePod volumes with the Pod's SELinux context instead of relabelling
+			// the whole filesystem recursively.
+			SELinuxMount: ptr.To(true),
 		},
 	}
 	return csiDriver
