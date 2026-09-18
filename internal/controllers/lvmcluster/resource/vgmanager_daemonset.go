@@ -44,6 +44,7 @@ var (
 	devDirPath          = "/dev"
 	udevPath            = "/run/udev"
 	sysPath             = "/sys"
+	selinuxPath         = "/etc/selinux"
 	metricsCertsDirPath = "/tmp/k8s-metrics-server/serving-certs"
 )
 
@@ -203,6 +204,31 @@ var (
 )
 
 var (
+	SELinuxVolName = "etc-selinux"
+	// SELinuxHostDirVol is the corev1.Volume definition for the read-only "/etc/selinux"
+	// host bind-mount. libselinux resolves the host policy store through it, which the node
+	// plugin needs to translate the "-o context" mount option kubelet passes for
+	// ReadWriteOncePod volumes. DirectoryOrCreate keeps the pod schedulable on hosts that
+	// run without SELinux.
+	SELinuxHostDirVol = corev1.Volume{
+		Name: SELinuxVolName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: selinuxPath,
+				Type: &HostPathDirectoryOrCreate,
+			},
+		},
+	}
+
+	// SELinuxHostDirVolMount is the corresponding mount for SELinuxHostDirVol
+	SELinuxHostDirVolMount = corev1.VolumeMount{
+		Name:      SELinuxVolName,
+		MountPath: selinuxPath,
+		ReadOnly:  true,
+	}
+)
+
+var (
 	MetricsCertsVolName = "metrics-cert"
 	// MetricsCertsDirVol is the corev1.Volume definition for the
 	// certs to be used in metrics endpoint.
@@ -247,6 +273,7 @@ func templateVGManagerDaemonset(
 		DevHostDirVol,
 		UDevHostDirVol,
 		SysHostDirVol,
+		SELinuxHostDirVol,
 		MetricsCertsDirVol,
 	}
 	volumeMounts := []corev1.VolumeMount{
@@ -259,6 +286,7 @@ func templateVGManagerDaemonset(
 		DevHostDirVolMount,
 		UDevHostDirVolMount,
 		SysHostDirVolMount,
+		SELinuxHostDirVolMount,
 		MetricsCertsDirVolMount,
 	}
 
