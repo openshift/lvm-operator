@@ -5964,6 +5964,265 @@ spec:
 		o.Expect(err).NotTo(o.HaveOccurred())
 	})
 
+	g.It("Author:mmakwana-High-90161-[OTP][LVMS] Verify that LVMS supports software RAID configuration [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		g.By("#. Get list of available block devices/disks attached to all worker nodes")
+		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		if len(freeDiskNameCountMap) < 2 {
+			g.Skip("Skipped: Cluster's Worker nodes does not have minimum required free block devices/disks attached (need at least 2)")
+		}
+
+		workerNodes, err := getWorkersList()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		workerNodeCount := len(workerNodes)
+
+		var disk1 string
+		var disk2 string
+		isDiskFound := false
+		diskIndex := 0
+
+		for diskName, count := range freeDiskNameCountMap {
+			if count == int64(workerNodeCount) {
+				if diskIndex == 0 {
+					disk1 = diskName
+					diskIndex++
+				} else {
+					disk2 = diskName
+					isDiskFound = true
+					break
+				}
+			}
+		}
+
+		if !isDiskFound {
+			g.Skip("Skipped: All Worker nodes do not have at least 2 free block devices/disks with same name attached")
+		}
+
+		logf("Disk 1: /dev/%s, Disk 2: /dev/%s\n", disk1, disk2)
+
+		g.By("#. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		logf("Original LVMCluster saved: %s\n", originLVMClusterName)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		g.By("#. Wait for baseline VG to be fully removed from all worker nodes")
+		o.Eventually(func() bool {
+			// On multi-node clusters, must verify baseline VG is removed from all nodes
+			for _, node := range workerNodes {
+				cmd := exec.Command("oc", "debug", "node/"+node, "--", "chroot", "/host", "/bin/bash", "-c", "vgs --noheadings -o vg_name 2>/dev/null")
+				output, err := cmd.CombinedOutput()
+				// If vgs returns output, check that baseline VGs are not present
+				if err == nil {
+					vgList := strings.TrimSpace(string(output))
+					if strings.Contains(vgList, "vg1") || strings.Contains(vgList, originLVMClusterName) {
+						return false // Baseline VG still exists on this node
+					}
+				}
+				// If vgs failed, assume no VGs on this node (expected after deletion)
+			}
+			return true // All nodes have baseline VG removed
+		}, 120*time.Second, 5*time.Second).Should(o.BeTrue(), "Baseline VG should be removed from all nodes before RAID1 creation")
+		logf("Baseline VG removed from all worker nodes\n")
+
+		defer func() {
+			exists, _ := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			if !exists {
+				logf("Restoring original LVMCluster from saved JSON...\n")
+				if err := createLVMClusterFromJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		g.By("#. Create LVMCluster with RAID1 configuration")
+		newLVMClusterName := "test-raid1"
+		deviceClassName := "raid1-class"
+		diskPath1 := "/dev/" + disk1
+		diskPath2 := "/dev/" + disk2
+
+		err = createLVMClusterWithRAID(newLVMClusterName, lvmsNamespace, deviceClassName,
+			[]string{diskPath1, diskPath2},
+			RAIDConfig{Type: "raid1", Mirrors: "1", Stripes: ""})
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		// Safety net for the failure path: if the test aborts mid-run, the LVMCluster
+		// delete below strips the finalizer but can leave a stale RAID1 VG and LVM
+		// signatures on the disks, which would collide with the baseline LVMCluster
+		// restore. This defer is registered before the delete defer so it runs after
+		// it (LIFO): delete CR -> clean VG/wipe disks -> restore baseline.
+		raid1DiskPaths := []string{diskPath1, diskPath2}
+		defer func() {
+			for _, node := range workerNodes {
+				cleanupRAID1VGOnNode(node, deviceClassName, raid1DiskPaths)
+			}
+		}()
+
+		defer func() {
+			logf("Cleaning up test LVMCluster %s...\n", newLVMClusterName)
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+		}()
+
+		g.By("#. Wait for new LVMCluster to be Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterForceWipeReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("RAID1 LVMCluster created successfully\n")
+
+		g.By("#. Create PVC with RAID1 storage class")
+		storageClassName := "lvms-" + deviceClassName
+		pvcName := "raid1-pvc"
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcName,
+			namespace:        testNamespace,
+			storageClassName: storageClassName,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("PVC created: %s\n", pvcName)
+
+		defer func() {
+			deleteSpecifiedResource("pvc", pvcName, testNamespace)
+		}()
+
+		g.By("#. Create Pod with PVC")
+		podName := "raid1-pod"
+		err = createPodWithOC(podConfig{
+			name:      podName,
+			namespace: testNamespace,
+			pvcName:   pvcName,
+			mountPath: "/mnt/data",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Pod created: %s\n", podName)
+
+		defer func() {
+			deleteSpecifiedResource("pod", podName, testNamespace)
+		}()
+
+		g.By("#. Wait for PVC to be bound")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return "Pending"
+			}
+			return strings.TrimSpace(string(output))
+		}, PVCBoundTimeout, 5*time.Second).Should(o.Equal("Bound"))
+		logf("PVC is bound\n")
+
+		g.By("#. Wait for Pod to be running")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pod", podName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return "Pending"
+			}
+			return strings.TrimSpace(string(output))
+		}, PodReadyTimeout, 5*time.Second).Should(o.Equal("Running"))
+		logf("Pod is running\n")
+
+		g.By("#. Write test data to the volume")
+		testData := "RAID1 test data"
+		writeCmd := fmt.Sprintf("echo '%s' > /mnt/data/testfile", testData)
+		output := execCommandInPod(tc, testNamespace, podName, "test-container", writeCmd)
+		logf("Write output: %s\n", output)
+
+		g.By("#. Sync to ensure data is flushed")
+		syncOutput := execCommandInPod(tc, testNamespace, podName, "test-container", "sync")
+		logf("Sync output: %s\n", syncOutput)
+
+		g.By("#. Read and verify test data")
+		readCmd := "cat /mnt/data/testfile"
+		readOutput := execCommandInPod(tc, testNamespace, podName, "test-container", readCmd)
+		o.Expect(strings.TrimSpace(readOutput)).To(o.Equal(testData))
+		logf("Data verified: %s\n", readOutput)
+
+		g.By("#. Delete Pod (data persistence test)")
+		deleteSpecifiedResource("pod", podName, testNamespace)
+		logf("Pod deleted\n")
+
+		g.By("#. Recreate Pod with same PVC")
+		err = createPodWithOC(podConfig{
+			name:      podName,
+			namespace: testNamespace,
+			pvcName:   pvcName,
+			mountPath: "/mnt/data",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		logf("Pod recreated: %s\n", podName)
+
+		g.By("#. Wait for recreated Pod to be running")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pod", podName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return "Pending"
+			}
+			return strings.TrimSpace(string(output))
+		}, PodReadyTimeout, 5*time.Second).Should(o.Equal("Running"))
+		logf("Recreated Pod is running\n")
+
+		g.By("#. Verify data persisted after pod recreation")
+		readOutput = execCommandInPod(tc, testNamespace, podName, "test-container", readCmd)
+		o.Expect(strings.TrimSpace(readOutput)).To(o.Equal(testData))
+		logf("Data persisted: %s\n", readOutput)
+
+		g.By("#. Validation - Verify raidConfig is immutable")
+		patchCmd := exec.Command("oc", "patch", "lvmcluster", newLVMClusterName, "-n", lvmsNamespace,
+			"--type=merge", "-p", `{"spec":{"storage":{"deviceClasses":[{"name":"raid1-class","deviceSelector":{"paths":["`+diskPath1+`","`+diskPath2+`"]},"raidConfig":{"type":"raid5"}}]}}}`)
+		patchOutput, err := patchCmd.CombinedOutput()
+		logf("Patch attempt output: %s\n", string(patchOutput))
+		o.Expect(err).To(o.HaveOccurred(), "Expected error when modifying immutable raidConfig")
+		o.Expect(string(patchOutput)).To(o.ContainSubstring("immutable"))
+		logf("RAID configuration is immutable - verified\n")
+
+		g.By("#. Delete Pod and PVC before running validation cases")
+		deleteSpecifiedResource("pod", podName, testNamespace)
+		deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#. Delete the RAID1 LVMCluster so validation cases run without a duplicate")
+		// The webhook rejects a second LVMCluster with "duplicate LVMClusters are not
+		// allowed" BEFORE it evaluates raidConfig rules (verifyRAIDConfig), so the
+		// invalid-config cases below must run with no LVMCluster present in order to
+		// exercise their real validation errors instead of the duplicate error.
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, deviceClassName)
+		o.Eventually(func() bool {
+			exists, _ := resourceExists("lvmcluster", newLVMClusterName, lvmsNamespace)
+			return !exists
+		}, LVMClusterReadyTimeout, 5*time.Second).Should(o.BeTrue(), "RAID1 LVMCluster was not deleted before validation cases")
+
+		g.By("#. Validation - RAID + thinPool combination should be rejected at creation")
+		newLVMClusterName2 := "test-invalid-thin"
+		defer deleteLVMClusterSafely(newLVMClusterName2, lvmsNamespace, "invalid-class")
+		err = createLVMClusterWithRAID(newLVMClusterName2, lvmsNamespace, "invalid-class",
+			[]string{diskPath1, diskPath2},
+			RAIDConfig{Type: "raid1", Mirrors: "1", Stripes: "", WithThinPool: true})
+		o.Expect(err).To(o.HaveOccurred(), "Expected RAID + thinPool combination to be rejected")
+		o.Expect(err.Error()).To(o.ContainSubstring("mutually exclusive"))
+		logf("Validation confirmed: RAID + thinPool combination rejected\n")
+
+		g.By("#. Validation - RAID5 with insufficient disks should be rejected at creation")
+		newLVMClusterName3 := "test-invalid-raid5"
+		defer deleteLVMClusterSafely(newLVMClusterName3, lvmsNamespace, "invalid-raid5")
+		err = createLVMClusterWithRAID(newLVMClusterName3, lvmsNamespace, "invalid-raid5",
+			[]string{diskPath1, diskPath2}, RAIDConfig{Type: "raid5", Stripes: "2"})
+		o.Expect(err).To(o.HaveOccurred(), "Expected RAID5 with insufficient disks to be rejected")
+		o.Expect(err.Error()).To(o.ContainSubstring("requires at least"))
+		logf("Validation confirmed: RAID5 with insufficient disks rejected\n")
+
+		g.By("#. Test completed successfully - RAID configuration support verified")
+		logf("All RAID configuration tests passed\n")
+	})
+
 	g.It("Author:mmakwana-High-90162-[OTP][LVMS] Verify LVMS RAID5 survives disk failure and can be repaired with replacement disk [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
 
 		g.By("#. Get list of available block devices/disks attached to all worker nodes")

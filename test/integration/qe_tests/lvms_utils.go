@@ -2221,6 +2221,24 @@ func createLVMClusterWithRAID(name, namespace, deviceClassName string, diskPaths
 	return nil
 }
 
+// cleanupRAID1VGOnNode removes the RAID1 device-class VG if it is still present
+// on the node and wipes LVM signatures off the backing disks. It is best-effort
+// and used as a defer safety net: if the RAID1 test aborts mid-run, deleting the
+// LVMCluster strips the finalizer but can leave a stale VG and LVM signatures on
+// the disks, which would collide with the baseline LVMCluster restore.
+func cleanupRAID1VGOnNode(nodeName string, vgName string, diskPaths []string) {
+	cleanupCmd := "if vgs --noheadings -o vg_name 2>/dev/null | grep -qw " + vgName + "; then vgremove -ff " + vgName + "; fi; " +
+		"for d in " + strings.Join(diskPaths, " ") + "; do wipefs -a $d 2>/dev/null || true; done; " +
+		"echo RAID1_CLEANUP_DONE"
+	cmd := exec.Command("oc", "debug", "node/"+nodeName, "--", "chroot", "/host", "/bin/bash", "-c", cleanupCmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "RAID1_CLEANUP_DONE") {
+		logf("Warning: RAID1 VG cleanup was not fully successful (best-effort): %v\n", err)
+		return
+	}
+	logf("RAID1 VG %s cleaned up (VG removed if present, disks wiped)\n", vgName)
+}
+
 func getLVMClusterState(name string, namespace string) (string, error) {
 	cmd := exec.Command("oc", "get", "lvmcluster", name, "-n", namespace, "-o=jsonpath={.status.state}")
 	output, err := cmd.CombinedOutput()
