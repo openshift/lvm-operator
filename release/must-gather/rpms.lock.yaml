@@ -88,13 +88,6 @@ arches:
     name: kmod-libs
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.aarch64.rpm
-    repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 31468
-    checksum: sha256:70ba010505e9805254f772c3dd9cd9e6176fc9e007e8c9be7204c44f85d8bbd2
-    name: libacl
-    evr: 2.4.0-1.el9_8
-    sourcerpm: acl-2.4.0-1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libblkid-2.37.4-25.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 113931
@@ -339,12 +332,6 @@ arches:
     checksum: sha256:813f1b4868e3b0043c369c7b547f4a7bb2fefeb470a545a8731145d3a8e6251f
     name: tcpdump
     evr: 14:4.99.0-9.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/a/acl-2.4.0-1.el9_8.src.rpm
-    repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 609918
-    checksum: sha256:b140deb68f46517b0093e18969d8fb42a17216064fb2ee5783e9316d786430db
-    name: acl
-    evr: 2.4.0-1.el9_8
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/b/bash-completion-2.11-5.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 323037
@@ -618,13 +605,6 @@ arches:
     name: kmod-libs
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 34015
-    checksum: sha256:4a1aa328a37838f664459a8894b5050470d9c52c15be0e75315a3c40ca1cc4e0
-    name: libacl
-    evr: 2.4.0-1.el9_8
-    sourcerpm: acl-2.4.0-1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libblkid-2.37.4-25.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 130845
@@ -876,12 +856,6 @@ arches:
     checksum: sha256:813f1b4868e3b0043c369c7b547f4a7bb2fefeb470a545a8731145d3a8e6251f
     name: tcpdump
     evr: 14:4.99.0-9.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/a/acl-2.4.0-1.el9_8.src.rpm
-    repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 609918
-    checksum: sha256:b140deb68f46517b0093e18969d8fb42a17216064fb2ee5783e9316d786430db
-    name: acl
-    evr: 2.4.0-1.el9_8
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/b/bash-completion-2.11-5.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 323037
@@ -1161,13 +1135,6 @@ arches:
     name: kmod-libs
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.s390x.rpm
-    repoid: rhel-9-for-s390x-baseos-rpms
-    size: 31509
-    checksum: sha256:716c3f6af6da1f3395061722cdaa43ba4329b6b7114ffaf0157e697403a5d7fd
-    name: libacl
-    evr: 2.4.0-1.el9_8
-    sourcerpm: acl-2.4.0-1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libblkid-2.37.4-25.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 111331
@@ -1412,12 +1379,6 @@ arches:
     checksum: sha256:813f1b4868e3b0043c369c7b547f4a7bb2fefeb470a545a8731145d3a8e6251f
     name: tcpdump
     evr: 14:4.99.0-9.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/a/acl-2.4.0-1.el9_8.src.rpm
-    repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 609918
-    checksum: sha256:b140deb68f46517b0093e18969d8fb42a17216064fb2ee5783e9316d786430db
-    name: acl
-    evr: 2.4.0-1.el9_8
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/b/bash-completion-2.11-5.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 323037
@@ -1691,13 +1652,6 @@ arches:
     name: kmod-libs
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.x86_64.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 31657
-    checksum: sha256:a81fb7a4d7c946e9bd886ee3c471a4b5040dedbb8ffb2a388120b2094be93cc8
-    name: libacl
-    evr: 2.4.0-1.el9_8
-    sourcerpm: acl-2.4.0-1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libblkid-2.37.4-25.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 114192
@@ -1942,12 +1896,6 @@ arches:
     checksum: sha256:813f1b4868e3b0043c369c7b547f4a7bb2fefeb470a545a8731145d3a8e6251f
     name: tcpdump
     evr: 14:4.99.0-9.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/a/acl-2.4.0-1.el9_8.src.rpm
-    repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 609918
-    checksum: sha256:b140deb68f46517b0093e18969d8fb42a17216064fb2ee5783e9316d786430db
-    name: acl
-    evr: 2.4.0-1.el9_8
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/b/bash-completion-2.11-5.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 323037
