@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.aarch64.rpm
     repoid: rhocp-4.19-for-rhel-9-aarch64-rpms
-    size: 27038063
-    checksum: sha256:ede1e09b157425965c9b02f7c1b74ae1d2e731f6462f5536322f8add047bc93b
+    size: 27040567
+    checksum: sha256:66564caba3228b3b5eb23305f497fda69063486993b450ccfeb1c5877ba74e1e
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
-    sourcerpm: openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
+    sourcerpm: openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 548341
@@ -320,12 +320,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
     repoid: rhocp-4.19-for-rhel-9-aarch64-source-rpms
-    size: 17635229
-    checksum: sha256:afde2e5c8ecf7b2f15f87ddc9c4281fa18b47aa23a65a4f89c8130c2fa2158cd
+    size: 17638108
+    checksum: sha256:15c7c2da03c455706d767eecfcda9624a5c2e79bdd06ff9e679e0e3ba7b2187e
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-aarch64-appstream-source-rpms
     size: 2138254
@@ -521,13 +521,13 @@ arches:
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.ppc64le.rpm
     repoid: rhocp-4.19-for-rhel-9-ppc64le-rpms
-    size: 26822914
-    checksum: sha256:67b7733a99b84d63823e5706f9a6ee6e96338e174eabe4392f0a66e2a91e048a
+    size: 26815308
+    checksum: sha256:dd5ad494f8cebdf4004bf2ec8aded4870fc4dc47b242368c31df222b549ce0d3
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
-    sourcerpm: openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
+    sourcerpm: openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 577736
@@ -844,12 +844,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
     repoid: rhocp-4.19-for-rhel-9-ppc64le-source-rpms
-    size: 17635229
-    checksum: sha256:afde2e5c8ecf7b2f15f87ddc9c4281fa18b47aa23a65a4f89c8130c2fa2158cd
+    size: 17638108
+    checksum: sha256:15c7c2da03c455706d767eecfcda9624a5c2e79bdd06ff9e679e0e3ba7b2187e
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-ppc64le-appstream-source-rpms
     size: 2138254
@@ -1051,13 +1051,13 @@ arches:
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.s390x.rpm
     repoid: rhocp-4.19-for-rhel-9-s390x-rpms
-    size: 28374355
-    checksum: sha256:fbc0d6d1e33ab613099a89420ab11434b7a147b859b3c358ee982b844af19d21
+    size: 28379541
+    checksum: sha256:f63a6e48e036a71a5c78a138915e4b1d30eb404c434a6415eb13efda7193a249
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
-    sourcerpm: openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
+    sourcerpm: openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 527514
@@ -1367,12 +1367,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
     repoid: rhocp-4.19-for-rhel-9-s390x-source-rpms
-    size: 17635229
-    checksum: sha256:afde2e5c8ecf7b2f15f87ddc9c4281fa18b47aa23a65a4f89c8130c2fa2158cd
+    size: 17638108
+    checksum: sha256:15c7c2da03c455706d767eecfcda9624a5c2e79bdd06ff9e679e0e3ba7b2187e
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-s390x-appstream-source-rpms
     size: 2138254
@@ -1568,13 +1568,13 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.19/os/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.x86_64.rpm
     repoid: rhocp-4.19-for-rhel-9-x86_64-rpms
-    size: 29792266
-    checksum: sha256:3e604fc7f22ab6d94b11d170af8e9f2b5ddd695850213477a69509bf227cd7c1
+    size: 29810609
+    checksum: sha256:0d759cf7cb21629c050f12fdab0660c51e3b5e6962f19347b3a63e394bf29e70
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
-    sourcerpm: openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
+    sourcerpm: openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 559754
@@ -1884,12 +1884,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.19/source/SRPMS/Packages/o/openshift-clients-4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9.src.rpm
     repoid: rhocp-4.19-for-rhel-9-x86_64-source-rpms
-    size: 17635229
-    checksum: sha256:afde2e5c8ecf7b2f15f87ddc9c4281fa18b47aa23a65a4f89c8130c2fa2158cd
+    size: 17638108
+    checksum: sha256:15c7c2da03c455706d767eecfcda9624a5c2e79bdd06ff9e679e0e3ba7b2187e
     name: openshift-clients
-    evr: 4.19.0-202608271638.p2.ga2c805b.assembly.stream.el9
+    evr: 4.19.0-202609141900.p2.ga2c805b.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-x86_64-appstream-source-rpms
     size: 2138254
