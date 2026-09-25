@@ -20,7 +20,18 @@ const (
 	TypeOCP        Type = "openshift"
 	TypeOther      Type = "other"
 	TypeMicroShift Type = "microshift"
+
+	TypeEnvVar = "CLUSTER_TYPE"
 )
+
+func ParseType(s string) (Type, bool) {
+	switch Type(s) {
+	case TypeOCP, TypeOther, TypeMicroShift:
+		return Type(s), true
+	default:
+		return "", false
+	}
+}
 
 type TypeResolver interface {
 	GetType(ctx context.Context) (Type, error)
