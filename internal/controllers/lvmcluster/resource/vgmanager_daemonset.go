@@ -328,6 +328,10 @@ func templateVGManagerDaemonset(
 					Value: "2",
 				},
 				{
+					Name:  cluster.TypeEnvVar,
+					Value: string(clusterType),
+				},
+				{
 					Name: "NODE_NAME",
 					ValueFrom: &corev1.EnvVarSource{
 						FieldRef: &corev1.ObjectFieldSelector{

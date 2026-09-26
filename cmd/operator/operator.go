@@ -188,20 +188,23 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("failed to run wipe migration logic: %w", err)
 	}
 
-	tlsProfile, err := ctrlRuntimeCommon.FetchAPIServerTLSProfile(ctx, setupClient)
-	if err != nil {
-		return fmt.Errorf("failed to get tls profile: %w", err)
-	}
-
 	tlsOpts := []func(*tls.Config){
 		func(c *tls.Config) { c.NextProtos = []string{"http/1.1"} },
 	}
 
-	tlsConfig, unsupportedCiphers := ctrlRuntimeCommon.NewTLSConfigFromProfile(tlsProfile)
-	if len(unsupportedCiphers) > 0 {
-		opts.SetupLog.Info("some ciphers from TLS profile are not supported", "unsupportedCiphers", unsupportedCiphers)
+	var tlsProfile v1.TLSProfileSpec
+	if clusterType == cluster.TypeOCP {
+		tlsProfile, err = ctrlRuntimeCommon.FetchAPIServerTLSProfile(ctx, setupClient)
+		if err != nil {
+			return fmt.Errorf("failed to get tls profile: %w", err)
+		}
+
+		tlsConfig, unsupportedCiphers := ctrlRuntimeCommon.NewTLSConfigFromProfile(tlsProfile)
+		if len(unsupportedCiphers) > 0 {
+			opts.SetupLog.Info("some ciphers from TLS profile are not supported", "unsupportedCiphers", unsupportedCiphers)
+		}
+		tlsOpts = append(tlsOpts, tlsConfig)
 	}
-	tlsOpts = append(tlsOpts, tlsConfig)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: opts.Scheme,
@@ -240,20 +243,22 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
-		Client:                mgr.GetClient(),
-		InitialTLSProfileSpec: tlsProfile,
-		OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec v1.TLSProfileSpec) {
-			ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
-				"old profile", oldTLSProfileSpec,
-				"new profile", newTLSProfileSpec,
-			)
-			cancel()
-		},
-	}
+	if clusterType == cluster.TypeOCP {
+		tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
+			Client:                mgr.GetClient(),
+			InitialTLSProfileSpec: tlsProfile,
+			OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec v1.TLSProfileSpec) {
+				ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
+					"old profile", oldTLSProfileSpec,
+					"new profile", newTLSProfileSpec,
+				)
+				cancel()
+			},
+		}
 
-	if err := tlsWatcherController.SetupWithManager(mgr); err != nil {
-		return fmt.Errorf("unable to create controller for TLS config observation: %w", err)
+		if err := tlsWatcherController.SetupWithManager(mgr); err != nil {
+			return fmt.Errorf("unable to create controller for TLS config observation: %w", err)
+		}
 	}
 
 	// register controllers
