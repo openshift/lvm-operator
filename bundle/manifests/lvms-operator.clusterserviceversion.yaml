@@ -50,7 +50,7 @@ metadata:
           "apiVersion": "lvm.topolvm.io/v1alpha1",
           "kind": "LVMCluster",
           "metadata": {
-            "name": "test-lvmcluster"
+            "name": "my-lvmcluster"
           },
           "spec": {
             "storage": {
