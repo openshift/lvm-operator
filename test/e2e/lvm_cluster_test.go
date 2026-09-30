@@ -23,7 +23,10 @@ import (
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 )
@@ -79,6 +82,29 @@ func lvmClusterTest() {
 
 			CreateResource(ctx, cluster)
 			VerifyLVMSSetup(ctx, cluster)
+		})
+	})
+
+	Describe("CSI Driver", Serial, func() {
+		// A cluster upgraded from a release that predates spec.seLinuxMount still has a
+		// CSIDriver without it, so the reconciler has to converge the live object instead of
+		// only setting the field on the one it creates. Driving that through a real apiserver
+		// also proves the update is accepted: the fake client used in the unit test does not
+		// enforce CSIDriver update validation.
+		It("should restore seLinuxMount on a driver left over from an older release", func(ctx SpecContext) {
+			CreateResource(ctx, cluster)
+			VerifyLVMSSetup(ctx, cluster)
+			validateCSIDriverSELinuxMount(ctx)
+
+			By("clearing seLinuxMount the way an older release would have left it")
+			driver := &storagev1.CSIDriver{}
+			Expect(crClient.Get(ctx, types.NamespacedName{Name: csiDriverName}, driver)).To(Succeed())
+			patch := client.MergeFrom(driver.DeepCopy())
+			driver.Spec.SELinuxMount = ptr.To(false)
+			Expect(crClient.Patch(ctx, driver, patch)).To(Succeed())
+
+			// the LVMCluster reconciler requeues every minute, so nothing needs poking
+			validateCSIDriverSELinuxMount(ctx)
 		})
 	})
 

@@ -106,6 +106,35 @@ func pvcTestThinProvisioning() {
 			}
 		})
 	}
+
+	// A ReadWriteOncePod volume whose Pod asks for an SELinux context is mounted with
+	// "-o context" instead of being relabelled recursively. That only works if the CSIDriver
+	// advertises seLinuxMount and the node plugin can reach the host policy store, neither of
+	// which an object shape test can prove.
+	It("ReadWriteOncePod with an explicit SELinux context", func(ctx SpecContext) {
+		level := namespaceMCSLevel(ctx, testNamespace)
+
+		pvc := generatePVC(k8sv1.PersistentVolumeFilesystem)
+		// the mode based name is already taken by the Filesystem specs above
+		pvc.SetName("rwop-selinux")
+		pvc.Spec.AccessModes = []k8sv1.PersistentVolumeAccessMode{k8sv1.ReadWriteOncePod}
+
+		pod := generatePodConsumingPVC(pvc)
+		pod.Spec.SecurityContext = &k8sv1.PodSecurityContext{
+			SELinuxOptions: &k8sv1.SELinuxOptions{Level: level},
+		}
+
+		DeferCleanup(DeleteResources([][]client.Object{{pod, pvc}}))
+
+		CreateResource(ctx, pvc)
+		CreateResource(ctx, pod)
+
+		// NodePublishVolume fails outright if the plugin cannot apply "-o context",
+		// so the Pod never reaches Running without the policy store mount
+		validatePodIsRunning(ctx, client.ObjectKeyFromObject(pod))
+		validatePVCIsBound(ctx, client.ObjectKeyFromObject(pvc))
+		validateMountSELinuxContext(ctx, pod, level)
+	})
 }
 
 func pvcTestThickProvisioning() {
