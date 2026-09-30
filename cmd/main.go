@@ -106,3 +106,4 @@ func InitializeMetricsManager() *connection.ExtendedCSIMetricsManager {
 	}
 	return metricsManager
 }
+
