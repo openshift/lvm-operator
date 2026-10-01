@@ -12,7 +12,11 @@ spec:
           - name: source
             emptyDir: { }
         steps:
-        - image: registry.redhat.io/openshift4/ose-cli:latest
+        # ose-cli is used only as a RHEL9 base to install the Go toolchain and run
+        # `make test`; the oc binary it ships is unused. registry.redhat.io retired
+        # the :latest tag, and ose-cli-rhel9 has no v4.14 tag (RHEL9 builds start at
+        # v4.16), so we pin v4.16 here as the oldest available RHEL9 image.
+        - image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.16
           env:
           - name: URL
             valueFrom:
