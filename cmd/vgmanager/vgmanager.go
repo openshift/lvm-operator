@@ -18,7 +18,6 @@ package vgmanager
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -32,7 +31,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
 	v1 "github.com/openshift/api/config/v1"
-	ctrlRuntimeCommon "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/lvmcluster/resource"
@@ -45,6 +43,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/util"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs"
 	icsi "github.com/openshift/lvm-operator/v4/internal/csi"
+	internalTLS "github.com/openshift/lvm-operator/v4/internal/tls"
 	"github.com/spf13/cobra"
 	"github.com/topolvm/topolvm/pkg/controller"
 	"github.com/topolvm/topolvm/pkg/driver"
@@ -150,22 +149,27 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 		return fmt.Errorf("unable to initialize setup client for pre-manager startup checks: %w", err)
 	}
 
-	tlsProfile, err := ctrlRuntimeCommon.FetchAPIServerTLSProfile(ctx, setupClient)
+	typeResolver := cluster.NewTypeResolver(setupClient)
+	clusterType, err := typeResolver.GetType(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get tls profile: %w", err)
+		return fmt.Errorf("failed to determine cluster type: %w", err)
 	}
 
-	tlsOpts := []func(*tls.Config){
-		func(c *tls.Config) {
-			c.NextProtos = []string{"http/1.1"}
+	tlsSetup, err := internalTLS.Resolve(ctx, clusterType, setupClient, opts.SetupLog)
+	if err != nil {
+		return err
+	}
+
+	cacheOpts := cache.Options{
+		DefaultNamespaces: map[string]cache.Config{
+			operatorNamespace: {},
 		},
 	}
-
-	tlsConfig, unsupportedCiphers := ctrlRuntimeCommon.NewTLSConfigFromProfile(tlsProfile)
-	if len(unsupportedCiphers) > 0 {
-		opts.SetupLog.Info("some ciphers from TLS profile are not supported", "unsupportedCiphers", unsupportedCiphers)
+	if clusterType == cluster.TypeOCP {
+		cacheOpts.ByObject = map[client.Object]cache.ByObject{
+			&v1.APIServer{}: {},
+		}
 	}
-	tlsOpts = append(tlsOpts, tlsConfig)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: opts.Scheme,
@@ -173,41 +177,28 @@ func run(cmd *cobra.Command, _ []string, opts *Options) error {
 			BindAddress:    opts.diagnosticsAddr,
 			SecureServing:  true,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
-			TLSOpts:        tlsOpts,
+			TLSOpts:        tlsSetup.Options(),
 		},
 		WebhookServer: &webhook.DefaultServer{Options: webhook.Options{
 			Port:    9443,
-			TLSOpts: tlsOpts,
+			TLSOpts: tlsSetup.Options(),
 		}},
-		HealthProbeBindAddress: opts.healthProbeAddr,
-		LeaderElection:         false,
-		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				operatorNamespace: {},
-			},
-			ByObject: map[client.Object]cache.ByObject{
-				&v1.APIServer{}: {},
-			},
-		},
+		HealthProbeBindAddress:  opts.healthProbeAddr,
+		LeaderElection:          false,
+		Cache:                   cacheOpts,
 		GracefulShutdownTimeout: ptr.To(time.Duration(-1)),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	tlsWatcherController := &ctrlRuntimeCommon.SecurityProfileWatcher{
-		Client:                mgr.GetClient(),
-		InitialTLSProfileSpec: tlsProfile,
-		OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec v1.TLSProfileSpec) {
-			ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
-				"old profile", oldTLSProfileSpec,
-				"new profile", newTLSProfileSpec,
-			)
-			cancelWithCause(ErrTLSProfileModified)
-		},
-	}
-
-	if err := tlsWatcherController.SetupWithManager(mgr); err != nil {
+	if err := tlsSetup.SetupWatcher(mgr, func(ctx context.Context, oldProfile, newProfile v1.TLSProfileSpec) {
+		ctrl.Log.WithName("TLSWatcher").Info("TLS profile has changed, initiating a shutdown to reload it",
+			"old profile", oldProfile,
+			"new profile", newProfile,
+		)
+		cancelWithCause(ErrTLSProfileModified)
+	}); err != nil {
 		return fmt.Errorf("unable to create controller for TLS config observation: %w", err)
 	}
 
