@@ -12,7 +12,7 @@ spec:
           - name: source
             emptyDir: { }
         steps:
-        - image: registry.redhat.io/openshift4/ose-cli:latest
+        - image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.18
           env:
           - name: URL
             valueFrom:
