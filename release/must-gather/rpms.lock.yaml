@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.aarch64.rpm
     repoid: rhocp-4.18-for-rhel-9-aarch64-rpms
-    size: 59249983
-    checksum: sha256:2a570601c89b46c4415175ce51770129ea2fb3f9a153bca71d84dd1e8ccfb8e8
+    size: 59291196
+    checksum: sha256:db9d59067ac7c21f58b3719e0a396f12a176986ee841217291de8dd5b72bd577
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 548341
@@ -172,13 +172,13 @@ arches:
     name: libnl3
     evr: 3.11.0-1.el9
     sourcerpm: libnl3-3.11.0-1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libpcap-1.10.0-4.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libpcap-1.10.0-4.el9_8.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 176251
-    checksum: sha256:cd6462c66489eed11b8d9f1acf70a38a1a2629a969a31d0f511eca148783dcdd
+    size: 177153
+    checksum: sha256:c656f1ebc5833e01148f6dca75a1a43c89c8dfc78e7cf1fef29fcbedb04dac28
     name: libpcap
-    evr: 14:1.10.0-4.el9
-    sourcerpm: libpcap-1.10.0-4.el9.src.rpm
+    evr: 14:1.10.0-4.el9_8.1
+    sourcerpm: libpcap-1.10.0-4.el9_8.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 38310
@@ -320,12 +320,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-aarch64-source-rpms
-    size: 17178756
-    checksum: sha256:37543040ce0a42c087fd6c404f9a54dec5668719e9b6fe4ea9e2f2ff7e174b7a
+    size: 17199093
+    checksum: sha256:112eb54c1e5b4afc23c0535e6af78fdf723f98bf54e9f0a2080375ec178fb048
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-aarch64-appstream-source-rpms
     size: 2138254
@@ -434,12 +434,12 @@ arches:
     checksum: sha256:13f6ea90f26fbc96e3754584a576c03ca41221fc939164f5a7b6341a6372fd7a
     name: libnl3
     evr: 3.11.0-1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9_8.1.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 951935
-    checksum: sha256:539a59c99ed259ed660253101672d6af134b4de0a0ec64e37f12c4031eb2a2b2
+    size: 955899
+    checksum: sha256:76ab608dbc1d83677c4ea27c33d6735127f8d3d4e4aad87a693ac5c7c2c63b7d
     name: libpcap
-    evr: 14:1.10.0-4.el9
+    evr: 14:1.10.0-4.el9_8.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/l/libpwquality-1.4.4-8.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
     size: 447225
@@ -521,13 +521,13 @@ arches:
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.ppc64le.rpm
     repoid: rhocp-4.18-for-rhel-9-ppc64le-rpms
-    size: 55901856
-    checksum: sha256:3e07ecf9637748392b17f167f32ff9ffb902aafae505d47699c9861a2809bcbe
+    size: 55844676
+    checksum: sha256:4dd49c795290761cd2a054916142a43e5fb66eb3671dc35dd81147347fb3ef67
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 577736
@@ -689,13 +689,13 @@ arches:
     name: libnl3
     evr: 3.11.0-1.el9
     sourcerpm: libnl3-3.11.0-1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libpcap-1.10.0-4.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libpcap-1.10.0-4.el9_8.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 188789
-    checksum: sha256:0f664a5a3b8020718905e2b06e27354d07aed325d6f8e2254dedee4a63a729f8
+    size: 188750
+    checksum: sha256:869f87eb224be7529826ba8b5d0e22eb2cf020d8aed7478fea580ac0e8767144
     name: libpcap
-    evr: 14:1.10.0-4.el9
-    sourcerpm: libpcap-1.10.0-4.el9.src.rpm
+    evr: 14:1.10.0-4.el9_8.1
+    sourcerpm: libpcap-1.10.0-4.el9_8.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 42712
@@ -844,12 +844,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-ppc64le-source-rpms
-    size: 17178756
-    checksum: sha256:37543040ce0a42c087fd6c404f9a54dec5668719e9b6fe4ea9e2f2ff7e174b7a
+    size: 17199093
+    checksum: sha256:112eb54c1e5b4afc23c0535e6af78fdf723f98bf54e9f0a2080375ec178fb048
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-ppc64le-appstream-source-rpms
     size: 2138254
@@ -958,12 +958,12 @@ arches:
     checksum: sha256:13f6ea90f26fbc96e3754584a576c03ca41221fc939164f5a7b6341a6372fd7a
     name: libnl3
     evr: 3.11.0-1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9_8.1.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 951935
-    checksum: sha256:539a59c99ed259ed660253101672d6af134b4de0a0ec64e37f12c4031eb2a2b2
+    size: 955899
+    checksum: sha256:76ab608dbc1d83677c4ea27c33d6735127f8d3d4e4aad87a693ac5c7c2c63b7d
     name: libpcap
-    evr: 14:1.10.0-4.el9
+    evr: 14:1.10.0-4.el9_8.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/l/libpwquality-1.4.4-8.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
     size: 447225
@@ -1051,13 +1051,13 @@ arches:
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.s390x.rpm
     repoid: rhocp-4.18-for-rhel-9-s390x-rpms
-    size: 57763850
-    checksum: sha256:4a93383ad38de54e4b77302405240af4ad0a6e72c596ed19343e866500fa1f4d
+    size: 57557944
+    checksum: sha256:d67676bb2b574eafb77b19ef9f8656f65be403b8b7970c2a21dfd3d7b6937120
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 527514
@@ -1219,13 +1219,13 @@ arches:
     name: libnl3
     evr: 3.11.0-1.el9
     sourcerpm: libnl3-3.11.0-1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libpcap-1.10.0-4.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libpcap-1.10.0-4.el9_8.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 172787
-    checksum: sha256:8eeed3015f2ea273202e6ae622a208a88758ee07dfa9a237fe7e2447646645a8
+    size: 173695
+    checksum: sha256:de762a16f3a0419f0114aa2431885917563bd8b7d5e56c3c8e9e5abeb1f33ceb
     name: libpcap
-    evr: 14:1.10.0-4.el9
-    sourcerpm: libpcap-1.10.0-4.el9.src.rpm
+    evr: 14:1.10.0-4.el9_8.1
+    sourcerpm: libpcap-1.10.0-4.el9_8.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 37876
@@ -1367,12 +1367,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-s390x-source-rpms
-    size: 17178756
-    checksum: sha256:37543040ce0a42c087fd6c404f9a54dec5668719e9b6fe4ea9e2f2ff7e174b7a
+    size: 17199093
+    checksum: sha256:112eb54c1e5b4afc23c0535e6af78fdf723f98bf54e9f0a2080375ec178fb048
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-s390x-appstream-source-rpms
     size: 2138254
@@ -1481,12 +1481,12 @@ arches:
     checksum: sha256:13f6ea90f26fbc96e3754584a576c03ca41221fc939164f5a7b6341a6372fd7a
     name: libnl3
     evr: 3.11.0-1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9_8.1.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 951935
-    checksum: sha256:539a59c99ed259ed660253101672d6af134b4de0a0ec64e37f12c4031eb2a2b2
+    size: 955899
+    checksum: sha256:76ab608dbc1d83677c4ea27c33d6735127f8d3d4e4aad87a693ac5c7c2c63b7d
     name: libpcap
-    evr: 14:1.10.0-4.el9
+    evr: 14:1.10.0-4.el9_8.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/l/libpwquality-1.4.4-8.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
     size: 447225
@@ -1568,13 +1568,13 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/os/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.x86_64.rpm
     repoid: rhocp-4.18-for-rhel-9-x86_64-rpms
-    size: 59827014
-    checksum: sha256:23267caafa58709a33c323ec69c9583c41787cc4a50f2a2804c2468a341d24e0
+    size: 59815382
+    checksum: sha256:083a352593b04619a4532d660530c07edbbbb64607302f0f83519b0aa44b4ff4
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
-    sourcerpm: openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
+    sourcerpm: openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/t/tcpdump-4.99.0-9.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 559754
@@ -1736,13 +1736,13 @@ arches:
     name: libnl3
     evr: 3.11.0-1.el9
     sourcerpm: libnl3-3.11.0-1.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libpcap-1.10.0-4.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libpcap-1.10.0-4.el9_8.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 180846
-    checksum: sha256:3c0c51cc6b947970812238914713f1f96aa5e9bdaaceb6ee50249540ad89f05b
+    size: 181323
+    checksum: sha256:b60aac59b75ad9a26fb7b8c5fe431c696ea4c9d2803bd1e0b3d3cfc24ca33735
     name: libpcap
-    evr: 14:1.10.0-4.el9
-    sourcerpm: libpcap-1.10.0-4.el9.src.rpm
+    evr: 14:1.10.0-4.el9_8.1
+    sourcerpm: libpcap-1.10.0-4.el9_8.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 38387
@@ -1884,12 +1884,12 @@ arches:
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.18/source/SRPMS/Packages/o/openshift-clients-4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9.src.rpm
     repoid: rhocp-4.18-for-rhel-9-x86_64-source-rpms
-    size: 17178756
-    checksum: sha256:37543040ce0a42c087fd6c404f9a54dec5668719e9b6fe4ea9e2f2ff7e174b7a
+    size: 17199093
+    checksum: sha256:112eb54c1e5b4afc23c0535e6af78fdf723f98bf54e9f0a2080375ec178fb048
     name: openshift-clients
-    evr: 4.18.0-202608191253.p2.g3da7a06.assembly.stream.el9
+    evr: 4.18.0-202609081426.p2.g3da7a06.assembly.stream.el9
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/source/SRPMS/Packages/t/tcpdump-4.99.0-9.el9.src.rpm
     repoid: rhel-9-for-x86_64-appstream-source-rpms
     size: 2138254
@@ -1998,12 +1998,12 @@ arches:
     checksum: sha256:13f6ea90f26fbc96e3754584a576c03ca41221fc939164f5a7b6341a6372fd7a
     name: libnl3
     evr: 3.11.0-1.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libpcap-1.10.0-4.el9_8.1.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 951935
-    checksum: sha256:539a59c99ed259ed660253101672d6af134b4de0a0ec64e37f12c4031eb2a2b2
+    size: 955899
+    checksum: sha256:76ab608dbc1d83677c4ea27c33d6735127f8d3d4e4aad87a693ac5c7c2c63b7d
     name: libpcap
-    evr: 14:1.10.0-4.el9
+    evr: 14:1.10.0-4.el9_8.1
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/l/libpwquality-1.4.4-8.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 447225
