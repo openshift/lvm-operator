@@ -135,6 +135,40 @@ func pvcTestThinProvisioning() {
 		validatePVCIsBound(ctx, client.ObjectKeyFromObject(pvc))
 		validateMountSELinuxContext(ctx, pod, level)
 	})
+
+	// The control for the spec above. A volume the Pod wants relabelled recursively is
+	// mounted without "-o context", which is what makes the positive assertion meaningful:
+	// the same grep has to be able to come back negative.
+	//
+	// seLinuxChangePolicy is pinned rather than left to default. Kubelet defaults to
+	// MountOption for ReadWriteOncePod only, but that default widens to every access mode
+	// once the SELinuxMount feature gate is on, which would fail this spec on a newer
+	// cluster for a reason that has nothing to do with LVMS.
+	It("ReadWriteOnce with a recursive SELinux relabel", func(ctx SpecContext) {
+		level := namespaceMCSLevel(ctx, testNamespace)
+
+		pvc := generatePVC(k8sv1.PersistentVolumeFilesystem)
+		// the mode based name is already taken by the Filesystem specs above
+		pvc.SetName("rwo-selinux-recursive")
+		// already the generatePVC default, spelled out because not being ReadWriteOncePod
+		// is half of what this spec asserts
+		pvc.Spec.AccessModes = []k8sv1.PersistentVolumeAccessMode{k8sv1.ReadWriteOnce}
+
+		pod := generatePodConsumingPVC(pvc)
+		pod.Spec.SecurityContext = &k8sv1.PodSecurityContext{
+			SELinuxOptions:      &k8sv1.SELinuxOptions{Level: level},
+			SELinuxChangePolicy: ptr.To(k8sv1.SELinuxChangePolicyRecursive),
+		}
+
+		DeferCleanup(DeleteResources([][]client.Object{{pod, pvc}}))
+
+		CreateResource(ctx, pvc)
+		CreateResource(ctx, pod)
+
+		validatePodIsRunning(ctx, client.ObjectKeyFromObject(pod))
+		validatePVCIsBound(ctx, client.ObjectKeyFromObject(pvc))
+		validateMountHasNoSELinuxContext(ctx, pod)
+	})
 }
 
 func pvcTestThickProvisioning() {
