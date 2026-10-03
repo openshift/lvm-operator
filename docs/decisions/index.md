@@ -20,6 +20,7 @@ Format: [MADR 4.0](https://adr.github.io/madr/) short template. See [adr-templat
 | [0010](0010-server-side-apply-for-storageclassoptions.md) | Server-side apply for StorageClassOptions | Accepted | 2026-03-03 |
 | [0011](0011-deletion-gates-pvc-pv-policy.md) | Deletion gates: PVC and PV policy checks | Accepted | 2026-03-03 |
 | [0012](0012-cel-vs-webhook-validation.md) | CEL XValidation vs webhook for validation | Accepted | 2026-06-09 |
+| [0013](0013-konflux-final-pipelines-for-release-automation.md) | Konflux final pipelines for release automation | Proposed | 2026-07-20 |
 
 ## Adding a New ADR
 
