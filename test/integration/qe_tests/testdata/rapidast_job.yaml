@@ -1,0 +1,80 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: rapidast-job-template
+objects:
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    name: ${NAME}
+  spec:
+    backoffLimit: 0
+    completionMode: NonIndexed
+    completions: 1
+    parallelism: 1
+    selector:
+      matchLabels:
+        job-name: ${NAME}
+    suspend: false
+    template:
+      metadata:
+        labels:
+          job-name: ${NAME}
+        name: rapidast-job
+      spec:
+        serviceAccountName: rapidast-sa
+        containers:
+        - command:
+          - sh
+          - -c
+          - |
+            mkdir -p /opt/rapidast/scanners/zap/policies
+            cp /opt/rapidast/config/customscan.policy /opt/rapidast/scanners/zap/policies/custom-scan.policy
+            rapidast.py --config /opt/rapidast/config/rapidastconfig.yaml
+            echo "--------------- show rapidast result -----------------"
+            find /opt/rapidast/results/ -name zap-report.json -exec cat {} \;
+            echo "--------------- rapidast result end -----------------"
+          image: quay.io/redhatproductsecurity/rapidast:latest
+          imagePullPolicy: Always
+          name: rapidast
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+              - SYS_ADMIN
+          env:
+          - name: _JAVA_OPTIONS
+            value: "-DmaxYamlCodePoints=99999999"
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: "/opt/rapidast/config/dast-gcs-secret.json"
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /opt/rapidast/config
+            name: config-volume
+          - mountPath: /opt/rapidast/results/
+            name: results-volume
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        terminationGracePeriodSeconds: 30
+        nodeSelector:
+          kubernetes.io/os: linux
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: ${NAME}
+          name: config-volume
+        - name: results-volume
+          emptyDir:
+            sizeLimit: 1Gi
+parameters:
+- name: NAME
+  value: rapidast-job
