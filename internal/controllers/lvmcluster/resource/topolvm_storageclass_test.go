@@ -137,9 +137,9 @@ func TestGetTopolvmStorageClasses_Defaults(t *testing.T) {
 		t.Errorf("expected fstype xfs, got %s", got.Parameters[constants.FsTypeKey])
 	}
 
-	// Default annotation should be "false" (no Default flag set on device class)
-	if got.Annotations[defaultSCAnnotation] != "false" {
-		t.Errorf("expected default annotation false, got %s", got.Annotations[defaultSCAnnotation])
+	// Default annotation should be omitted when no Default flag is set.
+	if _, ok := got.Annotations[defaultSCAnnotation]; ok {
+		t.Errorf("expected default annotation to be absent, got %s", got.Annotations[defaultSCAnnotation])
 	}
 }
 
@@ -251,22 +251,22 @@ func TestGetTopolvmStorageClasses_DefaultAnnotation(t *testing.T) {
 	scheme := newTestScheme(t)
 
 	tests := []struct {
-		name           string
-		defaultFlag    bool
-		existingSCs    []client.Object
-		expectedResult string
+		name                    string
+		defaultFlag             bool
+		existingSCs             []client.Object
+		expectDefaultAnnotation bool
 	}{
 		{
-			name:           "default=true, no other default SC",
-			defaultFlag:    true,
-			existingSCs:    nil,
-			expectedResult: "true",
+			name:                    "default=true, no other default SC",
+			defaultFlag:             true,
+			existingSCs:             nil,
+			expectDefaultAnnotation: true,
 		},
 		{
-			name:           "default=false",
-			defaultFlag:    false,
-			existingSCs:    nil,
-			expectedResult: "false",
+			name:                    "default=false",
+			defaultFlag:             false,
+			existingSCs:             nil,
+			expectDefaultAnnotation: false,
 		},
 		{
 			name:        "default=true but another SC is already default",
@@ -282,7 +282,71 @@ func TestGetTopolvmStorageClasses_DefaultAnnotation(t *testing.T) {
 					Provisioner: "other.csi.driver",
 				},
 			},
-			expectedResult: "false",
+			expectDefaultAnnotation: false,
+		},
+		{
+			name:        "beta annotation on another SC is detected as default",
+			defaultFlag: true,
+			existingSCs: []client.Object{
+				&storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "other-sc",
+						Annotations: map[string]string{
+							betaDefaultSCAnnotation: "true",
+						},
+					},
+					Provisioner: "other.csi.driver",
+				},
+			},
+			expectDefaultAnnotation: false,
+		},
+		{
+			name:        "user-set GA annotation on LVMS SC is preserved",
+			defaultFlag: false,
+			existingSCs: []client.Object{
+				&storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: GetStorageClassName("vg1"),
+						Annotations: map[string]string{
+							defaultSCAnnotation: "true",
+						},
+					},
+					Provisioner: constants.TopolvmCSIDriverName,
+				},
+			},
+			expectDefaultAnnotation: false,
+		},
+		{
+			name:        "user-set beta annotation on LVMS SC is preserved",
+			defaultFlag: false,
+			existingSCs: []client.Object{
+				&storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: GetStorageClassName("vg1"),
+						Annotations: map[string]string{
+							betaDefaultSCAnnotation: "true",
+						},
+					},
+					Provisioner: constants.TopolvmCSIDriverName,
+				},
+			},
+			expectDefaultAnnotation: false,
+		},
+		{
+			name:        "CR changed from default true to false removes annotation",
+			defaultFlag: false,
+			existingSCs: []client.Object{
+				&storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: GetStorageClassName("vg1"),
+						Annotations: map[string]string{
+							defaultSCAnnotation: "true",
+						},
+					},
+					Provisioner: constants.TopolvmCSIDriverName,
+				},
+			},
+			expectDefaultAnnotation: false,
 		},
 	}
 
@@ -301,8 +365,15 @@ func TestGetTopolvmStorageClasses_DefaultAnnotation(t *testing.T) {
 			result := sc.getTopolvmStorageClasses(r, ctx, cluster)
 
 			got := result[0]
-			if got.Annotations[defaultSCAnnotation] != tt.expectedResult {
-				t.Errorf("expected default annotation %s, got %s", tt.expectedResult, got.Annotations[defaultSCAnnotation])
+			annotation, hasDefaultAnnotation := got.Annotations[defaultSCAnnotation]
+			if tt.expectDefaultAnnotation {
+				if !hasDefaultAnnotation {
+					t.Error("expected default annotation to be present")
+				} else if annotation != "true" {
+					t.Errorf("expected default annotation true, got %s", annotation)
+				}
+			} else if hasDefaultAnnotation {
+				t.Errorf("expected default annotation to be absent, got %s", annotation)
 			}
 		})
 	}
