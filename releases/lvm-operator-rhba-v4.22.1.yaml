@@ -1,0 +1,26 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.22.1
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-22
+  snapshot: lvm-operator-4-22-20261006-105324-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
+
+        This erratum implements the following changes:
+
+        - Fixes the LVMS operator failing on MicroShift with an APIServer TLS profile lookup error
+        - Updates base image and RPM content to address security vulnerabilities
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      issues:
+        fixed:
+          - id: OCPBUGS-92090
+            source: issues.redhat.com
