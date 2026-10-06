@@ -35,14 +35,7 @@ spec:
   - name: skip-additional-tags
     value: "true"
   pipelineRef:
-    resolver: git
-    params:
-    - name: url
-      value: https://github.com/openshift/lvm-operator.git
-    - name: revision
-      value: main
-    - name: pathInRepo
-      value: .tekton/multi-arch-build-pipeline.yaml
+    name: multi-arch-build-pipeline
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvms-must-gather-5-1
   timeouts:
