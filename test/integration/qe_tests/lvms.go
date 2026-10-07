@@ -5247,7 +5247,11 @@ spec:
 		})
 		o.Expect(err).NotTo(o.HaveOccurred())
 		defer func() {
-			pvName := getPVCVolumeName(testNamespace, pvcName)
+			cmd := exec.Command("oc", "get", "pvc", pvcName, "-n", testNamespace, "--ignore-not-found", "-o=jsonpath={.spec.volumeName}")
+			output, err := cmd.CombinedOutput()
+			o.Expect(err).NotTo(o.HaveOccurred())
+			pvName := strings.TrimSpace(string(output))
+			logf("The PVC %s in namespace %s is bound to volume %s\n", pvcName, testNamespace, pvName)
 			deleteSpecifiedResource("pvc", pvcName, testNamespace)
 			if pvName != "" {
 				cleanupLogicalVolumeByName(pvName)
