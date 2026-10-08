@@ -217,14 +217,12 @@ func validatePodData(ctx context.Context, pod *k8sv1.Pod, expectedData string, c
 	return Expect(actualData).To(Equal(expectedData))
 }
 
-// validateMountSELinuxContext asserts the volume was mounted with "-o context" carrying the
-// level the Pod asked for. /proc/mounts is read directly because the test image has no
-// SELinux aware tooling, and a recursive relabel leaves no "context=" option behind at all,
-// so its presence is what distinguishes the two.
-func validateMountSELinuxContext(ctx context.Context, pod *k8sv1.Pod, level string) {
+// podVolumeMountLine returns the /proc/mounts entry for the Pod's test volume. /proc/mounts
+// is read directly because the test image has no SELinux aware tooling, and a recursive
+// relabel leaves no "context=" option behind at all, so its presence is what distinguishes
+// the two labelling paths.
+func podVolumeMountLine(ctx context.Context, pod *k8sv1.Pod) string {
 	GinkgoHelper()
-	By(fmt.Sprintf("validating the mount of Pod %q carries the SELinux level %q",
-		client.ObjectKeyFromObject(pod), level))
 	var mount string
 	Eventually(func(ctx context.Context) error {
 		var err error
@@ -232,10 +230,32 @@ func validateMountSELinuxContext(ctx context.Context, pod *k8sv1.Pod, level stri
 			pod.GetNamespace(), fmt.Sprintf("grep ' %s ' /proc/mounts", MountPathForPVCTests))
 		return err
 	}, timeout, interval).WithContext(ctx).Should(Succeed())
+	return mount
+}
+
+// validateMountSELinuxContext asserts the volume was mounted with "-o context" carrying the
+// level the Pod asked for.
+func validateMountSELinuxContext(ctx context.Context, pod *k8sv1.Pod, level string) {
+	GinkgoHelper()
+	By(fmt.Sprintf("validating the mount of Pod %q carries the SELinux level %q",
+		client.ObjectKeyFromObject(pod), level))
+	mount := podVolumeMountLine(ctx, pod)
 
 	Expect(mount).To(ContainSubstring("context="), "volume was not mounted with an SELinux context")
 	Expect(mount).To(ContainSubstring(sortMCSCategories(level)),
 		"mount context does not carry the requested MCS level")
+}
+
+// validateMountHasNoSELinuxContext is the control for validateMountSELinuxContext. Without
+// it a mount option that is always present would satisfy the positive assertion and prove
+// nothing about seLinuxMount, so a Pod that opted out of mount option labelling has to come
+// back from the same grep without a context.
+func validateMountHasNoSELinuxContext(ctx context.Context, pod *k8sv1.Pod) {
+	GinkgoHelper()
+	By(fmt.Sprintf("validating the mount of Pod %q carries no SELinux context",
+		client.ObjectKeyFromObject(pod)))
+	Expect(podVolumeMountLine(ctx, pod)).NotTo(ContainSubstring("context="),
+		"volume was mounted with an SELinux context despite the Recursive change policy")
 }
 
 // sortMCSCategories orders the categories of an MCS level numerically, the way the kernel
