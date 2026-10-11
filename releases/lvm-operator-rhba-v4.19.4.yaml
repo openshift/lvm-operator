@@ -1,0 +1,40 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.19.4
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-19
+  snapshot: lvm-operator-4-19-20260924-073109-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
+
+        This erratum implements the following changes:
+
+        - Golang version bump to address CVE-2026-56859, CVE-2026-56858, CVE-2026-56862 and CVE-2026-33818
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      cves:
+        - key: CVE-2026-56859
+          component: lvm-operator-4-19
+        - key: CVE-2026-56858
+          component: lvm-operator-4-19
+        - key: CVE-2026-56862
+          component: lvm-operator-4-19
+        - key: CVE-2026-33818
+          component: lvm-operator-4-19
+      issues:
+        fixed:
+          - id: OCPBUGS-110263
+            source: issues.redhat.com
+          - id: OCPBUGS-110674
+            source: issues.redhat.com
+          - id: OCPBUGS-110896
+            source: issues.redhat.com
+          - id: OCPBUGS-110988
+            source: issues.redhat.com
