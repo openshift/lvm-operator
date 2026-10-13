@@ -1,4 +1,4 @@
-FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4-1790555122
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4-1791765668
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
