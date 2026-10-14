@@ -1,0 +1,55 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: lvm-operator-rhba-v4.21.2
+  namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
+spec:
+  releasePlan: lvm-operator-production-releaseplan-4-21
+  snapshot: lvm-operator-4-21-20261014-083050-000
+  data:
+    releaseNotes:
+      description: |
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
+
+        This erratum is a security maintenance release that implements the following changes:
+
+        - Refreshes the operator base RPM packages (including openssl, systemd, pam and expat) to the latest RHEL 9 security errata
+        - Updates the UBI Minimal base image to its latest digest to pick up operating system security fixes
+        - Updates the must-gather base image to its latest digest
+        - Golang version bump to address CVE-2025-68121, CVE-2026-32283, CVE-2026-56858, CVE-2026-56859, CVE-2026-56860, CVE-2026-56862 and CVE-2026-33818
+
+        Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
+      cves:
+        - key: CVE-2025-68121
+          component: lvm-operator-4-21
+        - key: CVE-2026-32283
+          component: lvm-operator-4-21
+        - key: CVE-2026-56858
+          component: lvm-operator-4-21
+        - key: CVE-2026-56859
+          component: lvm-operator-4-21
+        - key: CVE-2026-56860
+          component: lvm-operator-4-21
+        - key: CVE-2026-56862
+          component: lvm-operator-4-21
+        - key: CVE-2026-33818
+          component: lvm-operator-4-21
+      issues:
+        fixed:
+          - id: OCPBUGS-81659
+            source: issues.redhat.com
+          - id: OCPBUGS-83280
+            source: issues.redhat.com
+          - id: OCPBUGS-110676
+            source: issues.redhat.com
+          - id: OCPBUGS-110265
+            source: issues.redhat.com
+          - id: OCPBUGS-109960
+            source: issues.redhat.com
+          - id: OCPBUGS-110898
+            source: issues.redhat.com
+          - id: OCPBUGS-110989
+            source: issues.redhat.com
