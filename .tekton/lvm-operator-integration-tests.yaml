@@ -12,11 +12,8 @@ spec:
           - name: source
             emptyDir: { }
         steps:
-        # ose-cli is used only as a RHEL8 base to install the Go toolchain and run
-        # `make test`; the oc binary it ships is unused. registry.redhat.io retired
-        # the :latest tag, so we pin the 4.12 image. 4.12 predates the ose-cli-rhel9
-        # repository, so the unsuffixed (RHEL8-based) ose-cli is the correct one here.
-        - image: registry.redhat.io/openshift4/ose-cli:v4.12
+        # Match the bundle builder's Go 1.20 toolchain for this release branch.
+        - image: brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.20
           env:
           - name: URL
             valueFrom:
@@ -38,12 +35,13 @@ spec:
             fi
 
             # Install Deps
-            dnf -y install git make golang patch
+            dnf -y install git make patch
 
             # Runtime Env Config
             export GOPATH=$HOME/.go
             export PATH="$PATH:$GOPATH/bin"
-            export GOTOOLCHAIN=auto
+
+            go version
 
             echo "Initializing the env vars"
             echo "URL: $URL"

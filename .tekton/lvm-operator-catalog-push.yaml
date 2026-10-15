@@ -35,10 +35,8 @@ spec:
     value: "true"
   - name: build-platforms
     value:
+    # OCP 4.12 and 4.13 FBC parent images support only x86_64.
     - linux/x86_64
-    - linux/arm64
-    - linux/ppc64le
-    - linux/s390x
   - name: opm_args
     value:
     - alpha
