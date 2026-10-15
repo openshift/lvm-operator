@@ -40,6 +40,7 @@ spec:
             # Runtime Env Config
             export GOPATH=$HOME/.go
             export PATH="$PATH:$GOPATH/bin"
+            export GOFLAGS=-mod=readonly
 
             go version
 
