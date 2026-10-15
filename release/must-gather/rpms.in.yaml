@@ -54,6 +54,33 @@ contentOrigin:
       sslclientkey: $SSL_CLIENT_KEY
       sslclientcert: $SSL_CLIENT_CERT
 
+    # OpenShift CLI packages are not provided by BaseOS or AppStream.
+    - repoid: rhocp-4.12-for-rhel-8-$basearch-rpms
+      name: Red Hat OpenShift Container Platform 4.12 for RHEL 8 $basearch (RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/layered/rhel8/$basearch/rhocp/4.12/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhocp-4.12-for-rhel-8-$basearch-source-rpms
+      name: Red Hat OpenShift Container Platform 4.12 for RHEL 8 $basearch (Source RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/layered/rhel8/$basearch/rhocp/4.12/source/SRPMS
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "0"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
 packages:
   - tar
   - rsync

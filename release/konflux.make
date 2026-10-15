@@ -7,7 +7,7 @@ Y_STREAM?="v4.12"
 .PHONY: rpm-lock
 rpm-lock: rhsm-keys
 	@echo $(AUTH_FILE)
-	podman run --rm -it \
+	podman run --rm -it --user 0:0 \
 	-v $(shell pwd):/source:z \
 	-v $(AUTH_FILE):/.dockerconfig.json:z \
 	--env 'REGISTRY_AUTH_FILE=/.dockerconfig.json' \
@@ -15,7 +15,7 @@ rpm-lock: rhsm-keys
 	--env 'RHSM_ORG=$(RHSM_ORG)' \
 	--env 'SMDEV_CONTAINER_OFF=1' \
 	--workdir /source \
-	registry.redhat.io/ubi8/ubi:latest ./release/hack/generate-rpm-lock.sh $(TARGET)
+	registry.redhat.io/ubi9/ubi:latest ./release/hack/generate-rpm-lock.sh $(TARGET)
 
 .PHONY: rhsm-keys
 rhsm-keys:
