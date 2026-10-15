@@ -79,11 +79,11 @@ for i in "${!all_y_streams[@]}"; do
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
         for ver in "${catalog_versions[@]}"; do
             if ! [[ -n "${digests["${ver}"]}" ]]; then
-                digests["${ver}"]=$(skopeo inspect "docker://${staging_bundle_path}:${ver}" --format "{{.Digest}}")
+                digests["${ver}"]=$(skopeo inspect "docker://${quay_bundle_path}:${ver}" --format "{{.Digest}}")
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
-            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${quay_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
+            catalog_template=$(echo "${catalog_template}" | yq ".Stable.Bundles += ({\"Image\": \"${staging_bundle_path}@${digests["${ver}"]}\"} | (.Image | key) line_comment=\"${ver}\")")
         done
     elif ! [ -z "${SKIP_CANDIDATES+x}" ]; then
         echo "SKIP_CANDIDATES flag was set, skipping pre-release content"
