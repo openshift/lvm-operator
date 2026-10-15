@@ -5,7 +5,7 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.20 as bui
 # LVMS 4.12 z-stream (v4.12.9). They were taken from that bundle's
 # ClusterServiceVersion .spec.relatedImages, which records registry.redhat.io
 # digests. Mintmaker/Renovate keeps them current once the component is onboarded.
-ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:661ad5fb4cfca5396169ae0aac88d1cddd640d6cc38a18ba49dc4a4f1ffa318f
+ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:765dd5338b1f12d61231e58cdb278005bce5a58cfb25a53472fbeaec039b4d32
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:f533b503c248b598afd96da761db4f380a1bf1b07e1566e5dbfc092a2a184f70
 
