@@ -8,11 +8,6 @@ WORKDIR /workspace
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# release-4.12 vendors its dependencies, so the vendor tree is copied in and the
-# build runs with -mod=vendor. This keeps the build hermetic without relying on
-# module downloads at build time (4.14+ dropped vendor/ and builds -mod=readonly).
-COPY vendor/ vendor/
-
 # Copy the go source
 COPY api/ api/
 COPY cmd/ cmd/
@@ -24,7 +19,7 @@ COPY main.go main.go
 ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 ENV GOEXPERIMENT=strictfipsruntime
-ENV GOFLAGS="-mod=vendor"
+ENV GOFLAGS="-mod=readonly"
 
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o manager main.go
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go

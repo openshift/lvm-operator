@@ -12,7 +12,7 @@ metadata:
       || ".tekton/lvm-operator-push.yaml".pathChanged() || "release/operator/***".pathChanged()
       || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged()
       || "cmd/***".pathChanged() || "pkg/***".pathChanged() || "controllers/***".pathChanged()
-      || "monitoring/***".pathChanged() || "main.go".pathChanged() || "vendor/***".pathChanged()
+      || "monitoring/***".pathChanged() || "main.go".pathChanged()
       || "test/***".pathChanged() || "api/***".pathChanged()
       || "release/container-build.args".pathChanged())
   creationTimestamp: null

@@ -41,16 +41,13 @@ ENV RBAC_PROXY_IMAGE="${RBAC_PROXY_IMAGE}"
 WORKDIR /operator
 COPY ./ ./
 
-# release-4.12 vendors its dependencies. The tool installs below use the
-# pkg@version form, which resolves independently of the main module, so they are
-# unaffected by the vendor tree.
 ENV GOFLAGS="-mod=readonly"
 ENV GOBIN=/operator/bin
 
 
 RUN mkdir -p bin && \
-    go install -mod=readonly sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0 && \
-    go install -mod=readonly sigs.k8s.io/kustomize/kustomize/v4@v4.5.3
+    go install -mod=readonly sigs.k8s.io/controller-tools/cmd/controller-gen && \
+    go install -mod=readonly sigs.k8s.io/kustomize/kustomize/v4
 
 COPY --from=operator-sdk /usr/local/bin/operator-sdk ./bin/operator-sdk
 

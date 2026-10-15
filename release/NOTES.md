@@ -24,9 +24,10 @@ Consequences, all reflected in this directory:
 * Base images are UBI8 / `openshift-golang-builder:rhel_8_1.20` (4.12 is `go 1.20`).
 * Image `name` labels use the `-rhel8` repositories and the `cpe` labels end in `::el8`.
 * The RPM lockfile inputs (`rpms.in.yaml`) point at the `rhel-8-*` CDN repos.
-* `release-4.12` still vendors its dependencies, so `release/operator/konflux.Dockerfile`
-  copies `vendor/` and builds with `-mod=vendor`. 4.14 dropped `vendor/` and uses
-  `-mod=readonly`.
+* Go dependencies and bundle build tools are pinned in `go.mod` and `go.sum`.
+  Konflux prefetches them before the image builds, which use `-mod=readonly`.
+  Like 4.14, this branch no longer tracks `vendor/`. Run `make godeps-update`
+  after changing dependencies.
 * On 4.12 the CSI snapshotter ships as `ose-csi-external-snapshotter-rhel8`, not the
   unsuffixed `ose-csi-external-snapshotter` used from 4.14 onward.
 
