@@ -55,7 +55,7 @@ BUNDLE_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(BUNDLE_IMAGE_NAME):$(IMA
 
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.22
+ENVTEST_K8S_VERSION = 1.24.2
 
 # Each CSV has a replaces parameter that indicates which Operator it replaces.
 # This builds a graph of CSVs that can be queried by OLM, and updates can be
@@ -122,7 +122,9 @@ godeps-update: ## Run go mod tidy.
 	go mod tidy
 
 test: manifests generate fmt vet envtest godeps-update ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -cover `go list ./... | grep -v "e2e"`
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --use-deprecated-gcs=false -p path)"; \
+	export KUBEBUILDER_ASSETS; \
+	go test -v -cover `go list ./... | grep -v "e2e"`
 
 
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -223,7 +225,7 @@ kustomize: ## Download kustomize locally if necessary.
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@bf15e44028f908c790721fc8fe67c7bf2d06a611)
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@9557f1031fe4d65e6cce592b072dfd4270c6a373)
 
 JSONNET = $(shell pwd)/bin/jsonnet
 jsonnet: ## Download jsonnet locally if necessary.
