@@ -1,0 +1,108 @@
+contentOrigin:
+  repos:
+    - repoid: rhel-8-for-$basearch-baseos-rpms
+      name: Red Hat Enterprise Linux 8 for $basearch - BaseOS (RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel8/$releasever/$basearch/baseos/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      sslverifystatus: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhel-8-for-$basearch-appstream-source-rpms
+      name: Red Hat Enterprise Linux 8 for $basearch - AppStream (Source RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel8/$releasever/$basearch/appstream/source/SRPMS
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      sslverifystatus: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "0"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhel-8-for-$basearch-appstream-rpms
+      name: Red Hat Enterprise Linux 8 for $basearch - AppStream (RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel8/$releasever/$basearch/appstream/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhel-8-for-$basearch-baseos-source-rpms
+      name: Red Hat Enterprise Linux 8 for $basearch - BaseOS (Source RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/rhel8/$releasever/$basearch/baseos/source/SRPMS
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "0"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    # OpenShift CLI packages are not provided by BaseOS or AppStream.
+    - repoid: rhocp-4.12-for-rhel-8-$basearch-rpms
+      name: Red Hat OpenShift Container Platform 4.12 for RHEL 8 $basearch (RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/layered/rhel8/$basearch/rhocp/4.12/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+    - repoid: rhocp-4.12-for-rhel-8-$basearch-source-rpms
+      name: Red Hat OpenShift Container Platform 4.12 for RHEL 8 $basearch (Source RPMs)
+      baseurl: https://cdn.redhat.com/content/dist/layered/rhel8/$basearch/rhocp/4.12/source/SRPMS
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "0"
+      sslcacert: /etc/rhsm/ca/redhat-uep.pem
+      sslclientkey: $SSL_CLIENT_KEY
+      sslclientcert: $SSL_CLIENT_CERT
+
+packages:
+  - tar
+  - rsync
+  - findutils
+  - gzip
+  - iproute
+  - tcpdump
+  - pciutils
+  - util-linux
+  - nftables
+  - procps-ng
+  - openshift-clients
+
+arches:
+  - aarch64
+  - x86_64
+  - s390x
+  - ppc64le
+
+context:
+  containerfile:
+    file: must-gather.konflux.Dockerfile
+    imagePattern: registry.redhat.io/ubi8/ubi-minimal
+
+allowerasing: true
