@@ -5,6 +5,12 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
+# OPERATOR_VERSION is the version stamped into the generated bundle. It defaults
+# to VERSION so existing `make bundle` invocations are unchanged; the Konflux
+# bundle build (release/hack/render_templates.sh) exports it to the real z-stream
+# version. This mirrors the split introduced on release-4.14.
+OPERATOR_VERSION ?= $(VERSION)
+
 OPERATOR_SDK_VERSION ?= 1.23.0
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -239,7 +245,14 @@ rename-csv:
 	sed 's/@BUNDLE_PACKAGE@/$(BUNDLE_PACKAGE)/g' --in-place config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle: build-prometheus-alert-rules bundle-base ## Generate bundle manifests and metadata, then validate generated files.
+
+# bundle-base performs the bundle generation without regenerating the Prometheus
+# alert rules. The Konflux bundle build calls this target directly so it does not
+# need the jsonnet toolchain (which is fetched with @latest and therefore is not
+# hermetic). Mirrors the bundle/bundle-base split on release-4.14.
+.PHONY: bundle-base
+bundle-base: update-mgr-env manifests kustomize operator-sdk rename-csv
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
@@ -252,7 +265,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 		$(KUSTOMIZE) edit add annotation --force 'olm.skipRange':"$(SKIP_RANGE)" && \
 		$(KUSTOMIZE) edit add patch --name $(BUNDLE_PACKAGE).v0.0.0 --kind ClusterServiceVersion\
 		--patch '[{"op": "replace", "path": "/spec/replaces", "value": "$(REPLACES)"}]'
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(OPERATOR_VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
