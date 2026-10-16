@@ -193,7 +193,7 @@ verify: ## Verify go formatting and generated files.
 test: envtest godeps-update ## Run tests.
 	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --use-deprecated-gcs=false -p path)"; \
 	export KUBEBUILDER_ASSETS; \
-	go test -v -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
+	go test -v -p 2 -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
 ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
 endif
