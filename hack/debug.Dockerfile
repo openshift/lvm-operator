@@ -9,10 +9,7 @@ WORKDIR /workspace
 COPY ../go.mod go.mod
 COPY ../go.sum go.sum
 
-# since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
-# reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
-COPY ../vendor vendor/
-RUN go mod verify
+RUN go mod download && go mod verify
 
 # Copy the go source
 COPY ../api api/
@@ -24,7 +21,7 @@ ENV GOOS=$TARGETOS
 ENV CGO_ENABLED=0
 
 # Build
-RUN go build -gcflags "all=-N -l" -mod=vendor -a -o lvms cmd/main.go
+RUN go build -gcflags "all=-N -l" -mod=readonly -a -o lvms cmd/main.go
 
 FROM golang:1.20 as dlv
 RUN go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest

@@ -12,7 +12,8 @@ spec:
           - name: source
             emptyDir: { }
         steps:
-        - image: registry.redhat.io/openshift4/ose-cli:latest
+        # Match the bundle builder's Go 1.21 toolchain for this release branch.
+        - image: brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21
           env:
           - name: URL
             valueFrom:
@@ -34,12 +35,14 @@ spec:
             fi
 
             # Install Deps
-            dnf -y install git make golang patch
+            dnf -y install git make patch
 
             # Runtime Env Config
             export GOPATH=$HOME/.go
             export PATH="$PATH:$GOPATH/bin"
-            export GOTOOLCHAIN=auto
+            export GOFLAGS=-mod=readonly
+
+            go version
 
             echo "Initializing the env vars"
             echo "URL: $URL"

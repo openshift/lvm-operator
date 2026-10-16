@@ -10,10 +10,7 @@ WORKDIR /workspace
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
-# reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
-COPY vendor vendor/
-RUN go mod verify
+RUN go mod download && go mod verify
 
 # Copy the go source
 COPY api/ api/
@@ -21,7 +18,7 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 
 # Build
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=vendor --ldflags "-s -w" -a -o lvms cmd/main.go
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=readonly --ldflags "-s -w" -a -o lvms cmd/main.go
 
 # vgmanager needs 'nsenter' and other basic linux utils to correctly function
 FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.2

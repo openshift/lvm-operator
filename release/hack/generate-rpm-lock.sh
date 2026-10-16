@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+set -euo pipefail
 
 # Disable container mode
 rm /etc/rhsm-host
@@ -8,29 +8,23 @@ rm /etc/rhsm-host
 subscription-manager clean
 subscription-manager register --activationkey="${RHSM_ACTIVATION_KEY}" --org="${RHSM_ORG}"
 
-arch=$(uname -m)
 target="${1}"
 
-# Activate the repos
-dnf config-manager \
-    --enable rhel-9-for-${arch}-appstream-rpms \
-    --enable rhel-9-for-${arch}-appstream-source-rpms \
-    --enable rhel-9-for-${arch}-baseos-rpms \
-    --enable rhel-9-for-${arch}-baseos-source-rpms
-
-# Install pip, skopeo and rpm-lockfile-prototype
+# Install tools from UBI 9. Target RHEL 9 repos come from rpms.in.yaml.
 dnf install -y  python3 python3-pip python3-dnf skopeo rpm
 python3 -m pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
 
 cd release
 
-cp /etc/yum.repos.d/redhat.repo ./$target/redhat.repo
+# Get the SSL Keys
+keyfiles=(/etc/pki/entitlement/*-key.pem)
+if [[ ${#keyfiles[@]} -ne 1 || ! -f "${keyfiles[0]}" ]]; then
+    echo "Expected one RHSM entitlement key in /etc/pki/entitlement" >&2
+    exit 1
+fi
 
-# Overwrite the arch listing so that we can do multiarch
-sed -i "s/$(uname -m)/\$basearch/g" ./$target/redhat.repo
+export DNF_VAR_SSL_CLIENT_KEY="${keyfiles[0]}"
+export DNF_VAR_SSL_CLIENT_CERT="${keyfiles[0]%-key.pem}.pem"
 
 # Generate the rpms.lock.yaml file for the operator
-rpm-lockfile-prototype --debug --allowerasing --outfile="${target}/rpms.lock.yaml" ${target}/rpms.in.yaml
-
-# Cleanup the repo file
-rm -rf ./$target/redhat.repo
+rpm-lockfile-prototype --outfile="${target}/rpms.lock.yaml" "${target}/rpms.in.yaml"
