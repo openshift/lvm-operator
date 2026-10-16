@@ -2,7 +2,7 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21 as bui
 
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:2ed8b819386f66ae04ec6b4d92490ae573279d64f699fd7ac85c42cdce2cc097
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:382ceea1151da56d0931403207c9f85721d58a66b39b1cd79790eca6219807d0
-ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel9@sha256:074a206d36c9e4198d90baed86f3046abd2ec12f9b36a715b60900011366b3d4
+ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel9@sha256:5150279c2e22b37eb87a3c9fcd56c25f56cba3800c39b3a54744683f64e826ef
 ARG CSI_REGISTRAR_IMAGE=registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:bafbe772c77a66f48cdd31749e6fb3114125fa428890ba707515d7b74a4f9bdc
 ARG CSI_LIVENESSPROBE_IMAGE=registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:af7c1e9a9e8f2ffc66587e5c0b67dc3fd16c5a6f70e1586fe17170f3cd12df8d
 ARG CSI_RESIZER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:fd62320124f44d35d136c5c2ce44020f0ccb8b73ba2078fb674a8e06bc3ef369
