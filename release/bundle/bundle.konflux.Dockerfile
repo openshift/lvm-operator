@@ -1,15 +1,11 @@
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel8:v4.13 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.21 as builder
 
-# The pinned digests below are the images shipped in the most recent released
-# LVMS 4.13 z-stream (v4.13.12). They were taken from that bundle's
-# ClusterServiceVersion .spec.relatedImages, which records registry.redhat.io
-# digests. Mintmaker/Renovate keeps them current once the component is onboarded.
-ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:edea9ef18a5ee168ee630b89b9eaddb78e44b6ccf7532c2891f4306daf32f720
+ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:20914e099f35e98dac92e30779614325e0db6aeeb179f44009f2c581e07a5635
 
-ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:5200487bfbd99ffaf590ab24873cf4754d04833371b1efbd910c4dde3256368b
+ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:10183805e405bac405a9d3bc62b1ec01972f0c9f48f2a0256c77a1a9747b0962
 
-ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel8@sha256:555f38a625558ae9020e9491bda6a10d4a5f45ddd454e81beb049f6b889467cb
+ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel8@sha256:0c73fe1c644151c43f06a4573388793ab2795bc7b64c0836987c4a8c84093e0b
 
 ARG CSI_REGISTRAR_IMAGE=registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:44120dccc70961d1a2421a553cf87ebbfa937d1c1ef8d774d130831c77c61334
 
