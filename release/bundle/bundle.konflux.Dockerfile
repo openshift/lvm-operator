@@ -1,14 +1,15 @@
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel8:v4.15 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.21 as builder
 
-ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:2ed8b819386f66ae04ec6b4d92490ae573279d64f699fd7ac85c42cdce2cc097
+ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:696edeb4c168646b49b8b0ca5b3d06071ab66fdb010e7cd46888d8b2f3a0c7a8
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:382ceea1151da56d0931403207c9f85721d58a66b39b1cd79790eca6219807d0
 ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel9@sha256:074a206d36c9e4198d90baed86f3046abd2ec12f9b36a715b60900011366b3d4
-ARG CSI_REGISTRAR_IMAGE=registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:bafbe772c77a66f48cdd31749e6fb3114125fa428890ba707515d7b74a4f9bdc
-ARG CSI_LIVENESSPROBE_IMAGE=registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:af7c1e9a9e8f2ffc66587e5c0b67dc3fd16c5a6f70e1586fe17170f3cd12df8d
-ARG CSI_RESIZER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:fd62320124f44d35d136c5c2ce44020f0ccb8b73ba2078fb674a8e06bc3ef369
-ARG CSI_PROVISIONER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:d9a205ccf13e127183b9f5d2008f4acba609446a35d7e24a0b261cd35d8d97d7
-ARG CSI_SNAPSHOTTER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel9@sha256:8cc7bd58f72d3aa9306e8f27c6730fb8af50b18c2ed5eaf62cbc831cb7bee673
-ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:f15d124e4868a4f3ee30141535abc7f2654a3707f8595fd28bbc9ab0d366c9df
+ARG CSI_REGISTRAR_IMAGE=registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:05dceaff7f0b2b769ddfd9261cc66d42aab9158ce99ed3dbd6c229e784072635
+ARG CSI_LIVENESSPROBE_IMAGE=registry.redhat.io/openshift4/ose-csi-livenessprobe@sha256:771d513c4d4e5d77d797b4c18f86e23162a20c6d39955e93d24f62b94e62e785
+ARG CSI_RESIZER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-resizer@sha256:82c01635b32821f04a7cfcf80da8b3f7e097786f220e0c85aab47bda4536a1d6
+ARG CSI_PROVISIONER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-provisioner@sha256:2db4f32824a8f9f6780dc3d236f73684cb20db41466ffa8f9a89fd3f5eb62fdd
+ARG CSI_SNAPSHOTTER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel9@sha256:479454d0d4de6609d8a4696b9c7f0097115afb45db3bdd46631d58afd77dcc58
+ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:7ce50398cd29df6e07ccd89790a53a711a7e5b484698c48f6581f5d4e9efb05a
 ARG OPERATOR_VERSION
 
 ENV CI_VERSION="${OPERATOR_VERSION}"
@@ -25,10 +26,14 @@ ENV RBAC_PROXY_IMAGE="${RBAC_PROXY_IMAGE}"
 WORKDIR /operator
 COPY ./ ./
 
+ENV GOFLAGS="-mod=readonly"
+ENV GOBIN=/operator/bin
+
 RUN mkdir bin && \
-    cp /cachi2/output/deps/generic/* bin/ && \
-    tar -xvf bin/kustomize.tar.gz -C bin && \
-    chmod +x bin/operator-sdk bin/controller-gen
+    go install -mod=readonly sigs.k8s.io/controller-tools/cmd/controller-gen && \
+    go install -mod=readonly sigs.k8s.io/kustomize/kustomize/v5
+
+COPY --from=operator-sdk /usr/local/bin/operator-sdk ./bin/operator-sdk
 
 RUN ./release/hack/render_templates.sh
 
@@ -73,3 +78,4 @@ LABEL distribution-scope="public"
 
 # Additional labels for the bundle for use in the release process
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
+LABEL cpe="cpe:/a:redhat:lvms:${LVMS_TAGS#v}::el9"

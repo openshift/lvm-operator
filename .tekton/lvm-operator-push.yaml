@@ -7,11 +7,11 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-4.15" && (".tekton/multi-arch-build-pipeline.yaml".pathChanged() || ".tekton/lvm-operator-pull-request.yaml".pathChanged()
+      == "release-4.15" && (".tekton/lvm-operator-pull-request.yaml".pathChanged()
       || ".tekton/lvm-operator-push.yaml".pathChanged() || "release/operator/***".pathChanged()
       || "go.mod".pathChanged() || "go.sum".pathChanged() || "Makefile".pathChanged()
       || "cmd/***".pathChanged() || "internal/***".pathChanged() || "test/***".pathChanged()
-      || "vendor/***".pathChanged() || "api/***".pathChanged() || "release/container-build.args".pathChanged())
+      || "api/***".pathChanged() || "release/container-build.args".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: lvm-operator-4-15
@@ -30,11 +30,18 @@ spec:
   - name: dockerfile
     value: release/operator/konflux.Dockerfile
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": "release/operator"}]'
+    value: '[{"type": "rpm", "path": "release/operator"},{"type": "gomod", "path": "."}]'
   - name: build-args-file
     value: release/container-build.args
   pipelineRef:
-    name: multi-arch-build-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/multi-arch-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-lvm-operator-4-15
   timeouts:

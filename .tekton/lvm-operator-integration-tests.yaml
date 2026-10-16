@@ -12,7 +12,15 @@ spec:
           - name: source
             emptyDir: { }
         steps:
-        - image: registry.redhat.io/openshift4/ose-cli:latest
+        # Match release-4.14's RHEL9 test image and install Go from its RPM repos.
+        - image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.16
+          computeResources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
           env:
           - name: URL
             valueFrom:
@@ -40,6 +48,9 @@ spec:
             export GOPATH=$HOME/.go
             export PATH="$PATH:$GOPATH/bin"
             export GOTOOLCHAIN=auto
+            export GOFLAGS=-mod=readonly
+
+            go version
 
             echo "Initializing the env vars"
             echo "URL: $URL"

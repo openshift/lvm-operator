@@ -8,11 +8,6 @@ WORKDIR /workspace
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# since we use vendoring we don't need to redownload our dependencies every time. Instead we can simply
-# reuse our vendored directory and verify everything is good. If not we can abort here and ask for a revendor.
-COPY vendor vendor/
-#RUN go mod verify # This is temporarily removed while we hold a carry patch
-
 # Copy the go source
 COPY api/ api/
 COPY cmd/ cmd/
@@ -22,10 +17,11 @@ ENV CGO_ENABLED=1
 ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 ENV GOEXPERIMENT=strictfipsruntime
+ENV GOFLAGS="-mod=readonly"
 
-RUN go build -tags strictfipsruntime -mod=vendor -ldflags "-s -w" -a -o lvms cmd/main.go
+RUN go build -tags strictfipsruntime -mod=readonly -ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2
+FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2-1792010189
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
@@ -57,5 +53,6 @@ LABEL io.openshift.tags="lvms"
 LABEL lvms.tags="${LVMS_TAGS}"
 LABEL konflux.additional-tags="${LVMS_TAGS} v${OPERATOR_VERSION}"
 
+LABEL cpe="cpe:/a:redhat:lvms:${LVMS_TAGS#v}::el9"
 
 ENTRYPOINT ["/lvms"]

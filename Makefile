@@ -180,8 +180,8 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-godeps-update: ## Run go mod tidy and go mod vendor.
-	go mod tidy && go mod vendor
+godeps-update: ## Run go mod tidy.
+	go mod tidy
 
 verify: ## Verify go formatting and generated files.
 	hack/verify-gofmt.sh
@@ -191,7 +191,9 @@ verify: ## Verify go formatting and generated files.
 	hack/verify-generated.sh
 
 test: envtest godeps-update ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --use-deprecated-gcs=false -p path)"; \
+	export KUBEBUILDER_ASSETS; \
+	go test -v -p 2 -coverprofile=coverage.out `go list ./... | grep -v -e "e2e" -e "performance"`
 ifeq ($(OPENSHIFT_CI), true)
 	hack/publish-codecov.sh
 endif
@@ -348,19 +350,19 @@ performance-idle-test: ## Build and run idle tests. Requires a fully setup LVMS 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 ifeq (,$(wildcard $(CONTROLLER_GEN)))
-	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen@v0.13.0)
+	$(call go-get-tool,sigs.k8s.io/controller-tools/cmd/controller-gen)
 endif
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 ifeq (,$(wildcard $(KUSTOMIZE)))
-	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5@v5.2.1)
+	$(call go-get-tool,sigs.k8s.io/kustomize/kustomize/v5)
 endif
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 ifeq (,$(wildcard $(ENVTEST)))
-	$(call go-get-tool,sigs.k8s.io/controller-runtime/tools/setup-envtest@bf15e44028f908c790721fc8fe67c7bf2d06a611)
+	$(call go-get-tool,sigs.k8s.io/controller-runtime/tools/setup-envtest@9557f1031fe4d65e6cce592b072dfd4270c6a373)
 endif
 
 JSONNET = $(shell pwd)/bin/jsonnet
