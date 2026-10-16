@@ -5,6 +5,12 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
+# OPERATOR_VERSION is the version stamped into the generated bundle. It defaults
+# to VERSION so existing `make bundle` invocations are unchanged; the Konflux
+# bundle build (release/hack/render_templates.sh) exports it to the real z-stream
+# version. This mirrors the split introduced on release-4.14.
+OPERATOR_VERSION ?= $(VERSION)
+
 OPERATOR_SDK_VERSION ?= 1.23.0
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -49,7 +55,7 @@ BUNDLE_IMG ?= $(IMAGE_REGISTRY)/$(REGISTRY_NAMESPACE)/$(BUNDLE_IMAGE_NAME):$(IMA
 
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.22
+ENVTEST_K8S_VERSION = 1.24.2
 
 # Each CSV has a replaces parameter that indicates which Operator it replaces.
 # This builds a graph of CSVs that can be queried by OLM, and updates can be
@@ -112,11 +118,13 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-godeps-update: ## Run go mod tidy and go mod vendor.
-	go mod tidy && go mod vendor
+godeps-update: ## Run go mod tidy.
+	go mod tidy
 
 test: manifests generate fmt vet envtest godeps-update ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v -cover `go list ./... | grep -v "e2e"`
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --use-deprecated-gcs=false -p path)"; \
+	export KUBEBUILDER_ASSETS; \
+	go test -v -cover `go list ./... | grep -v "e2e"`
 
 
 OPERATOR_NAMESPACE ?= openshift-storage
@@ -209,15 +217,15 @@ undeploy-with-olm: ## Undeploy controller from the K8s cluster
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.3)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@bf15e44028f908c790721fc8fe67c7bf2d06a611)
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@9557f1031fe4d65e6cce592b072dfd4270c6a373)
 
 JSONNET = $(shell pwd)/bin/jsonnet
 jsonnet: ## Download jsonnet locally if necessary.
@@ -239,7 +247,14 @@ rename-csv:
 	sed 's/@BUNDLE_PACKAGE@/$(BUNDLE_PACKAGE)/g' --in-place config/manifests/bases/$(BUNDLE_PACKAGE).clusterserviceversion.yaml
 
 .PHONY: bundle
-bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometheus-alert-rules ## Generate bundle manifests and metadata, then validate generated files.
+bundle: build-prometheus-alert-rules bundle-base ## Generate bundle manifests and metadata, then validate generated files.
+
+# bundle-base performs the bundle generation without regenerating the Prometheus
+# alert rules. The Konflux bundle build calls this target directly so it does not
+# need the jsonnet toolchain (which is fetched with @latest and therefore is not
+# hermetic). Mirrors the bundle/bundle-base split on release-4.14.
+.PHONY: bundle-base
+bundle-base: update-mgr-env manifests kustomize operator-sdk rename-csv
 	rm -rf bundle
 #	$(OPERATOR_SDK) generate kustomize manifests --package $(BUNDLE_PACKAGE) -q
 	cd config/default && $(KUSTOMIZE) edit set namespace $(OPERATOR_NAMESPACE)
@@ -252,7 +267,7 @@ bundle: update-mgr-env manifests kustomize operator-sdk rename-csv build-prometh
 		$(KUSTOMIZE) edit add annotation --force 'olm.skipRange':"$(SKIP_RANGE)" && \
 		$(KUSTOMIZE) edit add patch --name $(BUNDLE_PACKAGE).v0.0.0 --kind ClusterServiceVersion\
 		--patch '[{"op": "replace", "path": "/spec/replaces", "value": "$(REPLACES)"}]'
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(VERSION) $(BUNDLE_METADATA_OPTS) \
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --package $(BUNDLE_PACKAGE) --version $(OPERATOR_VERSION) $(BUNDLE_METADATA_OPTS) \
 		--extra-service-accounts topolvm-node,vg-manager,topolvm-controller
 	$(OPERATOR_SDK) bundle validate ./bundle
 
@@ -283,12 +298,14 @@ endif
 
 .PHONY: operator-sdk
 OPERATOR_SDK = ./bin/operator-sdk
-operator-sdk: ## Download operator-sdk locally
+operator-sdk: ## Download operator-sdk locally if necessary.
+ifeq (,$(wildcard $(OPERATOR_SDK)))
 	set -e ;\
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
 	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH};\
-	chmod +x $(OPERATOR_SDK) ;\
+	chmod +x $(OPERATOR_SDK)
+endif
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
