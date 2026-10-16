@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/lvm-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-4.13" &&
+      (".tekton/lvm-operator-catalog-pull-request.yaml".pathChanged() ||
+      ".tekton/lvm-operator-catalog-push.yaml".pathChanged() ||
+      ".tekton/images-mirror-set.yaml".pathChanged() ||
+      "release/catalog/***".pathChanged())
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: lvm-operator-catalog-4-13
+    appstudio.openshift.io/component: lvm-operator-catalog-4-13
+    pipelines.appstudio.openshift.io/type: build
+  name: lvm-operator-catalog-4-13-on-push
+  namespace: logical-volume-manag-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.13-{{revision}}
+  - name: dockerfile
+    value: release/catalog/catalog.konflux.Dockerfile
+  - name: build-args
+    value:
+    - CATALOG_VERSION=v4.13
+  - name: hermetic
+    value: "true"
+  - name: build-platforms
+    value:
+    # OCP 4.13 and 4.13 FBC parent images support only x86_64.
+    - linux/x86_64
+  - name: opm_args
+    value:
+    - alpha
+    - render-template
+    - semver
+    - release/catalog/lvm-operator-catalog-template.yaml
+  - name: catalog-output-path
+    value: "release/catalog/lvm-operator-catalog.json"
+  - name: catalog-template-merge-script
+    value: "./release/hack/prepare-catalog.sh"
+  - name: catalog-patch-script
+    value: "./release/hack/render-catalog.sh"
+  - name: catalog-patch-image
+    value: quay.io/konflux-ci/yq@sha256:41aee71bcaa8a759073e00d6acea358fbc4013ad6e28554729451606c0c35591
+  pipelineRef:
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/lvm-operator.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: .tekton/catalog-patching-build-pipeline.yaml
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-lvm-operator-catalog-4-13
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
