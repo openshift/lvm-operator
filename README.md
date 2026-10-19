@@ -34,12 +34,6 @@ The default wait limit is one hour, with status checks every ten seconds. Set
 Set `DRYRUNONLY=1` to run `oc create --dry-run=server` without creating releases
 or waiting for completion. Dry runs still check for name clashes.
 
-Run the script tests with:
-
-```bash
-python3 -m unittest discover -s hack/tests -v
-```
-
 ### Required Release Information
 In order to generate a release you will need to acquire the following information:
 - Release specific Jira information
