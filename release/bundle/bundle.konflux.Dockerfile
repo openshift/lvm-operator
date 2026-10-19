@@ -1,12 +1,12 @@
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel8:v4.12 as operator-sdk
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.20 as builder
 
-# The pinned digests below are the images shipped in the most recent released
-# LVMS 4.12 z-stream (v4.12.9). They were taken from that bundle's
+# The pinned digests below are based on the images shipped in the most recent
+# released LVMS 4.12 z-stream (v4.12.9), except the RBAC proxy digest was updated
+# to a current image because the v4.11-era digest was removed from the registry.
+# The original digests were taken from that bundle's
 # ClusterServiceVersion .spec.relatedImages, which records registry.redhat.io
 # digests. Mintmaker/Renovate keeps them current once the component is onboarded.
-# NOTE: The RBAC proxy digest was updated from the v4.11-era image (which was
-# removed from registry.redhat.io) to a current ose-kube-rbac-proxy image.
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:765dd5338b1f12d61231e58cdb278005bce5a58cfb25a53472fbeaec039b4d32
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:5b6df276e53a1683e615d4ce72b1bf006ed5a7e93d0544dba93f3103897c2b3c
