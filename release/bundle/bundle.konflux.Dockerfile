@@ -5,6 +5,8 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.20 as bui
 # LVMS 4.12 z-stream (v4.12.9). They were taken from that bundle's
 # ClusterServiceVersion .spec.relatedImages, which records registry.redhat.io
 # digests. Mintmaker/Renovate keeps them current once the component is onboarded.
+# NOTE: The RBAC proxy digest was updated from the v4.11-era image (which was
+# removed from registry.redhat.io) to a current ose-kube-rbac-proxy image.
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:765dd5338b1f12d61231e58cdb278005bce5a58cfb25a53472fbeaec039b4d32
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:5b6df276e53a1683e615d4ce72b1bf006ed5a7e93d0544dba93f3103897c2b3c
@@ -23,7 +25,7 @@ ARG CSI_PROVISIONER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-provisi
 # 4.14+ which uses the unsuffixed registry.redhat.io/openshift4/ose-csi-external-snapshotter.
 ARG CSI_SNAPSHOTTER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:116987000c38d947ddd7c093ca2880e74aa006bae0149e637452c8c596706d37
 
-ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:b4934c45ba595b36e65c73b734c58d1517e7f43b7cfc309ca8bc853733582f76
+ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:6ba961c2c2a29750c0132fe6dd6fa9f6001010afbc5f19b98add87b31b54bcf6
 
 ARG OPERATOR_VERSION
 
