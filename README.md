@@ -17,6 +17,29 @@ The process for releasing the **LVM Operator** is as follows:
 4. Apply the docs approved tag to the yaml (we don't need docs approval for the catalog)
 5. After merging, the release yaml file can be applied to the konflux cluster in our tenant namespace
 
+### Release automation
+
+`hack/manage-release.sh` creates the changed Release objects with `oc create`.
+Before creating anything, it checks that each name is unique in the change and
+does not already exist in the target namespace. To retry a release, use a new
+`metadata.name` in its YAML file. The script does not patch or delete releases.
+
+When a change includes both operator (bundle) and catalog releases, the script
+creates the operator releases first. It waits for each release's `Released`
+condition to become `True` before creating any catalog releases. A failed release
+or timeout stops the script. Catalog-only changes still run on their own.
+
+The default wait limit is one hour, with status checks every ten seconds. Set
+`RELEASE_TIMEOUT_SECONDS` and `RELEASE_POLL_SECONDS` to change these limits.
+Set `DRYRUNONLY=1` to run `oc create --dry-run=server` without creating releases
+or waiting for completion. Dry runs still check for name clashes.
+
+Run the script tests with:
+
+```bash
+python3 -m unittest discover -s hack/tests -v
+```
+
 ### Required Release Information
 In order to generate a release you will need to acquire the following information:
 - Release specific Jira information

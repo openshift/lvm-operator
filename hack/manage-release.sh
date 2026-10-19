@@ -9,66 +9,148 @@ set -euo pipefail
 : "${KONFLUX_PROJECT:="logical-volume-manag-tenant"}"
 : "${DRYRUNONLY:=""}"
 : "${JOB_TYPE:=""}"
+: "${RELEASE_TIMEOUT_SECONDS:=3600}"
+: "${RELEASE_POLL_SECONDS:=10}"
 
-changes=""
+case "${JOB_TYPE}" in
+    presubmit)
+        url="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}/files"
+        ;;
+    postsubmit)
+        url="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${PULL_BASE_SHA}"
+        ;;
+    "")
+        echo "No job type specified. Set JOB_TYPE to presubmit or postsubmit." >&2
+        exit 1
+        ;;
+    *)
+        echo "Unsupported job type '${JOB_TYPE}', skipping."
+        exit 0
+        ;;
+esac
 
-if [ "${JOB_TYPE}" == "presubmit" ]; then
-    commit_data=$(curl -s -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}/files")
-    changes=$(echo "${commit_data}" | jq '{"changes": [.[] | select(.filename|test("releases/*")) | .filename]}')
-elif [ "${JOB_TYPE}" == "postsubmit" ]; then
-    commit_data=$(curl -s -L -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${PULL_BASE_SHA}")
-    changes=$(echo "${commit_data}" | jq '{"changes": [.files[] | select(.filename|test("releases/*")) | .filename]}')
-elif [ -z "${JOB_TYPE}" ]; then
-    echo "No job type specified, please specify either 'presubmit' or 'postsubmit' via the JOB_TYPE env"
-    exit 1
-else
-    echo "Unsupported job type '${JOB_TYPE}' specified. Only presubmit and postsubmit jobs are supported. Skipping.."
+commit_data=$(curl --fail --silent --show-error --location \
+    -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "${url}")
+changes=$(echo "${commit_data}" | jq -r '
+    (if type == "array" then . else .files end)
+    | [.[] | select(.status != "removed")
+        | .filename | select(test("^releases/.*\\.ya?ml$"))] | .[]')
+
+if [[ -z "${changes}" ]]; then
+    echo "No release object changes detected, skipping."
     exit 0
 fi
 
-if echo "${changes}" | jq -e '.changes | length' > /dev/null; then
-    echo "Release object changes detected:"
-    echo "${changes}" | jq ".changes[]"
-    echo ""
-else
-    echo "No release object changes detected, skipping.."
-    exit 0
-fi
-
-
-KUBECONFIG="./konflux-config"
-
-oc="oc --kubeconfig ${KUBECONFIG}"
-
-# Login to the Konflux Server
-if ! $oc login --token="${KONFLUX_SA_TOKEN}" --server="${KONFLUX_SERVER}" > /dev/null; then
-    status=$?
-    echo "Error: Unable to login with the provided token. Exiting.."
+if [[ ! "${RELEASE_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ || ! "${RELEASE_POLL_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "RELEASE_TIMEOUT_SECONDS and RELEASE_POLL_SECONDS must be positive integers." >&2
     exit 1
 fi
 
-$oc project "${KONFLUX_PROJECT}"
+oc=(oc --kubeconfig ./konflux-config --namespace "${KONFLUX_PROJECT}")
+"${oc[@]}" login --token="${KONFLUX_SA_TOKEN}" --server="${KONFLUX_SERVER}" > /dev/null
+"${oc[@]}" project "${KONFLUX_PROJECT}"
 
-perms=$($oc auth can-i create releases)
-status=$?
-echo -e "\nDo I have appropriate permissions to do a release? \033[1m${perms}\033[0m\n"
-
-if ! [ $status ] || [ "${perms}" == "no" ]; then
-    echo "Error: The auth token does not have permissions to create a release."
+can_create=$("${oc[@]}" auth can-i create releases)
+if [[ "${can_create}" != "yes" ]]; then
+    echo "The auth token does not have permission to create releases." >&2
     exit 1
 fi
 
-dry_run_flag=""
-if ! [ -z "${DRYRUNONLY}" ]; then
-    echo -e "\u2705 Enabling dry run mode"
-    dry_run_flag="--dry-run=server"
-fi
+bundle_files=()
+catalog_files=()
+declare -A release_names
 
-for change in $(echo "${changes}" | jq '.changes[]'); do
-    echo -e "\n\033[1mApplying ${change}\033[0m\n---"
-    if ! $oc apply $dry_run_flag -f "${change}" -o yaml; then
-        status=$?
-        echo "Error: Unable to apply ${change}. Return code: ${status}"
+# Check the whole batch before creating anything. A later name clash must not
+# leave a bundle submitted while its catalog cannot be created.
+while IFS= read -r change; do
+    manifest=$("${oc[@]}" create --dry-run=client -f "${change}" -o json | jq -e --arg namespace "${KONFLUX_PROJECT}" '
+        if .kind == "Release"
+            and (.metadata.name | type == "string" and length > 0)
+            and ((.metadata.namespace // $namespace) == $namespace)
+            and (.spec.releasePlan | type == "string" and length > 0)
+        then . else error("Expected one named Release in the target namespace") end')
+    name=$(echo "${manifest}" | jq -r '.metadata.name')
+    plan=$(echo "${manifest}" | jq -r '.spec.releasePlan')
+
+    if [[ -n "${release_names[${name}]:-}" ]]; then
+        echo "Release name '${name}' appears in more than one changed file." >&2
         exit 1
     fi
+
+    existing=$("${oc[@]}" get release "${name}" --ignore-not-found -o name)
+    if [[ -n "${existing}" ]]; then
+        echo "Release '${name}' already exists. Use a new release name." >&2
+        exit 1
+    fi
+
+    release_names[${name}]=1
+    case "${plan}" in
+        lvm-operator-catalog-*) catalog_files+=("${change}") ;;
+        lvm-operator-*) bundle_files+=("${change}") ;;
+        *)
+            echo "Unknown release plan '${plan}' in ${change}." >&2
+            exit 1
+            ;;
+    esac
+done <<< "${changes}"
+
+wait_for_release() {
+    local name=$1
+    local deadline=$((SECONDS + RELEASE_TIMEOUT_SECONDS))
+    local release condition status reason remaining delay
+
+    echo "Waiting for bundle release '${name}' to succeed."
+    while true; do
+        release=$("${oc[@]}" get release "${name}" -o json)
+        condition=$(echo "${release}" | jq -c '[.status.conditions[]? | select(.type == "Released")][0] // {}')
+        status=$(echo "${condition}" | jq -r '.status // "Unknown"')
+        reason=$(echo "${condition}" | jq -r '.reason // ""')
+
+        if [[ "${status}" == "True" ]]; then
+            echo "Bundle release '${name}' succeeded."
+            return 0
+        fi
+
+        if [[ "${status}" == "False" && "${reason}" != "Progressing" && -n "${reason}" ]]; then
+            echo "Bundle release '${name}' failed: ${condition}" >&2
+            return 1
+        fi
+
+        remaining=$((deadline - SECONDS))
+        if (( remaining <= 0 )); then
+            echo "Timed out waiting for bundle release '${name}': ${condition}" >&2
+            return 1
+        fi
+
+        delay=${RELEASE_POLL_SECONDS}
+        if (( delay > remaining )); then
+            delay=${remaining}
+        fi
+
+        sleep "${delay}"
+    done
+}
+
+create_flags=()
+if [[ -n "${DRYRUNONLY}" ]]; then
+    echo "Enabling server dry run; release completion will not be checked."
+    create_flags+=(--dry-run=server)
+fi
+
+for change in "${bundle_files[@]}"; do
+    echo "Creating bundle release from ${change}."
+    created=$("${oc[@]}" create "${create_flags[@]}" -f "${change}" -o json)
+    echo "${created}"
+
+    if [[ -z "${DRYRUNONLY}" ]]; then
+        name=$(echo "${created}" | jq -er '.metadata.name')
+        wait_for_release "${name}"
+    fi
+done
+
+# Catalog-only changes remain supported. When bundles are in this change,
+# every bundle above must have succeeded before any catalog is submitted.
+for change in "${catalog_files[@]}"; do
+    echo "Creating catalog release from ${change}."
+    "${oc[@]}" create "${create_flags[@]}" -f "${change}" -o yaml
 done
