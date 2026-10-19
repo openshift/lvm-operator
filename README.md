@@ -29,7 +29,7 @@ creates the operator releases first. It waits for each release's `Released`
 condition to become `True` before creating any catalog releases. A failed release
 or timeout stops the script. Catalog-only changes still run on their own.
 
-The default wait limit is one hour, with status checks every ten seconds. Set
+The default wait limit is one hour, with status checks every minute. Set
 `RELEASE_TIMEOUT_SECONDS` and `RELEASE_POLL_SECONDS` to change these limits.
 Set `DRYRUNONLY=1` to run `oc create --dry-run=server` without creating releases
 or waiting for completion. Dry runs still check for name clashes.

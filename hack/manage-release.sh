@@ -10,7 +10,7 @@ set -euo pipefail
 : "${DRYRUNONLY:=""}"
 : "${JOB_TYPE:=""}"
 : "${RELEASE_TIMEOUT_SECONDS:=3600}"
-: "${RELEASE_POLL_SECONDS:=10}"
+: "${RELEASE_POLL_SECONDS:=60}"
 
 case "${JOB_TYPE}" in
     presubmit)
