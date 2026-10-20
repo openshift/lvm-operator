@@ -32,7 +32,7 @@ ARG OPERATOR_VERSION
 ARG LVMS_TAGS
 
 RUN microdnf update -y && \
-    microdnf install -y util-linux xfsprogs e2fsprogs && \
+    microdnf install -y util-linux xfsprogs e2fsprogs openssl && \
     microdnf clean all
 
 RUN [ -d /run/lock ] || mkdir /run/lock
