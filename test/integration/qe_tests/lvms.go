@@ -1281,15 +1281,19 @@ var _ = g.Describe("[sig-storage] STORAGE", func() {
 		expectedStorageCapacity := sizePercent * (pathsDiskTotalSize + optionalPathsDiskTotalSize) / 100
 		logf("EXPECTED USABLE STORAGE CAPACITY: %d Gi\n", expectedStorageCapacity)
 
-		currentLvmStorageCapacity := getCurrentTotalLvmStorageCapacityByStorageClass("lvms-vg1")
-		actualStorageCapacity := (currentLvmStorageCapacity / ratio) / 1024 // Get size in Gi
-		logf("ACTUAL USABLE STORAGE CAPACITY: %d Gi\n", actualStorageCapacity)
+		// LVMCluster readiness does not wait for the periodically refreshed CSI capacity.
+		o.Eventually(func() int {
+			currentLvmStorageCapacity := getCurrentTotalLvmStorageCapacityByStorageClass("lvms-vg1")
+			actualStorageCapacity := (currentLvmStorageCapacity / ratio) / 1024 // Get size in Gi
+			logf("ACTUAL USABLE STORAGE CAPACITY: %d Gi\n", actualStorageCapacity)
 
-		storageDiff := expectedStorageCapacity - actualStorageCapacity
-		if storageDiff < 0 {
-			storageDiff = -storageDiff
-		}
-		o.Expect(storageDiff < 2).To(o.BeTrue()) // there is always a difference of 1 Gi between backend disk size and usable size
+			storageDiff := expectedStorageCapacity - actualStorageCapacity
+			if storageDiff < 0 {
+				storageDiff = -storageDiff
+			}
+			return storageDiff
+		}, 180*time.Second, 10*time.Second).Should(o.BeNumerically("<", 2),
+			"CSI storage capacity should converge to within 2 Gi of backend usable capacity %d Gi", expectedStorageCapacity)
 
 		g.By("Create a pvc with the pre-set lvms csi storageclass")
 		storageClassName := "lvms-" + deviceClassName
