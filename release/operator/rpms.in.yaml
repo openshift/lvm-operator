@@ -59,6 +59,7 @@ packages:
   - xfsprogs
   - e2fsprogs
   - glibc
+  - openssl
 
 arches:
   - aarch64
