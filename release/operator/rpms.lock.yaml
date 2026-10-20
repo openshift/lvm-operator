@@ -221,6 +221,13 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/o/openssl-1.1.1k-17.el8_6.aarch64.rpm
+    repoid: rhel-8-for-aarch64-baseos-rpms
+    size: 708360
+    checksum: sha256:6fd4b1b3a54158d8eff4fd6965aa4741286688dc3cd2517cd3cd485bef44de95
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
+    sourcerpm: openssl-1.1.1k-17.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/p/pam-1.3.1-40.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 761196
@@ -384,6 +391,12 @@ arches:
     checksum: sha256:350e26dbc6f830fdb3548319013264cb2049858907c093a90b84a5945f6a4835
     name: lvm2
     evr: 8:2.03.14-15.el8_10.3
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/source/SRPMS/Packages/o/openssl-1.1.1k-17.el8_6.src.rpm
+    repoid: rhel-8-for-aarch64-baseos-source-rpms
+    size: 7754886
+    checksum: sha256:a7c7c944978492dd300bf769d4d46499f0fe56eb3388c13b2b6e63615d406bca
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/source/SRPMS/Packages/p/pam-1.3.1-40.el8_10.src.rpm
     repoid: rhel-8-for-aarch64-baseos-source-rpms
     size: 1188367
@@ -641,6 +654,13 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/o/openssl-1.1.1k-17.el8_6.ppc64le.rpm
+    repoid: rhel-8-for-ppc64le-baseos-rpms
+    size: 731540
+    checksum: sha256:7fbd2d669c333e4d0922f8c604bebe88887723265dcfb7b59bfb29d3d6164128
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
+    sourcerpm: openssl-1.1.1k-17.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/p/pam-1.3.1-40.el8_10.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
     size: 814252
@@ -810,6 +830,12 @@ arches:
     checksum: sha256:350e26dbc6f830fdb3548319013264cb2049858907c093a90b84a5945f6a4835
     name: lvm2
     evr: 8:2.03.14-15.el8_10.3
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/source/SRPMS/Packages/o/openssl-1.1.1k-17.el8_6.src.rpm
+    repoid: rhel-8-for-ppc64le-baseos-source-rpms
+    size: 7754886
+    checksum: sha256:a7c7c944978492dd300bf769d4d46499f0fe56eb3388c13b2b6e63615d406bca
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/source/SRPMS/Packages/p/pam-1.3.1-40.el8_10.src.rpm
     repoid: rhel-8-for-ppc64le-baseos-source-rpms
     size: 1188367
@@ -1060,6 +1086,13 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/o/openssl-1.1.1k-17.el8_6.s390x.rpm
+    repoid: rhel-8-for-s390x-baseos-rpms
+    size: 714556
+    checksum: sha256:c5565bd7dfc7d07d2f5902a22f27543a4ce831046aee22d62859b07048a30336
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
+    sourcerpm: openssl-1.1.1k-17.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/p/pam-1.3.1-40.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 745868
@@ -1223,6 +1256,12 @@ arches:
     checksum: sha256:350e26dbc6f830fdb3548319013264cb2049858907c093a90b84a5945f6a4835
     name: lvm2
     evr: 8:2.03.14-15.el8_10.3
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/source/SRPMS/Packages/o/openssl-1.1.1k-17.el8_6.src.rpm
+    repoid: rhel-8-for-s390x-baseos-source-rpms
+    size: 7754886
+    checksum: sha256:a7c7c944978492dd300bf769d4d46499f0fe56eb3388c13b2b6e63615d406bca
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/source/SRPMS/Packages/p/pam-1.3.1-40.el8_10.src.rpm
     repoid: rhel-8-for-s390x-baseos-source-rpms
     size: 1188367
@@ -1473,6 +1512,13 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/o/openssl-1.1.1k-17.el8_6.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 727856
+    checksum: sha256:d2e8518509c5900095c9811c7663a614b9ef44648e24e61dde954ca07328ad27
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
+    sourcerpm: openssl-1.1.1k-17.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/p/pam-1.3.1-40.el8_10.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
     size: 767072
@@ -1636,6 +1682,12 @@ arches:
     checksum: sha256:350e26dbc6f830fdb3548319013264cb2049858907c093a90b84a5945f6a4835
     name: lvm2
     evr: 8:2.03.14-15.el8_10.3
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/source/SRPMS/Packages/o/openssl-1.1.1k-17.el8_6.src.rpm
+    repoid: rhel-8-for-x86_64-baseos-source-rpms
+    size: 7754886
+    checksum: sha256:a7c7c944978492dd300bf769d4d46499f0fe56eb3388c13b2b6e63615d406bca
+    name: openssl
+    evr: 1:1.1.1k-17.el8_6
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/source/SRPMS/Packages/p/pam-1.3.1-40.el8_10.src.rpm
     repoid: rhel-8-for-x86_64-baseos-source-rpms
     size: 1188367
