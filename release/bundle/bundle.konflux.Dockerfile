@@ -19,7 +19,7 @@ ARG CSI_PROVISIONER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-provisi
 # 4.14+ which uses the unsuffixed registry.redhat.io/openshift4/ose-csi-external-snapshotter.
 ARG CSI_SNAPSHOTTER_IMAGE=registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8@sha256:40cfc78da681f31e0b3b7769f0a27a15dab50a4b8d888acff2bdd10b345e71a1
 
-ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:3f2804bc2af437ff1f06c214b48a1a780dfcfab995650d901c03270057eb9f3c
+ARG RBAC_PROXY_IMAGE=registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:6ba961c2c2a29750c0132fe6dd6fa9f6001010afbc5f19b98add87b31b54bcf6
 
 ARG OPERATOR_VERSION
 
