@@ -48,7 +48,6 @@ fi
 
 oc=(oc --kubeconfig ./konflux-config --namespace "${KONFLUX_PROJECT}")
 "${oc[@]}" login --token="${KONFLUX_SA_TOKEN}" --server="${KONFLUX_SERVER}" > /dev/null
-"${oc[@]}" project "${KONFLUX_PROJECT}"
 
 can_create=$("${oc[@]}" auth can-i create releases)
 if [[ "${can_create}" != "yes" ]]; then
