@@ -495,6 +495,27 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring("must be an absolute path to the device"))
 	})
 
+	It("accepts regex device paths in both selector lists", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths:         []DevicePath{"regex:/dev/sd[a-z]+"},
+			OptionalPaths: []DevicePath{"regex:^/dev/nvme[0-9]+n[0-9]+$"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	It("rejects an invalid regex optional device path", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			OptionalPaths: []DevicePath{"regex:/dev/["},
+		}
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		Expect(err.Error()).To(ContainSubstring("invalid regex pattern"))
+	})
+
 	It("device selector with overlapping devices in paths is forbidden", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{

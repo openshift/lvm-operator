@@ -66,6 +66,7 @@ spec:
                   optionalPaths:
                     description: |-
                       OptionalPaths is a list of device paths. At least one path must resolve on each node.
+                      Prefix a path with regex: to match kernel device names on each node instead.
                       Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
                       /dev/sda, which may be renamed or reordered by the kernel on reboot.
                       This can be used to provide a single list of disk IDs across multiple nodes.
@@ -74,7 +75,8 @@ spec:
                     type: array
                   paths:
                     description: |-
-                      Paths is a list of device paths. All paths must resolve on each node.
+                      Paths is a list of device paths. All literal paths must resolve on each node.
+                      Prefix a path with regex: to match kernel device names on each node instead.
                       Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
                       /dev/sda, which may be renamed or reordered by the kernel on reboot.
                     items:

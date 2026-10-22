@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
@@ -433,19 +434,36 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
-					return fmt.Errorf("path %s must be an absolute path to the device", path.Unresolved())
+				if err := verifyDevicePath(path, "path"); err != nil {
+					return err
 				}
 			}
 
 			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
-					return fmt.Errorf("optional path %s must be an absolute path to the device", path.Unresolved())
+				if err := verifyDevicePath(path, "optional path"); err != nil {
+					return err
 				}
 			}
 		}
 	}
 
+	return nil
+}
+
+func verifyDevicePath(path DevicePath, pathKind string) error {
+	if !path.IsRegex() {
+		if !strings.HasPrefix(path.Unresolved(), "/dev/") {
+			return fmt.Errorf("%s %s must be an absolute path to the device", pathKind, path.Unresolved())
+		}
+		return nil
+	}
+
+	if !strings.HasPrefix(strings.TrimPrefix(path.Pattern(), "^"), "/dev/") {
+		return fmt.Errorf("%s %s must be an absolute path to the device", pathKind, path.Unresolved())
+	}
+	if _, err := regexp.Compile(path.Pattern()); err != nil {
+		return fmt.Errorf("%s %s has an invalid regex pattern: %w", pathKind, path.Unresolved(), err)
+	}
 	return nil
 }
 
@@ -477,6 +495,9 @@ func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 
 		// Required paths
 		for _, path := range deviceClass.DeviceSelector.Paths {
+			if path.IsRegex() {
+				continue
+			}
 			if val, ok := devices[nodeSelector][path]; ok {
 				if val != deviceClass.Name {
 					return fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
@@ -493,6 +514,9 @@ func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 
 		// Optional paths
 		for _, path := range deviceClass.DeviceSelector.OptionalPaths {
+			if path.IsRegex() {
+				continue
+			}
 			if val, ok := devices[nodeSelector][path]; ok {
 				if val != deviceClass.Name {
 					return fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)

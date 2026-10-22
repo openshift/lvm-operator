@@ -150,6 +150,36 @@ func TestPartOfDeviceSelector(t *testing.T) {
 			}},
 			assertErr: assert.NoError,
 		},
+		{label: "match required regex", device: lsblk.BlockDevice{KName: "/dev/sda"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				Paths: []lvmv1alpha1.DevicePath{"regex:/dev/sd[a-z]+"},
+			}},
+			assertErr: assert.NoError,
+		},
+		{label: "match optional anchored regex", device: lsblk.BlockDevice{KName: "/dev/nvme0n1"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				OptionalPaths: []lvmv1alpha1.DevicePath{"regex:^/dev/nvme[0-9]+n[0-9]+$"},
+			}},
+			assertErr: assert.NoError,
+		},
+		{label: "regex requires full match", device: lsblk.BlockDevice{KName: "/dev/sda1"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				Paths: []lvmv1alpha1.DevicePath{"regex:/dev/sda"},
+			}},
+			assertErr: assert.Error,
+		},
+		{label: "regex alternation requires full match", device: lsblk.BlockDevice{KName: "/dev/nvme0n1extra"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				Paths: []lvmv1alpha1.DevicePath{"regex:/dev/sda|/dev/nvme0n1"},
+			}},
+			assertErr: assert.Error,
+		},
+		{label: "invalid regex is skipped", device: lsblk.BlockDevice{KName: "/dev/sda"},
+			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
+				OptionalPaths: []lvmv1alpha1.DevicePath{"regex:/dev/[", "/dev/sda"},
+			}},
+			assertErr: assert.NoError,
+		},
 		{label: "no match", device: lsblk.BlockDevice{KName: "dev1"},
 			volumeGroupSpec: &lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{
 				Paths: []lvmv1alpha1.DevicePath{"dev2"},
@@ -173,6 +203,16 @@ func TestPartOfDeviceSelector(t *testing.T) {
 		})
 	}
 
+}
+
+func TestPartOfDeviceSelectorRegexDoesNotResolve(t *testing.T) {
+	volumeGroup := &lvmv1alpha1.LVMVolumeGroup{}
+	volumeGroup.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"regex:/dev/sd[a-z]+"}}
+	resolver := symlinkResolver.NewWithResolver(func(path string) (string, error) {
+		t.Errorf("resolver called for regex path %q", path)
+		return "", nil
+	})
+	assert.NoError(t, DefaultFilters(context.Background(), &Options{VG: volumeGroup})[partOfDeviceSelector](lsblk.BlockDevice{KName: "/dev/sda"}, resolver))
 }
 
 func TestOnlyValidFilesystemSignatures(t *testing.T) {

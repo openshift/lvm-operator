@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -292,13 +294,15 @@ type DeviceSelector struct {
 	// +optional
 	// MinSize *resource.Quantity `json:"minSize,omitempty"`
 
-	// Paths is a list of device paths. All paths must resolve on each node.
+	// Paths is a list of device paths. All literal paths must resolve on each node.
+	// Prefix a path with regex: to match kernel device names on each node instead.
 	// Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
 	// /dev/sda, which may be renamed or reordered by the kernel on reboot.
 	// +optional
 	Paths []DevicePath `json:"paths,omitempty"`
 
 	// OptionalPaths is a list of device paths. At least one path must resolve on each node.
+	// Prefix a path with regex: to match kernel device names on each node instead.
 	// Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
 	// /dev/sda, which may be renamed or reordered by the kernel on reboot.
 	// This can be used to provide a single list of disk IDs across multiple nodes.
@@ -314,8 +318,18 @@ type DeviceSelector struct {
 
 type DevicePath string
 
+const RegexPrefix = "regex:"
+
 func (d DevicePath) Unresolved() string {
 	return string(d)
+}
+
+func (d DevicePath) IsRegex() bool {
+	return strings.HasPrefix(string(d), RegexPrefix)
+}
+
+func (d DevicePath) Pattern() string {
+	return strings.TrimPrefix(string(d), RegexPrefix)
 }
 
 type LVMStateType string

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
@@ -83,6 +84,39 @@ type FilteredBlockDevices struct {
 // checking if the excluded device has been filtered due to filter.ErrDeviceAlreadySetupCorrectly.
 func VerifyMandatoryDevicePaths(f FilteredBlockDevices, resolver *symlinkResolver.Resolver, paths []v1alpha1.DevicePath) error {
 	for _, path := range paths {
+		if path.IsRegex() {
+			expression, err := regexp.Compile("^(?:" + path.Pattern() + ")$")
+			if err != nil {
+				return fmt.Errorf("invalid mandatory device path regex %q: %w", path, err)
+			}
+			matched := false
+			for _, device := range f.Available {
+				if expression.MatchString(device.KName) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				for _, device := range f.Excluded {
+					if !expression.MatchString(device.KName) {
+						continue
+					}
+					for _, filterErr := range device.FilterErrors {
+						if errors.Is(filterErr, filter.ErrDeviceAlreadySetupCorrectly) {
+							matched = true
+							break
+						}
+					}
+					if matched {
+						break
+					}
+				}
+			}
+			if !matched {
+				return fmt.Errorf("mandatory device path %q does not match any available or already setup device", path)
+			}
+			continue
+		}
 		path, err := resolver.Resolve(path.Unresolved())
 		if err != nil {
 			return fmt.Errorf("failed to resolve symlink to determine available or setup path: %w", err)

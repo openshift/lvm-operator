@@ -43,6 +43,12 @@ func TestWipeDevices(t *testing.T) {
 			removeReferenceCount: 0,
 		},
 		{
+			name:                "Regex paths are not resolved or wiped",
+			devicePaths:         []v1alpha1.DevicePath{"regex:/dev/sd[a-z]+"},
+			optionalDevicePaths: []v1alpha1.DevicePath{"regex:/dev/nvme.*"},
+			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/nvme0n1"}},
+		},
+		{
 			name:                 "There is no path specified",
 			blockDevices:         []lsblk.BlockDevice{{KName: "/dev/sda"}, {KName: "/dev/sdb"}, {KName: "/dev/loop1"}},
 			wipeCount:            0,
@@ -167,10 +173,15 @@ func TestWipeDevices(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := log.IntoContext(context.Background(), testr.New(t))
 			r := &Reconciler{
-				NodeName:         "test",
-				Wipefs:           mockWipefs,
-				Dmsetup:          mockDmsetup,
-				SymlinkResolveFn: func(path string) (string, error) { return path, nil },
+				NodeName: "test",
+				Wipefs:   mockWipefs,
+				Dmsetup:  mockDmsetup,
+				SymlinkResolveFn: func(path string) (string, error) {
+					if v1alpha1.DevicePath(path).IsRegex() {
+						t.Errorf("resolver called for regex path %q", path)
+					}
+					return path, nil
+				},
 			}
 			if tt.wipeCount > 0 {
 				mockWipefs.EXPECT().Wipe(ctx, mock.Anything).Return(nil).Times(tt.wipeCount)

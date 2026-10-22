@@ -31,6 +31,9 @@ func (r *Reconciler) wipeDevices(
 	updated := false
 
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+		if path.IsRegex() {
+			continue
+		}
 		pathResolved, err := resolver.Resolve(path.Unresolved())
 		if err != nil {
 			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
@@ -43,6 +46,9 @@ func (r *Reconciler) wipeDevices(
 		}
 	}
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+		if path.IsRegex() {
+			continue
+		}
 		pathResolved, err := resolver.Resolve(path.Unresolved())
 		if err != nil {
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))

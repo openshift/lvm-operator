@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -92,6 +93,17 @@ func DefaultFilters(ctx context.Context, opts *Options) Filters {
 				opts.VG.Spec.DeviceSelector.Paths,
 				opts.VG.Spec.DeviceSelector.OptionalPaths...,
 			) {
+				if path.IsRegex() {
+					matched, err := regexp.MatchString("^(?:"+path.Pattern()+")$", dev.KName)
+					if err != nil {
+						logger.Error(err, "invalid regex device path", "path", path)
+						continue
+					}
+					if matched {
+						return nil
+					}
+					continue
+				}
 				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
 				if resolved, err := resolver.Resolve(path.Unresolved()); resolved == dev.KName {
 					return nil

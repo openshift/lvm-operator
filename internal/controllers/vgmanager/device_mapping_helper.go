@@ -38,6 +38,9 @@ func buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVo
 
 	// Process required paths
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
+		if path.IsRegex() {
+			continue
+		}
 		originalPath := path.Unresolved()
 		resolved, err := resolver.Resolve(originalPath)
 		if err != nil {
@@ -49,6 +52,9 @@ func buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVo
 
 	// Process optional paths
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
+		if path.IsRegex() {
+			continue
+		}
 		originalPath := path.Unresolved()
 		resolved, err := resolver.Resolve(originalPath)
 		if err != nil {
