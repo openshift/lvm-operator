@@ -60,6 +60,37 @@ var _ = Describe("webhook acceptance tests", func() {
 		return resource
 	}
 
+	It("accepts glob selectors on creation and narrowing on update", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{
+			Paths:         []DevicePath{"glob:/dev/sd[b-d]"},
+			OptionalPaths: []DevicePath{"glob:/dev/nvme[1-3]n1"},
+		}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []DevicePath{"glob:/dev/sdb"}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = nil
+		Expect(k8sClient.Update(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	})
+
+	DescribeTable("rejects invalid glob selectors on create and update", func(ctx SpecContext, optional bool) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		selector := &DeviceSelector{Paths: []DevicePath{"/dev/sdb"}}
+		if optional {
+			selector.OptionalPaths = []DevicePath{"glob:/dev/["}
+		} else {
+			selector.Paths = []DevicePath{"glob:/dev/["}
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = selector
+		Expect(k8sClient.Create(ctx, resource)).To(MatchError(ContainSubstring("invalid device path pattern")))
+
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{"/dev/sdb"}}
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = selector
+		Expect(k8sClient.Update(ctx, resource)).To(MatchError(ContainSubstring("invalid device path pattern")))
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	}, Entry("required paths", false), Entry("optional paths", true))
+
 	It("minimum viable create", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())

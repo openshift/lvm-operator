@@ -20,6 +20,7 @@ Format: [MADR 4.0](https://adr.github.io/madr/) short template. See [adr-templat
 | [0010](0010-server-side-apply-for-storageclassoptions.md) | Server-side apply for StorageClassOptions | Accepted | 2026-03-03 |
 | [0011](0011-deletion-gates-pvc-pv-policy.md) | Deletion gates: PVC and PV policy checks | Accepted | 2026-03-03 |
 | [0012](0012-cel-vs-webhook-validation.md) | CEL XValidation vs webhook for validation | Accepted | 2026-06-09 |
+| [0013](0013-glob-device-selectors.md) | Glob patterns, not regular expressions, for device selectors | Accepted | 2026-10-22 |
 
 ## Adding a New ADR
 
