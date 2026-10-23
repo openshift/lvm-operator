@@ -82,6 +82,7 @@ const (
 	EventReasonLVMDConfigUpdated                 EventReasonInfo  = "LVMDConfigUpdated"
 	EventReasonLVMDConfigDeleted                 EventReasonInfo  = "LVMDConfigDeleted"
 	EventReasonVolumeGroupReady                  EventReasonInfo  = "VolumeGroupReady"
+	EventReasonDeviceAdded                       EventReasonInfo  = "DeviceAdded"
 	EventReasonDeviceRemoved                     EventReasonInfo  = "DeviceRemoved"
 	EventReasonErrorManualCleanupRequired        EventReasonError = "ManualCleanupRequired"
 )
@@ -182,6 +183,16 @@ func (r *Reconciler) reconcile(
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
+
+	// LVMVolumeGroups can be created by hand, bypassing the LVMCluster webhook.
+	// Reject unusable selectors here, before anything destructive runs.
+	if err := validateDeviceSelector(&volumeGroup.Spec); err != nil {
+		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
+		if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
+			logger.Error(statusErr, "failed to set status to failed")
+		}
+		return ctrl.Result{}, err
+	}
 
 	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, resolver); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
@@ -348,6 +359,17 @@ func (r *Reconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	// A pattern absorbs devices unattended on every reconcile, so record which ones.
+	// Devices already in the volume group are filtered out as available, so this is
+	// always a genuine addition and the counterpart to EventReasonDeviceRemoved.
+	addedDevices := make([]string, len(devices.Available))
+	for i := range devices.Available {
+		addedDevices[i] = devices.Available[i].KName
+	}
+	addedMsg := fmt.Sprintf("successfully added %s device(s) to volume group", addedDevices)
+	logger.Info(addedMsg)
+	r.NormalEvent(ctx, volumeGroup, EventReasonDeviceAdded, addedMsg)
+
 	// Create thin pool
 	if volumeGroup.Spec.ThinPoolConfig != nil {
 		if err = r.addThinPoolToVG(ctx, volumeGroup.Name, volumeGroup.Spec.ThinPoolConfig); err != nil {
@@ -396,6 +418,11 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 	// since disk failures are node-side events with no Kubernetes object change.
 	if volumeGroup.Spec.RAIDConfig != nil {
 		return ctrl.Result{RequeueAfter: raidReconcileInterval}
+	}
+
+	// A pattern selects devices that can appear later, so refresh its matches periodically.
+	if volumeGroup.Spec.DeviceSelector.HasGlobPaths() {
+		return reconcileAgain
 	}
 
 	// With explicit paths, no periodic requeue is needed — the paths define
@@ -833,7 +860,23 @@ func (r *Reconciler) deleteRemovedDevices(
 		return false, err
 	}
 
-	userProvidedMappings, err := buildDevicePathMappings(ctx, volumeGroup, resolver)
+	// Patterns match kernel names, so a PV that LVM reports under a mapper alias has to be
+	// resolved before a pattern can see it. A PV that a pattern already matches as-is does
+	// not: resolving can only add matches, never take one away. Fail closed when a lookup
+	// does fail — without the kernel name we cannot tell whether the PV is still selected,
+	// and guessing means reducing a live device out of the volume group.
+	var knames []string
+	if globs := globPaths(volumeGroup.Spec.DeviceSelector); len(globs) > 0 {
+		for _, pv := range currentVG.PVs {
+			kname, err := resolveForGlobMatching(pv.PvName, globs, resolver)
+			if err != nil {
+				return false, err
+			}
+			knames = append(knames, kname)
+		}
+	}
+	candidates := knownDevices(knames)
+	userProvidedMappings, err := buildDevicePathMappings(ctx, volumeGroup, resolver, candidates)
 	if err != nil {
 		return false, err
 	}

@@ -96,11 +96,16 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
-	if hasExplicitDevicePaths(vg) {
-		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
-	} else if vg.Spec.DeviceDiscoveryPolicy == nil || *vg.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicyDynamic {
+	switch {
+	// A pattern keeps matching new devices on every reconcile, so the device set is not
+	// preconfigured even though explicit paths are present.
+	case vg.Spec.DeviceSelector.HasGlobPaths():
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
-	} else {
+	case hasExplicitDevicePaths(vg):
+		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
+	case vg.Spec.DeviceDiscoveryPolicy == nil || *vg.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicyDynamic:
+		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
+	default:
 		// Default is RuntimeStatic
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeStatic
 	}

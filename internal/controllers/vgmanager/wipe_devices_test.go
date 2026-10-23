@@ -35,6 +35,35 @@ func TestWipeDevices(t *testing.T) {
 		wipedBefore          bool
 	}{
 		{
+			name:                "Glob deduplicates overlapping selectors (webhook rejects these, hand-made LVMVolumeGroups do not)",
+			devicePaths:         []v1alpha1.DevicePath{"glob:/dev/loop[12]", "/dev/loop1"},
+			optionalDevicePaths: []v1alpha1.DevicePath{"glob:/dev/loop[12]", "glob:/dev/missing*"},
+			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/loop1"}, {KName: "/dev/sda", Children: []lsblk.BlockDevice{{KName: "/dev/loop2"}}}, {KName: "/dev/loop12"}},
+			wipeCount:           2,
+		},
+		{
+			// Wiping a disk takes its partitions with it, so only the disk is wiped.
+			name:        "Glob wipes the parent disk, not its partitions",
+			devicePaths: []v1alpha1.DevicePath{"glob:/dev/nvme2*"},
+			blockDevices: []lsblk.BlockDevice{{KName: "/dev/nvme2n1", Children: []lsblk.BlockDevice{
+				{KName: "/dev/nvme2n1p1", Type: "part"},
+				{KName: "/dev/nvme2n1p2", Type: "part"},
+			}}},
+			wipeCount: 1,
+		},
+		{
+			name:         "Glob does not bypass existing wipe marker",
+			devicePaths:  []v1alpha1.DevicePath{"glob:/dev/loop[12]"},
+			blockDevices: []lsblk.BlockDevice{{KName: "/dev/loop1"}, {KName: "/dev/loop2"}},
+			wipedBefore:  true,
+		},
+		{
+			name:                "Glob does not bypass disabled force wipe",
+			devicePaths:         []v1alpha1.DevicePath{"glob:/dev/loop[12]"},
+			blockDevices:        []lsblk.BlockDevice{{KName: "/dev/loop1"}},
+			forceWipeNotEnabled: true,
+		},
+		{
 			name:                 "Force wipe feature is not enabled",
 			forceWipeNotEnabled:  true,
 			devicePaths:          []v1alpha1.DevicePath{"/dev/loop1"},
@@ -201,4 +230,39 @@ func TestWipeDevices(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestWipeRejectsInvalidGlobBeforeChangingDevices(t *testing.T) {
+	ctx := context.Background()
+	for _, optional := range []bool{false, true} {
+		selector := &v1alpha1.DeviceSelector{ForceWipeDevicesAndDestroyAllData: ptr.To(true), Paths: []v1alpha1.DevicePath{"/dev/loop1"}}
+		if optional {
+			selector.OptionalPaths = []v1alpha1.DevicePath{"glob:/dev/["}
+		} else {
+			selector.Paths = append(selector.Paths, "glob:/dev/[")
+		}
+		r := &Reconciler{Wipefs: wipefsmocks.NewMockWipefs(t)}
+		vg := &v1alpha1.LVMVolumeGroup{Spec: v1alpha1.LVMVolumeGroupSpec{DeviceSelector: selector}}
+		updated, err := r.wipeDevices(ctx, vg, []lsblk.BlockDevice{{KName: "/dev/loop1"}}, symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
+		assert.ErrorContains(t, err, "invalid device path pattern")
+		assert.False(t, updated)
+		assert.Empty(t, vg.Annotations)
+	}
+}
+
+// A required pattern that matches nothing yet (device not enumerated) must be caught
+// before the first wipefs call. Aborting midway would leave the devices wiped but the
+// per-node annotation unwritten, so the next reconcile would wipe them all over again.
+func TestWipeResolvesEverySelectorBeforeWiping(t *testing.T) {
+	ctx := context.Background()
+	r := &Reconciler{Wipefs: wipefsmocks.NewMockWipefs(t)}
+	vg := &v1alpha1.LVMVolumeGroup{Spec: v1alpha1.LVMVolumeGroupSpec{DeviceSelector: &v1alpha1.DeviceSelector{
+		ForceWipeDevicesAndDestroyAllData: ptr.To(true),
+		Paths:                             []v1alpha1.DevicePath{"glob:/dev/loop1", "glob:/dev/nvme0*"},
+	}}}
+	updated, err := r.wipeDevices(ctx, vg, []lsblk.BlockDevice{{KName: "/dev/loop1"}},
+		symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil }))
+	assert.ErrorContains(t, err, "did not match any")
+	assert.False(t, updated)
+	assert.Empty(t, vg.Annotations)
 }

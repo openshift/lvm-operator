@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
+	"github.com/openshift/lvm-operator/v4/internal/nodeselector"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -74,6 +75,10 @@ var (
 	ErrRAIDStripeSizeNotPowerOf2                             = errors.New("stripeSize must be a power of 2 (e.g., 64Ki, 128Ki, 256Ki, 512Ki)")
 	ErrRAIDConfigCannotBeChanged                             = errors.New("raidConfig cannot be changed")
 	ErrRAIDConfigNotSet                                      = errors.New("RAIDConfig is not set for the DeviceClass")
+	// RAID needs an exact device count, which a pattern cannot supply at admission, and
+	// RAID geometry is fixed at lvcreate time, so devices discovered later cannot join the
+	// array anyway. List the devices explicitly instead.
+	ErrRAIDGlobPathsUnsupported = errors.New("glob: device paths are not supported with raidConfig, list the devices explicitly")
 )
 
 //+kubebuilder:webhook:path=/mutate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create,versions=v1alpha1,name=mlvmcluster.kb.io,admissionReviewVersions=v1
@@ -167,6 +172,8 @@ func (v *lvmClusterValidator) ValidateCreate(ctx context.Context, l *LVMCluster)
 	discoveryPolicyWarnings := v.verifyDeviceDiscoveryPolicy(l)
 	warnings = append(warnings, discoveryPolicyWarnings...)
 
+	warnings = append(warnings, v.verifyGlobForceWipe(l)...)
+
 	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
 	warnings = append(warnings, scOptionWarnings...)
 	if err != nil {
@@ -212,6 +219,10 @@ func (v *lvmClusterValidator) ValidateUpdate(_ context.Context, oldLVMCluster, l
 	if err != nil {
 		return warnings, err
 	}
+
+	// Also on update: a broadened pattern is wiped on any node that joins later, because
+	// the already-wiped marker is written per node.
+	warnings = append(warnings, v.verifyGlobForceWipe(l)...)
 
 	scOptionWarnings, err := v.validateAdditionalParamsAndLabels(l)
 	warnings = append(warnings, scOptionWarnings...)
@@ -433,14 +444,20 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
+				if !strings.HasPrefix(path.Pattern(), "/dev/") {
 					return fmt.Errorf("path %s must be an absolute path to the device", path.Unresolved())
+				}
+				if err := path.Validate(); err != nil {
+					return err
 				}
 			}
 
 			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
+				if !strings.HasPrefix(path.Pattern(), "/dev/") {
 					return fmt.Errorf("optional path %s must be an absolute path to the device", path.Unresolved())
+				}
+				if err := path.Validate(); err != nil {
+					return err
 				}
 			}
 		}
@@ -449,62 +466,79 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	return nil
 }
 
+// deviceSelectorEntry is one device path together with where it was declared.
+type deviceSelectorEntry struct {
+	path         DevicePath
+	deviceClass  string
+	nodeSelector *corev1.NodeSelector
+	optional     bool
+}
+
+// canShareNode reports whether two device classes can both land on one node. Two literal
+// paths keep the weaker rule they had before patterns existed — compared only under a
+// textually identical node selector — so that clusters accepted by earlier releases stay
+// updatable. Role labels use Exists, which CanIntersect rightly refuses to treat as proof
+// of disjointness, and applying that to literals would reject configurations that have
+// worked for months and block every later edit to them.
+func canShareNode(first, second deviceSelectorEntry) bool {
+	if !first.path.IsGlob() && !second.path.IsGlob() {
+		return first.nodeSelector.String() == second.nodeSelector.String()
+	}
+	return nodeselector.CanIntersect(first.nodeSelector, second.nodeSelector)
+}
+
+// verifyNoDeviceOverlap rejects selectors that can claim the same device, whether they
+// are literal paths, patterns, or a mix. Two device classes claiming one disk means the
+// loser's volume group fails for as long as the overlap lasts; two entries in a single
+// class claiming it is a configuration mistake worth surfacing early.
+//
+// Device classes that can never share a node cannot conflict, so an overlapping pair is
+// forgiven only when canShareNode says the two can never meet.
 func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
-
-	// make sure no device overlap with another VGs
-	// use map to find the duplicate entries for paths
-	/*
-		{
-		  "nodeSelector1": {
-		        "/dev/sda": "vg1",
-		        "/dev/sdb": "vg1"
-		    },
-		    "nodeSelector2": {
-		        "/dev/sda": "vg1",
-		        "/dev/sdb": "vg1"
-		    }
-		}
-	*/
-	devices := make(map[string]map[DevicePath]string)
-
+	var entries []deviceSelectorEntry
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
-
 		if deviceClass.DeviceSelector == nil {
 			continue
 		}
-
-		nodeSelector := deviceClass.NodeSelector.String()
-
-		// Required paths
 		for _, path := range deviceClass.DeviceSelector.Paths {
-			if val, ok := devices[nodeSelector][path]; ok {
-				if val != deviceClass.Name {
-					return fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
-				}
-				return fmt.Errorf("error: device path %s is specified at multiple places in deviceClass %s", path, val)
-			}
-
-			if devices[nodeSelector] == nil {
-				devices[nodeSelector] = make(map[DevicePath]string)
-			}
-
-			devices[nodeSelector][path] = deviceClass.Name
+			entries = append(entries, deviceSelectorEntry{
+				path: path, deviceClass: deviceClass.Name, nodeSelector: deviceClass.NodeSelector,
+			})
 		}
-
-		// Optional paths
 		for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-			if val, ok := devices[nodeSelector][path]; ok {
-				if val != deviceClass.Name {
-					return fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
-				}
-				return fmt.Errorf("error: optional device path %s is specified at multiple places in deviceClass %s", path, val)
-			}
+			entries = append(entries, deviceSelectorEntry{
+				path: path, deviceClass: deviceClass.Name, nodeSelector: deviceClass.NodeSelector, optional: true,
+			})
+		}
+	}
 
-			if devices[nodeSelector] == nil {
-				devices[nodeSelector] = make(map[DevicePath]string)
+	// A device class holds a handful of paths, so comparing every pair costs less than
+	// building an index, and it is the only way to catch pattern against pattern. Ask
+	// about the paths before the nodes: almost no pair of paths overlaps, while almost
+	// any pair of node selectors can intersect, so the node question is only worth
+	// asking for the few pairs that actually collide.
+	for i, first := range entries {
+		for _, second := range entries[i+1:] {
+			overlaps, err := first.path.Overlaps(second.path)
+			if err != nil {
+				return err
 			}
-
-			devices[nodeSelector][path] = deviceClass.Name
+			if !overlaps {
+				continue
+			}
+			if first.deviceClass != second.deviceClass && !canShareNode(first, second) {
+				continue
+			}
+			kind := "device path"
+			if second.optional {
+				kind = "optional device path"
+			}
+			if first.deviceClass != second.deviceClass {
+				return fmt.Errorf("error: %s %s overlaps in two different deviceClasss %s and %s",
+					kind, second.path, first.deviceClass, second.deviceClass)
+			}
+			return fmt.Errorf("error: %s %s is specified at multiple places in deviceClass %s",
+				kind, second.path, first.deviceClass)
 		}
 	}
 
@@ -626,6 +660,33 @@ func (v *lvmClusterValidator) verifyDeviceDiscoveryPolicy(l *LVMCluster) admissi
 	return warnings
 }
 
+// verifyGlobForceWipe warns when a pattern is combined with force wiping. A literal path
+// names the same device on every node, so an administrator who checked it has checked it
+// everywhere; a pattern is resolved separately per node and can match a different set on
+// each one. wipefs also runs before any safety filter, so nothing downstream can save a
+// device the pattern picked up by accident. Warning rather than rejection: the devices
+// are the administrator's to destroy, they just cannot preview this one from the CR.
+func (v *lvmClusterValidator) verifyGlobForceWipe(l *LVMCluster) admission.Warnings {
+	var warnings admission.Warnings
+	for _, dc := range l.Spec.Storage.DeviceClasses {
+		if dc.DeviceSelector == nil || !dc.DeviceSelector.HasGlobPaths() {
+			continue
+		}
+		if forceWipe := dc.DeviceSelector.ForceWipeDevicesAndDestroyAllData; forceWipe == nil || !*forceWipe {
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf(
+			"DANGER: device class %q combines a glob: pattern with forceWipeDevicesAndDestroyAllData. "+
+				"The pattern is resolved separately on every selected node and wipefs runs before any "+
+				"safety filter, so EVERY matching device on EVERY selected node will be destroyed, "+
+				"including whole disks that are not named in this resource and devices that differ "+
+				"between nodes. Run \"ls <pattern>\" on each selected node and confirm the output "+
+				"before applying.",
+			dc.Name))
+	}
+	return warnings
+}
+
 // lvmsOwnedParameterKeys are StorageClass parameter keys managed by LVMS that cannot be set via additionalParameters.
 var lvmsOwnedParameterKeys = map[string]struct{}{
 	constants.DeviceClassKey: {},
@@ -708,6 +769,10 @@ func (v *lvmClusterValidator) verifyRAIDConfig(l *LVMCluster) error {
 			(len(dc.DeviceSelector.Paths) > 0 || len(dc.DeviceSelector.OptionalPaths) > 0)
 		if !hasDevices {
 			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDDeviceSelectorRequired)
+		}
+
+		if dc.DeviceSelector.HasGlobPaths() {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDGlobPathsUnsupported)
 		}
 
 		totalDevices := len(dc.DeviceSelector.Paths) + len(dc.DeviceSelector.OptionalPaths)
