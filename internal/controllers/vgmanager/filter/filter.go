@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -89,9 +90,20 @@ func DefaultFilters(ctx context.Context, opts *Options) Filters {
 				return nil
 			}
 			for _, path := range append(
-				opts.VG.Spec.DeviceSelector.Paths,
+				slices.Clone(opts.VG.Spec.DeviceSelector.Paths),
 				opts.VG.Spec.DeviceSelector.OptionalPaths...,
 			) {
+				if path.IsGlob() {
+					// Globs match kernel names only; a symlink alias is not a kernel name.
+					matched, err := path.Match(dev.KName)
+					if err != nil {
+						return err
+					}
+					if matched {
+						return nil
+					}
+					continue
+				}
 				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
 				if resolved, err := resolver.Resolve(path.Unresolved()); resolved == dev.KName {
 					return nil

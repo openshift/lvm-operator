@@ -97,7 +97,8 @@ Two reconciliation loops run independently:
    k. Update LVMVolumeGroupNodeStatus with current state
 3. Determine requeue (in precedence order):
    - RAID device class → requeue in 60s (health monitoring)
-   - Explicit device paths (any policy) or Static → no periodic requeue
+   - Glob device paths (any policy) → requeue in 30s (refresh matches)
+   - Literal explicit device paths (any policy) or Static → no periodic requeue
    - Dynamic policy without explicit paths → requeue in 30s
    - After VG creation/extension → always requeue (verification step)
 ```

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
@@ -82,34 +83,43 @@ type FilteredBlockDevices struct {
 // While availability is easy to determine, an exclusion by being already setup can only be determined by
 // checking if the excluded device has been filtered due to filter.ErrDeviceAlreadySetupCorrectly.
 func VerifyMandatoryDevicePaths(f FilteredBlockDevices, resolver *symlinkResolver.Resolver, paths []v1alpha1.DevicePath) error {
-	for _, path := range paths {
-		path, err := resolver.Resolve(path.Unresolved())
+	candidates := slices.Clone(f.Available)
+	for _, excluded := range f.Excluded {
+		candidates = append(candidates, excluded.BlockDevice)
+	}
+	for _, selectorPath := range paths {
+		matched, err := resolveSelectedDevices(selectorPath, candidates, resolver)
 		if err != nil {
-			return fmt.Errorf("failed to resolve symlink to determine available or setup path: %w", err)
+			return fmt.Errorf("failed to resolve mandatory device path %q: %w", selectorPath, err)
 		}
-		available := f.IsAvailable(path)
-		errs := f.FilterErrors(path)
-		alreadySetup := false
-		for _, err := range errs {
-			if errors.Is(err, filter.ErrDeviceAlreadySetupCorrectly) {
-				alreadySetup = true
-				break
-			}
+		if err := requireDevicePathMatches(selectorPath, matched); err != nil {
+			return err
 		}
-		if !available && !alreadySetup {
-			if len(errs) > 0 {
-				err = errors.Join(errs...)
-			} else {
-				err = fmt.Errorf("the device did not exist on the host, "+
-					"make sure it is connected and visible via \"lsblk --json --paths -o %s\" "+
-					"and confirm it is discoverable via a path resolvable (e.g. via symlink) on the host", lsblk.LSBLK_COLUMNS)
+		for _, path := range matched {
+			available := f.IsAvailable(path)
+			errs := f.FilterErrors(path)
+			alreadySetup := false
+			for _, err := range errs {
+				if errors.Is(err, filter.ErrDeviceAlreadySetupCorrectly) {
+					alreadySetup = true
+					break
+				}
 			}
-			return fmt.Errorf("mandatory device path %q cannot be used, "+
-				"because it is NOT available as a new device for the volume group and "+
-				"NOT part of a valid and tagged existing volume group: %w",
-				path,
-				err,
-			)
+			if !available && !alreadySetup {
+				if len(errs) > 0 {
+					err = errors.Join(errs...)
+				} else {
+					err = fmt.Errorf("the device did not exist on the host, "+
+						"make sure it is connected and visible via \"lsblk --json --paths -o %s\" "+
+						"and confirm it is discoverable via a path resolvable (e.g. via symlink) on the host", lsblk.LSBLK_COLUMNS)
+				}
+				return fmt.Errorf("mandatory device path %q cannot be used, "+
+					"because it is NOT available as a new device for the volume group and "+
+					"NOT part of a valid and tagged existing volume group: %w",
+					path,
+					err,
+				)
+			}
 		}
 	}
 	return nil
