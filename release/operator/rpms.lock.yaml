@@ -228,13 +228,6 @@ arches:
     name: openssl
     evr: 1:1.1.1k-18.el8_6
     sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/o/openssl-libs-1.1.1k-18.el8_6.aarch64.rpm
-    repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 1414472
-    checksum: sha256:586eee386cc5188a40428f674e6ec46832b44ce696e406ae051b558dcd0494fd
-    name: openssl-libs
-    evr: 1:1.1.1k-18.el8_6
-    sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/p/pam-1.3.1-40.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 761196
@@ -666,13 +659,6 @@ arches:
     size: 731792
     checksum: sha256:c429b0a121c08f1bb2ca779e8592c3097ca07074ab7d6206ea8e8af914c330e6
     name: openssl
-    evr: 1:1.1.1k-18.el8_6
-    sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/o/openssl-libs-1.1.1k-18.el8_6.ppc64le.rpm
-    repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 1580624
-    checksum: sha256:852f8f80d06f59ddc8d33334b45e0895d99dd7286f75ad23048468f79542aea8
-    name: openssl-libs
     evr: 1:1.1.1k-18.el8_6
     sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/p/pam-1.3.1-40.el8_10.ppc64le.rpm
@@ -1107,13 +1093,6 @@ arches:
     name: openssl
     evr: 1:1.1.1k-18.el8_6
     sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/o/openssl-libs-1.1.1k-18.el8_6.s390x.rpm
-    repoid: rhel-8-for-s390x-baseos-rpms
-    size: 1214796
-    checksum: sha256:e659c9c989a7845eb4c8e2df887bd3c328a688a0c2922507bc440bcc03d3a72b
-    name: openssl-libs
-    evr: 1:1.1.1k-18.el8_6
-    sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/p/pam-1.3.1-40.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 745868
@@ -1538,13 +1517,6 @@ arches:
     size: 728096
     checksum: sha256:076e01a683a03aeff268e659d8532b7be6aa3609c9569ae6dedb8c908980ae0c
     name: openssl
-    evr: 1:1.1.1k-18.el8_6
-    sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/o/openssl-libs-1.1.1k-18.el8_6.x86_64.rpm
-    repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 1543184
-    checksum: sha256:f0c6f343f5b9d693f58c6162e5372443fb697b1ae17902a3493dc48df2e9bd9c
-    name: openssl-libs
     evr: 1:1.1.1k-18.el8_6
     sourcerpm: openssl-1.1.1k-18.el8_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/p/pam-1.3.1-40.el8_10.x86_64.rpm
