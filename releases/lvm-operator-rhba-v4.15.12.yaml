@@ -2,7 +2,7 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-rhba-v4.15.12
+  name: lvm-operator-rhba-v4.15.12-1
   namespace: logical-volume-manag-tenant
   labels:
     release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
@@ -20,7 +20,7 @@ spec:
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
       cves:
-        - key: CVE-2026-33816
+        - key: CVE-2026-33186
           component: lvm-operator-4-15
       issues:
         fixed:
