@@ -72,6 +72,17 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 	})
 
+	DescribeTable("accepts force wiping with a glob selector", func(ctx SpecContext, optional bool) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		selector := &DeviceSelector{Paths: []DevicePath{"glob:/dev/sd*"}, ForceWipeDevicesAndDestroyAllData: ptr.To(true)}
+		if optional {
+			selector.OptionalPaths, selector.Paths = selector.Paths, nil
+		}
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = selector
+		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	}, Entry("required glob", false), Entry("optional glob", true))
+
 	It("nil DeviceDiscoveryPolicy defaults to Static on create", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(resource.Spec.Storage.DeviceClasses[0].DeviceDiscoveryPolicy).To(BeNil())
@@ -465,7 +476,10 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring(ErrEmptyPathsWithMultipleDeviceClasses.Error()))
 	})
 
-	It("device selector with non-dev path is forbidden", func(ctx SpecContext) {
+	// The schema pattern rejects these before any webhook runs, which is the point:
+	// an LVMVolumeGroup created directly has no webhook of its own, so the /dev rule
+	// has to live in the CRD too. The API server reports that as Invalid, not Forbidden.
+	It("device selector with non-dev path is rejected by the schema", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
 			"some-random-path",
@@ -473,17 +487,34 @@ var _ = Describe("webhook acceptance tests", func() {
 
 		err := k8sClient.Create(ctx, resource)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+		Expect(err).To(Satisfy(k8serrors.IsInvalid))
 
 		statusError := &k8serrors.StatusError{}
 		Expect(errors.As(err, &statusError)).To(BeTrue())
-		Expect(statusError.Status().Message).To(ContainSubstring("must be an absolute path to the device"))
+		Expect(statusError.Status().Message).To(ContainSubstring(`^(glob:)?/dev/.+$`))
 	})
 
-	It("device selector with non-dev optional path is forbidden", func(ctx SpecContext) {
+	It("device selector with non-dev optional path is rejected by the schema", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{
 			"some-random-path",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsInvalid))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring(`^(glob:)?/dev/.+$`))
+	})
+
+	// A traversal passes the schema pattern but must not reach a node, so the webhook
+	// still has to run its own check. This keeps both layers covered.
+	It("device selector escaping /dev via traversal is forbidden by the webhook", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
+			"/dev/../etc/shadow",
 		}}
 
 		err := k8sClient.Create(ctx, resource)

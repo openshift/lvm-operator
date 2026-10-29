@@ -98,7 +98,7 @@ This operator manages physical storage. Mistakes destroy data. See [docs/core-be
 
 **Key architecture facts:**
 - VG Manager runs as a privileged DaemonSet and executes LVM commands (`vgcreate`, `vgextend`, `lvcreate`, `wipefs`) directly on nodes
-- VG Manager requeue interval depends on configuration, in precedence order: RAID: 60s for health monitoring; explicit device paths (any policy) or Static: no periodic requeue; Dynamic discovery without explicit paths: 30s; after VG creation/extension: always requeue (verification step). See `determineFinishedRequeue` in `internal/controllers/vgmanager/controller.go`. Controllers must handle partial states and retries safely (idempotency)
+- VG Manager requeue interval depends on configuration, in precedence order: RAID: 60s for health monitoring; glob device paths (any policy): 30s; literal device paths (any policy) or Static: no periodic requeue; Dynamic discovery without explicit paths: 30s; after VG creation/extension: always requeue (verification step). See `determineFinishedRequeue` in `internal/controllers/vgmanager/controller.go`. Controllers must handle partial states and retries safely (idempotency)
 - Data loss from incorrect device selection is unrecoverable — verify device selectors carefully in tests
 
 ## Path-Scoped Guidance

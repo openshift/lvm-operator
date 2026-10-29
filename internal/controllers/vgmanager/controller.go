@@ -90,6 +90,9 @@ var reconcileAgain = ctrl.Result{Requeue: true, RequeueAfter: reconcileInterval}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&lvmv1alpha1.LVMVolumeGroup{}).
 		Owns(&lvmv1alpha1.LVMVolumeGroupNodeStatus{}, builder.MatchEveryOwner, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
@@ -99,7 +102,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 type Reconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
 	events.EventRecorder
 	LVMD lvmd.Configurator
 	lvm.LVM
@@ -182,16 +186,28 @@ func (r *Reconciler) reconcile(
 	}
 
 	logger.V(1).Info("block devices", "blockDevices", blockDevices)
-
-	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, resolver); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
-	} else if updated {
-		return ctrl.Result{}, r.Update(ctx, volumeGroup)
+	if err := validateDeviceSelector(&volumeGroup.Spec); err != nil {
+		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
+		if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
+			logger.Error(statusErr, "failed to set status to failed")
+		}
+		return ctrl.Result{}, err
 	}
 
+	// Read all PV ownership before wiping, including VGs not managed by LVMS.
 	pvs, err := r.ListPVs(ctx, "")
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("physical volumes could not be fetched: %w", err)
+	}
+
+	if updated, err := r.wipeDevices(ctx, volumeGroup, blockDevices, pvs, resolver); err != nil {
+		r.WarningEvent(ctx, volumeGroup, EventReasonErrorDevicePathCheckFailed, err)
+		if _, statusErr := r.setVolumeGroupFailedStatus(ctx, volumeGroup, vgs, FilteredBlockDevices{}, err); statusErr != nil {
+			logger.Error(statusErr, "failed to set status to failed")
+		}
+		return ctrl.Result{}, fmt.Errorf("failed to wipe devices: %w", err)
+	} else if updated {
+		return ctrl.Result{}, r.Update(ctx, volumeGroup)
 	}
 
 	bdi, err := r.BlockDeviceInfos(ctx, blockDevices)
@@ -205,6 +221,13 @@ func (r *Reconciler) reconcile(
 		PVs: pvs,
 		VG:  volumeGroup,
 	}))
+	if volumeGroup.Spec.DeviceSelector.HasGlobPaths() && volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData != nil && *volumeGroup.Spec.DeviceSelector.ForceWipeDevicesAndDestroyAllData {
+		protected, err := protectedDevicePaths(blockDevices, pvs, resolver, true)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check device ownership: %w", err)
+		}
+		devices = filterGlobWipeCandidates(devices, blockDevices, protected)
+	}
 
 	if volumeGroup.Spec.DeviceSelector != nil {
 		if err := VerifyMandatoryDevicePaths(devices, resolver, volumeGroup.Spec.DeviceSelector.Paths); err != nil {
@@ -301,9 +324,9 @@ func (r *Reconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 
-		if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
+		if updated, degraded, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
-		} else if updated {
+		} else if updated && !degraded {
 			msg := "all the available devices are attached to the volume group"
 			logger.Info(msg)
 			r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
@@ -379,9 +402,9 @@ func (r *Reconciler) reconcile(
 		return reconcileAgain, err
 	}
 
-	if updated, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
+	if updated, degraded, err := r.setVolumeGroupReadyStatus(ctx, volumeGroup, vgs, devices); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to set status for volume group %s to ready: %w", volumeGroup.Name, err)
-	} else if updated {
+	} else if updated && !degraded {
 		msg := "all the available devices are attached to the volume group"
 		r.NormalEvent(ctx, volumeGroup, EventReasonVolumeGroupReady, msg)
 	}
@@ -398,7 +421,12 @@ func (r *Reconciler) determineFinishedRequeue(volumeGroup *lvmv1alpha1.LVMVolume
 		return ctrl.Result{RequeueAfter: raidReconcileInterval}
 	}
 
-	// With explicit paths, no periodic requeue is needed — the paths define
+	// Glob selectors can match newly attached devices without a spec change.
+	if volumeGroup.Spec.DeviceSelector.HasGlobPaths() {
+		return reconcileAgain
+	}
+
+	// With literal paths, no periodic requeue is needed — the paths define
 	// the exact set of devices. Changes to paths trigger reconciliation via
 	// the LVMVolumeGroup watch.
 	if hasExplicitDevicePaths(volumeGroup) {
@@ -833,7 +861,7 @@ func (r *Reconciler) deleteRemovedDevices(
 		return false, err
 	}
 
-	userProvidedMappings, err := buildDevicePathMappings(ctx, volumeGroup, resolver)
+	userProvidedMappings, err := buildDevicePathMappings(ctx, volumeGroup, resolver, currentVG.PVs...)
 	if err != nil {
 		return false, err
 	}
@@ -854,7 +882,10 @@ func (r *Reconciler) deleteRemovedDevices(
 		// If no direct match, try resolving the PV name and compare
 		if !pvMatched {
 			resolvedPvName, err := resolver.Resolve(pv.PvName)
-			if err == nil && slices.Contains(userProvidedMappings, resolvedPvName) {
+			if err != nil {
+				return false, fmt.Errorf("cannot determine whether PV %s is still selected: %w", pv.PvName, err)
+			}
+			if slices.Contains(userProvidedMappings, resolvedPvName) {
 				pvMatched = true
 			}
 		}
@@ -1019,9 +1050,9 @@ func (r *Reconciler) WarningEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolum
 
 // NormalEvent sends an event to both the nodeStatus, and the affected processed volumeGroup as well as the owning LVMCluster if present
 func (r *Reconciler) NormalEvent(ctx context.Context, obj *lvmv1alpha1.LVMVolumeGroup, reason EventReasonInfo, message string) {
-	if !log.FromContext(ctx).V(1).Enabled() {
-		return
-	}
+	// Events are an API surface, not a log line: gating them on debug verbosity meant
+	// DeviceRemoved and VolumeGroupReady never reached the API in a default deployment.
+	// Every caller already fires only on an actual state change, so this cannot spam.
 	nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 	nodeStatus.SetName(r.NodeName)
 	nodeStatus.SetNamespace(r.Namespace)

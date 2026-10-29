@@ -83,34 +83,61 @@ type FilteredBlockDevices struct {
 // checking if the excluded device has been filtered due to filter.ErrDeviceAlreadySetupCorrectly.
 func VerifyMandatoryDevicePaths(f FilteredBlockDevices, resolver *symlinkResolver.Resolver, paths []v1alpha1.DevicePath) error {
 	for _, path := range paths {
-		path, err := resolver.Resolve(path.Unresolved())
-		if err != nil {
+		resolved, err := resolver.ResolvePaths(path.Unresolved())
+		if err != nil && (!path.IsGlob() || len(resolved) == 0) {
 			return fmt.Errorf("failed to resolve symlink to determine available or setup path: %w", err)
 		}
-		available := f.IsAvailable(path)
-		errs := f.FilterErrors(path)
-		alreadySetup := false
-		for _, err := range errs {
-			if errors.Is(err, filter.ErrDeviceAlreadySetupCorrectly) {
-				alreadySetup = true
-				break
+		if path.IsGlob() {
+			var excludedErrors []error
+			for _, devicePath := range resolved {
+				if err := verifyMandatoryDevicePath(f, devicePath); err == nil {
+					// A glob requires at least one usable or already configured
+					// device; other matches remain excluded by the filter chain.
+					excludedErrors = nil
+					break
+				} else {
+					excludedErrors = append(excludedErrors, err)
+				}
+			}
+			if len(excludedErrors) > 0 {
+				return fmt.Errorf("mandatory device glob %q has no usable or already configured devices: %w", path, errors.Join(excludedErrors...))
+			}
+			continue
+		}
+		for _, path := range resolved {
+			if err := verifyMandatoryDevicePath(f, path); err != nil {
+				return err
 			}
 		}
-		if !available && !alreadySetup {
-			if len(errs) > 0 {
-				err = errors.Join(errs...)
-			} else {
-				err = fmt.Errorf("the device did not exist on the host, "+
-					"make sure it is connected and visible via \"lsblk --json --paths -o %s\" "+
-					"and confirm it is discoverable via a path resolvable (e.g. via symlink) on the host", lsblk.LSBLK_COLUMNS)
-			}
-			return fmt.Errorf("mandatory device path %q cannot be used, "+
-				"because it is NOT available as a new device for the volume group and "+
-				"NOT part of a valid and tagged existing volume group: %w",
-				path,
-				err,
-			)
+	}
+	return nil
+}
+
+func verifyMandatoryDevicePath(f FilteredBlockDevices, path string) error {
+	available := f.IsAvailable(path)
+	errs := f.FilterErrors(path)
+	alreadySetup := false
+	for _, err := range errs {
+		if errors.Is(err, filter.ErrDeviceAlreadySetupCorrectly) {
+			alreadySetup = true
+			break
 		}
+	}
+	if !available && !alreadySetup {
+		var err error
+		if len(errs) > 0 {
+			err = errors.Join(errs...)
+		} else {
+			err = fmt.Errorf("the device did not exist on the host, "+
+				"make sure it is connected and visible via \"lsblk --json --paths -o %s\" "+
+				"and confirm it is discoverable via a path resolvable (e.g. via symlink) on the host", lsblk.LSBLK_COLUMNS)
+		}
+		return fmt.Errorf("mandatory device path %q cannot be used, "+
+			"because it is NOT available as a new device for the volume group and "+
+			"NOT part of a valid and tagged existing volume group: %w",
+			path,
+			err,
+		)
 	}
 	return nil
 }
