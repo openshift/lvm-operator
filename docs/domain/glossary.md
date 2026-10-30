@@ -26,9 +26,9 @@ Controls whether VG Manager continuously discovers new devices or locks to insta
 
 **Spec values:** `Static` (locked after VG creation) or `Dynamic` (continuous 30s discovery).
 
-**Status values:** `Preconfigured` (explicit DeviceSelector paths override policy), `RuntimeStatic`, `RuntimeDynamic`.
+**Status values:** `Preconfigured` (explicit literal DeviceSelector paths override policy), `RuntimeStatic`, `RuntimeDynamic`.
 
-**Gotcha:** For new clusters, the webhook defaults nil to Static on CREATE. Upgraded clusters (created before this field existed) keep nil, which the controller treats as Dynamic for backward compatibility. RAID overrides to Static regardless of spec. In Static mode, if the VG already exists, newly discovered devices are excluded. With explicit device paths, the spec policy is ignored — status always reports Preconfigured.
+**Gotcha:** For new clusters, the webhook defaults nil to Static on CREATE. Upgraded clusters (created before this field existed) keep nil, which the controller treats as Dynamic for backward compatibility. RAID overrides to Static regardless of spec. In Static mode, if the VG already exists, newly discovered devices are excluded. With explicit literal device paths, the spec policy is ignored — status reports Preconfigured. A selector holding any glob pattern reports RuntimeDynamic instead, even when mixed with literal paths.
 
 ## VolumeGroup (LVM concept)
 

@@ -36,7 +36,8 @@ const (
 type DeviceDiscoveryPolicyStatus string
 
 const (
-	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through explicit DeviceSelector paths.
+	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through explicit literal
+	// DeviceSelector paths. Pattern entries report RuntimeDynamic instead, because they keep matching devices.
 	// When paths are specified, the device discovery policy from the spec is ignored.
 	DeviceDiscoveryPolicyPreconfigured DeviceDiscoveryPolicyStatus = "Preconfigured"
 	// DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are discovered and added to the VG dynamically
@@ -79,8 +80,9 @@ type VGStatus struct {
 	// but were not used for other reasons.
 	Excluded []ExcludedDevice `json:"excluded,omitempty"`
 	// DeviceDiscoveryPolicy is a field to indicate the effective device discovery policy for this volume group.
-	// Preconfigured indicates explicit DeviceSelector paths are configured and the discovery policy is not applicable.
-	// RuntimeDynamic indicates devices are discovered and added dynamically at runtime (no explicit paths, Dynamic policy).
+	// Preconfigured indicates explicit literal DeviceSelector paths are configured and the discovery policy is not applicable.
+	// RuntimeDynamic indicates devices are discovered and added dynamically at runtime, either because no explicit
+	// paths are configured and the policy is Dynamic, or because a "glob:" pattern keeps matching new devices.
 	// RuntimeStatic indicates devices were discovered at install time and new devices are ignored (no explicit paths, Static policy).
 	// +kubebuilder:validation:Enum=Preconfigured;RuntimeDynamic;RuntimeStatic
 	// +kubebuilder:default=RuntimeStatic
