@@ -128,7 +128,7 @@ spec:
       - name: name
         value: init
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-init:0.4.3@sha256:5197c2d81b0d0babe7468e8c06a9281fdf0654bba369faca4492233dc88f54e4
+        value: quay.io/konflux-ci/tekton-catalog/task-init:0.4.3@sha256:e3f908cd8ba002db70bc1264f0591c9c946fefa78678e8600fbd9eb3aac322dd
       - name: kind
         value: task
       resolver: bundles
@@ -149,7 +149,7 @@ spec:
       - name: name
         value: git-clone-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta:0.2.6@sha256:a3678910c2bf9187a66a96066193cb41046fbb7097160bf2be6a374ed5e49d30
+        value: quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta:0.2.6@sha256:590db5c909fa2f3b89cb46e10adb48d278ed7f259d7f613bc2c2b775504c9c11
       - name: kind
         value: task
       resolver: bundles
@@ -177,7 +177,7 @@ spec:
       - name: name
         value: run-script-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-run-script-oci-ta:0.1.3@sha256:ec40c7fd8efeb80c92e45c62b1acaff4a0c1882c3edd4bd14710e4115787e907
+        value: quay.io/konflux-ci/tekton-catalog/task-run-script-oci-ta:0.1.3@sha256:541ffae3f4e1abc8c1350847116d6d8ee825d11e73a4ff69a819ff8d94789370
       - name: kind
         value: task
       resolver: bundles
@@ -228,7 +228,7 @@ spec:
       - name: name
         value: prefetch-dependencies-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.11.0@sha256:7ffdaab6322c4bed64297eb79f767d92609a3e24bd123b14dc73536c038bf5b7
+        value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.11.0@sha256:6c63bc1ef05e823bb07fe73b4626a82b602ee3e6d3315fc5afa58dd5c532c270
       - name: kind
         value: task
       resolver: bundles
@@ -258,7 +258,7 @@ spec:
       - name: name
         value: run-script-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-run-script-oci-ta:0.1.3@sha256:ec40c7fd8efeb80c92e45c62b1acaff4a0c1882c3edd4bd14710e4115787e907
+        value: quay.io/konflux-ci/tekton-catalog/task-run-script-oci-ta:0.1.3@sha256:541ffae3f4e1abc8c1350847116d6d8ee825d11e73a4ff69a819ff8d94789370
       - name: kind
         value: task
       resolver: bundles
@@ -314,7 +314,7 @@ spec:
       - name: name
         value: buildah-remote-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.14.0@sha256:3c31a010d90b807c21c6bed676295bd2089b6886139a5b8160fd31f2dcfc8109
+        value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.14.1@sha256:612f539c5c45cb4fe2989695f988069245065a16e322888eeb3347eef9748471
       - name: kind
         value: task
       resolver: bundles
@@ -334,7 +334,7 @@ spec:
       - name: name
         value: build-image-index
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.4@sha256:654446d8ec028b20ed6ada8a96486ff16692a25192755aa04a99cea8e0afb7e2
+        value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.4@sha256:daa950c95b818de4db643bc9d38d76abe0d0277cb4b0a7973f5dbaef5fe935b3
       - name: kind
         value: task
       resolver: bundles
@@ -373,7 +373,7 @@ spec:
       - name: name
         value: apply-tags
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.3.2@sha256:a1d5e6d0912de4e39a19b4aa5587526cb8b20260ac32d00ac5c8c4581e3c2ea1
+        value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.3.2@sha256:a77e61465d4296611186dab48cabfaa5b3f8d8383831f80684ed98ce3ac02e9f
       - name: kind
         value: task
       resolver: bundles
@@ -458,7 +458,7 @@ spec:
       - name: name
         value: fbc-inject-lifecycle-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-fbc-inject-lifecycle-oci-ta:0.1@sha256:465d8c8745a7994f2e69f33df5b7538502c1355200fd37c8ac358b798add012c
+        value: quay.io/konflux-ci/tekton-catalog/task-fbc-inject-lifecycle-oci-ta:0.1@sha256:2fdc2361adc3c09c20600a436a7d4191e8b67618e07fe9d8710dbff27e9b0272
     params:
     - name: DOCKERFILE
       value: $(params.dockerfile)
