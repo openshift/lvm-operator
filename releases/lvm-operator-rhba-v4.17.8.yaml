@@ -2,19 +2,51 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-rhba-v4.17.8-4
+  name: lvm-operator-rhba-v4.17.8
   namespace: logical-volume-manag-tenant
+  labels:
+    release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
 spec:
   releasePlan: lvm-operator-production-releaseplan-4-17
-  snapshot: lvm-operator-4-17-20260327-084256-000
+  snapshot: lvm-operator-4-17-20261022-170238-000
   data:
     releaseNotes:
       description: |
-        After a successful LVMS upgrade, the latest lvms-operator SHA image should be seen.
+        After a successful LVMS upgrade, the latest lvms-operator SHA image should be running.
 
         This erratum implements the following changes:
 
-        - General base image version bumps
+        - Golang version bump to address CVE-2026-68121, CVE-2026-25679, CVE-2026-32280, CVE-2026-33811, CVE-2026-56860, CVE-2026-56862, CVE-2026-33818
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
-
+      cves:
+        - key: CVE-2026-68121
+          component: lvm-operator-4-17
+        - key: CVE-2026-25679
+          component: lvm-operator-4-17
+        - key: CVE-2026-32280
+          component: lvm-operator-4-17
+        - key: CVE-2026-33811
+          component: lvm-operator-4-17
+        - key: CVE-2026-56860
+          component: lvm-operator-4-17
+        - key: CVE-2026-56862
+          component: lvm-operator-4-17
+        - key: CVE-2026-33818
+          component: lvm-operator-4-17
+      issues:
+        fixed:
+          - id: OCPBUGS-76878
+            source: issues.redhat.com
+          - id: OCPBUGS-78667
+            source: issues.redhat.com
+          - id: OCPBUGS-83007
+            source: issues.redhat.com
+          - id: OCPBUGS-91891
+            source: issues.redhat.com
+          - id: OCPBUGS-109956
+            source: issues.redhat.com
+          - id: OCPBUGS-110894
+            source: issues.redhat.com
+          - id: OCPBUGS-110986
+            source: issues.redhat.com
