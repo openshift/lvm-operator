@@ -2,7 +2,7 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Release
 metadata:
-  name: lvm-operator-rhba-v4.17.8
+  name: lvm-operator-rhba-v4.17.8-1
   namespace: logical-volume-manag-tenant
   labels:
     release.appstudio.openshift.io/author: "Pablo Acevedo Montserrat <pacevedo@redhat.com>"
@@ -16,11 +16,11 @@ spec:
 
         This erratum implements the following changes:
 
-        - Golang version bump to address CVE-2026-68121, CVE-2026-25679, CVE-2026-32280, CVE-2026-33811, CVE-2026-56860, CVE-2026-56862, CVE-2026-33818
+        - Golang version bump to address CVE-2025-68121, CVE-2026-25679, CVE-2026-32280, CVE-2026-33811, CVE-2026-56860, CVE-2026-56862, CVE-2026-33818
 
         Users of LVMS are advised to upgrade to the latest version in OpenShift Container Platform, which fixes these bugs and adds these enhancements.
       cves:
-        - key: CVE-2026-68121
+        - key: CVE-2025-68121
           component: lvm-operator-4-17
         - key: CVE-2026-25679
           component: lvm-operator-4-17
