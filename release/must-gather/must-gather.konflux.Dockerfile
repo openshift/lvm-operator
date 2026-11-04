@@ -1,4 +1,4 @@
-FROM registry.redhat.io/openshift4/ose-must-gather-rhel9:v4.20@sha256:5edde92dcba1c0fc3d508f611d5ee2d39378f64b07578f8db839fc5126beae8d
+FROM registry.redhat.io/openshift4/ose-must-gather-rhel9:v4.20@sha256:9efe795d2763a7c68a10dfd316da2f6e3133de33ac004dd2136ceb94efe26e5a
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
