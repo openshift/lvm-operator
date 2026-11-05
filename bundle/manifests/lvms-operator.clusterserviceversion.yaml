@@ -441,6 +441,7 @@ spec:
           - config.openshift.io
           resources:
           - apiservers
+          - infrastructures
           verbs:
           - get
           - list
