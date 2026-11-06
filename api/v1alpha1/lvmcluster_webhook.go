@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/labels"
+	"github.com/openshift/lvm-operator/v4/internal/nodeselector"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -53,6 +54,7 @@ type lvmClusterDefaulter struct{}
 var _ admission.Defaulter[*LVMCluster] = &lvmClusterDefaulter{}
 
 var (
+	ErrRAIDGlobPathsUnsupported                              = errors.New("glob: device paths are not supported with raidConfig, list the devices explicitly")
 	ErrDeviceClassNotFound                                   = errors.New("DeviceClass not found in the LVMCluster")
 	ErrThinPoolConfigNotSet                                  = errors.New("ThinPoolConfig is not set for the DeviceClass")
 	ErrNodeSelectorNotSet                                    = errors.New("NodeSelector is not set for the DeviceClass")
@@ -433,14 +435,14 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
-					return fmt.Errorf("path %s must be an absolute path to the device", path.Unresolved())
+				if err := validateDevicePath(path); err != nil {
+					return fmt.Errorf("path %s %w", path, err)
 				}
 			}
 
 			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
-					return fmt.Errorf("optional path %s must be an absolute path to the device", path.Unresolved())
+				if err := validateDevicePath(path); err != nil {
+					return fmt.Errorf("optional path %s %w", path, err)
 				}
 			}
 		}
@@ -449,62 +451,118 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	return nil
 }
 
+// validateDevicePath keeps the rule in one place: DevicePath owns both halves so
+// the CRD schema, this webhook and the volume group controller cannot drift apart.
+func validateDevicePath(devicePath DevicePath) error {
+	if err := devicePath.ValidateLocation(); err != nil {
+		return err
+	}
+	if err := devicePath.Validate(); err != nil {
+		return fmt.Errorf("has an invalid device path pattern: %w", err)
+	}
+	return nil
+}
+
+// deviceSelectorEntry is one device path together with where it was declared.
+type deviceSelectorEntry struct {
+	path         DevicePath
+	deviceClass  string
+	nodeSelector *corev1.NodeSelector
+	optional     bool
+	forceWipe    bool
+}
+
+// canShareNode reports whether two device classes can both land on one node. Two literal
+// paths keep the weaker rule they had before patterns existed — compared only under a
+// textually identical node selector — so that clusters accepted by earlier releases stay
+// updatable. Role labels use Exists, which CanIntersect rightly refuses to treat as
+// proof that two selectors are disjoint, and applying that to literals would reject
+// configurations that have worked for months and block every later edit to them.
+func canShareNode(first, second deviceSelectorEntry) bool {
+	if !first.path.IsGlob() && !second.path.IsGlob() {
+		return first.nodeSelector.String() == second.nodeSelector.String()
+	}
+	return nodeselector.CanIntersect(first.nodeSelector, second.nodeSelector)
+}
+
+// verifyNoDeviceOverlap rejects selectors that certainly claim the same device: identical
+// entries, or a literal path matched by another entry's pattern. Two device classes
+// claiming one disk means the loser's volume group fails for as long as the overlap
+// lasts; two entries in a single class claiming it is a configuration mistake worth
+// surfacing early.
+//
+// Two different patterns are normally admitted, because only a node knows whether any
+// disk satisfies both, and VG Manager settles it there: the filter chain refuses a disk
+// another volume group already owns, so the loser simply goes without it. That reasoning
+// depends on ownership existing. Force wipe runs before any volume group owns anything,
+// so the first node to reconcile destroys the disk the other class was configured for.
+// Across two classes where either force wipes, the patterns are compared here instead,
+// conservatively: see DevicePath.MayOverlap.
+//
+// Device classes that can never share a node cannot conflict, so an overlapping pair is
+// forgiven only when canShareNode says the two can never meet.
+//
+// This is a fast check for the common case, not the safety boundary. Admission compares
+// path text and has no node filesystem to resolve it against, so two names for one disk —
+// a /dev/disk/by-id literal here, a pattern there — pass as unequal. The node enforces the
+// invariant where names resolve: owningVolumeGroup before wiping, and the filter chain
+// before adding a device to a volume group.
 func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
-
-	// make sure no device overlap with another VGs
-	// use map to find the duplicate entries for paths
-	/*
-		{
-		  "nodeSelector1": {
-		        "/dev/sda": "vg1",
-		        "/dev/sdb": "vg1"
-		    },
-		    "nodeSelector2": {
-		        "/dev/sda": "vg1",
-		        "/dev/sdb": "vg1"
-		    }
-		}
-	*/
-	devices := make(map[string]map[DevicePath]string)
-
+	var entries []deviceSelectorEntry
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
-
 		if deviceClass.DeviceSelector == nil {
 			continue
 		}
-
-		nodeSelector := deviceClass.NodeSelector.String()
-
-		// Required paths
+		forceWipe := deviceClass.DeviceSelector.ForceWipeDevicesAndDestroyAllData != nil &&
+			*deviceClass.DeviceSelector.ForceWipeDevicesAndDestroyAllData
 		for _, path := range deviceClass.DeviceSelector.Paths {
-			if val, ok := devices[nodeSelector][path]; ok {
-				if val != deviceClass.Name {
-					return fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
-				}
-				return fmt.Errorf("error: device path %s is specified at multiple places in deviceClass %s", path, val)
-			}
-
-			if devices[nodeSelector] == nil {
-				devices[nodeSelector] = make(map[DevicePath]string)
-			}
-
-			devices[nodeSelector][path] = deviceClass.Name
+			entries = append(entries, deviceSelectorEntry{
+				path: path, deviceClass: deviceClass.Name, nodeSelector: deviceClass.NodeSelector, forceWipe: forceWipe,
+			})
 		}
-
-		// Optional paths
 		for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-			if val, ok := devices[nodeSelector][path]; ok {
-				if val != deviceClass.Name {
-					return fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
-				}
-				return fmt.Errorf("error: optional device path %s is specified at multiple places in deviceClass %s", path, val)
-			}
+			entries = append(entries, deviceSelectorEntry{
+				path: path, deviceClass: deviceClass.Name, nodeSelector: deviceClass.NodeSelector, optional: true, forceWipe: forceWipe,
+			})
+		}
+	}
 
-			if devices[nodeSelector] == nil {
-				devices[nodeSelector] = make(map[DevicePath]string)
+	// A device class holds a handful of paths, so comparing every pair costs less than
+	// building an index, and it is the only way to catch pattern against pattern. Ask
+	// about the paths before the nodes: almost no pair of paths overlaps, while almost
+	// any pair of node selectors can intersect, so the node question is only worth
+	// asking for the few pairs that actually collide.
+	for i, first := range entries {
+		for _, second := range entries[i+1:] {
+			// Deferring a pattern pair to the node is only safe while ownership picks
+			// the winner. Across two device classes where either one force wipes, the
+			// disk is destroyed before any ownership exists, so compare the patterns.
+			// Within one class an overlap is harmless for wiping, and across classes
+			// without force wipe the loser merely goes without the disk.
+			compare := first.path.Overlaps
+			if first.deviceClass != second.deviceClass && (first.forceWipe || second.forceWipe) {
+				compare = first.path.MayOverlap
 			}
-
-			devices[nodeSelector][path] = deviceClass.Name
+			overlaps, err := compare(second.path)
+			if err != nil {
+				return err
+			}
+			if !overlaps {
+				continue
+			}
+			if first.deviceClass != second.deviceClass && !canShareNode(first, second) {
+				continue
+			}
+			kind := "device path"
+			if second.optional {
+				kind = "optional device path"
+			}
+			if first.deviceClass != second.deviceClass {
+				return fmt.Errorf("error: %s %s overlaps in two different deviceClasss %s and %s",
+					kind, second.path, first.deviceClass, second.deviceClass)
+			}
+			return fmt.Errorf("error: %s %s is specified at multiple places in deviceClass %s",
+				kind, second.path, first.deviceClass)
 		}
 	}
 
@@ -708,6 +766,12 @@ func (v *lvmClusterValidator) verifyRAIDConfig(l *LVMCluster) error {
 			(len(dc.DeviceSelector.Paths) > 0 || len(dc.DeviceSelector.OptionalPaths) > 0)
 		if !hasDevices {
 			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDDeviceSelectorRequired)
+		}
+
+		// Glob cardinality is node-specific. The VG manager validates the actual
+		// device count after expansion and filtering, before creating/extending a VG.
+		if dc.DeviceSelector.HasGlobPaths() {
+			return fmt.Errorf("device class %q: %w", dc.Name, ErrRAIDGlobPathsUnsupported)
 		}
 
 		totalDevices := len(dc.DeviceSelector.Paths) + len(dc.DeviceSelector.OptionalPaths)

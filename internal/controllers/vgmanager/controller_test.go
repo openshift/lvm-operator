@@ -1144,7 +1144,6 @@ func testReconcileFailure(ctx context.Context) {
 		}, nil)
 		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
 		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
-		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		instances.Wipefs.EXPECT().Wipe(ctx, "/dev/sda").Once().Return(fmt.Errorf("mocked error"))
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		Expect(err).To(HaveOccurred())
@@ -1157,6 +1156,8 @@ func testReconcileFailure(ctx context.Context) {
 		}
 		instances.LSBLK.EXPECT().ListBlockDevices(ctx).Once().Return(blockDevices, nil)
 		instances.LVM.EXPECT().ListVGs(ctx, true).Once().Return(nil, nil)
+		instances.LVM.EXPECT().ListPVs(ctx, "").Once().Return(nil, nil)
+		instances.LSBLK.EXPECT().BlockDeviceInfos(ctx, mock.Anything).Once().Return(lsblk.BlockDeviceInfos{}, nil)
 		_, err := instances.Reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(vg)})
 		nodeStatus := &lvmv1alpha1.LVMVolumeGroupNodeStatus{}
 		Expect(instances.client.Get(ctx, client.ObjectKey{

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -46,6 +47,8 @@ const (
 	noChildren                    = "noChildren"
 	usableDeviceType              = "usableDeviceType"
 	partOfDeviceSelector          = "partOfDeviceSelector"
+	notInAnotherVolumeGroup       = "notInAnotherVolumeGroup"
+	globNotMounted                = "globNotMounted"
 )
 
 var (
@@ -83,17 +86,59 @@ func IsExpectedDeviceErrorAfterSetup(err error) bool {
 func DefaultFilters(ctx context.Context, opts *Options) Filters {
 	logger := log.FromContext(ctx)
 	return Filters{
+		globNotMounted: func(dev lsblk.BlockDevice, _ *symlinkResolver.Resolver) error {
+			if !opts.VG.Spec.DeviceSelector.HasGlobPaths() {
+				return nil
+			}
+			if dev.Mountpoints == nil {
+				return fmt.Errorf("%s mount state is unknown", dev.Name)
+			}
+			for _, mount := range *dev.Mountpoints {
+				if mount != nil && *mount != "" {
+					return fmt.Errorf("%s is mounted or active as swap at %s", dev.Name, *mount)
+				}
+			}
+			return nil
+		},
+		notInAnotherVolumeGroup: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
+			if !opts.VG.Spec.DeviceSelector.HasGlobPaths() {
+				return nil
+			}
+			for _, pv := range opts.PVs {
+				if pv.PvMissing != "" || pv.VgName == opts.VG.Name {
+					continue
+				}
+				// A physical volume whose device node has gone is treated as missing, not
+				// ignored: it may be the very disk this selector is about to claim, and
+				// only an operator can say whether it died or was moved.
+				resolved, err := resolver.Resolve(pv.PvName)
+				if err != nil {
+					return fmt.Errorf("physical volume %s cannot be resolved and is treated as missing; "+
+						"reattach the device, or clear the stale volume on the node, to recover: %w", pv.PvName, err)
+				}
+				if resolved == dev.KName {
+					if pv.VgName == "" {
+						return fmt.Errorf("%s is an unassigned physical volume, which a glob selector will not claim; "+
+							"list it as a literal path, or clear the stale label on the node, to reuse it", dev.Name)
+					}
+					return fmt.Errorf("%s belongs to another volume group (%s)", dev.Name, pv.VgName)
+				}
+			}
+			return nil
+		},
+
 		partOfDeviceSelector: func(dev lsblk.BlockDevice, resolver *symlinkResolver.Resolver) error {
 			if opts.VG.Spec.DeviceSelector == nil {
 				// if no device selector is set, its automatically a valid candidate
 				return nil
 			}
 			for _, path := range append(
-				opts.VG.Spec.DeviceSelector.Paths,
+				slices.Clone(opts.VG.Spec.DeviceSelector.Paths),
 				opts.VG.Spec.DeviceSelector.OptionalPaths...,
 			) {
 				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
-				if resolved, err := resolver.Resolve(path.Unresolved()); resolved == dev.KName {
+				resolved, err := resolver.ResolvePaths(path.Unresolved())
+				if slices.Contains(resolved, dev.KName) {
 					return nil
 				} else if err != nil {
 					logger.Error(err, "the path was no kernel block device name and could not be resolved via symlink resolution", "path", path)
@@ -148,6 +193,9 @@ func DefaultFilters(ctx context.Context, opts *Options) Filters {
 				}
 
 				if foundPV == nil {
+					if opts.VG.Spec.DeviceSelector.HasGlobPaths() {
+						return fmt.Errorf("%s has an LVM signature but its physical volume is not visible; refusing glob selection", dev.Name)
+					}
 					// if there was no PV that matched it and it still is flagged as LVM2_member, it is formatted but not recognized by LVM
 					// configuration. We can assume that in this case, the Volume can be reused by simply recalling the vgcreate command on it
 					return nil
@@ -159,6 +207,9 @@ func DefaultFilters(ctx context.Context, opts *Options) Filters {
 					return fmt.Errorf("%s is already a LVM2_Member of another volume group (%s) and cannot be used for the volume group %s",
 						dev.Name, foundPV.VgName, opts.VG.GetName())
 				}
+				// An unassigned PV is rejected by notInAnotherVolumeGroup, which sees it
+				// whether or not lsblk reports the signature. Repeating it here only
+				// printed the same sentence twice in the node status.
 
 				// a volume is a valid PV if it exists under the same name as the Block Device and has
 				// 1. No Children

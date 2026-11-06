@@ -171,3 +171,27 @@ However, it will also not pick it up and simply ignore it.
 
 This is because Operator Lifecycle Manager (OLM) does not allow the creation of `ClusterServiceVersion` with installMode `OwnNamespace` while also not restricting the webhook configuration.
 Validation in the `openshift-lvm-storage` namespace is processed normally.
+
+## Wildcard Selectors Will Not Claim a Disk Carrying an Unassigned LVM Label
+
+A wildcard (`glob:`) entry in `deviceSelector` never claims a disk that holds an LVM
+physical volume label belonging to no volume group, even when the pattern matches the
+disk. Such a label is normally transient, but it survives when a disk is removed from a
+volume group and the follow-up `pvremove` does not complete, or when a `vgcreate` is
+interrupted after LVM has labelled the disk.
+
+The restriction is deliberate. A pattern resolves separately on every node and cannot
+distinguish a leftover label from a disk another administrator is preparing, so claiming
+it would risk adopting storage that was never offered. A literal path is an explicit
+statement about one named disk, so it is still accepted and is the supported way to
+recover such a disk:
+
+```yaml
+deviceSelector:
+  paths:
+    - /dev/disk/by-id/scsi-0000000000000000   # instead of a glob: entry
+```
+
+The node status reports the refusal against the device, naming the remedy. The volume
+group itself stays `Ready` on the disks it did claim, so watch the excluded devices in
+`LVMVolumeGroupNodeStatus` if a pattern yields less capacity than expected.

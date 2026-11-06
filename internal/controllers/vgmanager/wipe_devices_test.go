@@ -2,6 +2,7 @@ package vgmanager
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -16,11 +17,37 @@ import (
 	wipefsmocks "github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/wipefs/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
+
+func TestProtectedDevicePathsSkipsMissingPVs(t *testing.T) {
+	var resolved []string
+	resolver := symlinkResolver.NewWithResolver(func(path string) (string, error) {
+		resolved = append(resolved, path)
+		if path != "/dev/owned" {
+			return "", errors.New("device is unavailable")
+		}
+		return "/dev/sda1", nil
+	})
+	devices := []lsblk.BlockDevice{{KName: "/dev/sda", Children: []lsblk.BlockDevice{{KName: "/dev/sda1"}}}}
+	pvs := []lvm.PhysicalVolume{
+		{PvName: "[unknown]", VgName: "missing-vg", PvMissing: "missing"},
+		{PvName: "/dev/missing", VgName: "missing-vg", PvMissing: "missing"},
+		{PvName: "/dev/owned", VgName: "active-vg"},
+	}
+	protected, err := protectedDevicePaths(devices, pvs, resolver, false)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/dev/owned"}, resolved)
+	assert.Contains(t, protected["/dev/sda"], "active-vg")
+	assert.Contains(t, protected["/dev/sda1"], "active-vg")
+
+	_, err = protectedDevicePaths(devices, []lvm.PhysicalVolume{{PvName: "[unknown]", VgName: "active-vg"}}, resolver, false)
+	assert.ErrorContains(t, err, "treated as missing")
+}
 
 func TestWipeDevices(t *testing.T) {
 	tests := []struct {
@@ -192,7 +219,7 @@ func TestWipeDevices(t *testing.T) {
 					constants.DevicesWipedAnnotationPrefix + r.NodeName: time.Now().Format(time.RFC3339)}
 			}
 
-			wiped, err := r.wipeDevices(ctx, volumeGroup, tt.blockDevices, symlinkResolver.NewWithResolver(r.SymlinkResolveFn))
+			wiped, err := r.wipeDevices(ctx, volumeGroup, tt.blockDevices, nil, symlinkResolver.NewWithResolver(r.SymlinkResolveFn))
 			if tt.wipeCount > 0 {
 				assert.True(t, wiped)
 			} else {

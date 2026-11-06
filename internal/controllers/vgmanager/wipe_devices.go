@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
@@ -12,6 +13,7 @@ import (
 	"github.com/openshift/lvm-operator/v4/internal/controllers/constants"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/dmsetup"
 	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lvm"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -19,6 +21,7 @@ func (r *Reconciler) wipeDevices(
 	ctx context.Context,
 	volumeGroup *lvmv1alpha1.LVMVolumeGroup,
 	blockDevices []lsblk.BlockDevice,
+	pvs []lvm.PhysicalVolume,
 	resolver *symlinkResolver.Resolver,
 ) (bool, error) {
 	logger := log.FromContext(ctx)
@@ -27,28 +30,68 @@ func (r *Reconciler) wipeDevices(
 		logger.V(1).Info("skipping wiping devices as the volume group does not require it")
 		return false, nil
 	}
+	if err := validateDeviceSelector(&volumeGroup.Spec); err != nil {
+		return false, err
+	}
 
-	updated := false
+	protected, err := protectedDevicePaths(blockDevices, pvs, resolver, volumeGroup.Spec.DeviceSelector.HasGlobPaths())
+	if err != nil {
+		return false, err
+	}
+	if volumeGroup.Spec.DeviceSelector.HasGlobPaths() {
+		return r.wipeGlobDevices(ctx, volumeGroup, blockDevices, pvs, protected, resolver)
+	}
+
+	// Only literal paths reach here: any selector holding a pattern returned to
+	// wipeGlobDevices above, so no glob reduction is needed below.
+	//
+	// Validate the entire required set before executing any destructive command.
+	// This also protects a whole disk when one of its partitions is an owned PV.
+	candidates := make([]wipeCandidate, 0)
+	seen := make(map[string]bool)
 
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-		pathResolved, err := resolver.Resolve(path.Unresolved())
+		pathsResolved, err := resolver.ResolvePaths(path.Unresolved())
 		if err != nil {
 			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
 		}
 
-		if deviceWiped, err := r.wipeDevice(ctx, pathResolved, blockDevices); err != nil {
-			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
-		} else if deviceWiped {
-			updated = true
+		for _, pathResolved := range pathsResolved {
+			for _, owner := range protected[pathResolved] {
+				if owner != volumeGroup.Name {
+					return false, fmt.Errorf("refusing to wipe device %s: it belongs to volume group %s", pathResolved, owner)
+				}
+			}
+			if len(protected[pathResolved]) == 0 && !seen[pathResolved] {
+				candidates = append(candidates, wipeCandidate{path: pathResolved, required: true})
+				seen[pathResolved] = true
+			}
 		}
 	}
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
-		pathResolved, err := resolver.Resolve(path.Unresolved())
+		pathsResolved, err := resolver.ResolvePaths(path.Unresolved())
 		if err != nil {
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
 		}
-		if deviceWiped, err := r.wipeDevice(ctx, pathResolved, blockDevices); err != nil {
-			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
+		for _, pathResolved := range pathsResolved {
+			if len(protected[pathResolved]) > 0 {
+				logger.Info("skipping wiping device belonging to an existing volume group", "device", pathResolved, "volumeGroups", protected[pathResolved])
+				continue
+			}
+			if !seen[pathResolved] {
+				candidates = append(candidates, wipeCandidate{path: pathResolved})
+				seen[pathResolved] = true
+			}
+		}
+	}
+
+	updated := false
+	for _, candidate := range candidates {
+		if deviceWiped, err := r.wipeDevice(ctx, candidate.path, blockDevices); err != nil {
+			if candidate.required {
+				return false, fmt.Errorf("failed to wipe device %s: %w", candidate.path, err)
+			}
+			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", candidate.path, err))
 		} else if deviceWiped {
 			updated = true
 		}
@@ -66,6 +109,47 @@ func (r *Reconciler) wipeDevices(
 	}
 
 	return updated, nil
+}
+
+type wipeCandidate struct {
+	path     string
+	required bool
+}
+
+// protectedDevicePaths includes all owned PVs, their children, and their parent
+// disks. Glob selectors also protect unassigned PVs, represented by an empty owner.
+// Symlink aliases are resolved before comparing against kernel paths.
+func protectedDevicePaths(devices []lsblk.BlockDevice, pvs []lvm.PhysicalVolume, resolver *symlinkResolver.Resolver, protectUnassigned bool) (map[string][]string, error) {
+	owners := make(map[string][]string)
+	for _, pv := range pvs {
+		if pv.PvMissing != "" || (pv.VgName == "" && !protectUnassigned) {
+			continue
+		}
+		path, err := resolver.Resolve(pv.PvName)
+		if err != nil {
+			return nil, fmt.Errorf("physical volume %s cannot be resolved and is treated as missing; "+
+				"refusing to wipe any device until it is reattached or cleared on the node: %w", pv.PvName, err)
+		}
+		owners[path] = append(owners[path], pv.VgName)
+	}
+	protected := make(map[string][]string)
+	for path, vgs := range owners {
+		protected[path] = slices.Clone(vgs)
+	}
+	for _, device := range devices {
+		protectDeviceTree(device, owners, nil, protected)
+	}
+	return protected, nil
+}
+
+func protectDeviceTree(device lsblk.BlockDevice, owners map[string][]string, inherited []string, protected map[string][]string) []string {
+	deviceOwners := append(slices.Clone(inherited), owners[device.KName]...)
+	allOwners := slices.Clone(deviceOwners)
+	for _, child := range device.Children {
+		allOwners = append(allOwners, protectDeviceTree(child, owners, deviceOwners, protected)...)
+	}
+	protected[device.KName] = append(protected[device.KName], allOwners...)
+	return allOwners
 }
 
 // shouldWipeDevicesOnVolumeGroup checks if the volume group should have its devices wiped

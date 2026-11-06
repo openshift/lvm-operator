@@ -26,6 +26,95 @@ type advancedFilterTestCase struct {
 	lvmExpect       []lvm.PhysicalVolume
 }
 
+func TestForeignPVOwnershipCheckAppliesOnlyToGlobSelectors(t *testing.T) {
+	device := lsblk.BlockDevice{Name: "/dev/sdb", KName: "/dev/sdb"}
+	for _, tc := range []struct {
+		name     string
+		selector *lvmv1alpha1.DeviceSelector
+		pv       lvm.PhysicalVolume
+		wantErr  string
+		calls    int
+	}{
+		{name: "no selector", pv: lvm.PhysicalVolume{PvName: "/dev/missing", VgName: "vg2"}},
+		{name: "literal selector", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sdb"}}, pv: lvm.PhysicalVolume{PvName: "/dev/missing", VgName: "vg2"}},
+		{name: "literal selector with unassigned PV", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"/dev/sdb"}}, pv: lvm.PhysicalVolume{PvName: "/dev/alias"}},
+		{name: "required glob with foreign PV", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/alias", VgName: "vg2"}, wantErr: "belongs to another volume group", calls: 1},
+		{name: "optional glob with foreign PV", selector: &lvmv1alpha1.DeviceSelector{OptionalPaths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/alias", VgName: "vg2"}, wantErr: "belongs to another volume group", calls: 1},
+		{name: "glob with unresolved foreign PV", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/missing", VgName: "vg2"}, wantErr: "treated as missing", calls: 1},
+		{name: "glob with missing foreign PV", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "[unknown]", VgName: "vg2", PvMissing: "missing"}},
+		{name: "glob with missing named foreign PV", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/missing", VgName: "vg2", PvMissing: "missing"}},
+		{name: "glob with unassigned PV", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/alias"}, wantErr: "unassigned physical volume", calls: 1},
+		{name: "optional glob with unassigned PV", selector: &lvmv1alpha1.DeviceSelector{OptionalPaths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/alias"}, wantErr: "unassigned physical volume", calls: 1},
+		{name: "glob with same VG", selector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}, pv: lvm.PhysicalVolume{PvName: "/dev/alias", VgName: "vg1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			resolver := symlinkResolver.NewWithResolver(func(path string) (string, error) {
+				calls++
+				if path == "/dev/missing" {
+					return "", fmt.Errorf("missing device")
+				}
+				return "/dev/sdb", nil
+			})
+			vg := &lvmv1alpha1.LVMVolumeGroup{}
+			vg.Name = "vg1"
+			vg.Spec.DeviceSelector = tc.selector
+			err := DefaultFilters(context.Background(), &Options{VG: vg, PVs: []lvm.PhysicalVolume{tc.pv}})[notInAnotherVolumeGroup](device, resolver)
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+			assert.Equal(t, tc.calls, calls)
+		})
+	}
+}
+
+func TestGlobRejectsUnknownAndUnassignedPhysicalVolumes(t *testing.T) {
+	vg := &lvmv1alpha1.LVMVolumeGroup{}
+	vg.Name = "vg1"
+	vg.Spec.DeviceSelector = &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}
+	device := lsblk.BlockDevice{Name: "/dev/sdb", KName: "/dev/sdb", FSType: FSTypeLVM2Member}
+	resolver := symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil })
+	for _, tc := range []struct {
+		name string
+		pvs  []lvm.PhysicalVolume
+		want string
+	}{
+		{name: "hidden PV", want: "not visible"},
+		// notInAnotherVolumeGroup owns the unassigned case: it sees such a PV whether or
+		// not lsblk reports the signature, so repeating the rule here only printed the
+		// same sentence twice in the node status.
+		{name: "unassigned PV", pvs: []lvm.PhysicalVolume{{PvName: "/dev/sdb"}}},
+		{name: "other VG", pvs: []lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg2"}}, want: "another volume group"},
+		{name: "same VG", pvs: []lvm.PhysicalVolume{{PvName: "/dev/sdb", VgName: "vg1"}}, want: ErrDeviceAlreadySetupCorrectly.Error()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			filters := DefaultFilters(context.Background(), &Options{VG: vg, PVs: tc.pvs})
+			err := filters[onlyValidFilesystemSignatures](device, resolver)
+			if tc.want == "" {
+				assert.NoError(t, err)
+				assert.ErrorContains(t, filters[notInAnotherVolumeGroup](device, resolver), "unassigned physical volume")
+				return
+			}
+			assert.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
+func TestGlobRejectsMountedOrUnknownMountState(t *testing.T) {
+	vg := &lvmv1alpha1.LVMVolumeGroup{Spec: lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/sd*"}}}}
+	filter := DefaultFilters(context.Background(), &Options{VG: vg})[globNotMounted]
+	device := lsblk.BlockDevice{Name: "/dev/sda"}
+	assert.ErrorContains(t, filter(device, nil), "unknown")
+	mounted := "/data"
+	mounts := []*string{&mounted}
+	device.Mountpoints = &mounts
+	assert.ErrorContains(t, filter(device, nil), "mounted")
+	mounts = []*string{nil}
+	assert.NoError(t, filter(device, nil))
+}
+
 func TestNotReadOnly(t *testing.T) {
 	testcases := []filterTestCase{
 		{label: "tc false", device: lsblk.BlockDevice{ReadOnly: false}, expectErr: false},

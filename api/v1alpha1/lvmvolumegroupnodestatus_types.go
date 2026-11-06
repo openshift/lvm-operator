@@ -36,11 +36,11 @@ const (
 type DeviceDiscoveryPolicyStatus string
 
 const (
-	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through explicit DeviceSelector paths.
+	// DeviceDiscoveryPolicyPreconfigured indicates the devices are preconfigured through literal DeviceSelector paths.
 	// When paths are specified, the device discovery policy from the spec is ignored.
 	DeviceDiscoveryPolicyPreconfigured DeviceDiscoveryPolicyStatus = "Preconfigured"
 	// DeviceDiscoveryPolicyRuntimeDynamic indicates the devices are discovered and added to the VG dynamically
-	// if they are present at runtime. No DeviceSelector paths are configured and the discovery policy is Dynamic.
+	// if they are present at runtime. The discovery policy is Dynamic or a glob selector is configured.
 	DeviceDiscoveryPolicyRuntimeDynamic DeviceDiscoveryPolicyStatus = "RuntimeDynamic"
 	// DeviceDiscoveryPolicyRuntimeStatic indicates the VG is created with devices discovered at install time;
 	// later-discovered devices are ignored. No DeviceSelector paths are configured and the discovery policy is Static.
@@ -79,9 +79,13 @@ type VGStatus struct {
 	// but were not used for other reasons.
 	Excluded []ExcludedDevice `json:"excluded,omitempty"`
 	// DeviceDiscoveryPolicy is a field to indicate the effective device discovery policy for this volume group.
-	// Preconfigured indicates explicit DeviceSelector paths are configured and the discovery policy is not applicable.
-	// RuntimeDynamic indicates devices are discovered and added dynamically at runtime (no explicit paths, Dynamic policy).
-	// RuntimeStatic indicates devices were discovered at install time and new devices are ignored (no explicit paths, Static policy).
+	// Preconfigured indicates the DeviceSelector names an exact set of devices through literal paths only,
+	// so the discovery policy from the spec does not apply.
+	// RuntimeDynamic indicates devices are discovered and added at runtime, either because the DeviceSelector
+	// contains a glob pattern, which can match devices attached later whatever the spec policy says, or because
+	// no paths are configured and the spec policy is Dynamic.
+	// RuntimeStatic indicates no paths are configured and the spec policy is Static, so devices that appear after
+	// the volume group was created are ignored.
 	// +kubebuilder:validation:Enum=Preconfigured;RuntimeDynamic;RuntimeStatic
 	// +kubebuilder:default=RuntimeStatic
 	// +kubebuilder:validation:Required
