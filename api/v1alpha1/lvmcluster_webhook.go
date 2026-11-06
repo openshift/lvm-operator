@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/openshift/lvm-operator/v4/internal/cluster"
@@ -74,6 +75,8 @@ var (
 	ErrRAIDStripeSizeNotPowerOf2                             = errors.New("stripeSize must be a power of 2 (e.g., 64Ki, 128Ki, 256Ki, 512Ki)")
 	ErrRAIDConfigCannotBeChanged                             = errors.New("raidConfig cannot be changed")
 	ErrRAIDConfigNotSet                                      = errors.New("RAIDConfig is not set for the DeviceClass")
+	ErrRegexPatternEmpty                                     = errors.New("regex pattern cannot be empty")
+	ErrRegexPatternInvalid                                   = errors.New("invalid regex")
 )
 
 //+kubebuilder:webhook:path=/mutate-lvm-topolvm-io-v1alpha1-lvmcluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=lvm.topolvm.io,resources=lvmclusters,verbs=create,versions=v1alpha1,name=mlvmcluster.kb.io,admissionReviewVersions=v1
@@ -433,19 +436,40 @@ func (v *lvmClusterValidator) verifyAbsolutePath(l *LVMCluster) error {
 	for _, deviceClass := range l.Spec.Storage.DeviceClasses {
 		if deviceClass.DeviceSelector != nil {
 			for _, path := range deviceClass.DeviceSelector.Paths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
-					return fmt.Errorf("path %s must be an absolute path to the device", path.Unresolved())
+				if err := v.validateDevicePathEntry(path); err != nil {
+					return err
 				}
 			}
 
 			for _, path := range deviceClass.DeviceSelector.OptionalPaths {
-				if !strings.HasPrefix(path.Unresolved(), "/dev/") {
-					return fmt.Errorf("optional path %s must be an absolute path to the device", path.Unresolved())
+				if err := v.validateDevicePathEntry(path); err != nil {
+					return fmt.Errorf("optional %w", err)
 				}
 			}
 		}
 	}
 
+	return nil
+}
+
+func (v *lvmClusterValidator) validateDevicePathEntry(path DevicePath) error {
+	if path.IsRegex() {
+		rawPattern := strings.TrimPrefix(string(path), DevicePathRegexPrefix)
+		if rawPattern == "" {
+			return fmt.Errorf("path %s: %w", path, ErrRegexPatternEmpty)
+		}
+		if !strings.HasPrefix(rawPattern, "/dev/") {
+			return fmt.Errorf("path %s must be an absolute path to the device", path)
+		}
+		if _, err := regexp.Compile(rawPattern); err != nil {
+			return fmt.Errorf("path %s: %w: %v", path, ErrRegexPatternInvalid, err)
+		}
+		return nil
+	}
+
+	if !strings.HasPrefix(path.Unresolved(), "/dev/") {
+		return fmt.Errorf("path %s must be an absolute path to the device", path.Unresolved())
+	}
 	return nil
 }
 
@@ -475,8 +499,11 @@ func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 
 		nodeSelector := deviceClass.NodeSelector.String()
 
-		// Required paths
+		// Required paths - skip regex paths (overlap detection is deferred to runtime)
 		for _, path := range deviceClass.DeviceSelector.Paths {
+			if path.IsRegex() {
+				continue
+			}
 			if val, ok := devices[nodeSelector][path]; ok {
 				if val != deviceClass.Name {
 					return fmt.Errorf("error: device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
@@ -491,8 +518,11 @@ func (v *lvmClusterValidator) verifyNoDeviceOverlap(l *LVMCluster) error {
 			devices[nodeSelector][path] = deviceClass.Name
 		}
 
-		// Optional paths
+		// Optional paths - skip regex paths (overlap detection is deferred to runtime)
 		for _, path := range deviceClass.DeviceSelector.OptionalPaths {
+			if path.IsRegex() {
+				continue
+			}
 			if val, ok := devices[nodeSelector][path]; ok {
 				if val != deviceClass.Name {
 					return fmt.Errorf("error: optional device path %s overlaps in two different deviceClasss %s and %s", path, val, deviceClass.Name)
