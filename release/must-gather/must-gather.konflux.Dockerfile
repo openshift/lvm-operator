@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8/ubi-minimal@sha256:62d3baa1ca1cdc4613ad79521b21bdef5baa81ea9167441c731acef18b8253cf
+FROM registry.redhat.io/ubi8/ubi-minimal@sha256:7c5f7ae1bcad8d2ebbc364bb8f62c76f50e5666062a65a5cc969d9d1e54ce0d8
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
