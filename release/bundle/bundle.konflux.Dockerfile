@@ -7,7 +7,7 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.20 as bui
 # The original digests were taken from that bundle's
 # ClusterServiceVersion .spec.relatedImages, which records registry.redhat.io
 # digests. Mintmaker/Renovate keeps them current once the component is onboarded.
-ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:1e06883ffee5f3a6d6ec6678711791170764a86a57b8b1898557639ca909a688
+ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:445f18c8e696cf4be15168fcdd7431995fa1a6f6c29dae73b2ab3f7899cce6a8
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:12ae31fef18fc100ce052cb211701527cd723d47078100540b69b2da8cafbe28
 
