@@ -58,7 +58,7 @@ func deviceRemovalTest() {
 		validateCSINodeInfo(ctx, cluster, false)
 	})
 
-	It("should remove devices from volume group successfully", func(ctx SpecContext) {
+	DescribeTable("should remove devices from volume group successfully", func(ctx SpecContext, useGlob bool) {
 		By("Creating cluster without device selector to discover available devices")
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
@@ -84,6 +84,13 @@ func deviceRemovalTest() {
 				v1alpha1.DevicePath(largerDevice),
 			},
 		}
+		if useGlob {
+			// Globs have no alternation; the list is already a list.
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
+				v1alpha1.DevicePath("glob:" + smallerDevice),
+				v1alpha1.DevicePath("glob:" + largerDevice),
+			}
+		}
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
 
@@ -92,15 +99,18 @@ func deviceRemovalTest() {
 		cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{
 			v1alpha1.DevicePath(largerDevice),
 		}
+		if useGlob {
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{v1alpha1.DevicePath("glob:" + largerDevice)}
+		}
 		Expect(crClient.Update(ctx, cluster)).To(Succeed())
 
 		By("Verifying device removal completed successfully")
 		Eventually(func(ctx SpecContext) bool {
 			return validateDeviceRemovalSuccess(ctx, cluster, 1)
 		}, 5*timeout, interval).WithContext(ctx).Should(BeTrue())
-	})
+	}, Entry("with literal paths", false), Entry("by narrowing a glob", true))
 
-	It("should handle optional device removal", func(ctx SpecContext) {
+	DescribeTable("should handle optional device removal", func(ctx SpecContext, useGlob bool) {
 		By("Creating cluster without device selector to discover available devices")
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
@@ -124,6 +134,13 @@ func deviceRemovalTest() {
 			Paths:         []v1alpha1.DevicePath{v1alpha1.DevicePath(largerDevice)},
 			OptionalPaths: []v1alpha1.DevicePath{v1alpha1.DevicePath(smallerDevice)},
 		}
+		if useGlob {
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.Paths = []v1alpha1.DevicePath{v1alpha1.DevicePath("glob:" + largerDevice)}
+			cluster.Spec.Storage.DeviceClasses[0].DeviceSelector.OptionalPaths = []v1alpha1.DevicePath{
+				v1alpha1.DevicePath("glob:" + smallerDevice),
+				"glob:/dev/lvms-nonexistent-device*",
+			}
+		}
 		CreateResource(ctx, cluster)
 		VerifyLVMSSetup(ctx, cluster)
 
@@ -133,8 +150,10 @@ func deviceRemovalTest() {
 		Expect(crClient.Update(ctx, cluster)).To(Succeed(), "Should allow removal of optional devices")
 
 		By("Verifying cluster remains Ready with required device only")
-		validateLVMCluster(ctx, cluster)
-	})
+		Eventually(func(ctx SpecContext) bool {
+			return validateDeviceRemovalSuccess(ctx, cluster, 1)
+		}, 5*timeout, interval).WithContext(ctx).Should(BeTrue())
+	}, Entry("with literal paths", false), Entry("with glob paths and an unmatched optional pattern", true))
 }
 
 // getDiscoveredDevices retrieves the device paths from the LVMCluster status after auto-discovery.

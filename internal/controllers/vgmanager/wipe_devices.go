@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
@@ -28,27 +29,45 @@ func (r *Reconciler) wipeDevices(
 		return false, nil
 	}
 
-	updated := false
+	// Re-check here and not only in the caller: this is the one destructive path, and a
+	// malformed pattern must never reach wipefs.
+	if err := validateDevicePaths(volumeGroup.Spec.DeviceSelector); err != nil {
+		return false, err
+	}
 
+	// Resolve every selector before touching a device. Aborting midway would discard the
+	// per-node wipe annotation and re-wipe the already-wiped devices on the next reconcile,
+	// and a required pattern matching nothing yet is a routine transient (device not
+	// enumerated) rather than a reason to leave the node half-wiped.
+	var targets []string
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
-		pathResolved, err := resolver.Resolve(path.Unresolved())
+		matched, err := resolveWipeTargets(path, blockDevices, resolver)
+		if err == nil {
+			err = requireDevicePathMatches(path, matched)
+		}
 		if err != nil {
 			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
 		}
-
-		if deviceWiped, err := r.wipeDevice(ctx, pathResolved, blockDevices); err != nil {
-			return false, fmt.Errorf("failed to wipe device %s: %w", path, err)
-		} else if deviceWiped {
-			updated = true
-		}
+		targets = append(targets, matched...)
 	}
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
-		pathResolved, err := resolver.Resolve(path.Unresolved())
+		matched, err := resolveWipeTargets(path, blockDevices, resolver)
 		if err != nil {
 			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
+			continue
 		}
-		if deviceWiped, err := r.wipeDevice(ctx, pathResolved, blockDevices); err != nil {
-			logger.Info(fmt.Sprintf("skipping wiping optional device %s: %v", path, err))
+		targets = append(targets, matched...)
+	}
+
+	updated := false
+	var wipedPaths []string
+	for _, target := range targets {
+		if slices.Contains(wipedPaths, target) {
+			continue
+		}
+		wipedPaths = append(wipedPaths, target)
+		if deviceWiped, err := r.wipeDevice(ctx, target, blockDevices); err != nil {
+			return updated, fmt.Errorf("failed to wipe device %s: %w", target, err)
 		} else if deviceWiped {
 			updated = true
 		}

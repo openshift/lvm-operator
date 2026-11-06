@@ -22,12 +22,13 @@ import (
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
 	symlinkResolver "github.com/openshift/lvm-operator/v4/internal/controllers/symlink-resolver"
+	"github.com/openshift/lvm-operator/v4/internal/controllers/vgmanager/lsblk"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // buildDevicePathMappings creates a mapping from user-provided paths to resolved device paths
 // for devices that are actually in the VG (using VG state from ListVGs)
-func buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, resolver *symlinkResolver.Resolver) ([]string, error) {
+func buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVolumeGroup, resolver *symlinkResolver.Resolver, candidates []lsblk.BlockDevice) ([]string, error) {
 	logger := log.FromContext(ctx).WithValues("VGName", volumeGroup.Name)
 
 	if volumeGroup.Spec.DeviceSelector == nil {
@@ -36,27 +37,33 @@ func buildDevicePathMappings(ctx context.Context, volumeGroup *lvmv1alpha1.LVMVo
 
 	resolvedPaths := make([]string, 0)
 
-	// Process required paths
+	// Process required paths. Candidates here are the PVs already in the volume group, so
+	// a selector matching none of them is not an error: it is a selector pointing at a
+	// device that is about to be added. "Must match at least one device" is checked
+	// against the host in VerifyMandatoryDevicePaths, which runs earlier in the reconcile.
 	for _, path := range volumeGroup.Spec.DeviceSelector.Paths {
 		originalPath := path.Unresolved()
-		resolved, err := resolver.Resolve(originalPath)
+		resolved, err := resolveSelectedDevices(path, candidates, resolver)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve path %s, %w", originalPath, err)
 		}
 
-		resolvedPaths = append(resolvedPaths, resolved)
+		resolvedPaths = append(resolvedPaths, resolved...)
 	}
 
 	// Process optional paths
 	for _, path := range volumeGroup.Spec.DeviceSelector.OptionalPaths {
 		originalPath := path.Unresolved()
-		resolved, err := resolver.Resolve(originalPath)
+		resolved, err := resolveSelectedDevices(path, candidates, resolver)
 		if err != nil {
+			if path.IsGlob() {
+				return nil, err
+			}
 			logger.Info("failed to resolve optional device path during mapping build", "path", originalPath, "error", err)
 			continue
 		}
 
-		resolvedPaths = append(resolvedPaths, resolved)
+		resolvedPaths = append(resolvedPaths, resolved...)
 	}
 
 	return resolvedPaths, nil
