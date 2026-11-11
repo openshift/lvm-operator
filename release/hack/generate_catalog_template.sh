@@ -1,10 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
+MAX_RETRIES=5
 
 bundle_path="registry.redhat.io/lvms4/lvms-operator-bundle"
-#quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
+quay_bundle_path="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle"
 staging_bundle_path="registry.stage.redhat.io/lvms4/lvms-operator-bundle"
-lvms_all_tags="$(skopeo list-tags docker://${staging_bundle_path})"
-lvms_released_tags="$(skopeo list-tags docker://${bundle_path})"
+if ! lvms_all_tags="$(skopeo list-tags "docker://${quay_bundle_path}")" || [[ -z "${lvms_all_tags}" ]]; then
+    echo "Failed to list candidate bundle tags from ${quay_bundle_path}" >&2
+    exit 1
+fi
+if ! lvms_released_tags="$(skopeo list-tags "docker://${bundle_path}")" || [[ -z "${lvms_released_tags}" ]]; then
+    echo "Failed to list released bundle tags from ${bundle_path}" >&2
+    exit 1
+fi
 all_y_streams=($(echo "${lvms_all_tags}" | yq '[.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+$"))] | join(" ")'))
 template="""
 Schema: olm.semver
@@ -16,7 +25,7 @@ staging_versions=$(echo "${lvms_all_tags}" | yq '{"staging": [.Tags[] | select(t
 released_versions=$(echo "${lvms_released_tags}" | yq '{"released": [.Tags[] | select(test("^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$"))]}')
 
 # Filter out the already released versions
-candidate_versions=$((yq ea '. as $item ireduce ({}; . * $item )' <(echo "${staging_versions}") <(echo "${released_versions}")) | yq '.staging - .released')
+candidate_versions=$( (yq ea '. as $item ireduce ({}; . * $item )' <(echo "${staging_versions}") <(echo "${released_versions}") ) | yq '.staging - .released')
 
 # Cache the digests so we don't need to double the quay calls
 declare -A digests
@@ -33,7 +42,7 @@ for i in "${!all_y_streams[@]}"; do
     fi
 
     # Filter out unsupported versions
-    if ! [[ " ${TARGET_VERSIONS[*]} " =~ " ${maxVersion} " ]]; then
+    if [[ -n "${TARGET_VERSIONS[*]+set}" ]] && [[ " ${TARGET_VERSIONS[*]} " != *" ${maxVersion} "* ]]; then
         continue
     fi
 
@@ -48,13 +57,16 @@ for i in "${!all_y_streams[@]}"; do
     fi
 
     for ver in "${catalog_versions[@]}"; do
-        if ! [[ -n "${digests["${ver}"]}" ]]; then
-            digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}")
-
-            while ! [ $? -eq 0 ]; do
-                echo "Trying again..."
+        if ! [[ -n "${digests["${ver}"]+set}" ]]; then
+            retries=0
+            until digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}"); do
+                retries=$((retries + 1))
+                if [ "${retries}" -ge "${MAX_RETRIES}" ]; then
+                    echo "ERROR: Failed to inspect ${bundle_path}:${ver} after ${MAX_RETRIES} attempts" >&2
+                    exit 1
+                fi
+                echo "Trying again (attempt $((retries + 1))/${MAX_RETRIES})..."
                 sleep 5s
-                digest=$(skopeo inspect "docker://${bundle_path}:${ver}" --format "{{.Digest}}")
             done
 
             digests["${ver}"]=$digest
@@ -77,8 +89,12 @@ for i in "${!all_y_streams[@]}"; do
     # Check for and add any candidates if SKIP_CANDIDATES was not specified
     if (( ${#catalog_versions[@]} )) && [ -z "${SKIP_CANDIDATES+x}" ]; then
         for ver in "${catalog_versions[@]}"; do
-            if ! [[ -n "${digests["${ver}"]}" ]]; then
-                digests["${ver}"]=$(skopeo inspect "docker://${staging_bundle_path}:${ver}" --format "{{.Digest}}")
+            if ! [[ -n "${digests["${ver}"]+set}" ]]; then
+                if ! digest=$(skopeo inspect "docker://${quay_bundle_path}:${ver}" --format "{{.Digest}}") || [[ -z "${digest}" ]]; then
+                    echo "Failed to resolve candidate digest for ${ver}" >&2
+                    exit 1
+                fi
+                digests["${ver}"]="${digest}"
                 echo "Pinning candidate ${ver} to ${digests["${ver}"]}"
             fi
 
