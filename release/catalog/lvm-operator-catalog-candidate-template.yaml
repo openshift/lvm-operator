@@ -4,4 +4,5 @@ Schema: olm.semver
 GenerateMajorChannels: false
 GenerateMinorChannels: true
 Stable:
-  Bundles: []
+  Bundles:
+    - Image: registry.stage.redhat.io/lvms4/lvms-operator-bundle@sha256:549ca68dcbfee3da82300888d16bbbf148fc86510c489ba5bf7a220c167c5a7c # v4.17.9
