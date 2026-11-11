@@ -25,7 +25,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o manager main.go
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o vgmanager cmd/vgmanager/main.go
 RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -a -o metricsexporter cmd/metricsexporter/exporter.go
 
-FROM --platform=$TARGETPLATFORM registry.redhat.io/ubi8/ubi-minimal@sha256:7c5f7ae1bcad8d2ebbc364bb8f62c76f50e5666062a65a5cc969d9d1e54ce0d8
+FROM --platform=$TARGETPLATFORM registry.redhat.io/ubi8/ubi-minimal@sha256:95689582e591ea3490d7d4da6f240e1b5138dacc5883cc87057750b7eaabafc2
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
