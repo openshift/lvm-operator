@@ -52,4 +52,4 @@ resources:
 images:
 - name: rbac-proxy
   newName: registry.redhat.io/openshift4/ose-kube-rbac-proxy
-  digest: sha256:ad3cbbb228a8f948da02b775dc6a348f4cc85ecb9c9f21064814be584971af54
+  digest: sha256:ef471676dc66764f5cdf30a1547260c5271cc241154b4af70adae5040abab9bb
