@@ -11,17 +11,15 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
-	"github.com/kubernetes-csi/external-provisioner/v5/pkg/capacity"
-	"github.com/kubernetes-csi/external-provisioner/v5/pkg/capacity/topology"
-	provisionctrl "github.com/kubernetes-csi/external-provisioner/v5/pkg/controller"
-	"github.com/kubernetes-csi/external-provisioner/v5/pkg/features"
-	"github.com/kubernetes-csi/external-provisioner/v5/pkg/owner"
+	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity"
+	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity/topology"
+	provisionctrl "github.com/kubernetes-csi/external-provisioner/v6/pkg/controller"
+	"github.com/kubernetes-csi/external-provisioner/v6/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -29,7 +27,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/v11/controller"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v13/controller"
 )
 
 const (
@@ -102,17 +100,22 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	translator := csitrans.New()
 	factory := informers.NewSharedInformerFactory(clientset, ResyncPeriodOfCsiNodeInformer)
 
-	featureMap := map[string]bool{string(features.Topology): true}
-	err = feature.DefaultMutableFeatureGate.SetFromMap(featureMap)
-	if err != nil {
-		return err
-	}
-
 	scLister := factory.Storage().V1().StorageClasses().Lister()
 	csiNodeLister := factory.Storage().V1().CSINodes().Lister()
 	nodeLister := factory.Core().V1().Nodes().Lister()
 	claimLister := factory.Core().V1().PersistentVolumeClaims().Lister()
 	vaLister := factory.Storage().V1().VolumeAttachments().Lister()
+
+	// Create a topology store for tracking PVC-to-node topology mappings.
+	// Only needed when the driver supports topology-aware provisioning.
+	// We check the plugin capability directly instead of using provisionctrl.SupportsTopology()
+	// because the latter also checks the Topology feature gate, which is GA (always enabled)
+	// and may conflict with the k8s 1.37 feature gate registry.
+	var topologyStore *provisionctrl.InMemoryStore
+	if pluginCapabilities[csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS] {
+		topologyStore = provisionctrl.NewInMemoryStore()
+	}
+
 	provisioner := provisionctrl.NewCSIProvisioner(
 		clientset,
 		p.options.CSIOperationTimeout,
@@ -133,12 +136,13 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		nodeLister,
 		claimLister,
 		vaLister,
-		nil,
+		nil, // referenceGrantLister
 		false,
 		"",
-		nil,
+		nil, // nodeDeployment
 		false,
 		false,
+		topologyStore,
 	)
 
 	var capacityController *capacity.Controller
@@ -160,9 +164,9 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		return fmt.Errorf("look up owner(s) of pod failed: %w", err)
 	}
 	logger.Info(fmt.Sprintf("using %s/%s %s as owner of CSIStorageCapacity objects", controllerRef.APIVersion, controllerRef.Kind, controllerRef.Name))
-	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
+	topologyRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Second, 5*time.Minute)
 
-	topologyQueue := workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
+	topologyQueue := workqueue.NewTypedRateLimitingQueueWithConfig(topologyRateLimiter, workqueue.TypedRateLimitingQueueConfig[string]{
 		Name: "csitopology",
 	})
 
@@ -190,12 +194,13 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	clientFactory := capacity.NewV1ClientFactory(clientset)
 	cInformer := factoryForNamespace.Storage().V1().CSIStorageCapacities()
 
+	capacityRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[capacity.QueueKey](time.Second, 5*time.Minute)
 	capacityController = capacity.NewCentralCapacityController(
 		csi.NewControllerClient(grpcClient),
 		p.options.DriverName,
 		clientFactory,
 		// Metrics for the queue is available in the default registry.
-		workqueue.NewTypedRateLimitingQueueWithConfig(rateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
+		workqueue.NewTypedRateLimitingQueueWithConfig(capacityRateLimiter, workqueue.TypedRateLimitingQueueConfig[capacity.QueueKey]{
 			Name: "csistoragecapacity",
 		}),
 		controllerRef,
@@ -211,12 +216,13 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	// Wrap Provision and Delete to detect when it is time to refresh capacity.
 	provisioner = capacity.NewProvisionWrapper(provisioner, capacityController)
 
-	claimRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[any](time.Second, 5*time.Minute)
-	claimQueue := workqueue.NewTypedRateLimitingQueueWithConfig(claimRateLimiter, workqueue.TypedRateLimitingQueueConfig[any]{
+	claimRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Second, 5*time.Minute)
+	claimQueue := workqueue.NewTypedRateLimitingQueueWithConfig(claimRateLimiter, workqueue.TypedRateLimitingQueueConfig[string]{
 		Name: "claims",
 	})
 	claimInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
 
+	provisionRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Second, 5*time.Minute)
 	provisionController := controller.NewProvisionController(
 		ctx,
 		clientset,
@@ -225,11 +231,10 @@ func (p *Provisioner) Start(ctx context.Context) error {
 		controller.LeaderElection(false), // Always disable leader election in provisioner lib. Leader election should be done here in the CSI provisioner level instead.
 		controller.FailedProvisionThreshold(0),
 		controller.FailedDeleteThreshold(0),
-		controller.RateLimiter(rateLimiter),
+		controller.RateLimiter(provisionRateLimiter),
 		controller.Threadiness(1),
-		controller.CreateProvisionedPVLimiter(workqueue.DefaultTypedControllerRateLimiter[any]()),
+		controller.CreateProvisionedPVLimiter(workqueue.DefaultTypedControllerRateLimiter[string]()),
 		controller.ClaimsInformer(claimInformer),
-		controller.NodesLister(nodeLister),
 		controller.AddFinalizer(true),
 	)
 
@@ -261,12 +266,12 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	}()
 	go func() {
 		defer wg.Done()
-		capacityController.Run(ctx, 1)
+		capacityController.Run(ctx, 1, &wg)
 		logger.Info("capacity controller finished shutdown")
 	}()
 	go func() {
 		defer wg.Done()
-		csiClaimController.Run(ctx, 1)
+		csiClaimController.Run(ctx, 1, &wg)
 		logger.Info("csi claim controller finished shutdown")
 	}()
 	go func() {
