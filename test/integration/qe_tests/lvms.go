@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -6502,6 +6503,241 @@ spec:
 
 		g.By("#. Test completed successfully - RAID5 disk failure and repair verified")
 		logf("RAID5 disk-failure survival and repair test passed\n")
+	})
+
+	g.It("Author:mmakwana-High-[LVMS] [NetworkPolicy] Verify network policy blocks test pods in the LVMS namespace [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+
+		mountPath := "/mnt/storage"
+		isolationPodName := "test-pod-np-isolation"
+		isolationPVCName := "test-pvc-np-isolation"
+		targetPodName := "test-pod-np-target"
+		targetPVCName := "test-pvc-np-target"
+		volumeGroup1 := "vg1"
+		storageClassName := "lvms-" + volumeGroup1
+		newLVMClusterName := "test-lvmcluster-network-policy"
+
+		// waitForPodRunning waits until the pod reports Running phase
+		waitForPodRunning := func(name, namespace string) {
+			o.Eventually(func() string {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, "oc", "get", "pod", name, "-n", namespace, "-o=jsonpath={.status.phase}")
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					return "Pending"
+				}
+				return strings.TrimSpace(string(output))
+			}, PodReadyTimeout, 5*time.Second).Should(o.Equal("Running"),
+				"pod %s in namespace %s should reach Running phase", name, namespace)
+		}
+
+		g.By("#. Get list of available block devices/disks attached to all worker nodes")
+		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		workerNodes, err := getWorkersList()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		workerNodeCount := len(workerNodes)
+
+		var diskName string
+		for disk, count := range freeDiskNameCountMap {
+			if count == int64(workerNodeCount) {
+				diskName = disk
+				break
+			}
+		}
+		if diskName == "" {
+			g.Skip("Skipped: No disk available on all worker nodes")
+		}
+		diskPath := "/dev/" + diskName
+
+		g.By("#. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
+
+		// Register restoration before deleting the original LVMCluster so the defer covers
+		// failures during deletion as well. The existence check keeps it a no-op when the
+		// original LVMCluster was never deleted.
+		defer func() {
+			exists, lookupErr := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			for retries := 0; lookupErr != nil && retries < 6; retries++ {
+				// A failed lookup must not be mistaken for evidence that the LVMCluster
+				// is absent. Retry before making a restoration decision.
+				logf("Warning: failed to check existence of LVMCluster %s: %v, retrying\n", originLVMClusterName, lookupErr)
+				time.Sleep(5 * time.Second)
+				exists, lookupErr = resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			}
+			if lookupErr != nil {
+				// Existence could not be confirmed; restoring is the safe direction
+				// because creating an LVMCluster that already exists is rejected
+				// harmlessly by the webhook.
+				logf("Warning: existence of LVMCluster %s undetermined (%v), attempting restoration\n", originLVMClusterName, lookupErr)
+				exists = false
+			}
+			if !exists {
+				logf("Restoring original LVMCluster %s...\n", originLVMClusterName)
+				if err := originLvmCluster.createWithExportJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		g.By("#. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		g.By("#. Wait for old CSIStorageCapacity objects to be cleaned up")
+		o.Eventually(func() int {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "oc", "get", "csistoragecapacity", "-n", lvmsNamespace,
+				"-o=jsonpath={.items[?(@.storageClassName==\""+storageClassName+"\")].capacity}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				// Keep polling on command failures, but never treat error output as
+				// evidence that the cleanup completed.
+				return 1
+			}
+			return len(strings.Fields(string(output)))
+		}, 180*time.Second, 10*time.Second).Should(o.Equal(0))
+
+		g.By("#. Create LVMCluster on the free disk with deviceSelector path")
+		// Register cleanup before creating the temporary LVMCluster: if the apply reaches
+		// the API server but its response is lost, creation can return an error while the
+		// LVMCluster exists, and the orphan would block restoration of the original.
+		// deleteLVMClusterSafely returns early when the resource is absent.
+		defer func() {
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup1)
+		}()
+
+		err = createLVMClusterWithPaths(newLVMClusterName, lvmsNamespace, volumeGroup1, diskPath)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Wait for LVMCluster to be Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Get the OpenShift API server service ClusterIP")
+		svcCtx, svcCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer svcCancel()
+		svcCmd := exec.CommandContext(svcCtx, "oc", "get", "svc", "kubernetes", "-n", "default", "-o=jsonpath={.spec.clusterIP}")
+		svcOutput, err := svcCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to get kubernetes service ClusterIP: %s", string(svcOutput))
+		// JoinHostPort brackets IPv6 addresses; plain concatenation would produce an
+		// invalid URL whose parse failure could be mistaken for blocked egress.
+		apiServerURL := "https://" + net.JoinHostPort(strings.TrimSpace(string(svcOutput)), "443")
+
+		g.By("#. Create a PVC and target pod in the test namespace")
+		err = createPVCWithOC(pvcConfig{
+			name:             targetPVCName,
+			namespace:        testNamespace,
+			storageClassName: storageClassName,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", targetPVCName, testNamespace)
+
+		err = createPodWithOC(podConfig{
+			name:      targetPodName,
+			namespace: testNamespace,
+			pvcName:   targetPVCName,
+			mountPath: mountPath,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pod", targetPodName, testNamespace)
+
+		g.By("#. Create a PVC and unlabeled test pod in the LVMS namespace (only lvms-default-deny selects it)")
+		err = createPVCWithOC(pvcConfig{
+			name:             isolationPVCName,
+			namespace:        lvmsNamespace,
+			storageClassName: storageClassName,
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", isolationPVCName, lvmsNamespace)
+
+		err = createPodWithOC(podConfig{
+			name:      isolationPodName,
+			namespace: lvmsNamespace,
+			pvcName:   isolationPVCName,
+			mountPath: mountPath,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pod", isolationPodName, lvmsNamespace)
+
+		g.By("#. Wait for both pods to be ready")
+		waitForPodRunning(targetPodName, testNamespace)
+		waitForPodRunning(isolationPodName, lvmsNamespace)
+
+		g.By("#. Get the target pod IP address")
+		var targetPodIP string
+		o.Eventually(func() string {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "oc", "get", "pod", targetPodName, "-n", testNamespace, "-o=jsonpath={.status.podIP}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return ""
+			}
+			ip := strings.TrimSpace(string(output))
+			if net.ParseIP(ip) == nil {
+				// Reject command error output or anything that is not a valid IP address.
+				return ""
+			}
+			targetPodIP = ip
+			return targetPodIP
+		}, PodReadyTimeout, 5*time.Second).ShouldNot(o.BeEmpty())
+		targetPodURL := "http://" + net.JoinHostPort(targetPodIP, "8080")
+
+		g.By("#. Start an HTTP server inside the target pod and verify it is serving")
+		startCtx, startCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer startCancel()
+		startCmd := exec.CommandContext(startCtx, "oc", "exec", targetPodName, "-n", testNamespace, "-c", "test-container", "--",
+			"/bin/sh", "-c", "nohup python3 -m http.server 8080 >/tmp/httpserver.log 2>&1 & sleep 5; curl -s -o /dev/null -m 5 http://localhost:8080; echo CONTROL_EXIT:$?")
+		startOutput, err := startCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to start HTTP server in target pod: %s", string(startOutput))
+		o.Expect(string(startOutput)).To(o.ContainSubstring("CONTROL_EXIT:0"),
+			"HTTP server in target pod %s is not serving on port 8080, isolation probes would pass vacuously: %s",
+			targetPodName, string(startOutput))
+
+		g.By("#. Positive control: verify the target pod (outside LVMS namespace) can reach the API server")
+		reachable, probeErr := canReach(targetPodName, testNamespace, "test-container", apiServerURL)
+		o.Expect(probeErr).NotTo(o.HaveOccurred(), "positive control probe must execute successfully")
+		o.Expect(reachable).To(o.BeTrue(),
+			"target pod in %s must reach the API server — proves the probe mechanism works before testing isolation", testNamespace)
+
+		g.By("#. Verify the test pod cannot reach the OpenShift API server")
+		o.Consistently(func() (bool, error) {
+			return canReach(isolationPodName, lvmsNamespace, "test-container", apiServerURL)
+		}, 30*time.Second, 10*time.Second).Should(o.BeFalse(),
+			"test pod in the LVMS namespace must not reach the API server: lvms-default-deny blocks all egress for unlabeled pods")
+
+		g.By("#. Verify the test pod cannot reach pods in other namespaces")
+		o.Consistently(func() (bool, error) {
+			return canReach(isolationPodName, lvmsNamespace, "test-container", targetPodURL)
+		}, 30*time.Second, 10*time.Second).Should(o.BeFalse(),
+			"test pod in the LVMS namespace must not reach pod %s in namespace %s: lvms-default-deny blocks all egress for unlabeled pods", targetPodName, testNamespace)
+
+		g.By("#. Delete Pod and PVC resources")
+		deleteSpecifiedResource("pod", isolationPodName, lvmsNamespace)
+		deleteSpecifiedResource("pod", targetPodName, testNamespace)
+		deleteSpecifiedResource("pvc", isolationPVCName, lvmsNamespace)
+		deleteSpecifiedResource("pvc", targetPVCName, testNamespace)
+		time.Sleep(10 * time.Second)
+
+		g.By("#. Delete newly created LVMCluster resource")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup1)
+
+		g.By("#. Create original LVMCluster resource")
+		err = originLvmCluster.createWithExportJSON(originLVMJSON)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
 	})
 })
 
