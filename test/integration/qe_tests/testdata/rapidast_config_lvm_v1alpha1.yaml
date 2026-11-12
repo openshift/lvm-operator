@@ -1,0 +1,38 @@
+config:
+    configVersion: 6
+    googleCloudStorage:
+        bucketName: "secaut-bucket"
+        directory: "lvms"
+application:
+  shortName: "LVMS-OCPVERSION_PLACEHOLDER"
+  url: "https://kubernetes.default.svc"
+general:
+    authentication:
+        type: "http_header"
+        parameters:
+            name: "Authorization"
+            value: "Bearer sha256~xxxxxxxx"
+    container:
+        type: "none"
+results:
+    exclusions:
+        - description: "Exclude 401 unauthorized responses which are expected for operator API endpoints"
+          cel: ".result.webResponse.statusCode == 401"
+          enabled: True
+        - description: "Exclude 403 forbidden responses which are expected for operator API endpoints"
+          cel: ".result.webResponse.statusCode == 403"
+          enabled: True
+scanners:
+    zap:
+        apiScan:
+            apis:
+                apiUrl: "https://kubernetes.default.svc/openapi/v3/apis/lvm.topolvm.io/v1alpha1"
+        passiveScan:
+            disabledRules: "2,10015,10027,10096,10024,10054"
+        activeScan:
+            policy: "custom-scan"
+        miscOptions:
+          enableUI: False
+          updateAddons: True
+          memMaxHeap: "2048m"
+          additionalAddons: "openapi,authentication"
