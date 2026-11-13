@@ -20,10 +20,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/featuregate"
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -53,6 +55,24 @@ func (p *Provisioner) NeedLeaderElection() bool {
 
 var _ manager.Runnable = &Provisioner{}
 var _ manager.LeaderElectionRunnable = &Provisioner{}
+
+// gaFeatureGateWrapper intercepts Enabled() calls for GA feature gates that
+// k8s 1.37+ prunes from the registry. The external-provisioner v6 library
+// still checks these gates despite them being GA since 2020, causing panics
+// when the gate is not found. This wrapper returns true for known GA gates
+// (the correct answer — they're always enabled) and delegates everything else.
+type gaFeatureGateWrapper struct {
+	featuregate.FeatureGate
+}
+
+func (w gaFeatureGateWrapper) Enabled(key featuregate.Feature) bool {
+	switch key {
+	case "Topology", "VolumeAttributesClass":
+		return true
+	default:
+		return w.FeatureGate.Enabled(key)
+	}
+}
 
 func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisioner {
 	return &Provisioner{
@@ -115,6 +135,11 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	if pluginCapabilities[csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS] {
 		topologyStore = provisionctrl.NewInMemoryStore()
 	}
+
+	// Wrap DefaultFeatureGate so that Enabled() calls for GA gates that k8s 1.37+
+	// prunes from the registry return true instead of panicking. The external-provisioner
+	// v6 library still checks these gates despite them being GA since 2020.
+	utilfeature.DefaultFeatureGate = gaFeatureGateWrapper{utilfeature.DefaultFeatureGate}
 
 	provisioner := provisionctrl.NewCSIProvisioner(
 		clientset,
