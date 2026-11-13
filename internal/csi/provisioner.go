@@ -14,16 +14,19 @@ import (
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity"
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity/topology"
 	provisionctrl "github.com/kubernetes-csi/external-provisioner/v6/pkg/controller"
+	_ "github.com/kubernetes-csi/external-provisioner/v6/pkg/features"
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/featuregate"
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -115,6 +118,15 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	if pluginCapabilities[csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS] {
 		topologyStore = provisionctrl.NewInMemoryStore()
 	}
+
+	// Register Topology and VolumeAttributesClass feature gates as Beta to prevent
+	// k8s 1.37 from pruning them. The external-provisioner v6 library registers them
+	// as GA, but k8s 1.37 rejects/prunes GA gates, causing Enabled() to panic.
+	// This is a workaround until the upstream library removes the dead feature gate checks.
+	_ = utilfeature.DefaultMutableFeatureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
+		"Topology":              {Default: true, PreRelease: featuregate.Beta},
+		"VolumeAttributesClass": {Default: true, PreRelease: featuregate.Beta},
+	})
 
 	provisioner := provisionctrl.NewCSIProvisioner(
 		clientset,
