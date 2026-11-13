@@ -291,13 +291,13 @@ arches:
     name: util-linux
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/x/xfsprogs-5.0.0-12.el8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/x/xfsprogs-5.0.0-13.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 1117772
-    checksum: sha256:055f26ad45280a432193cb210826bf5b1a51aeb38fa9c7c302ea4d8345d655e7
+    size: 1116556
+    checksum: sha256:00c3f365c8834a5e4314c8e9401460b138a60d682b3ea005d6b3313b296bd19f
     name: xfsprogs
-    evr: 5.0.0-12.el8
-    sourcerpm: xfsprogs-5.0.0-12.el8.src.rpm
+    evr: 5.0.0-13.el8_10
+    sourcerpm: xfsprogs-5.0.0-13.el8_10.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/appstream/source/SRPMS/Packages/l/libxkbcommon-0.9.1-1.el8.src.rpm
     repoid: rhel-8-for-aarch64-appstream-source-rpms
@@ -449,12 +449,12 @@ arches:
     checksum: sha256:98a6ca05944c3c98573b644a6a14edaac4c677ed55f4cc5fbaeb28bd031bdd89
     name: util-linux
     evr: 2.32.1-50.el8_10
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-12.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-13.el8_10.src.rpm
     repoid: rhel-8-for-aarch64-baseos-source-rpms
-    size: 1316620
-    checksum: sha256:af4601dbd2aee4aee767ac380c94e7848b488cec97027475133fb1f339eb6fe1
+    size: 1318403
+    checksum: sha256:c031a5650f8db6575f55a9edf05cb63138266df83aeabbe0410926567c1d494a
     name: xfsprogs
-    evr: 5.0.0-12.el8
+    evr: 5.0.0-13.el8_10
   module_metadata: []
 - arch: ppc64le
   packages:
@@ -752,13 +752,13 @@ arches:
     name: util-linux
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/x/xfsprogs-5.0.0-12.el8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/x/xfsprogs-5.0.0-13.el8_10.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 1194876
-    checksum: sha256:690889b60104fe9862c98f8d2d944d1015ccd9530ecda39e32321faa1ad82af1
+    size: 1194116
+    checksum: sha256:30c4edb29973dfb2b4660fd784a9126c685d496086197ce7bd2efeb1bd1031b1
     name: xfsprogs
-    evr: 5.0.0-12.el8
-    sourcerpm: xfsprogs-5.0.0-12.el8.src.rpm
+    evr: 5.0.0-13.el8_10
+    sourcerpm: xfsprogs-5.0.0-13.el8_10.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/appstream/source/SRPMS/Packages/l/libxkbcommon-0.9.1-1.el8.src.rpm
     repoid: rhel-8-for-ppc64le-appstream-source-rpms
@@ -916,12 +916,12 @@ arches:
     checksum: sha256:98a6ca05944c3c98573b644a6a14edaac4c677ed55f4cc5fbaeb28bd031bdd89
     name: util-linux
     evr: 2.32.1-50.el8_10
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-12.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-13.el8_10.src.rpm
     repoid: rhel-8-for-ppc64le-baseos-source-rpms
-    size: 1316620
-    checksum: sha256:af4601dbd2aee4aee767ac380c94e7848b488cec97027475133fb1f339eb6fe1
+    size: 1318403
+    checksum: sha256:c031a5650f8db6575f55a9edf05cb63138266df83aeabbe0410926567c1d494a
     name: xfsprogs
-    evr: 5.0.0-12.el8
+    evr: 5.0.0-13.el8_10
   module_metadata: []
 - arch: s390x
   packages:
@@ -1212,13 +1212,13 @@ arches:
     name: util-linux
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/x/xfsprogs-5.0.0-12.el8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/x/xfsprogs-5.0.0-13.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
-    size: 1076996
-    checksum: sha256:8e28b48c3380d72410198cc44edee9ed118104757b2ca42720f703d8c729d963
+    size: 1075944
+    checksum: sha256:088dd5b4aaec35c7e2b0f6e66cd1e3595af8a48576ace9bf0261d6355a281737
     name: xfsprogs
-    evr: 5.0.0-12.el8
-    sourcerpm: xfsprogs-5.0.0-12.el8.src.rpm
+    evr: 5.0.0-13.el8_10
+    sourcerpm: xfsprogs-5.0.0-13.el8_10.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/appstream/source/SRPMS/Packages/l/libxkbcommon-0.9.1-1.el8.src.rpm
     repoid: rhel-8-for-s390x-appstream-source-rpms
@@ -1370,12 +1370,12 @@ arches:
     checksum: sha256:98a6ca05944c3c98573b644a6a14edaac4c677ed55f4cc5fbaeb28bd031bdd89
     name: util-linux
     evr: 2.32.1-50.el8_10
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-12.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-13.el8_10.src.rpm
     repoid: rhel-8-for-s390x-baseos-source-rpms
-    size: 1316620
-    checksum: sha256:af4601dbd2aee4aee767ac380c94e7848b488cec97027475133fb1f339eb6fe1
+    size: 1318403
+    checksum: sha256:c031a5650f8db6575f55a9edf05cb63138266df83aeabbe0410926567c1d494a
     name: xfsprogs
-    evr: 5.0.0-12.el8
+    evr: 5.0.0-13.el8_10
   module_metadata: []
 - arch: x86_64
   packages:
@@ -1666,13 +1666,13 @@ arches:
     name: util-linux
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/x/xfsprogs-5.0.0-12.el8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/x/xfsprogs-5.0.0-13.el8_10.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 1120116
-    checksum: sha256:8c85402f7cb9879c732e742c8bbba061f0e8494bcdfac0ed6158ad88506da245
+    size: 1119024
+    checksum: sha256:4428d995b5e3081e1fbf1dea1eff6e3fe0c53614e711ec8400f066da4d9e20ae
     name: xfsprogs
-    evr: 5.0.0-12.el8
-    sourcerpm: xfsprogs-5.0.0-12.el8.src.rpm
+    evr: 5.0.0-13.el8_10
+    sourcerpm: xfsprogs-5.0.0-13.el8_10.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/appstream/source/SRPMS/Packages/l/libxkbcommon-0.9.1-1.el8.src.rpm
     repoid: rhel-8-for-x86_64-appstream-source-rpms
@@ -1824,10 +1824,10 @@ arches:
     checksum: sha256:98a6ca05944c3c98573b644a6a14edaac4c677ed55f4cc5fbaeb28bd031bdd89
     name: util-linux
     evr: 2.32.1-50.el8_10
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-12.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/source/SRPMS/Packages/x/xfsprogs-5.0.0-13.el8_10.src.rpm
     repoid: rhel-8-for-x86_64-baseos-source-rpms
-    size: 1316620
-    checksum: sha256:af4601dbd2aee4aee767ac380c94e7848b488cec97027475133fb1f339eb6fe1
+    size: 1318403
+    checksum: sha256:c031a5650f8db6575f55a9edf05cb63138266df83aeabbe0410926567c1d494a
     name: xfsprogs
-    evr: 5.0.0-12.el8
+    evr: 5.0.0-13.el8_10
   module_metadata: []
