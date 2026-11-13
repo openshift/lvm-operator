@@ -165,25 +165,11 @@ arches:
     name: kmod-libs
     evr: 25-20.el8
     sourcerpm: kmod-25-20.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libblkid-2.32.1-50.el8_10.aarch64.rpm
-    repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 220288
-    checksum: sha256:240b15fdb33e12dd42cbefa7c8790e4215fe3187ba91fbe8a2c18b0cf1bd4f6a
-    name: libblkid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libfdisk-2.32.1-50.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 250468
     checksum: sha256:eaafb0c65fa8715c1ba7145d4d24b576afda85717d81a4b1dfa95e7ac8c5d18c
     name: libfdisk
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libmount-2.32.1-50.el8_10.aarch64.rpm
-    repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 236272
-    checksum: sha256:f908cf68ef704aa580273ae081c2a0929a2bb825df0adef6daf6831b97d9b771
-    name: libmount
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libnsl2-1.2.0-2.20180605git4a062cf.el8.aarch64.rpm
@@ -214,13 +200,6 @@ arches:
     name: libsemanage
     evr: 2.9-12.el8_10
     sourcerpm: libsemanage-2.9-12.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libsmartcols-2.32.1-50.el8_10.aarch64.rpm
-    repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 179748
-    checksum: sha256:6f54135fa7e17605008e15321ad6f7462d2f5b2e40327d85032a23d00d6a9baf
-    name: libsmartcols
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libss-1.45.6-7.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 53992
@@ -242,13 +221,6 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/l/libuuid-2.32.1-50.el8_10.aarch64.rpm
-    repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 100316
-    checksum: sha256:10cd96c6691fd3512bae78657ea8853f42f6ed5a9f152e3579d7a4c30992f8da
-    name: libuuid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/o/openssl-1.1.1k-18.el8_6.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 708620
@@ -619,25 +591,11 @@ arches:
     name: kmod-libs
     evr: 25-20.el8
     sourcerpm: kmod-25-20.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libblkid-2.32.1-50.el8_10.ppc64le.rpm
-    repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 248556
-    checksum: sha256:42d5159a2da411a70bdcdef9913228d5bfab919ff77c285009629048aa4b8959
-    name: libblkid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libfdisk-2.32.1-50.el8_10.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
     size: 277252
     checksum: sha256:6cbc14dfbb7afb03b5bb15158f1e7e7f653e0d9b7cf4caeb6ded622021a39e5e
     name: libfdisk
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libmount-2.32.1-50.el8_10.ppc64le.rpm
-    repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 267764
-    checksum: sha256:f9b4f1e99a2d95a5c2c50ba89fd199c81e17098b750dd81e03854c4e15994f67
-    name: libmount
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libnsl2-1.2.0-2.20180605git4a062cf.el8.ppc64le.rpm
@@ -675,13 +633,6 @@ arches:
     name: libsemanage
     evr: 2.9-12.el8_10
     sourcerpm: libsemanage-2.9-12.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libsmartcols-2.32.1-50.el8_10.ppc64le.rpm
-    repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 196988
-    checksum: sha256:0b7df39bc816757411f667d0a1b2be98ce16d20b116d7661e8527b63782c899b
-    name: libsmartcols
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libss-1.45.6-7.el8_10.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
     size: 55556
@@ -703,13 +654,6 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/l/libuuid-2.32.1-50.el8_10.ppc64le.rpm
-    repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 102832
-    checksum: sha256:7a0614e29e17d70991fef71e612b3f37d1085d376a621f35ac7bce426bd5afaf
-    name: libuuid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/o/openssl-1.1.1k-18.el8_6.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
     size: 731792
@@ -1086,25 +1030,11 @@ arches:
     name: kmod-libs
     evr: 25-20.el8
     sourcerpm: kmod-25-20.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libblkid-2.32.1-50.el8_10.s390x.rpm
-    repoid: rhel-8-for-s390x-baseos-rpms
-    size: 218824
-    checksum: sha256:b7d8e5b9bc3e8bca0445c04039aaaa0205ef36fe0b309e96eacbd8ddf460c02e
-    name: libblkid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libfdisk-2.32.1-50.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 250324
     checksum: sha256:a5ef9fc8080cb44843fa832c2566e0e2b8354b0cf3811d33751e2bc0b455bc9b
     name: libfdisk
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libmount-2.32.1-50.el8_10.s390x.rpm
-    repoid: rhel-8-for-s390x-baseos-rpms
-    size: 234976
-    checksum: sha256:fb747183f12313d063fdfed10ae68659aebd2d612880588b289666a9cbb26727
-    name: libmount
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libnsl2-1.2.0-2.20180605git4a062cf.el8.s390x.rpm
@@ -1135,13 +1065,6 @@ arches:
     name: libsemanage
     evr: 2.9-12.el8_10
     sourcerpm: libsemanage-2.9-12.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libsmartcols-2.32.1-50.el8_10.s390x.rpm
-    repoid: rhel-8-for-s390x-baseos-rpms
-    size: 179740
-    checksum: sha256:e9e5f175638f32496103ed9983c3abbd35b3e3b4ca9f4a7658a64bff58e8254c
-    name: libsmartcols
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libss-1.45.6-7.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 54228
@@ -1163,13 +1086,6 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/l/libuuid-2.32.1-50.el8_10.s390x.rpm
-    repoid: rhel-8-for-s390x-baseos-rpms
-    size: 101076
-    checksum: sha256:cadc83771365c6ff74fa5ce7c53aafc6b4f95697a4931019742a0cec1e5d9058
-    name: libuuid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/o/openssl-1.1.1k-18.el8_6.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 714824
@@ -1540,25 +1456,11 @@ arches:
     name: kmod-libs
     evr: 25-20.el8
     sourcerpm: kmod-25-20.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libblkid-2.32.1-50.el8_10.x86_64.rpm
-    repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 226804
-    checksum: sha256:11110c750a1d4535ec4bc0facd212602b97c4033c332994e4a121394200a5561
-    name: libblkid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libfdisk-2.32.1-50.el8_10.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
     size: 260444
     checksum: sha256:56632cba87b189c418fc4ec89f6d5606eb34d1308cdbcded0c5216236f34c7d1
     name: libfdisk
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libmount-2.32.1-50.el8_10.x86_64.rpm
-    repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 243628
-    checksum: sha256:007fae61654977adbdaa3618e427c24049d6d7a9f6304b76e663474caf73cc5d
-    name: libmount
     evr: 2.32.1-50.el8_10
     sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libnsl2-1.2.0-2.20180605git4a062cf.el8.x86_64.rpm
@@ -1589,13 +1491,6 @@ arches:
     name: libsemanage
     evr: 2.9-12.el8_10
     sourcerpm: libsemanage-2.9-12.el8_10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libsmartcols-2.32.1-50.el8_10.x86_64.rpm
-    repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 184444
-    checksum: sha256:b090cb79881d9f0d1ae371c4e6287f34841270fd4a936134749af3e361115a1e
-    name: libsmartcols
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libss-1.45.6-7.el8_10.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
     size: 54504
@@ -1617,13 +1512,6 @@ arches:
     name: libutempter
     evr: 1.1.6-14.el8
     sourcerpm: libutempter-1.1.6-14.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/l/libuuid-2.32.1-50.el8_10.x86_64.rpm
-    repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 100960
-    checksum: sha256:46372a4e650a3217b0a98d82ddfcb623a3df2bdc29d32d7a2cb0e094b331ba40
-    name: libuuid
-    evr: 2.32.1-50.el8_10
-    sourcerpm: util-linux-2.32.1-50.el8_10.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/o/openssl-1.1.1k-18.el8_6.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
     size: 728096
