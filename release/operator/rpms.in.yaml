@@ -1,8 +1,26 @@
 contentOrigin:
+  # NOTE: These repos are pinned to the E4S content stream for a specific RHEL
+  # minor (e4s/rhel9/<minor>/), NOT the rolling dist/rhel9/9/ repos.
+  #
+  # Why:
+  #  - The operator base image is registry.redhat.io/rhel9-N-els/rhel-minimal,
+  #    which is built from E4S content (see its label cpe:/a:redhat:rhel_e4s:...).
+  #  - Using the rolling dist/rhel9/9/ repos pulls the latest RHEL 9 minor's
+  #    RPMs onto an older base -> an incoherent image (e.g. 9.9 userspace on a
+  #    9.2 base) and breaks FIPS-cert alignment.
+  #  - Using the GA snapshot dist/rhel9/<minor>/ pulls content OLDER than the
+  #    E4S base and fails the build: its openssl-libs bundles /usr/lib64/
+  #    ossl-modules/fips.so, which conflicts with the base's
+  #    openssl-fips-provider-so package.
+  #  - The E4S repos serve the exact z-stream content the base is built from, so
+  #    the image stays coherent at the pinned minor and the openssl conflict is
+  #    avoided. The pinned minor must match the base image's minor and the
+  #    OpenShift release this LVMS version ships in.
+  # Requires an E4S entitlement on the build's RHSM activation key.
   repos:
-    - repoid: rhel-9-for-$basearch-baseos-rpms
+    - repoid: rhel-9-for-$basearch-baseos-e4s-rpms
       name: Red Hat Enterprise Linux 9 for $basearch - BaseOS (RPMs)
-      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/baseos/os
+      baseurl: https://cdn.redhat.com/content/e4s/rhel9/9.2/$basearch/baseos/os
       enabled: "1"
       gpgcheck: "1"
       gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
@@ -14,9 +32,9 @@ contentOrigin:
       sslclientkey: $SSL_CLIENT_KEY
       sslclientcert: $SSL_CLIENT_CERT
 
-    - repoid: rhel-9-for-$basearch-appstream-source-rpms
+    - repoid: rhel-9-for-$basearch-appstream-e4s-source-rpms
       name: Red Hat Enterprise Linux 9 for $basearch - AppStream (Source RPMs)
-      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/appstream/source/SRPMS
+      baseurl: https://cdn.redhat.com/content/e4s/rhel9/9.2/$basearch/appstream/source/SRPMS
       enabled: "1"
       gpgcheck: "1"
       gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
@@ -28,9 +46,9 @@ contentOrigin:
       sslclientkey: $SSL_CLIENT_KEY
       sslclientcert: $SSL_CLIENT_CERT
 
-    - repoid: rhel-9-for-$basearch-appstream-rpms
+    - repoid: rhel-9-for-$basearch-appstream-e4s-rpms
       name: Red Hat Enterprise Linux 9 for $basearch - AppStream (RPMs)
-      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/appstream/os
+      baseurl: https://cdn.redhat.com/content/e4s/rhel9/9.2/$basearch/appstream/os
       enabled: "1"
       gpgcheck: "1"
       gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
@@ -41,9 +59,9 @@ contentOrigin:
       sslclientkey: $SSL_CLIENT_KEY
       sslclientcert: $SSL_CLIENT_CERT
 
-    - repoid: rhel-9-for-$basearch-baseos-source-rpms
+    - repoid: rhel-9-for-$basearch-baseos-e4s-source-rpms
       name: Red Hat Enterprise Linux 9 for $basearch - BaseOS (Source RPMs)
-      baseurl: https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/baseos/source/SRPMS
+      baseurl: https://cdn.redhat.com/content/e4s/rhel9/9.2/$basearch/baseos/source/SRPMS
       enabled: "1"
       gpgcheck: "1"
       gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
