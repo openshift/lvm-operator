@@ -20,7 +20,7 @@ ENV GOEXPERIMENT=strictfipsruntime
 
 RUN go build -tags strictfipsruntime -mod=readonly -ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-6-els/rhel-minimal:9.6@sha256:47e467abce6a76e4246ea2ebf8183a86faf2e4ceb1bbae7ff718f7c69a0ad643
+FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-6-els/rhel-minimal:9.6-1793855689@sha256:47e467abce6a76e4246ea2ebf8183a86faf2e4ceb1bbae7ff718f7c69a0ad643
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
