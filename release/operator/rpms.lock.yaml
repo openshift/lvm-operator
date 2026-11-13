@@ -291,13 +291,13 @@ arches:
     name: util-linux-core
     evr: 2.37.4-28.el9_9.1
     sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/x/xfsprogs-6.4.0-9.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/x/xfsprogs-6.4.0-10.el9_9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 1129411
-    checksum: sha256:4a185e91d8e21cbb9fa34e22d99be38afa49c20418dd14ba1c30e22f99b11581
+    size: 1129070
+    checksum: sha256:3755bb2bf5820c342443190d5d0a3dc8516ddf60c8f62a2786fb1aa40ce687bd
     name: xfsprogs
-    evr: 6.4.0-9.el9
-    sourcerpm: xfsprogs-6.4.0-9.el9.src.rpm
+    evr: 6.4.0-10.el9_9
+    sourcerpm: xfsprogs-6.4.0-10.el9_9.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/a/acl-2.4.0-2.el9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
@@ -443,12 +443,12 @@ arches:
     checksum: sha256:2d3ec3819df3e6eeb8b9706a0e2b3a64a128b16eea8a08ddb423f1c41b90a1ee
     name: util-linux
     evr: 2.37.4-28.el9_9.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-9.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-10.el9_9.src.rpm
     repoid: rhel-9-for-aarch64-baseos-source-rpms
-    size: 1399293
-    checksum: sha256:1f46e35beccb678c2a20d3adb81c8504d7436838ee1b844375135a4c5a671307
+    size: 1399521
+    checksum: sha256:960f54fc67caa0fc2b21651ff872b6062a71e89534af484a6ebe8aff54e6db67
     name: xfsprogs
-    evr: 6.4.0-9.el9
+    evr: 6.4.0-10.el9_9
   module_metadata: []
 - arch: ppc64le
   packages:
@@ -746,13 +746,13 @@ arches:
     name: util-linux-core
     evr: 2.37.4-28.el9_9.1
     sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/x/xfsprogs-6.4.0-9.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/x/xfsprogs-6.4.0-10.el9_9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 1206157
-    checksum: sha256:0d8254954d07f182844561803cb09e3a4e3bced7b83f009893a61e5825c81e4d
+    size: 1205366
+    checksum: sha256:6fc5957d436d5f870fc77a394a32a37bbb2bbbfe9b9b35cc255243cc1d62ffb1
     name: xfsprogs
-    evr: 6.4.0-9.el9
-    sourcerpm: xfsprogs-6.4.0-9.el9.src.rpm
+    evr: 6.4.0-10.el9_9
+    sourcerpm: xfsprogs-6.4.0-10.el9_9.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/a/acl-2.4.0-2.el9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
@@ -904,12 +904,12 @@ arches:
     checksum: sha256:2d3ec3819df3e6eeb8b9706a0e2b3a64a128b16eea8a08ddb423f1c41b90a1ee
     name: util-linux
     evr: 2.37.4-28.el9_9.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-9.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-10.el9_9.src.rpm
     repoid: rhel-9-for-ppc64le-baseos-source-rpms
-    size: 1399293
-    checksum: sha256:1f46e35beccb678c2a20d3adb81c8504d7436838ee1b844375135a4c5a671307
+    size: 1399521
+    checksum: sha256:960f54fc67caa0fc2b21651ff872b6062a71e89534af484a6ebe8aff54e6db67
     name: xfsprogs
-    evr: 6.4.0-9.el9
+    evr: 6.4.0-10.el9_9
   module_metadata: []
 - arch: s390x
   packages:
@@ -1200,13 +1200,13 @@ arches:
     name: util-linux-core
     evr: 2.37.4-28.el9_9.1
     sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/x/xfsprogs-6.4.0-9.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/x/xfsprogs-6.4.0-10.el9_9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 1083111
-    checksum: sha256:de7ea5729006f89bb0014831de9dacba7cc5d1949d46ffd0c2a8209de6dbef17
+    size: 1081618
+    checksum: sha256:1c8d097519b44201ebbcdf5b6f9de0a347a40ab07e11b298ac4991fdc693ee4e
     name: xfsprogs
-    evr: 6.4.0-9.el9
-    sourcerpm: xfsprogs-6.4.0-9.el9.src.rpm
+    evr: 6.4.0-10.el9_9
+    sourcerpm: xfsprogs-6.4.0-10.el9_9.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/a/acl-2.4.0-2.el9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
@@ -1352,12 +1352,12 @@ arches:
     checksum: sha256:2d3ec3819df3e6eeb8b9706a0e2b3a64a128b16eea8a08ddb423f1c41b90a1ee
     name: util-linux
     evr: 2.37.4-28.el9_9.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-9.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-10.el9_9.src.rpm
     repoid: rhel-9-for-s390x-baseos-source-rpms
-    size: 1399293
-    checksum: sha256:1f46e35beccb678c2a20d3adb81c8504d7436838ee1b844375135a4c5a671307
+    size: 1399521
+    checksum: sha256:960f54fc67caa0fc2b21651ff872b6062a71e89534af484a6ebe8aff54e6db67
     name: xfsprogs
-    evr: 6.4.0-9.el9
+    evr: 6.4.0-10.el9_9
   module_metadata: []
 - arch: x86_64
   packages:
@@ -1648,13 +1648,13 @@ arches:
     name: util-linux-core
     evr: 2.37.4-28.el9_9.1
     sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/x/xfsprogs-6.4.0-9.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/x/xfsprogs-6.4.0-10.el9_9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 1136642
-    checksum: sha256:21b9645040cca5732461bd0a9a60c00c7a014cffa215954c818a7c4cfd6d0bfb
+    size: 1135303
+    checksum: sha256:96d2bf56c6ce2fa439479c36331f627f87894ad7fad9d12ddd68124ec0a32d0c
     name: xfsprogs
-    evr: 6.4.0-9.el9
-    sourcerpm: xfsprogs-6.4.0-9.el9.src.rpm
+    evr: 6.4.0-10.el9_9
+    sourcerpm: xfsprogs-6.4.0-10.el9_9.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/a/acl-2.4.0-2.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
@@ -1800,10 +1800,10 @@ arches:
     checksum: sha256:2d3ec3819df3e6eeb8b9706a0e2b3a64a128b16eea8a08ddb423f1c41b90a1ee
     name: util-linux
     evr: 2.37.4-28.el9_9.1
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-9.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/x/xfsprogs-6.4.0-10.el9_9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 1399293
-    checksum: sha256:1f46e35beccb678c2a20d3adb81c8504d7436838ee1b844375135a4c5a671307
+    size: 1399521
+    checksum: sha256:960f54fc67caa0fc2b21651ff872b6062a71e89534af484a6ebe8aff54e6db67
     name: xfsprogs
-    evr: 6.4.0-9.el9
+    evr: 6.4.0-10.el9_9
   module_metadata: []
