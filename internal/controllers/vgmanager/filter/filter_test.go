@@ -243,3 +243,49 @@ func TestOnlyValidFilesystemSignatures(t *testing.T) {
 		})
 	}
 }
+
+func TestGlobSelector(t *testing.T) {
+	for _, optional := range []bool{false, true} {
+		selector := &lvmv1alpha1.DeviceSelector{}
+		paths := []lvmv1alpha1.DevicePath{"glob:/dev/sdb", "glob:/dev/nvme*n1"}
+		if optional {
+			selector.OptionalPaths = paths
+		} else {
+			selector.Paths = paths
+		}
+		vg := &lvmv1alpha1.LVMVolumeGroup{Spec: lvmv1alpha1.LVMVolumeGroupSpec{DeviceSelector: selector}}
+		filters := DefaultFilters(context.Background(), &Options{VG: vg})
+		resolver := symlinkResolver.NewWithResolver(func(string) (string, error) { t.Fatal("glob must not resolve symlinks"); return "", nil })
+		for _, tt := range []struct {
+			device  string
+			matches bool
+		}{
+			{"/dev/sdb", true},
+			{"/dev/nvme12n1", true},
+			{"/dev/sdb1", false},
+			{"/prefix/dev/nvme0n1", false},
+			{"/dev/sda", false},
+		} {
+			err := filters[partOfDeviceSelector](lsblk.BlockDevice{Name: tt.device, KName: tt.device}, resolver)
+			if tt.matches {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+		}
+	}
+}
+
+// A malformed pattern must exclude the device, never fall through to "selected".
+func TestGlobSelectorRejectsMalformedPattern(t *testing.T) {
+	vg := &lvmv1alpha1.LVMVolumeGroup{Spec: lvmv1alpha1.LVMVolumeGroupSpec{
+		DeviceSelector: &lvmv1alpha1.DeviceSelector{Paths: []lvmv1alpha1.DevicePath{"glob:/dev/["}},
+	}}
+	filters := DefaultFilters(context.Background(), &Options{VG: vg})
+	resolver := symlinkResolver.NewWithResolver(func(path string) (string, error) { return path, nil })
+	// The whole safety chain stays intact even when the selector cannot be evaluated.
+	for _, name := range []string{partOfDeviceSelector, notReadOnly, noChildren} {
+		assert.Contains(t, filters, name)
+	}
+	assert.ErrorContains(t, filters[partOfDeviceSelector](lsblk.BlockDevice{Name: "/dev/sdb", KName: "/dev/sdb"}, resolver), "invalid device path pattern")
+}

@@ -581,6 +581,7 @@ func testVGWithLocalDevice(ctx context.Context, vgTemplate lvmv1alpha1.LVMVolume
 	})
 
 	By("verifying the lvmd config generation", func() {
+		checkDistributedEvent(corev1.EventTypeNormal, fmt.Sprintf("successfully added [%s] device(s) to volume group", device.Unresolved()))
 		checkDistributedEvent(corev1.EventTypeNormal, "lvmd config file doesn't exist, will attempt to create a fresh config")
 		checkDistributedEvent(corev1.EventTypeNormal, "updated lvmd config with new deviceClasses")
 		lvmdConfig, err := instances.LVMD.Load(ctx)

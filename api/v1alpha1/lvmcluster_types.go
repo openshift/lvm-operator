@@ -293,12 +293,21 @@ type DeviceSelector struct {
 	// MinSize *resource.Quantity `json:"minSize,omitempty"`
 
 	// Paths is a list of device paths. All paths must resolve on each node.
+	// Entries prefixed with "glob:" are shell-style patterns matched against the full
+	// kernel device name (for example, glob:/dev/nvme2* or glob:/dev/sd[b-d]). The syntax
+	// is the same as the shell, so "ls <pattern>" on the node previews what is selected:
+	// "*" and "?" never cross a "/" and "." is a literal dot. Symlinks are not expanded
+	// for patterns, so /dev/disk/by-id/… aliases are not matched. Each pattern must match
+	// at least one device on each node, and every matching device must be usable or
+	// already belong to this volume group.
 	// Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
 	// /dev/sda, which may be renamed or reordered by the kernel on reboot.
 	// +optional
 	Paths []DevicePath `json:"paths,omitempty"`
 
 	// OptionalPaths is a list of device paths. At least one path must resolve on each node.
+	// Entries support the same "glob:" syntax as Paths. Unmatched optional entries
+	// are ignored. Matching devices still pass through the normal safety filters.
 	// Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
 	// /dev/sda, which may be renamed or reordered by the kernel on reboot.
 	// This can be used to provide a single list of disk IDs across multiple nodes.

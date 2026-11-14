@@ -40,7 +40,7 @@ When a user creates an `LVMCluster` CR, the operator drives the system through t
 2. **VG Manager** (running as a privileged DaemonSet on each matching node) watches for `LVMVolumeGroup` CRs, discovers block devices matching the device selector, creates LVM physical volumes and volume groups, and optionally provisions thin pools.
 3. **Status reporting**: each VG Manager instance creates or updates an `LVMVolumeGroupNodeStatus` CR reflecting the volume group state on its node. The LVMCluster controller aggregates these to set the cluster-level status.
 
-VG Manager periodic reconciliation depends on the configuration: RAID device classes requeue every 30 seconds for health monitoring, Dynamic discovery policy requeues every 30 seconds for device discovery, and explicit device paths with Static policy do not periodically requeue. The LVMCluster controller requeues every 1 minute unconditionally.
+VG Manager periodic reconciliation depends on the configuration: RAID device classes requeue every 60 seconds for health monitoring, glob device paths requeue every 30 seconds to refresh matches, and Dynamic discovery without explicit paths requeues every 30 seconds for device discovery. Literal explicit device paths and Static discovery without glob paths do not periodically requeue. The LVMCluster controller requeues every 1 minute unconditionally.
 
 ## Data Flow: PVC to Logical Volume
 
