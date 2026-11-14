@@ -52,23 +52,41 @@ func (r *Reconciler) setVolumeGroupProgressingStatus(ctx context.Context, vg *lv
 	return r.setVolumeGroupStatus(ctx, vg, status)
 }
 
-func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, error) {
+// setVolumeGroupReadyStatus reports whether the node status changed and whether the
+// volume group ended up Degraded rather than Ready. Both the missing-device check
+// below and applyRAIDStatus can downgrade it, and a caller that announced
+// VolumeGroupReady off the change alone would contradict the status it just wrote.
+func (r *Reconciler) setVolumeGroupReadyStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices) (bool, bool, error) {
 	status := &lvmv1alpha1.VGStatus{
 		Name:   vg.GetName(),
 		Status: lvmv1alpha1.VGStatusReady,
 	}
 
+	// A disk that disappeared is only noticed today when a removal happens to be
+	// pending, so a volume group can report Ready while LVM already records a
+	// missing physical volume. Report it on every pass instead.
+	for _, existing := range vgs {
+		if existing.Name == vg.GetName() && existing.IsMissingDevices() {
+			status.Status = lvmv1alpha1.VGStatusDegraded
+			status.Reason = fmt.Sprintf("volume group %s is missing one or more physical volumes on node %s; "+
+				"reattach the device, or repair the volume group on the node before changing the device selector",
+				vg.GetName(), r.NodeName)
+			break
+		}
+	}
+
 	if _, err := r.setDevices(status, vgs, devices); err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	if vg.Spec.RAIDConfig != nil {
 		if err := r.applyRAIDStatus(ctx, vg, vgs, status); err != nil {
-			return false, fmt.Errorf("failed to collect RAID status: %w", err)
+			return false, false, fmt.Errorf("failed to collect RAID status: %w", err)
 		}
 	}
 
-	return r.setVolumeGroupStatus(ctx, vg, status)
+	updated, err := r.setVolumeGroupStatus(ctx, vg, status)
+	return updated, status.Status == lvmv1alpha1.VGStatusDegraded, err
 }
 
 func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, vgs []lvm.VolumeGroup, devices FilteredBlockDevices, err error) (bool, error) {
@@ -96,7 +114,9 @@ func (r *Reconciler) setVolumeGroupFailedStatus(ctx context.Context, vg *lvmv1al
 func (r *Reconciler) setVolumeGroupStatus(ctx context.Context, vg *lvmv1alpha1.LVMVolumeGroup, status *lvmv1alpha1.VGStatus) (bool, error) {
 	logger := log.FromContext(ctx).WithValues("VolumeGroup", client.ObjectKeyFromObject(vg))
 
-	if hasExplicitDevicePaths(vg) {
+	if vg.Spec.DeviceSelector.HasGlobPaths() {
+		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic
+	} else if hasExplicitDevicePaths(vg) {
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyPreconfigured
 	} else if vg.Spec.DeviceDiscoveryPolicy == nil || *vg.Spec.DeviceDiscoveryPolicy == lvmv1alpha1.DeviceDiscoveryPolicyDynamic {
 		status.DeviceDiscoveryPolicy = lvmv1alpha1.DeviceDiscoveryPolicyRuntimeDynamic

@@ -31,18 +31,21 @@ const (
 // BlockDevice is the block device as output by lsblk.
 // All the fields are lsblk columns.
 type BlockDevice struct {
-	Name      string        `json:"name"`
-	KName     string        `json:"kname"`
-	Type      string        `json:"type"`
-	Model     string        `json:"model,omitempty"`
-	Vendor    string        `json:"vendor,omitempty"`
-	State     string        `json:"state,omitempty"`
-	FSType    string        `json:"fstype"`
-	Size      string        `json:"size"`
-	Children  []BlockDevice `json:"children,omitempty"`
-	ReadOnly  bool          `json:"ro,omitempty"`
-	Serial    string        `json:"serial,omitempty"`
-	PartLabel string        `json:"partLabel,omitempty"`
+	Name        string        `json:"name"`
+	KName       string        `json:"kname"`
+	Type        string        `json:"type"`
+	Model       string        `json:"model,omitempty"`
+	Vendor      string        `json:"vendor,omitempty"`
+	State       string        `json:"state,omitempty"`
+	FSType      string        `json:"fstype"`
+	Size        string        `json:"size"`
+	Children    []BlockDevice `json:"children,omitempty"`
+	ReadOnly    bool          `json:"ro,omitempty"`
+	Serial      string        `json:"serial,omitempty"`
+	WWN         string        `json:"wwn,omitempty"`
+	PartLabel   string        `json:"partLabel,omitempty"`
+	MajorMinor  string        `json:"maj:min,omitempty"`
+	Mountpoints *[]*string    `json:"mountpoints,omitempty"`
 }
 
 type LSBLK interface {
@@ -75,7 +78,21 @@ func (b BlockDevice) HasChildren() bool {
 	return len(b.Children) > 0
 }
 
-const LSBLK_COLUMNS = "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,PARTLABEL,FSTYPE"
+// LSBLK_COLUMNS requires util-linux 2.37 or newer on the node, because MOUNTPOINTS
+// was added in that release. lsblk runs on the host, so this is the node's version,
+// not the container's. Measured: util-linux 2.37.4 (RHEL 9) accepts the set, while
+// 2.32.1 (RHEL 8) rejects it with "unknown column: MOUNTPOINTS".
+//
+// An unknown column makes lsblk exit non-zero, so ListBlockDevices fails and the
+// node discovers no devices at all. Every OpenShift release this operator ships
+// with runs RHEL 9 or later nodes, so the floor is met; the hazard is backporting
+// the wildcard selector feature, which introduced MOUNTPOINTS, to a branch that
+// still supports RHEL 8 nodes. That would need a singular-MOUNTPOINT fallback, and
+// the fallback must keep reporting every mount: globWipeDevice refuses to wipe a
+// device whose mount state is unknown, and would be weakened by seeing only one.
+//
+// Before adding a column here, check it against the oldest supported node OS.
+const LSBLK_COLUMNS = "NAME,ROTA,TYPE,SIZE,MODEL,VENDOR,RO,STATE,KNAME,SERIAL,WWN,PARTLABEL,FSTYPE,MAJ:MIN,MOUNTPOINTS"
 
 // ListBlockDevices lists the block devices using the lsblk command
 func (lsblk *HostLSBLK) ListBlockDevices(ctx context.Context) ([]BlockDevice, error) {

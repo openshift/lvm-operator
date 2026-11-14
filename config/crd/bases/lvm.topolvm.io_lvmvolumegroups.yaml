@@ -62,22 +62,42 @@ spec:
                       ForceWipeDevicesAndDestroyAllData is a flag to force wipe the selected devices.
                       This wipes the file signatures on the devices. Use this feature with caution.
                       Force wipe the devices only when you know that they do not contain any important data.
+                      Glob matches are checked for device identity, mounts, dependencies, and volume group ownership before wiping.
                     type: boolean
                   optionalPaths:
                     description: |-
                       OptionalPaths is a list of device paths. At least one path must resolve on each node.
+                      Prefix a path with glob: to select all paths matching a shell-style glob,
+                      for example glob:/dev/disk/by-id/wwn-*. Patterns with no matches are ignored.
+                      Glob paths are not supported with RAID device classes.
                       Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
                       /dev/sda, which may be renamed or reordered by the kernel on reboot.
                       This can be used to provide a single list of disk IDs across multiple nodes.
                     items:
+                      description: |-
+                        DevicePath is an absolute path to a block device under /dev, optionally
+                        prefixed with "glob:" to select several devices by shell-style pattern.
+                        The schema enforces the /dev prefix so an LVMVolumeGroup created directly,
+                        which has no webhook of its own, cannot name a path outside /dev.
+                      pattern: ^(glob:)?/dev/.+$
                       type: string
                     type: array
                   paths:
                     description: |-
                       Paths is a list of device paths. All paths must resolve on each node.
+                      Prefix a path with glob: to select all paths matching a shell-style glob,
+                      for example glob:/dev/sd*. Each pattern must match at least one usable device
+                      or device already in the volume group. Other matches are excluded by filters.
+                      Glob paths are not supported with RAID device classes.
                       Prefer stable, consistent paths such as /dev/disk/by-id/… instead of
                       /dev/sda, which may be renamed or reordered by the kernel on reboot.
                     items:
+                      description: |-
+                        DevicePath is an absolute path to a block device under /dev, optionally
+                        prefixed with "glob:" to select several devices by shell-style pattern.
+                        The schema enforces the /dev prefix so an LVMVolumeGroup created directly,
+                        which has no webhook of its own, cannot name a path outside /dev.
+                      pattern: ^(glob:)?/dev/.+$
                       type: string
                     type: array
                 type: object
