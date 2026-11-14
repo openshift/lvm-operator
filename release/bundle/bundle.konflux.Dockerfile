@@ -5,7 +5,7 @@ ARG IMG=registry.redhat.io/lvms4/lvms-rhel9-operator@sha256:fc6127521bcffc464d83
 
 ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel9@sha256:c97a7004406a24cf1b1132d4684494f88e7579218fb5319a2628b1c4aef051d7
 
-ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel9@sha256:b2ac7d195cc06ef86f9e09f616c88b5b1a3cd19be2112c70b6ddc47c065d973d
+ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel9@sha256:beb9d42e6ac10bb801b2231f16955fd8ae8c89fee0a107be0b89c052d6d7312a
 
 ARG CSI_REGISTRAR_IMAGE=registry.redhat.io/openshift4/ose-csi-node-driver-registrar@sha256:2e7eac2a2c52f7c6f7ec5a1b2a9c1a211e56be6233d6b1fc5a29bb7d05f26fae
 
