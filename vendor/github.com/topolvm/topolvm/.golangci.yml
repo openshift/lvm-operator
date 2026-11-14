@@ -1,0 +1,49 @@
+version: "2"
+run:
+  timeout: 5m
+  allow-parallel-runners: true
+linters:
+  settings:
+    goconst:
+      # Test code often repeats short literals as test data; keeping them
+      # inline is more readable than extracting constants.
+      ignore-tests: true
+    staticcheck:
+      dot-import-whitelist: # allow dot imports for the following packages
+        - github.com/onsi/gomega
+        - github.com/onsi/ginkgo/v2
+  default: none
+  enable:
+    - copyloopvar
+    - dupl
+    - errcheck
+    - goconst
+    - gocyclo
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  exclusions:
+    rules:
+      - path: "api/*"
+        linters:
+          - lll
+      - path: "internal/*"
+        linters:
+          - dupl
+          - lll
+
+      # FIXME: remove this once we have fixed the issues
+      - path: "test/e2e/*"
+        linters:
+          - gocyclo
+formatters:
+  enable:
+    - gofmt
+    - goimports
