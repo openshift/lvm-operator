@@ -14,12 +14,14 @@ import (
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity"
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity/topology"
 	provisionctrl "github.com/kubernetes-csi/external-provisioner/v6/pkg/controller"
+	"github.com/kubernetes-csi/external-provisioner/v6/pkg/features"
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -56,22 +58,16 @@ func (p *Provisioner) NeedLeaderElection() bool {
 var _ manager.Runnable = &Provisioner{}
 var _ manager.LeaderElectionRunnable = &Provisioner{}
 
-// gaFeatureGateWrapper intercepts Enabled() calls for GA feature gates that
-// k8s 1.37+ prunes from the registry. The external-provisioner v6 library
-// still checks these gates despite them being GA since 2020, causing panics
-// when the gate is not found. This wrapper returns true for known GA gates
-// (the correct answer — they're always enabled) and delegates everything else.
-type gaFeatureGateWrapper struct {
-	featuregate.FeatureGate
-}
-
-func (w gaFeatureGateWrapper) Enabled(key featuregate.Feature) bool {
-	switch key {
-	case "Topology", "VolumeAttributesClass":
-		return true
-	default:
-		return w.FeatureGate.Enabled(key)
-	}
+func init() {
+	// Register Topology and CrossNamespaceVolumeDataSource feature gates explicitly.
+	// The external-provisioner v6 init() registers these along with VolumeAttributesClass,
+	// but the external-resizer also registers VolumeAttributesClass with a different spec,
+	// causing a conflict that silently prevents ALL provisioner gates from being registered.
+	// By registering just the non-conflicting gates here, we ensure SupportsTopology() works.
+	utilruntime.Must(utilfeature.DefaultMutableFeatureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
+		features.Topology:                       {Default: true, PreRelease: featuregate.GA},
+		features.CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
+	}))
 }
 
 func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisioner {
@@ -126,20 +122,10 @@ func (p *Provisioner) Start(ctx context.Context) error {
 	claimLister := factory.Core().V1().PersistentVolumeClaims().Lister()
 	vaLister := factory.Storage().V1().VolumeAttachments().Lister()
 
-	// Create a topology store for tracking PVC-to-node topology mappings.
-	// Only needed when the driver supports topology-aware provisioning.
-	// We check the plugin capability directly instead of using provisionctrl.SupportsTopology()
-	// because the latter also checks the Topology feature gate, which is GA (always enabled)
-	// and may conflict with the k8s 1.37 feature gate registry.
 	var topologyStore *provisionctrl.InMemoryStore
-	if pluginCapabilities[csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS] {
+	if provisionctrl.SupportsTopology(pluginCapabilities) {
 		topologyStore = provisionctrl.NewInMemoryStore()
 	}
-
-	// Wrap DefaultFeatureGate so that Enabled() calls for GA gates that k8s 1.37+
-	// prunes from the registry return true instead of panicking. The external-provisioner
-	// v6 library still checks these gates despite them being GA since 2020.
-	utilfeature.DefaultFeatureGate = gaFeatureGateWrapper{utilfeature.DefaultFeatureGate}
 
 	provisioner := provisionctrl.NewCSIProvisioner(
 		clientset,
