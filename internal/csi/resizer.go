@@ -3,11 +3,12 @@ package csi
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/kubernetes-csi/external-resizer/pkg/controller"
-	"github.com/kubernetes-csi/external-resizer/pkg/csi"
-	"github.com/kubernetes-csi/external-resizer/pkg/resizer"
+	"github.com/kubernetes-csi/external-resizer/v2/pkg/controller"
+	"github.com/kubernetes-csi/external-resizer/v2/pkg/csi"
+	"github.com/kubernetes-csi/external-resizer/v2/pkg/resizer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -78,7 +79,9 @@ func (r *Resizer) Start(ctx context.Context) error {
 
 	factory.Start(ctx.Done())
 
-	resizerController.Run(workers, ctx)
+	var waitGroup sync.WaitGroup
+	resizerController.Run(workers, ctx, &waitGroup)
+	waitGroup.Wait()
 
 	ctrl.Log.Info("resizer finished shutdown")
 

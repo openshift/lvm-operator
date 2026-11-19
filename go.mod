@@ -6,16 +6,16 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.33
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.318.0
-	github.com/container-storage-interface/spec v1.12.0
+	github.com/container-storage-interface/spec v1.13.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
-	github.com/kubernetes-csi/csi-lib-utils v0.24.0
+	github.com/kubernetes-csi/csi-lib-utils v0.25.0
 	github.com/kubernetes-csi/external-provisioner/v6 v6.3.0
-	github.com/kubernetes-csi/external-resizer v1.14.0
-	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.6.0
-	github.com/kubernetes-csi/external-snapshotter/v8 v8.6.0
+	github.com/kubernetes-csi/external-resizer/v2 v2.3.0
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.7.0
+	github.com/kubernetes-csi/external-snapshotter/v8 v8.7.0
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
 	github.com/openshift/api v0.0.0-20260729033540-b9305b7e8c5c
@@ -37,9 +37,7 @@ require (
 	k8s.io/api v0.37.2
 	k8s.io/apiextensions-apiserver v0.37.2
 	k8s.io/apimachinery v0.37.2
-	k8s.io/apiserver v0.37.2
 	k8s.io/client-go v0.37.2
-	k8s.io/component-base v0.37.2
 	k8s.io/component-helpers v0.37.2
 	k8s.io/csi-translation-lib v0.37.2
 	k8s.io/klog/v2 v2.140.0
@@ -53,6 +51,8 @@ require (
 )
 
 replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20261112104928-dc7b3c3a253c
+
+replace github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.12.0
 
 require (
 	cel.dev/expr v0.25.3 // indirect
@@ -154,7 +154,9 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	k8s.io/apiserver v0.37.2 // indirect
 	k8s.io/code-generator v0.37.2 // indirect
+	k8s.io/component-base v0.37.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260821135717-be32def86098 // indirect
 	k8s.io/mount-utils v0.37.2 // indirect
