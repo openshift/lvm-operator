@@ -53,9 +53,12 @@ func Resolve(ctx context.Context, clusterType cluster.Type, setupClient client.C
 			return nil, fmt.Errorf("failed to get tls profile: %w", err)
 		}
 
-		tlsConfig, unsupportedCiphers := ctrlRuntimeCommon.NewTLSConfigFromProfile(profile)
-		if len(unsupportedCiphers) > 0 {
-			setupLog.Info("some ciphers from TLS profile are not supported", "unsupportedCiphers", unsupportedCiphers)
+		tlsConfig, unsupported, err := ctrlRuntimeCommon.NewTLSConfigFromProfile(profile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure tls profile: %w", err)
+		}
+		if len(unsupported) > 0 {
+			setupLog.Info("some ciphers or groups from TLS profile are not supported", "unsupported", unsupported)
 		}
 
 		setup.tlsProfile = profile

@@ -14,20 +14,16 @@ import (
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity"
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/capacity/topology"
 	provisionctrl "github.com/kubernetes-csi/external-provisioner/v6/pkg/controller"
-	"github.com/kubernetes-csi/external-provisioner/v6/pkg/features"
 	"github.com/kubernetes-csi/external-provisioner/v6/pkg/owner"
 	snapclientset "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/featuregate"
 	csitrans "k8s.io/csi-translation-lib"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -57,18 +53,6 @@ func (p *Provisioner) NeedLeaderElection() bool {
 
 var _ manager.Runnable = &Provisioner{}
 var _ manager.LeaderElectionRunnable = &Provisioner{}
-
-func init() {
-	// Register Topology and CrossNamespaceVolumeDataSource feature gates explicitly.
-	// The external-provisioner v6 init() registers these along with VolumeAttributesClass,
-	// but the external-resizer also registers VolumeAttributesClass with a different spec,
-	// causing a conflict that silently prevents ALL provisioner gates from being registered.
-	// By registering just the non-conflicting gates here, we ensure SupportsTopology() works.
-	utilruntime.Must(utilfeature.DefaultMutableFeatureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
-		features.Topology:                       {Default: true, PreRelease: featuregate.GA},
-		features.CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
-	}))
-}
 
 func NewProvisioner(mgr manager.Manager, options ProvisionerOptions) *Provisioner {
 	return &Provisioner{

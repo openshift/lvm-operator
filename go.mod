@@ -6,22 +6,22 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.33
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.318.0
-	github.com/container-storage-interface/spec v1.12.0
+	github.com/container-storage-interface/spec v1.13.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
-	github.com/kubernetes-csi/csi-lib-utils v0.24.0
+	github.com/kubernetes-csi/csi-lib-utils v0.25.0
 	github.com/kubernetes-csi/external-provisioner/v6 v6.3.0
-	github.com/kubernetes-csi/external-resizer v1.14.0
-	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.6.0
-	github.com/kubernetes-csi/external-snapshotter/v8 v8.6.0
+	github.com/kubernetes-csi/external-resizer/v2 v2.3.0
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.7.0
+	github.com/kubernetes-csi/external-snapshotter/v8 v8.7.0
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
-	github.com/openshift/api v0.0.0-20260729033540-b9305b7e8c5c
-	github.com/openshift/client-go v0.0.0-20260728123811-92b24dd0dd1f
-	github.com/openshift/controller-runtime-common v0.0.0-20260722095319-fea68df23430
-	github.com/openshift/library-go v0.0.0-20260729082949-ed1b43415e01
+	github.com/openshift/api v0.0.0-20261118203153-ca0b115da1b1
+	github.com/openshift/client-go v0.0.0-20261117110410-e591d492769c
+	github.com/openshift/controller-runtime-common v0.0.0-20261026124434-bdfc411d93cd
+	github.com/openshift/library-go v0.0.0-20261117022826-d0be5e7c4fc8
 	github.com/operator-framework/api v0.45.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.93.0
@@ -37,15 +37,13 @@ require (
 	k8s.io/api v0.37.2
 	k8s.io/apiextensions-apiserver v0.37.2
 	k8s.io/apimachinery v0.37.2
-	k8s.io/apiserver v0.37.2
 	k8s.io/client-go v0.37.2
-	k8s.io/component-base v0.37.2
 	k8s.io/component-helpers v0.37.2
 	k8s.io/csi-translation-lib v0.37.2
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kubelet v0.37.2
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	sigs.k8s.io/controller-runtime v0.24.1
+	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/controller-tools v0.23.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v13 v13.0.0
@@ -53,6 +51,8 @@ require (
 )
 
 replace github.com/topolvm/topolvm => github.com/openshift/topolvm v0.15.3-0.20261112104928-dc7b3c3a253c
+
+replace github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.12.0
 
 require (
 	cel.dev/expr v0.25.3 // indirect
@@ -154,7 +154,9 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	k8s.io/apiserver v0.37.2 // indirect
 	k8s.io/code-generator v0.37.2 // indirect
+	k8s.io/component-base v0.37.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260821135717-be32def86098 // indirect
 	k8s.io/mount-utils v0.37.2 // indirect
