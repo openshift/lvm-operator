@@ -18,10 +18,10 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/v8 v8.7.0
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
-	github.com/openshift/api v0.0.0-20260729033540-b9305b7e8c5c
-	github.com/openshift/client-go v0.0.0-20260728123811-92b24dd0dd1f
-	github.com/openshift/controller-runtime-common v0.0.0-20260722095319-fea68df23430
-	github.com/openshift/library-go v0.0.0-20260729082949-ed1b43415e01
+	github.com/openshift/api v0.0.0-20261118203153-ca0b115da1b1
+	github.com/openshift/client-go v0.0.0-20261117110410-e591d492769c
+	github.com/openshift/controller-runtime-common v0.0.0-20261026124434-bdfc411d93cd
+	github.com/openshift/library-go v0.0.0-20261117022826-d0be5e7c4fc8
 	github.com/operator-framework/api v0.45.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.93.0
@@ -43,7 +43,7 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kubelet v0.37.2
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	sigs.k8s.io/controller-runtime v0.24.1
+	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/controller-tools v0.23.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v13 v13.0.0
