@@ -2352,3 +2352,22 @@ func repairRAID5OnNode(nodeName string, vgName string, replacementDiskPath strin
 	}
 	logf("RAID5 repair completed on node %s using %s for LV %s\n", nodeName, replacementDiskPath, lvName)
 }
+
+// canReach reports whether the given pod can establish an HTTP(S) connection to the URL.
+// It returns an error when the probe itself could not be executed, so a failed probe is
+// never mistaken for a blocked connection. TLS verification is disabled (-k) because this
+// is a connectivity-only probe and the container trust store may not include the cluster CA.
+func canReach(podName, namespace, containerName, url string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	probeCmd := exec.CommandContext(ctx, "oc", "exec", podName, "-n", namespace, "-c", containerName, "--",
+		"/bin/sh", "-c", fmt.Sprintf("curl -k -s -o /dev/null -m 10 %s; echo CURL_EXIT:$?", url))
+	output, err := probeCmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("probe execution failed for %s -> %s: %v, output: %s",
+			podName, url, err, strings.TrimSpace(string(output)))
+	}
+	reached := strings.Contains(string(output), "CURL_EXIT:0")
+	logf("Probe %s -> %s: reached=%v (%s)\n", podName, url, reached, strings.TrimSpace(string(output)))
+	return reached, nil
+}
