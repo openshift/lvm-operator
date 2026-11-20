@@ -139,9 +139,18 @@ How a DeviceClass becomes a Kubernetes StorageClass:
    - `csi.storage.k8s.io/fstype` = filesystem type
 4. Copies `AdditionalLabels` from user, then sets managed labels
 5. Applies via Server-Side Apply with field owner `lvms-operator` and `ForceOwnership`
-6. Sets default SC annotation (`storageclass.kubernetes.io/is-default-class`) if DeviceClass is default and no other default exists
+6. Detects existing default StorageClasses by checking both the GA annotation
+   (`storageclass.kubernetes.io/is-default-class`) and the deprecated beta
+   annotation (`storageclass.beta.kubernetes.io/is-default-class`). Sets the
+   GA annotation only when DeviceClass is default and no other default exists;
+   otherwise omits it from the SSA patch to release field ownership and
+   preserve any user-managed default.
 
-The SSA field manager model ensures LVMS-owned keys cannot be overridden by user kubectl edits. Day-2 changes to AdditionalLabels reconcile automatically.
+The SSA field manager model ensures LVMS-owned parameters and labels cannot be
+overridden by user kubectl edits. The default annotation follows a conditional
+ownership model: LVMS claims it when setting the StorageClass as default, and
+releases ownership when it is not setting the default so another field manager's
+annotation is preserved. Day-2 changes to AdditionalLabels reconcile automatically.
 
 ## Deletion Flow
 
