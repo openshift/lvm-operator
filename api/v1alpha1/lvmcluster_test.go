@@ -533,6 +533,71 @@ var _ = Describe("webhook acceptance tests", func() {
 		Expect(statusError.Status().Message).To(ContainSubstring("overlaps in two different deviceClasss"))
 	})
 
+	It("regex device path with valid pattern is accepted", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
+			"regex:/dev/nvme[0-9]n1",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("regex device path with valid pattern in optional paths is accepted", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{OptionalPaths: []DevicePath{
+			"regex:/dev/nvme[0-9]n1",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("regex device path with invalid regex pattern is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
+			"regex:/dev/nvme[",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("invalid regex"))
+	})
+
+	It("regex device path missing /dev/ prefix is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
+			"regex:nvme[0-9]n1",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("must be an absolute path to the device"))
+	})
+
+	It("regex device path with empty pattern is forbidden", func(ctx SpecContext) {
+		resource := defaultLVMClusterInUniqueNamespace(ctx)
+		resource.Spec.Storage.DeviceClasses[0].DeviceSelector = &DeviceSelector{Paths: []DevicePath{
+			"regex:",
+		}}
+
+		err := k8sClient.Create(ctx, resource)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Satisfy(k8serrors.IsForbidden))
+
+		statusError := &k8serrors.StatusError{}
+		Expect(errors.As(err, &statusError)).To(BeTrue())
+		Expect(statusError.Status().Message).To(ContainSubstring("regex pattern cannot be empty"))
+	})
+
 	It("minimum viable update", func(ctx SpecContext) {
 		resource := defaultLVMClusterInUniqueNamespace(ctx)
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
