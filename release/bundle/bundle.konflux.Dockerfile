@@ -9,7 +9,7 @@ FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_1.20 as bui
 # digests. Mintmaker/Renovate keeps them current once the component is onboarded.
 ARG IMG=registry.redhat.io/lvms4/lvms-rhel8-operator@sha256:52deb65155a3b7d39749fc4e7e2b9242dfac1e01aa0e79a354fd4fe65f60e0df
 
-ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:df3105aa9318b7c6241c4f2840f5a211af56407be71f07443492c9b230896136
+ARG LVM_MUST_GATHER=registry.redhat.io/lvms4/lvms-must-gather-rhel8@sha256:2a2a3355e29844d664a75c2fe3344499634ec6af245eaf6b3f559262a062be2a
 
 ARG TOPOLVM_CSI_IMAGE=registry.redhat.io/lvms4/topolvm-rhel8@sha256:8483635bd3772425d10b22d8a6553dd20164eb0525ad9fa474d1a45ec6e0ca7a
 
