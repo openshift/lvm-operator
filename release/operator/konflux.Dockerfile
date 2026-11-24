@@ -21,7 +21,7 @@ ENV GOFLAGS="-mod=readonly"
 
 RUN go build -tags strictfipsruntime -mod=readonly -ldflags "-s -w" -a -o lvms cmd/main.go
 
-FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2-1795335890
+FROM --platform=$TARGETPLATFORM registry.redhat.io/rhel9-2-els/rhel-minimal:9.2-1795409956
 
 ARG MAINTAINER
 ARG OPERATOR_VERSION
