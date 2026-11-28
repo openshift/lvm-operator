@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	lvmv1alpha1 "github.com/openshift/lvm-operator/v4/api/v1alpha1"
@@ -88,15 +89,25 @@ func DefaultFilters(ctx context.Context, opts *Options) Filters {
 				// if no device selector is set, its automatically a valid candidate
 				return nil
 			}
-			for _, path := range append(
+			for _, path := range slices.Concat(
 				opts.VG.Spec.DeviceSelector.Paths,
-				opts.VG.Spec.DeviceSelector.OptionalPaths...,
+				opts.VG.Spec.DeviceSelector.OptionalPaths,
 			) {
-				// used the non-resolved path, e.g. /dev/disk/by-id/xyz
+				if path.IsRegex() {
+					matched, err := path.Matches(dev.KName)
+					if err != nil {
+						logger.Error(err, "regex device path could not be compiled", "path", path)
+						continue
+					}
+					if matched {
+						return nil
+					}
+					continue
+				}
 				if resolved, err := resolver.Resolve(path.Unresolved()); resolved == dev.KName {
 					return nil
 				} else if err != nil {
-					logger.Error(err, "the path was no kernel block device name and could not be resolved via symlink resolution", "path", path)
+					logger.Error(err, "path could not be resolved via symlink resolution", "path", path)
 					continue
 				}
 			}
