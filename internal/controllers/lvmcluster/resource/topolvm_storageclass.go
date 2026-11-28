@@ -36,8 +36,9 @@ import (
 const (
 	scName = "topolvm-storageclass"
 
-	storageClassFieldOwner = "lvms-operator"
-	defaultSCAnnotation    = "storageclass.kubernetes.io/is-default-class"
+	storageClassFieldOwner  = "lvms-operator"
+	defaultSCAnnotation     = "storageclass.kubernetes.io/is-default-class"
+	betaDefaultSCAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 )
 
 func TopoLVMStorageClass() Manager {
@@ -62,7 +63,7 @@ func (s topolvmStorageClass) EnsureCreated(r Reconciler, ctx context.Context, cl
 
 	for _, sc := range topolvmStorageClasses {
 		if err := r.Patch(ctx, sc,
-			client.Apply, //nolint:staticcheck // TODO: migrate to client.Client.Apply() with typed apply configurations
+			client.Apply, //nolint:staticcheck // SA1019: using deprecated client.Apply for SSA patch type
 			client.FieldOwner(storageClassFieldOwner),
 			client.ForceOwnership,
 		); err != nil {
@@ -118,8 +119,7 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		setDefaultStorageClass = false
 	} else {
 		for _, sc := range scList.Items {
-			v := sc.Annotations[defaultSCAnnotation]
-			if v == "true" {
+			if sc.Annotations[defaultSCAnnotation] == "true" || sc.Annotations[betaDefaultSCAnnotation] == "true" {
 				defaultStorageClassName = sc.Name
 				break
 			}
@@ -152,12 +152,23 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 		parameters[constants.DeviceClassKey] = deviceClass.Name
 		parameters[constants.FsTypeKey] = string(deviceClass.FilesystemType)
 
-		// Always declare the default-class annotation so the SSA field manager
-		// owns it and can toggle or remove it on day-2 changes.
-		isDefault := "false"
+		// Only declare the default-class annotation when setting to "true".
+		// Omitting it from the SSA patch releases the lvms-operator field manager's
+		// ownership of this key. The API server then:
+		//   - removes the annotation if lvms-operator was its sole field manager
+		//     (e.g. CR changed from Default:true to Default:false), or
+		//   - preserves the annotation if another field manager (e.g. kubectl or
+		//     the OCP console) owns it (e.g. user set the default manually).
+		isDefault := false
 		if deviceClass.Default && setDefaultStorageClass && (defaultStorageClassName == "" || defaultStorageClassName == scName) {
-			isDefault = "true"
+			isDefault = true
 			defaultStorageClassName = scName
+		}
+		annotations := map[string]string{
+			"description": "Provides RWO and RWOP Filesystem & Block volumes",
+		}
+		if isDefault {
+			annotations[defaultSCAnnotation] = "true"
 		}
 
 		storageClass := &storagev1.StorageClass{
@@ -166,11 +177,8 @@ func (s topolvmStorageClass) getTopolvmStorageClasses(r Reconciler, ctx context.
 				Kind:       "StorageClass",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: scName,
-				Annotations: map[string]string{
-					"description":       "Provides RWO and RWOP Filesystem & Block volumes",
-					defaultSCAnnotation: isDefault,
-				},
+				Name:        scName,
+				Annotations: annotations,
 			},
 			Provisioner:          constants.TopolvmCSIDriverName,
 			ReclaimPolicy:        &reclaimPolicy,
