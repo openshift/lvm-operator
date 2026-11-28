@@ -969,7 +969,30 @@ func deleteLVMClusterSafely(name string, namespace string, deviceClassName strin
 	if !exists {
 		return
 	}
+
+	// Prefer a graceful deletion so the operator's finalizers run and vg-manager
+	// wipes the volume group / thin-pool on the nodes. Stripping finalizers up
+	// front short-circuits that cleanup and leaves an orphaned VG behind, which
+	// makes the next LVMCluster that reuses the same device class name go
+	// Degraded with "InconsistentLVs" (the thin-pool LV is gone but the VG still
+	// exists). Only force-remove finalizers if graceful deletion gets stuck.
+	cmd := exec.Command("oc", "delete", "lvmcluster", name, "-n", namespace,
+		"--ignore-not-found", "--wait=true", "--timeout=180s")
+	_, _ = cmd.CombinedOutput()
+
+	if stillExists, _ := resourceExists("lvmcluster", name, namespace); !stillExists {
+		return
+	}
+
+	// Fallback: deletion is blocked on finalizers. Strip them (cluster plus the
+	// derived LVMVolumeGroup / LVMVolumeGroupNodeStatus resources) so the test
+	// can make progress, then force the delete through.
+	logf("LVMCluster %s still present after graceful delete, stripping finalizers as fallback\n", name)
 	removeLVMClusterFinalizers(name, namespace)
+	if deviceClassName != "" {
+		removeLVMVolumeGroupFinalizers(deviceClassName, namespace)
+	}
+	removeLVMVolumeGroupNodeStatusFinalizers(namespace)
 	deleteSpecifiedResource("lvmcluster", name, namespace)
 }
 
