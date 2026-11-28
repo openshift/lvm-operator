@@ -6740,6 +6740,218 @@ spec:
 		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
 		o.Expect(err).NotTo(o.HaveOccurred())
 	})
+
+	g.It("Author:mmakwana-High-[LVMS] [Filesystem] [RWOP] Verify SELinux context is applied at mount time for ReadWriteOncePod PVCs [Disruptive]", g.Label("SNO", "MNO", "Serial"), func() {
+		// OCPSTRAT-1627 (SELinux Mount Support for LVMS with RWOP), Epic: OCPEDGE-2862
+
+		mountPath := "/mnt/storage"
+		pvcName := "test-pvc-rwop-selinux"
+		podName := "test-pod-rwop-selinux"
+		containerName := "test-container"
+		volumeGroup1 := "vg1"
+		storageClassName := "lvms-" + volumeGroup1
+
+		g.By("#. Get list of available block devices/disks attached to all worker nodes")
+		freeDiskNameCountMap, err := getListOfFreeDisksFromWorkerNodes(tc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		workerNodes, err := getWorkersList()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		workerNodeCount := len(workerNodes)
+
+		var diskName string
+		for disk, count := range freeDiskNameCountMap {
+			if count == int64(workerNodeCount) {
+				diskName = disk
+				break
+			}
+		}
+		if diskName == "" {
+			g.Skip("Skipped: No disk available on all worker nodes")
+		}
+		diskPath := "/dev/" + diskName
+
+		g.By("#. Copy and save existing LVMCluster configuration in JSON format")
+		originLVMClusterName, err := getLVMClusterName(lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLVMJSON, err := getLVMClusterJSON(originLVMClusterName, lvmsNamespace)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		originLvmCluster := newLvmCluster(setLvmClusterName(originLVMClusterName), setLvmClusterNamespace(lvmsNamespace))
+
+		// Register restoration before deleting the original LVMCluster so the defer covers
+		// failures during deletion as well. The existence check keeps it a no-op when the
+		// original LVMCluster was never deleted.
+		defer func() {
+			exists, lookupErr := resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			for retries := 0; lookupErr != nil && retries < 6; retries++ {
+				// A failed lookup must not be mistaken for evidence that the LVMCluster
+				// is absent. Retry before making a restoration decision.
+				logf("Warning: failed to check existence of LVMCluster %s: %v, retrying\n", originLVMClusterName, lookupErr)
+				time.Sleep(5 * time.Second)
+				exists, lookupErr = resourceExists("lvmcluster", originLVMClusterName, lvmsNamespace)
+			}
+			if lookupErr != nil {
+				// Existence could not be confirmed; restoring is the safe direction
+				// because creating an LVMCluster that already exists is rejected
+				// harmlessly by the webhook.
+				logf("Warning: existence of LVMCluster %s undetermined (%v), attempting restoration\n", originLVMClusterName, lookupErr)
+				exists = false
+			}
+			if !exists {
+				logf("Restoring original LVMCluster %s...\n", originLVMClusterName)
+				if err := originLvmCluster.createWithExportJSON(originLVMJSON); err != nil {
+					logf("Warning: Failed to restore LVMCluster from JSON: %v\n", err)
+				}
+			}
+			if err := waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout); err != nil {
+				logf("Warning: LVMCluster did not become ready: %v\n", err)
+			}
+		}()
+
+		g.By("#. Delete existing LVMCluster resource")
+		deleteSpecifiedResource("lvmcluster", originLVMClusterName, lvmsNamespace)
+
+		g.By("#. Wait for old CSIStorageCapacity objects to be cleaned up")
+		o.Eventually(func() int {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "oc", "get", "csistoragecapacity", "-n", lvmsNamespace,
+				"-o=jsonpath={.items[?(@.storageClassName==\""+storageClassName+"\")].capacity}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				// Keep polling on command failures, but never treat error output as
+				// evidence that the cleanup completed.
+				return 1
+			}
+			return len(strings.Fields(string(output)))
+		}, 180*time.Second, 10*time.Second).Should(o.Equal(0))
+
+		g.By("#. Create LVMCluster on the free disk with deviceSelector path")
+		newLVMClusterName := "test-lvmcluster-rwop-selinux"
+		// Register cleanup before creating the temporary LVMCluster: if the apply reaches
+		// the API server but its response is lost, creation can return an error while the
+		// LVMCluster exists, and the orphan would block restoration of the original.
+		// deleteLVMClusterSafely returns early when the resource is absent.
+		defer func() {
+			deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup1)
+		}()
+
+		err = createLVMClusterWithPaths(newLVMClusterName, lvmsNamespace, volumeGroup1, diskPath)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		g.By("#. Wait for LVMCluster to be Ready")
+		err = waitForLVMClusterReady(newLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+
+		g.By("#. Verify the LVMS CSIDriver advertises SELinux mount support (spec.seLinuxMount=true)")
+		cmd := exec.Command("oc", "get", "csidriver", "topolvm.io", "-o=jsonpath={.spec.seLinuxMount}")
+		output, err := cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.Equal("true"),
+			"CSIDriver topolvm.io must set spec.seLinuxMount=true to support SELinux mounting")
+
+		g.By("#. Create a ReadWriteOncePod PVC with the lvms storageclass")
+		err = createPVCWithOC(pvcConfig{
+			name:             pvcName,
+			namespace:        testNamespace,
+			storageClassName: storageClassName,
+			accessMode:       "ReadWriteOncePod",
+			storage:          "1Gi",
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pvc", pvcName, testNamespace)
+
+		g.By("#. Create a pod consuming the RWOP PVC (required for WaitForFirstConsumer binding mode)")
+		err = createPodWithOC(podConfig{
+			name:      podName,
+			namespace: testNamespace,
+			pvcName:   pvcName,
+			mountPath: mountPath,
+		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		defer deleteSpecifiedResource("pod", podName, testNamespace)
+
+		g.By("#. Wait for the pod to be ready")
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "get", "pod", podName, "-n", testNamespace, "-o=jsonpath={.status.phase}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return "Pending"
+			}
+			return strings.TrimSpace(string(output))
+		}, PodReadyTimeout, 5*time.Second).Should(o.Equal("Running"))
+
+		g.By("#. Verify the PV got the ReadWriteOncePod access mode")
+		pvName := getPVCVolumeName(testNamespace, pvcName)
+		cmd = exec.Command("oc", "get", "pv", pvName, "-o=jsonpath={.spec.accessModes[*]}")
+		output, err = cmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(strings.TrimSpace(string(output))).To(o.ContainSubstring("ReadWriteOncePod"))
+
+		g.By("#. Check the pod process SELinux context (cat /proc/self/attr/current)")
+		labelCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", containerName, "--", "/bin/sh", "-c",
+			"cat /proc/self/attr/current")
+		labelCmdOutput, err := labelCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to read SELinux label from pod: %s", string(labelCmdOutput))
+		currentLabel := strings.TrimSpace(strings.ReplaceAll(string(labelCmdOutput), "\x00", ""))
+		o.Expect(currentLabel).NotTo(o.BeEmpty(), "failed to read the pod process SELinux label")
+		labelParts := strings.Split(currentLabel, ":")
+		o.Expect(len(labelParts)).To(o.BeNumerically(">=", 4),
+			"unexpected SELinux label format: %s", currentLabel)
+		selinuxLevel := strings.Join(labelParts[3:], ":")
+		logf("Pod %s runs with SELinux label '%s' (MCS level '%s')\n", podName, currentLabel, selinuxLevel)
+
+		g.By("#. Write data in the pod mounted volume")
+		testData := "selinux mount test"
+		writeCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", containerName, "--", "/bin/sh", "-c",
+			fmt.Sprintf("echo '%s' > %s/testfile && sync", testData, mountPath))
+		writeOutput, err := writeCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to write data to pod: %s", string(writeOutput))
+
+		g.By("#. Verify the written data could be read from the pod mounted volume")
+		readCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", containerName, "--", "/bin/sh", "-c",
+			fmt.Sprintf("cat %s/testfile", mountPath))
+		readOutput, err := readCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to read data from pod: %s", string(readOutput))
+		o.Expect(strings.TrimSpace(string(readOutput))).To(o.Equal(testData))
+
+		g.By("#. Verify files created by the pod are labeled with the pod SELinux context")
+		lsCmd := exec.Command("oc", "exec", podName, "-n", testNamespace, "-c", containerName, "--", "/bin/sh", "-c",
+			fmt.Sprintf("ls -Z %s/testfile", mountPath))
+		lsOutput, err := lsCmd.CombinedOutput()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to read file label from pod: %s", string(lsOutput))
+		o.Expect(string(lsOutput)).To(o.ContainSubstring(selinuxLevel),
+			"file on the RWOP volume is not labeled with the pod SELinux context: %s", string(lsOutput))
+
+		g.By("#. Verify the volume is mounted with the SELinux context applied at mount time on the node")
+		nodeName := getNodeNameByPod(testNamespace, podName)
+		o.Eventually(func() string {
+			cmd := exec.Command("oc", "debug", "node/"+nodeName, "--quiet", "--", "chroot", "/host", "grep", pvName, "/proc/mounts")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logf("Failed to read mounts on node %s: %v, output: %s\n", nodeName, err, string(output))
+				return ""
+			}
+			return string(output)
+		}, 60*time.Second, 10*time.Second).Should(o.And(
+			o.ContainSubstring("context="),
+			o.ContainSubstring(selinuxLevel)),
+			"volume mount on node %s does not carry the pod SELinux context in a context= mount option", nodeName)
+		logf("Volume %s mount on node %s contains context= with %s\n", pvName, nodeName, selinuxLevel)
+
+		g.By("#. Delete Pod and PVC resources")
+		deleteSpecifiedResource("pod", podName, testNamespace)
+		deleteSpecifiedResource("pvc", pvcName, testNamespace)
+		time.Sleep(10 * time.Second)
+
+		g.By("#. Delete newly created LVMCluster resource")
+		deleteLVMClusterSafely(newLVMClusterName, lvmsNamespace, volumeGroup1)
+
+		g.By("#. Create original LVMCluster resource")
+		err = originLvmCluster.createWithExportJSON(originLVMJSON)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		err = waitForLVMClusterReady(originLVMClusterName, lvmsNamespace, LVMClusterReadyTimeout)
+		o.Expect(err).NotTo(o.HaveOccurred())
+	})
 })
 
 func checkLvmsOperatorInstalled(tc *TestClient) {
